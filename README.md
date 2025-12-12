@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # MarkdownManager (flat-file PHP notes)
 
 Sharpen your thinking.
@@ -458,4 +458,3 @@ This project is designed for personal/self-hosted use and intentionally stays si
 - “Secret note is locked”: open the file in `index.php` first and enter the password.
 - Filenames rejected: only paths containing `A-Za-z0-9._-` and unicode letters/numbers are accepted; spaces are not allowed; must end in `.md`.
 - Math not rendering: MathJax is loaded from a CDN; offline networks will block it unless you host it locally.
->>>>>>> de7efcc (Sync local project)
