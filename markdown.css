@@ -1,0 +1,122 @@
+/* Editor area: line numbers + textarea */
+
+.editor-lines {
+    width: 3.2rem;
+    padding: 0.4rem 0.3rem 0.4rem 0.6rem;
+    border-right: 1px solid rgba(15,23,42,0.35);
+    background-color: var(--surface-code);
+    color: var(--line-number);
+    border-right-color: var(--surface-code-border);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    text-align: right;
+    white-space: pre;
+    overflow: hidden;
+}
+
+.editor-textarea {
+    flex: 1 1 auto;
+    border: none;
+    resize: none;
+    padding: 0.4rem 0.6rem 0.4rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--surface-code-contrast);
+    background-color: var(--surface-code);
+    outline: none;
+    overflow: auto;
+}
+
+.editor-textarea:focus {
+    outline: none;
+}
+
+/* inline markdown styling (Used by md_to_html)  */
+
+.md-code-inline {
+    background-color: var(--inline-code-bg);
+    color: var(--surface-code-contrast);
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.25rem;
+    font-size: 0.78em;
+    font-family: var(--font-mono);
+}
+
+.md-strong {
+    font-weight: 600;
+}
+
+.md-em {
+    font-style: italic;
+}
+
+.md-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(148, 163, 184, 0.55);
+    text-underline-offset: 2px;
+}
+
+/* block elements, reused in preview as basis */
+
+.md-heading,
+.md-h1,
+.md-h2,
+.md-h3,
+.md-h4,
+.md-h5,
+.md-h6 {
+    margin: 0.6rem 0 0.2rem;
+    font-weight: 600;
+}
+
+.md-h1 {
+    font-size: 1.4rem;
+    text-align: center;
+}
+
+.md-h2 {
+    font-size: 1.15rem;
+}
+
+.md-h3 {
+    font-size: 1rem;
+}
+
+.md-h4 {
+    font-size: 0.95rem;
+}
+
+.md-h5,
+.md-h6 {
+    font-size: 0.85rem;
+}
+
+.md-p {
+    margin: 0.35rem 0;
+}
+
+.md-list {
+    margin: 0.4rem 0 0.4rem 1.2rem;
+    padding: 0;
+}
+
+.md-li {
+    margin: 0.15rem 0;
+}
+
+/* code blocks */
+
+.md-codeblock {
+    margin: 0.5rem 0;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.6rem;
+    background-color: var(--surface-code);
+    color: var(--surface-code-contrast);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    overflow-x: auto;
+    border: 1px solid var(--surface-code-border);
+}

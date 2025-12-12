@@ -1,0 +1,910 @@
+/* ui.css - minimal, Tailwind-vrij, maar wel met vergelijkbare look */
+
+/* Reset & base ------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --col-left: 24%;
+  --col-mid: 46%;
+  --col-right: 30%;
+  --app-header-height: 56px;
+  --app-header-gap: var(--app-header-height);
+}
+
+body.app-body {
+  min-height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-page);
+  color: var(--text-main);
+  overflow: hidden;
+}
+
+/* kleur-variabelen */
+
+body.app-body {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg-page: #0b0f16;
+  --bg-panel: #0f141d;
+  --bg-panel-alt: #121926;
+  --border-soft: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
+  --text-main: #e5e7eb;
+  --text-muted: #9ca3af;
+  --accent: #93c5fd;
+  --danger: #dc2626;
+  --input-bg: #0f141d;
+  --input-border: rgba(148, 163, 184, 0.22);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --input-border-focus: rgba(147, 197, 253, 0.85);
+  --chip-bg: rgba(148, 163, 184, 0.14);
+  --surface-code: #0b0f16;
+  --surface-code-border: rgba(148, 163, 184, 0.18);
+  --surface-code-contrast: #e5e7eb;
+  --inline-code-bg: rgba(148, 163, 184, 0.16);
+  --line-number: #64748b;
+  --hover-bg: rgba(148, 163, 184, 0.10);
+  --active-bg: rgba(148, 163, 184, 0.14);
+}
+
+.theme-light body.app-body {
+  --bg-page: #f9fafb;
+  --bg-panel: #ffffff;
+  --bg-panel-alt: #f3f4f6;
+  --border-soft: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.3);
+  --text-main: #0f172a;
+  --text-muted: #6b7280;
+  --accent: #334155;
+  --danger: #dc2626;
+  --input-bg: #ffffff;
+  --input-border: rgba(148, 163, 184, 1);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --input-border-focus: #0ea5e9;
+  --chip-bg: #111827;
+  --surface-code: #ffffff;
+  --surface-code-border: #e2e8f0;
+  --surface-code-contrast: #0f172a;
+  --inline-code-bg: rgba(148, 163, 184, 0.25);
+  --line-number: #94a3b8;
+  --hover-bg: rgba(15, 23, 42, 0.06);
+  --active-bg: rgba(15, 23, 42, 0.09);
+}
+
+/* links */
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(148, 163, 184, 0.55);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.app-header {
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-panel);
+  padding: 0.75rem 1.5rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  transform: translateY(calc(-1 * (var(--app-header-height) - var(--app-header-gap))));
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  will-change: transform;
+}
+
+.theme-light body.app-body .app-header {
+  background: #ffffff;
+}
+
+.header-scrolled .app-header {
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+}
+
+.header-hidden {
+  --app-header-gap: 0px;
+}
+
+.app-header-inner {
+  max-width: 1600px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.app-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.app-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-logo {
+  font-size: 1.25rem;
+  color: var(--text-main);
+  opacity: 0.9;
+}
+
+.app-title {
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.app-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.app-breadcrumb {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.breadcrumb-sep {
+  opacity: 0.7;
+  margin: 0 0.35rem;
+}
+
+.breadcrumb-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.dirty-star {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1rem;
+  line-height: 1;
+  margin-left: 0.2rem;
+  color: var(--danger);
+}
+
+.nav-item-current.dirty .nav-item-title::after {
+  content: " *";
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Header right actions */
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mobile-nav-toggle,
+.mobile-nav-close {
+  display: none;
+}
+
+.nav-overlay {
+  display: none;
+}
+
+.badge-secret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  background: var(--danger);
+  color: #ffffff;
+  letter-spacing: 0.08em;
+}
+
+/* Buttons ----------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9), 0 10px 25px rgba(15, 23, 42, 0.9);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #020617, #0f172a);
+  transform: translateY(-0.5px);
+}
+
+.btn-ghost {
+  border-color: var(--border-soft);
+  background: var(--bg-panel-alt);
+}
+
+.theme-light body.app-body .btn-ghost {
+  background: var(--bg-panel-alt);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--border-strong);
+}
+
+.btn-small {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.68rem;
+}
+
+/* Layout main ------------------------------------------------------------- */
+
+.app-main {
+  flex: 1 1 auto;
+  padding: calc(1rem + var(--app-header-gap)) 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-main-inner {
+  max-width: 1600px;
+  margin: 0;
+  height: 100%;
+}
+
+.index-page .app-main-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.kbd-item:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.6rem;
+}
+
+/* Editor grid met 3 kolommen + 2 resizers */
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: var(--col-left) 4px var(--col-mid) 4px var(--col-right);
+  gap: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Wrapper voor de grid, moet flex-grow hebben */
+.editor-shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Panelen ----------------------------------------------------------------- */
+
+.editor-pane {
+  background: var(--bg-panel);
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-strong);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* voorkomt dat flex-items te breed worden */
+  min-height: 0; /* cruciaal voor scrollen binnen flex-items */
+}
+
+.theme-light body.app-body .editor-pane {
+  background: var(--bg-panel);
+}
+
+.editor-pane-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.pane-header {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  margin-bottom: 0.5rem;
+}
+
+.pane-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+.pane-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pane-header-actions form {
+  margin: 0;
+}
+.pane-subtitle {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.pane-subtitle small {
+  font-size: 1vw;
+}
+.pane-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  border-radius: 0.5rem;
+  min-height: 0;
+}
+
+/* Specifiek voor de editor header, zodat deze niet krimpt */
+.editor-pane-header.editor-header {
+  flex-shrink: 0;
+}
+
+/* Resizers --------------------------------------------------------------- */
+
+.col-resizer {
+  cursor: col-resize;
+  background: rgba(148, 163, 184, 0.06);
+  position: relative;
+}
+
+.col-resizer:hover {
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.col-resizer::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(148, 163, 184, 0.65);
+  border-radius: 999px;
+}
+
+/* Notelijst links -------------------------------------------------------- */
+
+.notes-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.notes-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.notes-count {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.notes-filter-input {
+  width: 100%;
+  margin: 0.4rem 0 0.5rem;
+}
+
+.notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-group-title {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.note-item {
+  margin-bottom: 0.25rem;
+}
+
+.note-link {
+  display: block;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+}
+
+.note-link:hover {
+  border-color: var(--border-soft);
+  background: var(--hover-bg);
+}
+
+.note-link.active {
+  border-color: var(--border-strong);
+  background: var(--active-bg);
+}
+
+.nav-item-current > .nav-item-link {
+  border-color: var(--border-strong);
+  background: var(--active-bg);
+}
+
+.index-page .note-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.index-page .note-link-main {
+  flex: 1 1 auto;
+}
+
+.index-page .note-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-top: 0.15rem;
+}
+
+.index-page .note-actions form {
+  margin: 0;
+}
+
+.index-page .note-actions .icon-button {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+.note-title {
+  font-size: 0.72rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.nav-item-path {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  word-break: break-all;
+}
+
+/* Navigation (edit.php left pane) ---------------------------------------- */
+
+.nav-body {
+  padding: 0.25rem;
+}
+
+.nav-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nav-filter-row .input {
+  flex: 1 1 auto;
+}
+
+.filter-reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.nav-section {
+  margin-top: 0.85rem;
+}
+
+.nav-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0.35rem;
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-item,
+.nav-shortcut {
+  margin: 0.15rem 0;
+}
+
+.nav-item-link,
+.nav-shortcut-link {
+  display: block;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem;
+  border: 1px solid transparent;
+  color: var(--text-main);
+  text-decoration: none;
+}
+
+.nav-item-link:hover,
+.nav-shortcut-link:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-soft);
+  text-decoration: none;
+}
+
+.nav-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nav-item-title {
+  font-size: 0.75rem;
+  font-weight: 520;
+  color: var(--text-main);
+}
+
+.nav-shortcut-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.nav-shortcut-label {
+  font-size: 0.72rem;
+  color: var(--text-main);
+  text-decoration: none;
+}
+
+.nav-shortcut-icon {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-empty {
+  padding: 0.8rem 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* Inputs ------------------------------------------------------------------ */
+
+.input {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 0.7rem;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.input-search-icon {
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Markdown editor midden -------------------------------------------------- */
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.editor-toolbar-left,
+.editor-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.editor-filename {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Code wrapper met line numbers */
+
+.editor-code-wrapper {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-code);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--surface-code-contrast);
+}
+
+.theme-light body.app-body .editor-code-wrapper {
+  background: var(--surface-code);
+  color: var(--surface-code-contrast);
+}
+
+/* line numbers */
+
+.editor-line-numbers {
+  padding: 0.45rem 0.4rem 0.45rem 0.6rem;
+  text-align: right;
+  user-select: none;
+  color: var(--line-number);
+  background: var(--surface-code);
+  border-right: 1px solid var(--border-soft);
+  min-width: 2.2rem;
+  max-width: 4rem;
+  overflow: hidden;
+}
+
+.editor-line-numbers span {
+  display: block;
+  line-height: 1.4;
+}
+
+/* textarea */
+
+.editor-textarea {
+  border: none;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  resize: none;
+  width: 100%;
+  height: 100%;
+  background: var(--surface-code);
+  color: var(--surface-code-contrast);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.4;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+
+.editor-textarea:focus {
+  outline: none;
+}
+
+/* Preview rechts ---------------------------------------------------------- */
+
+.preview-container {
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-panel-alt);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+/* eenvoudige typografie als markdown.css ontbreekt */
+.preview-container h1,
+.preview-container h2,
+.preview-container h3 {
+  margin-top: 1.2rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.preview-container p {
+  margin: 0.4rem 0;
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+.app-footer {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  padding: 0.6rem 0.5rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Utility chips / labels -------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  font-size: 0.6rem;
+  color: #e5e7eb;
+}
+
+/* Overrides voor editor-specifieke elementen */
+.editor-form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.editor-body { flex: 1 1 auto; position: relative; display: grid; grid-template-columns: auto 1fr; border-radius: 0.5rem; border: 1px solid var(--border-soft); background: var(--surface-code); overflow: hidden; }
+.editor-footer { padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+.status-text { font-size: 0.65rem; color: var(--text-muted); }
+
+
+/* Small helper for icon-only buttons */
+
+.icon-button {
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive fallback: onder 960px alleen markdown + preview */
+
+@media (max-width: 960px) {
+  .app-main {
+    padding: calc(0.75rem + var(--app-header-gap)) 0.75rem 0.75rem;
+  }
+
+  .editor-shell {
+    height: auto;
+  }
+
+  .editor-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(320px, 50vh) minmax(260px, 45vh);
+    height: auto;
+    row-gap: 0.75rem;
+  }
+
+  #paneMarkdown,
+  #panePreview {
+    grid-column: 1 / -1;
+  }
+
+  #paneMarkdown { grid-row: 1; }
+  #panePreview { grid-row: 2; }
+
+  .edit-page #links_md_overview {
+    display: none;
+  }
+
+  .col-resizer {
+    display: none;
+  }
+
+  .mobile-nav-toggle,
+  .mobile-nav-close {
+    display: inline-flex;
+  }
+
+  .nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 80;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+  }
+
+  .nav-open .nav-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-open .app-main {
+    overflow: hidden;
+  }
+
+  .edit-page.nav-open #links_md_overview {
+    display: flex;
+    position: fixed;
+    inset: calc(1rem + var(--app-header-gap)) 1rem 1rem 1rem;
+    max-width: min(440px, calc(100% - 2rem));
+    width: min(440px, calc(100% - 2rem));
+    z-index: 90;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  }
+
+  .edit-page.nav-open #links_md_overview .pane-body {
+    overflow: auto;
+  }
+}
