@@ -1,6 +1,11 @@
 
 # MarkdownManager (flat-file PHP notes)
 
+![MarkdownManager screenshot](markdownmanager.png)
+
+**Version:** 0.1  
+**Last commit:** added sample `.md` files in various folders.
+
 Sharpen your thinking.
 
 MarkdownManager is a **fast, flexible, self-hosted** Markdown viewer + editor for your private notes — built with **plain PHP**, **zero database**, and files you can open with any editor.
