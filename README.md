@@ -176,6 +176,7 @@ It supports a practical subset:
 - Paragraphs
 - Inline code (`` `code` ``)
 - Bold / italic (`**bold**`, `*italic*`)
+- Images (`![alt](url)`) including relative paths
 - Links (`[label](https://example.com)`)
 - Fenced code blocks (```), with optional language token
 - Blockquotes (`>`)
@@ -183,7 +184,7 @@ It supports a practical subset:
 - GFM-ish tables
 - Nested lists via indentation (basic)
 
-If you rely on features outside this subset (e.g. images), you’ll likely want to extend the parser or swap it for a library.
+If you rely on features outside this subset, you’ll likely want to extend the parser or swap it for a library.
 
 ## Configuration
 

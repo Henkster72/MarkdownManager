@@ -97,14 +97,78 @@ function folder_from_path($path) {
 /* ESCAPE */
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
+function url_encode_path($path) {
+    $path = str_replace("\\", "/", (string)$path);
+    $segments = explode('/', $path);
+    $segments = array_map('rawurlencode', $segments);
+    return implode('/', $segments);
+}
+
+function is_external_url($url) {
+    $url = (string)$url;
+    if ($url === '') return false;
+    if (str_starts_with($url, '//')) return true;
+    return (bool)preg_match('~^[a-z][a-z0-9+.-]*:~i', $url);
+}
+
+function resolve_rel_url_from_md($url, $mdPath) {
+    $url = (string)$url;
+    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
+    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
+
+    $suffixPos = null;
+    $qPos = strpos($url, '?');
+    $hPos = strpos($url, '#');
+    if ($qPos !== false && $hPos !== false) $suffixPos = min($qPos, $hPos);
+    else if ($qPos !== false) $suffixPos = $qPos;
+    else if ($hPos !== false) $suffixPos = $hPos;
+    $base = ($suffixPos === null) ? $url : substr($url, 0, $suffixPos);
+    $suffix = ($suffixPos === null) ? '' : substr($url, $suffixPos);
+
+    $base = str_replace("\\", "/", $base);
+    if ($base === '') return $url;
+
+    $mdDir = dirname($mdPath);
+    if ($mdDir === '.' || $mdDir === '') return url_encode_path($base) . $suffix;
+
+    $baseParts = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
+    $relParts = explode('/', $base);
+    $out = $baseParts;
+    foreach ($relParts as $p) {
+        if ($p === '' || $p === '.') continue;
+        if ($p === '..') {
+            if (empty($out)) return $url; // don't allow escaping project root
+            array_pop($out);
+            continue;
+        }
+        $out[] = $p;
+    }
+
+    return url_encode_path(implode('/', $out)) . $suffix;
+}
+
 /* INLINE MARKDOWN */
-function inline_md($text) {
+function inline_md($text, $mdPath = null) {
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
     // `code`
     $text = preg_replace(
         '/`([^`]+)`/',
         '<code class="bg-neutral-800 text-neutral-100 px-1.5 py-0.5 rounded text-[0.8em]">$1</code>',
+        $text
+    );
+
+    // ![alt](url "title")
+    $text = preg_replace_callback(
+        '/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/',
+        function($m) use ($mdPath){
+            $alt = $m[1];
+            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+            $urlResolved = resolve_rel_url_from_md($urlRaw, $mdPath);
+            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
+            $titleAttr = isset($m[3]) ? ' title="'.$m[3].'"' : '';
+            return '<img class="md-img" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
+        },
         $text
     );
 
@@ -177,7 +241,7 @@ function md_indent_width($ws) {
 }
 
 /* BLOCK MARKDOWN -> HTML */
-function md_to_html($text) {
+function md_to_html($text, $mdPath = null) {
     $text = str_replace(["\r\n","\r"], "\n", $text);
     $lines = explode("\n",$text);
 
@@ -251,7 +315,7 @@ function md_to_html($text) {
             }
             $i--;
             $inner = implode("\n", $bq);
-            $html[] = '<blockquote>' . "\n" . md_to_html($inner) . "\n" . '</blockquote>';
+            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath) . "\n" . '</blockquote>';
             continue;
         }
 
@@ -287,7 +351,7 @@ function md_to_html($text) {
             for ($c = 0; $c < $colCount; $c++) {
                 $txt = $headerCells[$c] ?? '';
                 $a = $align[$c];
-                $table[] = '<th class="align-'.$a.'">' . inline_md($txt) . '</th>';
+                $table[] = '<th class="align-'.$a.'">' . inline_md($txt, $mdPath) . '</th>';
             }
             $table[] = '</tr></thead>';
             $table[] = '<tbody>';
@@ -296,7 +360,7 @@ function md_to_html($text) {
                 for ($c = 0; $c < $colCount; $c++) {
                     $txt = $r[$c] ?? '';
                     $a = $align[$c];
-                    $table[] = '<td class="align-'.$a.'">' . inline_md($txt) . '</td>';
+                    $table[] = '<td class="align-'.$a.'">' . inline_md($txt, $mdPath) . '</td>';
                 }
                 $table[] = '</tr>';
             }
@@ -323,7 +387,7 @@ function md_to_html($text) {
             ];
             $cls = $clsMap[$level] ?? "font-bold mt-4 mb-2";
 
-            $html[] = "<$tag class=\"$cls\">".inline_md($content)."</$tag>";
+            $html[] = "<$tag class=\"$cls\">".inline_md($content, $mdPath)."</$tag>";
             continue;
         }
 
@@ -366,7 +430,7 @@ function md_to_html($text) {
                 $listStack[$topIndex]['liOpen'] = false;
             }
 
-            $html[] = '<li>' . inline_md($content);
+            $html[] = '<li>' . inline_md($content, $mdPath);
             $listStack[$topIndex]['liOpen'] = true;
             continue;
         }
@@ -376,7 +440,7 @@ function md_to_html($text) {
             $html[]="";
         } else {
             $closeAllLists();
-            $html[]='<p class="leading-relaxed my-4 text-neutral-700 dark:text-neutral-300">'.inline_md($line).'</p>';
+            $html[]='<p class="leading-relaxed my-4 text-neutral-700 dark:text-neutral-300">'.inline_md($line, $mdPath).'</p>';
         }
     }
 
@@ -678,14 +742,14 @@ if ($requested) {
                 $mode = 'view';
                 $raw = file_get_contents($full);
                 $article_title = extract_title($raw);
-                $article_html  = md_to_html($raw);
+                $article_html  = md_to_html($raw, $requested);
             }
         } else {
             // normaal, niet-secret bestand
             $mode='view';
             $raw = file_get_contents($full);
             $article_title = extract_title($raw);
-            $article_html  = md_to_html($raw);
+            $article_html  = md_to_html($raw, $requested);
         }
     }
 }
