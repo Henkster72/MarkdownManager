@@ -319,6 +319,23 @@
         const t = e.target;
         if (t instanceof HTMLElement && t.matches('input, textarea, [contenteditable="true"]')) return;
 
+        if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const form = document.querySelector('form.deleteForm');
+            if (!(form instanceof HTMLFormElement)) return;
+            e.preventDefault();
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
+                return;
+            }
+            const btn = form.querySelector('button[type="submit"], input[type="submit"]');
+            if (btn instanceof HTMLElement) {
+                btn.click();
+                return;
+            }
+            form.submit();
+            return;
+        }
+
         if (e.key === 'Backspace' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             e.preventDefault();
             const url = `index.php?folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(focus)}`;
@@ -346,6 +363,7 @@
     const mobileNavToggle = document.getElementById('mobileNavToggle');
     const mobileNavClose  = document.getElementById('mobileNavClose');
     const filterReset = document.getElementById('filterReset');
+    const filterClear = document.getElementById('filterClear');
 
     if (!filterInput || !navCount) return;
 
@@ -373,6 +391,9 @@
         if (filterReset) {
             filterReset.disabled = q.length === 0;
         }
+        if (filterClear) {
+            filterClear.style.display = q.length === 0 ? 'none' : '';
+        }
     }
 
     // q parameter uit URL
@@ -383,11 +404,13 @@
     }
 
     filterInput.addEventListener('input', update);
-    filterReset?.addEventListener('click', () => {
+    const clearFilter = () => {
         filterInput.value = '';
         update();
         filterInput.focus();
-    });
+    };
+    filterReset?.addEventListener('click', clearFilter);
+    filterClear?.addEventListener('click', clearFilter);
 
     // SPA-achtige navigatie
     navItems.forEach(item => {

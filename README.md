@@ -8,6 +8,7 @@ Sharpen your thinking.
 
 ## Changelog
 
+- 0.1.2: Clear filter button + Delete key deletes the current note (preview mode)
 - 0.1.1: Markdown images (`![alt](url)`) + relative paths resolved from the `.md` directory
 - 0.1.0: Initial public release
 

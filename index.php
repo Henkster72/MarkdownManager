@@ -927,7 +927,12 @@ window.MathJax = {
         Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).
         First <code># Heading</code> in each .md becomes the title.
     </p>
-    <input id="filterInput" class="input notes-filter-input" style="max-width: 20rem; margin-top: 1rem;" type="text" placeholder="Type to filter...">
+    <div id="filterWrap" style="position: relative; max-width: 20rem; margin: 1rem auto 0;">
+        <input id="filterInput" class="input notes-filter-input" style="margin: 0; padding-right: 2.25rem;" type="text" placeholder="Type to filter...">
+        <button id="filterClear" type="button" class="btn btn-ghost icon-button" title="Clear filter" aria-label="Clear filter" style="display: none; position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);">
+            <span class="pi pi-cross"></span>
+        </button>
+    </div>
 </section>
 
 <div id="contentList" style="margin-top: 1.5rem;">
