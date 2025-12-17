@@ -171,6 +171,7 @@
         const anchor = active.closest('a');
         if (!anchor) return null;
         const row = anchor.closest('[data-file]');
+        if (row?.dataset?.kind && row.dataset.kind !== 'md') return null;
         if (row?.dataset?.file) return row.dataset.file;
         try {
             const url = new URL(anchor.getAttribute('href') || '', window.location.href);
@@ -336,7 +337,7 @@
             return;
         }
 
-        if (e.key === 'Backspace' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if ((e.key === 'Backspace' || e.key === 'Escape' || e.key === 'Esc') && !e.ctrlKey && !e.metaKey && !e.altKey) {
             e.preventDefault();
             const url = `index.php?folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(focus)}`;
             window.location.href = url;
@@ -355,9 +356,12 @@
 (function(){
     const normalizeNewlines = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
 
+    const overview = document.getElementById('links_md_overview');
+    if (!overview) return;
+
+    const isEditorPage = !!document.getElementById('editor');
+
     const filterInput = document.getElementById('filterInput');
-    const navCount   = document.getElementById('navCount');
-    const navItems   = document.querySelectorAll('.nav-item.doclink');
     const editorForm = document.querySelector('.editor-form');
     const navOverlay = document.getElementById('navOverlay');
     const mobileNavToggle = document.getElementById('mobileNavToggle');
@@ -365,7 +369,65 @@
     const filterReset = document.getElementById('filterReset');
     const filterClear = document.getElementById('filterClear');
 
-    if (!filterInput || !navCount) return;
+    if (!filterInput) return;
+
+    const navCount = document.getElementById('navCount') || (() => {
+        const counter = document.createElement('div');
+        counter.id = 'filterCount';
+        counter.className = 'status-text';
+        counter.style.textAlign = 'center';
+        counter.style.marginTop = '0.5rem';
+        const filterWrap = document.getElementById('filterWrap');
+        if (filterWrap && filterWrap.contains(filterInput)) {
+            filterWrap.insertAdjacentElement('afterend', counter);
+        } else {
+            filterInput.insertAdjacentElement('afterend', counter);
+        }
+        return counter;
+    })();
+
+    const getFolderDefaultOpen = (section) => section.getAttribute('data-default-open') === '1';
+    const getFolderUserOpen = (section) => {
+        const v = section.getAttribute('data-user-open');
+        if (v === null) return null;
+        return v === '1';
+    };
+    const getFolderOpen = (section) => {
+        const user = getFolderUserOpen(section);
+        if (user !== null) return user;
+        return getFolderDefaultOpen(section);
+    };
+    const setFolderOpen = (section, open) => {
+        if (!(section instanceof HTMLElement)) return;
+        const btn = section.querySelector('button.folder-toggle');
+        if (!(btn instanceof HTMLButtonElement)) return;
+
+        const id = btn.getAttribute('aria-controls');
+        if (!id) return;
+        const children = document.getElementById(id);
+        if (!children) return;
+
+        children.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.title = open ? 'Collapse folder' : 'Expand folder';
+
+        const icon = btn.querySelector('.pi');
+        if (icon) {
+            icon.classList.toggle('pi-openfolder', open);
+            icon.classList.toggle('pi-folder', !open);
+        }
+    };
+
+    document.querySelectorAll('[data-folder-section]').forEach(section => {
+        const btn = section.querySelector('button.folder-toggle');
+        if (!(btn instanceof HTMLButtonElement)) return;
+        btn.addEventListener('click', () => {
+            const next = !getFolderOpen(section);
+            section.setAttribute('data-user-open', next ? '1' : '0');
+            setFolderOpen(section, next);
+        });
+        setFolderOpen(section, getFolderOpen(section));
+    });
 
     const closeNav = () => {
         document.documentElement.classList.remove('nav-open');
@@ -380,20 +442,35 @@
 
     function update() {
         const q = filterInput.value.toLowerCase();
+        const docs = Array.from(overview.querySelectorAll('.doclink'))
+            .filter(el => el instanceof HTMLElement);
         let visible = 0;
-        navItems.forEach(el => {
-            const text = el.innerText.toLowerCase();
+        docs.forEach(el => {
+            const text = (el.innerText || el.textContent || '').toLowerCase();
             const match = text.includes(q);
             el.style.display = match ? '' : 'none'; // Gebruik class voor betere controle
             if (match) visible++;
         });
-        navCount.textContent = visible + ' item' + (visible === 1 ? '' : 's');
+        navCount.textContent = q
+            ? `${visible} item${visible === 1 ? '' : 's'}`
+            : `${docs.length} total items`;
         if (filterReset) {
             filterReset.disabled = q.length === 0;
         }
         if (filterClear) {
             filterClear.style.display = q.length === 0 ? 'none' : '';
         }
+
+        document.querySelectorAll('[data-folder-section]').forEach(section => {
+            if (!(section instanceof HTMLElement)) return;
+            if (!q) {
+                setFolderOpen(section, getFolderOpen(section));
+                return;
+            }
+            const anyVisible = Array.from(section.querySelectorAll('.doclink'))
+                .some(el => el instanceof HTMLElement && el.style.display !== 'none');
+            setFolderOpen(section, anyVisible);
+        });
     }
 
     // q parameter uit URL
@@ -412,42 +489,69 @@
     filterReset?.addEventListener('click', clearFilter);
     filterClear?.addEventListener('click', clearFilter);
 
-    // SPA-achtige navigatie
-    navItems.forEach(item => {
-        const link = item.querySelector('a');
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const url = new URL(this.href);
-            const file = url.searchParams.get('file'); // of this.dataset.file
-            const isSecret = item.dataset.secret === 'true';
-            
-            if (file === window.CURRENT_FILE) {
-                closeNav();
-                return;
-            }
+    // Editor: SPA-achtige navigatie (only markdown items)
+    if (isEditorPage) {
+        const navItems = Array.from(overview.querySelectorAll('.doclink[data-kind="md"]'))
+            .filter(el => el instanceof HTMLElement);
 
-            if (window.__mdDirty) {
-                if (!confirm('You have unsaved changes. Discard them and continue?')) {
+        const setCurrentItem = (item) => {
+            if (!(item instanceof HTMLElement)) return;
+            document.querySelectorAll('.nav-item-current').forEach(el => {
+                el.classList.remove('nav-item-current', 'dirty');
+                const a = el.querySelector('a.kbd-item');
+                if (a) a.classList.remove('active');
+            });
+            item.classList.add('nav-item-current');
+            const a = item.querySelector('a.kbd-item');
+            if (a) a.classList.add('active');
+        };
+
+        const focusCurrentInExplorer = () => {
+            const a = overview.querySelector('.nav-item-current a.kbd-item');
+            if (a instanceof HTMLAnchorElement) {
+                a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+        };
+
+        focusCurrentInExplorer();
+
+        navItems.forEach(item => {
+            const link = item.querySelector('a.kbd-item');
+            if (!(link instanceof HTMLAnchorElement)) return;
+            link.addEventListener('click', function(e) {
+                if (e.defaultPrevented) return;
+                if (e.button !== 0) return; // left click only
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+                const url = new URL(this.href, window.location.href);
+                const file = url.searchParams.get('file');
+                if (!file) return;
+                e.preventDefault();
+
+                const isSecret = item.dataset.secret === 'true';
+
+                if (file === window.CURRENT_FILE) {
+                    closeNav();
                     return;
                 }
-            }
 
-            // Als het een geheim bestand is en de gebruiker niet is ingelogd,
-            // stuur door naar de indexpagina om in te loggen.
-            if (isSecret && !window.IS_SECRET_AUTHENTICATED) {
-                window.location.href = this.href.replace('edit.php', 'index.php');
-                return;
-            }
+                if (window.__mdDirty) {
+                    if (!confirm('You have unsaved changes. Discard them and continue?')) {
+                        return;
+                    }
+                }
 
-            // Visuele update
-            document.querySelector('.nav-item.nav-item-current')?.classList.remove('nav-item-current');
-            item.classList.add('nav-item-current');
+                if (isSecret && !window.IS_SECRET_AUTHENTICATED) {
+                    window.location.href = this.href.replace('edit.php', 'index.php');
+                    return;
+                }
 
-            // Laad nieuwe content
-            loadDocument(file);
-            closeNav();
+                setCurrentItem(item);
+                loadDocument(file);
+                closeNav();
+            });
         });
-    });
+    }
 
     async function loadDocument(file) {
         try {
@@ -516,6 +620,236 @@
     update();
 })();
 
+// Add link modal (edit.php)
+(function(){
+    const btn = document.getElementById('addLinkBtn');
+    const modal = document.getElementById('linkModal');
+    const overlay = document.getElementById('linkModalOverlay');
+    const closeBtn = document.getElementById('linkModalClose');
+    const cancelBtn = document.getElementById('linkModalCancel');
+    const insertBtn = document.getElementById('linkModalInsert');
+    const editor = document.getElementById('editor');
+    if (!btn || !modal || !overlay || !insertBtn || !editor) return;
+
+    const internalSection = document.getElementById('linkModalInternal');
+    const externalSection = document.getElementById('linkModalExternal');
+    const picker = document.getElementById('linkPicker');
+    const pickerFilter = document.getElementById('linkPickerFilter');
+    const pickerFilterClear = document.getElementById('linkPickerFilterClear');
+    const externalText = document.getElementById('externalLinkText');
+    const externalUrl = document.getElementById('externalLinkUrl');
+
+    const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    const dirname = (p) => {
+        p = normalizePath(p);
+        const idx = p.lastIndexOf('/');
+        return idx === -1 ? '' : p.slice(0, idx);
+    };
+
+    const relativePath = (fromFile, toFile) => {
+        const fromDir = dirname(fromFile);
+        const fromParts = fromDir ? fromDir.split('/').filter(Boolean) : [];
+        const to = normalizePath(toFile);
+        const toParts = to.split('/').filter(Boolean);
+        if (toParts.length === 0) return '';
+        const toDirParts = toParts.slice(0, -1);
+        const toName = toParts[toParts.length - 1];
+
+        let i = 0;
+        while (i < fromParts.length && i < toDirParts.length && fromParts[i] === toDirParts[i]) i++;
+        const up = fromParts.length - i;
+        const down = toDirParts.slice(i);
+        const out = [];
+        for (let k = 0; k < up; k++) out.push('..');
+        out.push(...down);
+        out.push(toName);
+        return out.join('/');
+    };
+
+    let mode = 'internal';
+    let selectedPath = null;
+    let selectedTitle = null;
+
+    const setMode = (next) => {
+        mode = next === 'external' ? 'external' : 'internal';
+        if (internalSection) internalSection.hidden = mode !== 'internal';
+        if (externalSection) externalSection.hidden = mode !== 'external';
+        validate();
+        if (mode === 'external') {
+            externalUrl?.focus();
+        } else {
+            pickerFilter?.focus();
+        }
+    };
+
+    const open = () => {
+        overlay.hidden = false;
+        modal.hidden = false;
+        document.documentElement.classList.add('modal-open');
+
+        if (pickerFilter) pickerFilter.value = '';
+        if (pickerFilterClear) pickerFilterClear.style.display = 'none';
+
+        const checked = modal.querySelector('input[name="linkMode"][value="internal"]');
+        if (checked instanceof HTMLInputElement) checked.checked = true;
+        setMode('internal');
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        modal.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+
+        selectedPath = null;
+        selectedTitle = null;
+        picker?.querySelectorAll('.link-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        if (pickerFilter) pickerFilter.value = '';
+        if (pickerFilterClear) pickerFilterClear.style.display = 'none';
+        if (externalText) externalText.value = '';
+        if (externalUrl) externalUrl.value = '';
+        validate();
+        btn.focus();
+    };
+
+    const getEditorSelectionText = () => {
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        if (end > start) return editor.value.slice(start, end);
+        return '';
+    };
+
+    const insertAtSelection = (text) => {
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        const before = editor.value.slice(0, start);
+        const after = editor.value.slice(end);
+        editor.value = before + text + after;
+        const pos = start + text.length;
+        editor.setSelectionRange(pos, pos);
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.focus();
+    };
+
+    const validate = () => {
+        if (mode === 'external') {
+            const url = String(externalUrl?.value || '').trim();
+            insertBtn.disabled = url === '';
+            return;
+        }
+        insertBtn.disabled = !selectedPath;
+    };
+
+    btn.addEventListener('click', open);
+    overlay.addEventListener('click', close);
+    closeBtn?.addEventListener('click', close);
+    cancelBtn?.addEventListener('click', close);
+
+    document.addEventListener('keydown', (e) => {
+        if (modal.hidden) return;
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        e.preventDefault();
+        close();
+    });
+
+    modal.addEventListener('change', (e) => {
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.name !== 'linkMode') return;
+        setMode(t.value);
+    });
+
+    externalUrl?.addEventListener('input', validate);
+
+    picker?.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target.closest('.link-pick-item') : null;
+        if (!(target instanceof HTMLElement)) return;
+        const path = target.getAttribute('data-path');
+        const title = target.getAttribute('data-title') || '';
+        if (!path) return;
+
+        picker.querySelectorAll('.link-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        target.classList.add('is-selected');
+        selectedPath = path;
+        selectedTitle = title || path;
+        validate();
+    });
+
+    const applyPickerFilter = () => {
+        if (!picker || !pickerFilter) return;
+        const q = String(pickerFilter.value || '').trim().toLowerCase();
+        if (pickerFilterClear) pickerFilterClear.style.display = q ? '' : 'none';
+
+        picker.querySelectorAll('.nav-section').forEach(section => {
+            if (!(section instanceof HTMLElement)) return;
+            const items = Array.from(section.querySelectorAll('.link-pick-item'))
+                .filter(el => el instanceof HTMLElement);
+            let any = false;
+            items.forEach(el => {
+                const text = (el.textContent || '').toLowerCase();
+                const match = !q || text.includes(q);
+                el.closest('li')?.toggleAttribute('hidden', !match);
+                if (match) any = true;
+            });
+            section.toggleAttribute('hidden', !any);
+        });
+
+        const selectedEl = picker.querySelector('.link-pick-item.is-selected');
+        if (selectedEl instanceof HTMLElement) {
+            const li = selectedEl.closest('li');
+            const visible = li && !li.hasAttribute('hidden');
+            if (!visible) {
+                selectedEl.classList.remove('is-selected');
+                selectedPath = null;
+                selectedTitle = null;
+                validate();
+            }
+        }
+    };
+
+    pickerFilter?.addEventListener('input', applyPickerFilter);
+    pickerFilterClear?.addEventListener('click', () => {
+        if (!pickerFilter) return;
+        pickerFilter.value = '';
+        applyPickerFilter();
+        pickerFilter.focus();
+    });
+
+    const insertLink = () => {
+        if (mode === 'external') {
+            const url = String(externalUrl?.value || '').trim();
+            if (!url) return;
+            const selection = getEditorSelectionText();
+            const text = selection || String(externalText?.value || '').trim() || url;
+            insertAtSelection(`[${text}](${url})`);
+            close();
+            return;
+        }
+
+        if (!selectedPath) return;
+        const selection = getEditorSelectionText();
+        const text = selection || selectedTitle || selectedPath;
+        const href = relativePath(window.CURRENT_FILE || '', selectedPath);
+        insertAtSelection(`[${text}](${href})`);
+        close();
+    };
+
+    insertBtn.addEventListener('click', insertLink);
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+            return;
+        }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (!insertBtn.disabled) insertLink();
+        }
+    });
+
+    applyPickerFilter();
+    validate();
+})();
+
 // LINE NUMBERS + LIVE PREVIEW
 (function(){
     const normalizeNewlines = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
@@ -540,7 +874,7 @@
     function setDirty(isDirty) {
         window.__mdDirty = !!isDirty;
         if (dirtyStar) dirtyStar.style.display = isDirty ? '' : 'none';
-        const currentNavItem = document.querySelector('.nav-item.nav-item-current');
+        const currentNavItem = document.querySelector('.nav-item-current');
         if (currentNavItem) currentNavItem.classList.toggle('dirty', isDirty);
         document.title = isDirty
             ? document.title.replace(/\s*\*$/, '') + ' *'

@@ -14,10 +14,11 @@
 session_start();
 
 /* CONFIG */
-$LINKS_CSV        = __DIR__ . '/links.csv';
-$SECRET_MDS_FILE  = __DIR__ . '/secret_mds.txt';
-// Zet dit in een aparte config of ENV als je netjes wilt zijn:
-$SECRET_MDS_PASSWORD = 'secretpwd';
+require_once __DIR__ . '/env_loader.php';
+
+$LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
+$SECRET_MDS_FILE     = env_path('SECRET_MDS_FILE', __DIR__ . '/secret_mds.txt');
+$SECRET_MDS_PASSWORD = (string)env_str('SECRET_MDS_PASSWORD', '');
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
@@ -147,16 +148,92 @@ function resolve_rel_url_from_md($url, $mdPath) {
     return url_encode_path(implode('/', $out)) . $suffix;
 }
 
-/* INLINE MARKDOWN */
-function inline_md($text, $mdPath = null) {
-    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+function resolve_rel_href_from_md_link($url, $mdPath) {
+    $url = (string)$url;
+    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
+    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
 
-    // `code`
-    $text = preg_replace(
-        '/`([^`]+)`/',
-        '<code class="bg-neutral-800 text-neutral-100 px-1.5 py-0.5 rounded text-[0.8em]">$1</code>',
-        $text
-    );
+    $qPos = strpos($url, '?');
+    $hPos = strpos($url, '#');
+
+    $baseEnd = null;
+    if ($qPos !== false && $hPos !== false) $baseEnd = min($qPos, $hPos);
+    else if ($qPos !== false) $baseEnd = $qPos;
+    else if ($hPos !== false) $baseEnd = $hPos;
+
+    $base = ($baseEnd === null) ? $url : substr($url, 0, $baseEnd);
+    $suffix = ($baseEnd === null) ? '' : substr($url, $baseEnd);
+
+    $base = str_replace("\\", "/", $base);
+    if ($base === '') return $url;
+
+    $mdDir = dirname($mdPath);
+    $out = [];
+    if ($mdDir !== '.' && $mdDir !== '') {
+        $out = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
+    }
+
+    $relParts = explode('/', $base);
+    foreach ($relParts as $p) {
+        if ($p === '' || $p === '.') continue;
+        if ($p === '..') {
+            if (empty($out)) return $url; // don't allow escaping project root
+            array_pop($out);
+            continue;
+        }
+        $out[] = $p;
+    }
+
+    $resolved = implode('/', $out);
+    if ($resolved === '') return $url;
+
+    // If it points to a markdown file, route through the app (works in subfolder installs like /md/).
+    if (preg_match('/\\.md$/i', $resolved)) {
+        $href = 'index.php?file=' . rawurlencode($resolved);
+        if ($suffix !== '') {
+            if ($suffix[0] === '?') $href .= '&' . substr($suffix, 1);
+            else $href .= $suffix; // includes #fragment
+        }
+        return $href;
+    }
+
+    return url_encode_path($resolved) . $suffix;
+}
+
+/* INLINE MARKDOWN */
+function fix_mathjax_currency_in_math_delimiters($text) {
+    $replace = static function($m) {
+        $open  = $m[1];
+        $inner = $m[2];
+        $close = $m[3];
+
+        // MathJax (TeX) errors on raw currency symbols like "€" in math mode.
+        // Wrapping it in \text{} makes it parse reliably.
+        $inner = str_replace('€', '\\text{€}', $inner);
+
+        return $open . $inner . $close;
+    };
+
+    // \( ... \)
+    $text = preg_replace_callback('/(\\\\\\()(.+?)(\\\\\\))/s', $replace, $text);
+    // \[ ... \]
+    $text = preg_replace_callback('/(\\\\\\[)(.+?)(\\\\\\])/s', $replace, $text);
+    return $text;
+}
+
+function inline_md($text, $mdPath = null) {
+    // Protect inline code spans from further processing (and MathJax fixes).
+    $codeSpans = [];
+    $text = preg_replace_callback('/`([^`]+)`/', function($m) use (&$codeSpans){
+        $key = '@@MD_CODE_' . count($codeSpans) . '@@';
+        $codeSpans[$key] = $m[1];
+        return $key;
+    }, $text);
+
+    // Fix common MathJax TeX parse issues (e.g. "€" inside \( ... \)).
+    $text = fix_mathjax_currency_in_math_delimiters($text);
+
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
     // ![alt](url "title")
     $text = preg_replace_callback(
@@ -189,16 +266,30 @@ function inline_md($text, $mdPath = null) {
     // [text](url)
     $text = preg_replace_callback(
         '/\[([^\]]+)\]\(([^)]+)\)/',
-        function($m){
+        function($m) use ($mdPath){
             $label = $m[1];
-            $url   = $m[2];
-            $urlEsc = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+            $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
+            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
             return '<a class="underline text-blue-600 dark:text-blue-400 hover:opacity-80" href="'.
                    $urlEsc.
                    '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
         },
         $text
     );
+
+    // Restore protected inline code spans.
+    if (!empty($codeSpans)) {
+        foreach ($codeSpans as $key => $raw) {
+            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+            $rawEsc = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
+            $text = str_replace(
+                $keyEsc,
+                '<code class="bg-neutral-800 text-neutral-100 px-1.5 py-0.5 rounded text-[0.8em]">'.$rawEsc.'</code>',
+                $text
+            );
+        }
+    }
 
     return $text;
 }
@@ -574,6 +665,25 @@ function list_md_by_subdir_sorted(){
     return $map;
 }
 
+function list_existing_folders_sorted($excludeNames = []) {
+    $exclude = [];
+    if (is_array($excludeNames)) {
+        foreach ($excludeNames as $n) {
+            if (is_string($n) && $n !== '') $exclude[$n] = true;
+        }
+    }
+
+    $dirs = array_filter(glob('*'), function($f) use ($exclude){
+        if (!is_dir($f)) return false;
+        if ($f === '' || $f[0] === '.') return false;
+        if (isset($exclude[$f])) return false;
+        return true;
+    });
+
+    sort($dirs, SORT_NATURAL | SORT_FLAG_CASE);
+    return array_values($dirs);
+}
+
 /* LINKS FROM CSV (shortcuts at top) */
 function read_shortcuts_csv($csv){
     $out=[];
@@ -669,6 +779,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     } else if ($_POST['action'] === 'create') {
         $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
+        if (trim($postedPath) === '') {
+            $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
+            $folder = sanitize_folder_name($folder) ?? 'root';
+            $file = isset($_POST['new_file']) ? (string)$_POST['new_file'] : '';
+            $file = trim(str_replace("\\", "/", $file));
+            $file = ltrim($file, "/");
+            $postedPath = ($folder && $folder !== 'root') ? ($folder . '/' . $file) : $file;
+        }
+
         $sanNew = sanitize_new_md_path($postedPath);
         $open_new_panel = true;
         if (!$sanNew) {
@@ -754,20 +873,20 @@ if ($requested) {
     }
 }
 
-/* LOAD DATA FOR INDEX */
-$shortcuts = $mode==='index' ? read_shortcuts_csv($LINKS_CSV) : [];
-$rootList  = $mode==='index' ? list_md_root_sorted()        : [];
-$dirMap    = $mode==='index' ? list_md_by_subdir_sorted()   : [];
-$secretMap = load_secret_mds(); // voor index-weergave
-
-if ($mode === 'index' && $folder_filter) {
-    if ($folder_filter === 'root') {
-        $dirMap = [];
-    } else {
-        $rootList = [];
-        $dirMap = isset($dirMap[$folder_filter]) ? [$folder_filter => $dirMap[$folder_filter]] : [];
-    }
-}
+	/* LOAD DATA FOR INDEX */
+	$rootList  = $mode==='index' ? list_md_root_sorted()        : [];
+	$dirMap    = $mode==='index' ? list_md_by_subdir_sorted()   : [];
+	$secretMap = load_secret_mds(); // voor index-weergave
+	$existingFolders = [];
+	$default_new_folder = 'root';
+	if ($mode === 'index') {
+	    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+	    $exclude = [basename($pluginsDir), 'HTML', 'PDF'];
+	    $existingFolders = list_existing_folders_sorted($exclude);
+	    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
+	        $default_new_folder = $folder_filter;
+	    }
+	}
 
 
 ?>
@@ -811,30 +930,48 @@ window.MathJax = {
 
 <body class="app-body index-page">
 
-<header class="app-header">
-    <div class="app-header-inner">
-        <div class="app-header-main">
-            <div class="app-title">
-                <?=h($APP_NAME)?>
-                <?php if ($mode==='index'): ?>
-                    <span style="font-weight: 500; opacity: 0.75;"> • overview</span>
-                <?php endif; ?>
-            </div>
-            <div class="app-breadcrumb">
-                <a class="breadcrumb-link" href="index.php">/index</a>
-                <?php if ($active_folder_for_breadcrumb): ?>
-                    <span class="breadcrumb-sep">/</span>
-                    <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($active_folder_for_breadcrumb)?>">
+	<header class="app-header">
+	    <div class="app-header-inner">
+	        <div class="app-header-main">
+	            <span class="app-logo" aria-hidden="true">
+	                <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
+	                 <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
+	                 <g stroke="#fff" stroke-width="20">
+	                  <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
+	                  <path d="m10 130h663"/>
+	                  <path class="B C" d="M550 70H216"/>
+	                  <path d="m172 70a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm-70 0a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm713 109c10-10 10-27 0-38l-18-18c-10-10-27-10-37 0l-294 297-48 90c-6 9 5 20 14 14l89-49 294-296zm-299 296-51-52"/>
+	                  <path d="m796 197-55-55z"/>
+	                  <path class="B C" d="M72 499h165M72 447h330M72 397h330M72 348h330"/>
+	                  <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
+	                 </g>
+	                </svg>
+	            </span>
+	            <div class="app-header-text">
+	                <div class="app-title-row">
+	                    <div class="app-title">
+	                        <?=h($APP_NAME)?>
+	                        <?php if ($mode==='index'): ?>
+	                            <span style="font-weight: 500; opacity: 0.75;"> • overview</span>
+	                        <?php endif; ?>
+	                    </div>
+	                </div>
+	                <div class="app-breadcrumb">
+	                <a class="breadcrumb-link" href="index.php">/index</a>
+	                <?php if ($active_folder_for_breadcrumb): ?>
+	                    <span class="breadcrumb-sep">/</span>
+	                    <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($active_folder_for_breadcrumb)?>">
                         <?=h($active_folder_for_breadcrumb)?>
                     </a>
                 <?php endif; ?>
-                <?php if ($mode==='view' && $requested): ?>
-                    <span class="breadcrumb-sep">/</span>
-                    <span class="app-path-segment"><?=h(basename($requested))?></span>
-                <?php endif; ?>
-            </div>
-        </div>
-        <div class="app-header-actions">
+	                <?php if ($mode==='view' && $requested): ?>
+	                    <span class="breadcrumb-sep">/</span>
+	                    <span class="app-path-segment"><?=h(basename($requested))?></span>
+	                <?php endif; ?>
+	                </div>
+	            </div>
+	        </div>
+	        <div class="app-header-actions">
             <?php if ($mode==='index'): ?>
             <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
             <?php endif; ?>
@@ -885,150 +1022,62 @@ window.MathJax = {
         <button id="newMdClose" type="button" class="btn btn-ghost btn-small">Close</button>
     </div>
 
-    <form method="post" style="margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem;">
-        <input type="hidden" name="action" value="create">
-        <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-        <input name="new_path" class="input" type="text" placeholder="folder/yy-mm-dd-title.md" required>
-        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="# Title&#10;&#10;Start writing..."></textarea>
-        <div style="display: flex; justify-content: flex-end;">
-            <button type="submit" class="btn btn-primary btn-small">Create & edit</button>
-        </div>
-    </form>
+	    <form method="post" style="margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem;">
+	        <input type="hidden" name="action" value="create">
+	        <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+	        <div style="display: flex; gap: 0.6rem; align-items: center;">
+	            <select name="new_folder" class="input" style="width: auto; flex: 0 0 10rem;" aria-label="Folder">
+	                <option value="root" <?= $default_new_folder === 'root' ? 'selected' : '' ?>>Root</option>
+	                <?php foreach ($existingFolders as $folder): ?>
+	                    <option value="<?=h($folder)?>" <?= $default_new_folder === $folder ? 'selected' : '' ?>><?=h($folder)?></option>
+	                <?php endforeach; ?>
+	            </select>
+	            <input name="new_file" class="input" style="flex: 1 1 auto;" type="text" placeholder="yy-mm-dd-title.md" required>
+	        </div>
+	        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="# Title&#10;&#10;Start writing..."></textarea>
+	        <div style="display: flex; justify-content: flex-end;">
+	            <button type="submit" class="btn btn-primary btn-small">Create & edit</button>
+	        </div>
+	    </form>
 </section>
 
-<!-- Shortcuts from links.csv -->
-<?php if (!empty($shortcuts)): ?>
-<section class="nav-section" style="margin-bottom: 2.5rem;">
-    <div class="nav-section-title" style="justify-content: center; margin-bottom: 1rem; font-size: 1.25rem;">
-        <span class="pi pi-dashboard"></span>
-        <span>Shortcuts</span>
-    </div>
-
-<ul class="nav-list">
-<?php foreach($shortcuts as $lnk): ?>
-    <li class="nav-item">
-        <a href="<?=h($lnk['url'])?>" target="_blank" rel="noopener noreferrer" class="note-link kbd-item">
-            <div class="note-title">
-                <span><?=h($lnk['shortcut'])?></span>
-                <span class="pi pi-externallink" style="font-size: 0.8em; opacity: 0.6;"></span>
-            </div>
-            <div class="nav-item-path"><?=h($lnk['url'])?></div>
-        </a>
-    </li>
-<?php endforeach; ?>
-</ul>
-</section>
-<?php endif; ?>
+	<?php
+	require_once __DIR__ . '/explorer_view.php';
+	explorer_view_render_plugin_hook('header', [
+	    'page' => 'index',
+	    'project_dir' => __DIR__,
+	    'plugins_enabled' => true,
+	    'links_csv' => $LINKS_CSV,
+	    'links_variant' => 'index',
+	]);
+	?>
 
 <!-- Filter + heading -->
 <section style="text-align: center; margin-bottom: 2rem;">
     <h1 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 0.75rem;">Contents</h1>
-    <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 42em; margin: 0 auto; line-height: 1.6;">
-        Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).
-        First <code># Heading</code> in each .md becomes the title.
-    </p>
-    <div id="filterWrap" style="position: relative; max-width: 20rem; margin: 1rem auto 0;">
-        <input id="filterInput" class="input notes-filter-input" style="margin: 0; padding-right: 2.25rem;" type="text" placeholder="Type to filter...">
-        <button id="filterClear" type="button" class="btn btn-ghost icon-button" title="Clear filter" aria-label="Clear filter" style="display: none; position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);">
-            <span class="pi pi-cross"></span>
+	    <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 42em; margin: 0 auto; line-height: 1.6;">
+	        Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).
+	        First <code># Heading</code> in each .md becomes the title; HTML uses <code>&lt;title&gt;</code> (or <code>&lt;h1&gt;</code>).
+	    </p>
+	    <div id="filterWrap" style="position: relative; max-width: 20rem; margin: 1rem auto 0;">
+	        <input id="filterInput" class="input notes-filter-input" style="margin: 0; padding-right: 2.25rem;" type="text" placeholder="Type to filter...">
+	        <button id="filterClear" type="button" class="btn btn-ghost icon-button" title="Clear filter" aria-label="Clear filter" style="display: none; position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);">
+	            <span class="pi pi-cross"></span>
         </button>
     </div>
 </section>
 
-<div id="contentList" style="margin-top: 1.5rem;">
-
-<!-- Root files -->
-<?php if (!empty($rootList)): ?>
-<section class="nav-section" style="margin-bottom: 2.5rem;">
-    <h2 class="note-group-title">
-        <span class="pi pi-folder"></span>
-        <a class="breadcrumb-link" href="index.php?folder=root">Root</a>
-    </h2>
-<ul class="notes-list">
-<?php foreach($rootList as $entry):
-$p   = $entry['path'];
-$t   = extract_title_from_file(__DIR__ . '/' . $p, $entry['basename']);
-$isSecret = isset($secretMap[$p]);
-?>
-<li class="note-item doclink note-row" data-file="<?=h($p)?>">
-    <a href="index.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(folder_from_path($p))?>&focus=<?=rawurlencode($p)?>" class="note-link note-link-main kbd-item">
-        <div class="note-title" style="justify-content: space-between;">
-            <span><?=h($t)?></span>
-            <?php if ($isSecret): ?>
-                <span class="badge-secret">secret</span>
-            <?php endif; ?>
-        </div>
-        <div class="nav-item-path"><?=h($p)?></div>
-    </a>
-    <div class="note-actions">
-        <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(folder_from_path($p))?>" class="btn btn-ghost icon-button" title="Edit">
-            <span class="pi pi-edit"></span>
-        </a>
-        <form method="post" class="deleteForm" data-file="<?=h($p)?>">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="file" value="<?=h($p)?>">
-            <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-            <button type="submit" class="btn btn-ghost icon-button" title="Delete">
-                <span class="pi pi-bin"></span>
-            </button>
-        </form>
-    </div>
-</li>
-<?php endforeach; ?>
-</ul>
-</section>
-<?php endif; ?>
-
-<!-- Subdirectory groups -->
-<?php foreach($dirMap as $dirname=>$list): ?>
-<section class="nav-section" style="margin-bottom: 2.5rem;">
-    <h2 class="note-group-title">
-        <span class="pi pi-folder"></span>
-        <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($dirname)?>"><?=h($dirname)?></a>
-    </h2>
-
-<ul class="notes-list">
-<?php foreach($list as $entry):
-$p   = $entry['path'];
-$t   = extract_title_from_file(__DIR__ . '/' . $p, $entry['basename']);
-$isSecret = isset($secretMap[$p]);
-?>
-<li class="note-item doclink note-row" data-file="<?=h($p)?>">
-    <a href="index.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(folder_from_path($p))?>&focus=<?=rawurlencode($p)?>" class="note-link note-link-main kbd-item">
-        <div class="note-title" style="justify-content: space-between;">
-            <span><?=h($t)?></span>
-            <?php if ($isSecret): ?>
-                <span class="badge-secret">secret</span>
-            <?php endif; ?>
-        </div>
-        <div class="nav-item-path"><?=h($p)?></div>
-    </a>
-    <div class="note-actions">
-        <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(folder_from_path($p))?>" class="btn btn-ghost icon-button" title="Edit">
-            <span class="pi pi-edit"></span>
-        </a>
-        <form method="post" class="deleteForm" data-file="<?=h($p)?>">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="file" value="<?=h($p)?>">
-            <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-            <button type="submit" class="btn btn-ghost icon-button" title="Delete">
-                <span class="pi pi-bin"></span>
-            </button>
-        </form>
-    </div>
-</li>
-<?php endforeach; ?>
-</ul>
-</section>
-<?php endforeach; ?>
-
-<?php if (empty($rootList) && empty($dirMap) && empty($shortcuts)): ?>
-<div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; text-align: center;">
-Nothing here yet.
-</div>
-<?php endif; ?>
-
-</div><!-- /contentList -->
+	<?php
+	explorer_view_render_tree([
+	    'page' => 'index',
+	    'rootList' => $rootList,
+	    'dirMap' => $dirMap,
+	    'secretMap' => $secretMap,
+	    'folder_filter' => $folder_filter,
+	    'csrf_token' => $CSRF_TOKEN,
+	    'show_actions' => true,
+	]);
+	?>
 
 <?php elseif ($mode==='secret_prompt'): ?>
 
@@ -1070,41 +1119,6 @@ Nothing here yet.
 <footer class="app-footer">
     flat md site • <?=date('Y')?> • no db, no cms, no bloat
 </footer>
-
-<script>
-const filterInput = document.getElementById('filterInput');
-if (filterInput) {
-    const counter = document.createElement('div');
-    counter.id = 'filterCount';
-    counter.className = 'status-text';
-    counter.style.textAlign = 'center';
-    counter.style.marginTop = '0.5rem';
-    filterInput.insertAdjacentElement('afterend', counter);
-
-    const update = () => {
-        const q = filterInput.value.toLowerCase();
-        const docs = document.querySelectorAll('.doclink');
-        let visible = 0;
-        docs.forEach(el => {
-            const match = el.innerText.toLowerCase().includes(q);
-            el.style.display = match ? '' : 'none';
-            if (match) visible++;
-        });
-        counter.textContent = q
-            ? `${visible} item${visible !== 1 ? 's' : ''} found`
-            : `${docs.length} total items`;
-    };
-
-    const params = new URLSearchParams(window.location.search);
-    const qParam = params.get('q');
-    if (qParam) {
-        filterInput.value = qParam;
-    }
-
-    filterInput.addEventListener('input', update);
-    update();
-}
-</script>
 
 <script defer src="base.js"></script>
 

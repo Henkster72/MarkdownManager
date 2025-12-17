@@ -8,9 +8,23 @@ Sharpen your thinking.
 
 ## Changelog
 
+- 0.2: Plugin-based explorer (HTML/PDF/links), shared `explorer_view.php`, improved folder UX (toggle state, back caret), header SVG logo, +MD folder dropdown, internal/external link modal (with search), and `.md` links route via `index.php?file=...` for subfolder installs
 - 0.1.2: Clear filter button + Delete key deletes the current note (preview mode)
 - 0.1.1: Markdown images (`![alt](url)`) + relative paths resolved from the `.md` directory
 - 0.1.0: Initial public release
+
+## TODO (Roadmap)
+
+- [x] Folder toggle in overview (`index.php`): subdirs start collapsed; clicking the folder icon toggles children; use `pi pi-openfolder` for “open” state
+- [x] Internal linking between notes (`edit.php` “Add link”): support subdirs + content-aware picker; allow external URLs too with a simple modal
+- [x] Add plugins for viewing of different files like PDF and HTML
+- [ ] Add functionality for the explorer to drag and drop md files to other folders 
+- [ ] Tagging (frontmatter or inline `#tags`) + tag browser
+- [ ] Add theming for markdown editor and html preview in edit mode
+- [ ] Improve Markdown parser edge cases (nested lists, tables, better code fences)
+- [ ] Syntax highlighting in preview (server-side or client-side)
+- [ ] Offline-friendly MathJax option (self-hosted instead of CDN)
+- [ ] Better mobile editor ergonomics (toolbar, larger tap targets, quicker pane toggle)
 
 ## Why you’ll like it
 
@@ -125,6 +139,14 @@ It supports a practical subset:
 
 ## Configuration
 
+Configuration is read from a local `.env` file (or real environment variables).
+Copy `.env.example` to `.env` and edit as needed.
+
+- `LINKS_CSV` (default: `links.csv`)
+- `SECRET_MDS_FILE` (default: `secret_mds.txt`)
+- `SECRET_MDS_PASSWORD` (required for unlocking secret notes)
+- `PLUGINS_DIR` (default: `plugins`)
+
 ### Secret notes
 
 `secret_mds.txt` is a newline-separated list of relative markdown paths to protect:
@@ -135,14 +157,14 @@ research/25-01-01-secret-note.md
 ```
 
 Password:
-- The password is currently set in code as `$SECRET_MDS_PASSWORD` in both `index.php` and `edit.php`.
-- If you change it, change it in both files so the viewer/editor stay in sync.
+- Set `SECRET_MDS_PASSWORD` in `.env`.
+- If it’s empty/missing, secret notes stay locked (no login possible).
 
 Important: “secret” is only a lightweight UI/session gate; it does not encrypt files.
 
 ### Shortcuts (`links.csv`)
 
-If `links.csv` exists, it is shown as a “Shortcuts” section.
+If `links.csv` exists, it is shown as a “Shortcuts” section (via the `links_plugin.php` plugin).
 
 The parser expects a header row and at least two columns:
 

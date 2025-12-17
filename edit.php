@@ -8,9 +8,11 @@
 session_start();
 
 /* CONFIG */
-$LINKS_CSV        = __DIR__ . '/links.csv';
-$SECRET_MDS_FILE  = __DIR__ . '/secret_mds.txt';
-$SECRET_MDS_PASSWORD = 'secretpwd';
+require_once __DIR__ . '/env_loader.php';
+
+$LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
+$SECRET_MDS_FILE     = env_path('SECRET_MDS_FILE', __DIR__ . '/secret_mds.txt');
+$SECRET_MDS_PASSWORD = (string)env_str('SECRET_MDS_PASSWORD', '');
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
@@ -108,16 +110,92 @@ function resolve_rel_url_from_md($url, $mdPath) {
     return url_encode_path(implode('/', $out)) . $suffix;
 }
 
-/* INLINE MARKDOWN */
-function inline_md($text, $mdPath = null) {
-    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+function resolve_rel_href_from_md_link($url, $mdPath) {
+    $url = (string)$url;
+    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
+    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
 
-    // `code`
-    $text = preg_replace(
-        '/`([^`]+)`/',
-        '<code class="md-code-inline">$1</code>',
-        $text
-    );
+    $qPos = strpos($url, '?');
+    $hPos = strpos($url, '#');
+
+    $baseEnd = null;
+    if ($qPos !== false && $hPos !== false) $baseEnd = min($qPos, $hPos);
+    else if ($qPos !== false) $baseEnd = $qPos;
+    else if ($hPos !== false) $baseEnd = $hPos;
+
+    $base = ($baseEnd === null) ? $url : substr($url, 0, $baseEnd);
+    $suffix = ($baseEnd === null) ? '' : substr($url, $baseEnd);
+
+    $base = str_replace("\\", "/", $base);
+    if ($base === '') return $url;
+
+    $mdDir = dirname($mdPath);
+    $out = [];
+    if ($mdDir !== '.' && $mdDir !== '') {
+        $out = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
+    }
+
+    $relParts = explode('/', $base);
+    foreach ($relParts as $p) {
+        if ($p === '' || $p === '.') continue;
+        if ($p === '..') {
+            if (empty($out)) return $url; // don't allow escaping project root
+            array_pop($out);
+            continue;
+        }
+        $out[] = $p;
+    }
+
+    $resolved = implode('/', $out);
+    if ($resolved === '') return $url;
+
+    // If it points to a markdown file, route through the app (works in subfolder installs like /md/).
+    if (preg_match('/\\.md$/i', $resolved)) {
+        $href = 'index.php?file=' . rawurlencode($resolved);
+        if ($suffix !== '') {
+            if ($suffix[0] === '?') $href .= '&' . substr($suffix, 1);
+            else $href .= $suffix; // includes #fragment
+        }
+        return $href;
+    }
+
+    return url_encode_path($resolved) . $suffix;
+}
+
+/* INLINE MARKDOWN */
+function fix_mathjax_currency_in_math_delimiters($text) {
+    $replace = static function($m) {
+        $open  = $m[1];
+        $inner = $m[2];
+        $close = $m[3];
+
+        // MathJax (TeX) errors on raw currency symbols like "€" in math mode.
+        // Wrapping it in \text{} makes it parse reliably.
+        $inner = str_replace('€', '\\text{€}', $inner);
+
+        return $open . $inner . $close;
+    };
+
+    // \( ... \)
+    $text = preg_replace_callback('/(\\\\\\()(.+?)(\\\\\\))/s', $replace, $text);
+    // \[ ... \]
+    $text = preg_replace_callback('/(\\\\\\[)(.+?)(\\\\\\])/s', $replace, $text);
+    return $text;
+}
+
+function inline_md($text, $mdPath = null) {
+    // Protect inline code spans from further processing (and MathJax fixes).
+    $codeSpans = [];
+    $text = preg_replace_callback('/`([^`]+)`/', function($m) use (&$codeSpans){
+        $key = '@@MD_CODE_' . count($codeSpans) . '@@';
+        $codeSpans[$key] = $m[1];
+        return $key;
+    }, $text);
+
+    // Fix common MathJax TeX parse issues (e.g. "€" inside \( ... \)).
+    $text = fix_mathjax_currency_in_math_delimiters($text);
+
+    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
     // ![alt](url "title")
     $text = preg_replace_callback(
@@ -150,16 +228,30 @@ function inline_md($text, $mdPath = null) {
     // [text](url)
     $text = preg_replace_callback(
         '/\[([^\]]+)\]\(([^)]+)\)/',
-        function($m){
+        function($m) use ($mdPath){
             $label = $m[1];
-            $url   = $m[2];
-            $urlEsc = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+            $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
+            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
             return '<a class="md-link" href="'.
                    $urlEsc.
                    '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
         },
         $text
     );
+
+    // Restore protected inline code spans.
+    if (!empty($codeSpans)) {
+        foreach ($codeSpans as $key => $raw) {
+            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+            $rawEsc = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
+            $text = str_replace(
+                $keyEsc,
+                '<code class="md-code-inline">'.$rawEsc.'</code>',
+                $text
+            );
+        }
+    }
 
     return $text;
 }
@@ -568,19 +660,9 @@ if (isset($_GET['file'])) {
 }
 
 $secretMap  = load_secret_mds();
-$shortcuts  = read_shortcuts_csv($LINKS_CSV);
 $rootList   = list_md_root_sorted();
 $dirMap     = list_md_by_subdir_sorted();
 $folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
-
-if ($folder_filter) {
-    if ($folder_filter === 'root') {
-        $dirMap = [];
-    } else {
-        $rootList = [];
-        $dirMap = isset($dirMap[$folder_filter]) ? [$folder_filter => $dirMap[$folder_filter]] : [];
-    }
-}
 
 $save_error = null;
 $saved_flag = isset($_GET['saved']) ? true : false;
@@ -722,38 +804,53 @@ window.MathJax = {
 <body class="app-body edit-page">
     <header class="app-header">
         <div class="app-header-inner">
-            <div class="app-header-main">
-                <div class="app-title-row">
-                    <span class="pi pi-edit app-logo" aria-hidden="true"></span>
-                    <div class="app-title"><?=h($current_title)?></div>
-                    <span id="dirtyStar" class="dirty-star" style="display:none;" title="Unsaved changes">*</span>
-                </div>
-                <div class="app-breadcrumb">
-                    <a class="breadcrumb-link" href="index.php">/index</a>
-                    <?php if ($requested): ?>
-                        <?php $crumbFolder = folder_from_path($requested); ?>
-                        <span class="breadcrumb-sep">/</span>
+	            <div class="app-header-main">
+	                <span class="app-logo" aria-hidden="true">
+	                    <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
+	                     <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
+	                     <g stroke="#fff" stroke-width="20">
+	                      <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
+	                      <path d="m10 130h663"/>
+	                      <path class="B C" d="M550 70H216"/>
+	                      <path d="m172 70a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm-70 0a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm713 109c10-10 10-27 0-38l-18-18c-10-10-27-10-37 0l-294 297-48 90c-6 9 5 20 14 14l89-49 294-296zm-299 296-51-52"/>
+	                      <path d="m796 197-55-55z"/>
+	                      <path class="B C" d="M72 499h165M72 447h330M72 397h330M72 348h330"/>
+	                      <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
+	                     </g>
+	                    </svg>
+	                </span>
+	                <div class="app-header-text">
+	                    <div class="app-title-row">
+	                        <div class="app-title"><?=h($current_title)?></div>
+	                        <span id="dirtyStar" class="dirty-star" style="display:none;" title="Unsaved changes">*</span>
+	                    </div>
+	                    <div class="app-breadcrumb">
+	                    <a class="breadcrumb-link" href="index.php">/index</a>
+	                    <?php if ($requested): ?>
+	                        <?php $crumbFolder = folder_from_path($requested); ?>
+	                        <span class="breadcrumb-sep">/</span>
                         <a class="breadcrumb-link" href="edit.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($crumbFolder)?>">
                             <?=h($crumbFolder)?>
                         </a>
                         <span class="breadcrumb-sep">/</span>
-                        <span class="app-path-segment"><?=h(basename($requested))?></span>
-                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>">secret</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div class="app-header-actions">
+	                        <span class="app-path-segment"><?=h(basename($requested))?></span>
+	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>">secret</span>
+	                    <?php endif; ?>
+	                    </div>
+	                </div>
+	            </div>
+	            <div class="app-header-actions">
                 <?php if ($saved_flag && !$save_error): ?>
                     <div class="chip" style="background-color: #166534; color: white;">Opgeslagen</div>
                 <?php elseif ($save_error): ?>
                     <div class="chip" style="background-color: var(--danger); color: white;"><?=h($save_error)?></div>
                 <?php endif; ?>
 
-                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="Toon files">
-                    <span class="pi pi-list"></span>
-                </button>
-                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
-            </div>
+	                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="Toon files">
+	                    <span class="pi pi-list"></span>
+	                </button>
+	                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
+	            </div>
         </div>
     </header>
 
@@ -772,106 +869,34 @@ window.MathJax = {
                                 <span class="pi pi-notebook"></span>
                                 <span>Notes</span>
                             </div>
-                            <div class="pane-title-actions">
-                                <div class="pane-subtitle" id="navCount">0 items</div>
-                                <button type="button" id="mobileNavClose" class="btn btn-ghost icon-button mobile-nav-close" aria-label="Sluit files">
-                                    <span class="pi pi-times"></span>
-                                </button>
-                            </div>
+	                                <div class="pane-title-actions">
+	                                <div class="pane-subtitle" id="navCount">0 items</div>
+	                                <button type="button" id="mobileNavClose" class="btn btn-ghost icon-button mobile-nav-close" aria-label="Sluit files">
+	                                    <span class="pi pi-cross"></span>
+	                                </button>
+	                            </div>
                         </div>
-                        <div class="nav-filter-row">
-                            <input id="filterInput" class="input" type="text" placeholder="Filter…">
-                            <button type="button" id="filterReset" class="btn btn-ghost icon-button filter-reset" aria-label="Reset filter">
-                                <span class="pi pi-times" aria-hidden="true"></span>
-                            </button>
-                        </div>
-                    </header>
-                    <div class="pane-body nav-body">
-                        <?php if (!empty($shortcuts)): ?>
-                        <div class="nav-section">
-                            <div class="nav-section-title">
-                                <span class="pi pi-dashboard"></span>
-                                <span>Shortcuts</span>
-                            </div>
-                            <ul class="nav-list">
-                            <?php foreach($shortcuts as $lnk): ?>
-                                <li class="nav-shortcut">
-                                    <a href="<?=h($lnk['url'])?>" target="_blank" rel="noopener noreferrer" class="nav-shortcut-link kbd-item">
-                                        <span class="nav-shortcut-label"><?=h($lnk['shortcut'])?></span>
-                                        <span class="pi pi-externallink nav-shortcut-icon"></span>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($rootList)): ?>
-                        <div class="nav-section">
-                            <div class="nav-section-title">
-                                <span class="pi pi-folder"></span>
-                                <a class="breadcrumb-link" href="edit.php?<?= $requested ? ('file='.rawurlencode($requested).'&') : '' ?>folder=root">Root</a>
-                            </div>
-                            <ul class="nav-list">
-                            <?php foreach($rootList as $entry):
-                                $p   = $entry['path'];
-                                $raw = @file_get_contents($p);
-                                $t   = $raw ? extract_title($raw) : $entry['basename'];
-                                $isSecret = isset($secretMap[$p]);
-                                $isCurrent = ($requested === $p);
-                            ?>
-                                <li class="nav-item doclink <?= $isCurrent ? 'nav-item-current' : '' ?>" data-secret="<?=$isSecret ? 'true' : 'false'?>" data-file="<?=h($p)?>">
-                                    <a href="edit.php?file=<?=rawurlencode($p)?>" class="nav-item-link kbd-item">
-                                        <div class="nav-item-main">
-                                            <span class="nav-item-title"><?=h($t)?></span>
-                                            <?php if ($isSecret): ?>
-                                                <span class="badge badge-secret">secret</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="nav-item-path"><?=h($p)?></div>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <?php endif; ?>
-
-                        <?php foreach($dirMap as $dirname=>$list): ?>
-                        <div class="nav-section">
-                            <div class="nav-section-title">
-                                <span class="pi pi-folder"></span>
-                                <a class="breadcrumb-link" href="edit.php?<?= $requested ? ('file='.rawurlencode($requested).'&') : '' ?>folder=<?=rawurlencode($dirname)?>"><?=h($dirname)?></a>
-                            </div>
-                            <ul class="nav-list">
-                            <?php foreach($list as $entry):
-                                $p   = $entry['path'];
-                                $raw = @file_get_contents($p);
-                                $t   = $raw ? extract_title($raw) : $entry['basename'];
-                                $isSecret = isset($secretMap[$p]);
-                                $isCurrent = ($requested === $p);
-                            ?>
-                                <li class="nav-item doclink <?= $isCurrent ? 'nav-item-current' : '' ?>" data-secret="<?=$isSecret ? 'true' : 'false'?>" data-file="<?=h($p)?>">
-                                    <a href="edit.php?file=<?=rawurlencode($p)?>" class="nav-item-link kbd-item">
-                                        <div class="nav-item-main">
-                                            <span class="nav-item-title"><?=h($t)?></span>
-                                            <?php if ($isSecret): ?>
-                                                <span class="badge badge-secret">secret</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="nav-item-path"><?=h($p)?></div>
-                                    </a>
-                                </li>
-                            <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <?php endforeach; ?>
-
-                        <?php if (empty($rootList) && empty($dirMap) && empty($shortcuts)): ?>
-                            <div class="nav-empty">Nothing here yet.</div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </section>
+	                        <div class="nav-filter-row">
+	                            <input id="filterInput" class="input" type="text" placeholder="Filter…">
+	                        </div>
+	                    </header>
+	                    <div class="pane-body nav-body">
+	                        <?php
+	                            require_once __DIR__ . '/explorer_view.php';
+	                            explorer_view_render_tree([
+	                                'page' => 'edit',
+	                                'rootList' => $rootList,
+	                                'dirMap' => $dirMap,
+	                                'secretMap' => $secretMap,
+	                                'folder_filter' => $folder_filter,
+	                                'current_file' => $requested,
+	                                'show_actions' => false,
+	                                'plugins_enabled' => false,
+	                            ]);
+	                        ?>
+	                    </div>
+	                </div>
+	            </section>
 
             <!-- resizer tussen links en midden -->
             <div class="col-resizer" data-resizer="left"></div>
@@ -885,12 +910,16 @@ window.MathJax = {
                                 <span class="icon-text-logo">MD</span>
                                 <span>Markdown</span>
                             </div>
-                            <div class="pane-header-actions">
-                                <button type="submit" form="editor-form" class="btn btn-ghost">
-                                    <span class="pi pi-floppydisk"></span>
-                                    <span class="btn-label">Save</span>
-                                </button>
-                                <button type="button" id="btnRevert" class="btn btn-ghost">
+	                            <div class="pane-header-actions">
+	                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="Add link">
+	                                    <span class="pi pi-linkchain"></span>
+	                                    <span class="btn-label">Link</span>
+	                                </button>
+	                                <button type="submit" form="editor-form" class="btn btn-ghost">
+	                                    <span class="pi pi-floppydisk"></span>
+	                                    <span class="btn-label">Save</span>
+	                                </button>
+	                                <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label">Revert</span>
                                 </button>
@@ -957,9 +986,99 @@ window.MathJax = {
     </div>
 </main>
 
-    <footer class="app-footer">
-        flat md site • <?=date('Y')?> • no db, no cms, no bloat
-    </footer>
+	    <footer class="app-footer">
+	        flat md site • <?=date('Y')?> • no db, no cms, no bloat
+	    </footer>
+
+	<div class="modal-overlay" id="linkModalOverlay" hidden></div>
+	<div class="modal" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle" hidden>
+	    <div class="modal-header">
+	        <div class="modal-title" id="linkModalTitle">Add link</div>
+	        <button type="button" class="btn btn-ghost icon-button" id="linkModalClose" aria-label="Close">
+	            <span class="pi pi-cross"></span>
+	        </button>
+	    </div>
+	    <div class="modal-body">
+	        <div class="modal-row">
+	            <label class="radio">
+	                <input type="radio" name="linkMode" value="internal" checked>
+	                <span>Internal</span>
+	            </label>
+	            <label class="radio">
+	                <input type="radio" name="linkMode" value="external">
+	                <span>External</span>
+	            </label>
+	        </div>
+
+	        <div id="linkModalInternal" class="link-modal-section">
+	            <div class="link-picker-filter-row">
+	                <input id="linkPickerFilter" type="text" class="input" placeholder="Search notes...">
+	                <button type="button" class="btn btn-ghost icon-button" id="linkPickerFilterClear" aria-label="Clear search" style="display:none;">
+	                    <span class="pi pi-cross"></span>
+	                </button>
+	            </div>
+	            <div class="link-picker" id="linkPicker">
+	                <?php
+	                    $renderPickerGroup = function($groupTitle, $entries) use ($secretMap) {
+	                        if (empty($entries)) return;
+	                        $groupId = 'linkpicker-' . substr(sha1('picker:' . $groupTitle), 0, 10);
+	                        ?>
+	                        <section class="nav-section">
+	                            <div class="nav-section-title">
+	                                <span class="pi pi-folder"></span>
+	                                <span><?=h($groupTitle)?></span>
+	                            </div>
+	                            <ul class="notes-list" id="<?=h($groupId)?>">
+	                            <?php foreach ($entries as $entry):
+	                                $p = $entry['path'];
+	                                $t = function_exists('explorer_view_extract_md_title_from_file')
+	                                    ? explorer_view_extract_md_title_from_file(__DIR__ . '/' . $p, $entry['basename'])
+	                                    : $entry['basename'];
+	                                $isSecret = isset($secretMap[$p]);
+	                            ?>
+	                                <li class="note-item">
+	                                    <button type="button" class="note-link kbd-item link-pick-item" data-path="<?=h($p)?>" data-title="<?=h($t)?>">
+	                                        <div class="note-title" style="justify-content: space-between;">
+	                                            <span><?=h($t)?></span>
+	                                            <?php if ($isSecret): ?>
+	                                                <span class="badge-secret">secret</span>
+	                                            <?php endif; ?>
+	                                        </div>
+	                                    </button>
+	                                </li>
+	                            <?php endforeach; ?>
+	                            </ul>
+	                        </section>
+	                        <?php
+	                    };
+
+	                    $rootEntries = [];
+	                    foreach ($rootList as $e) $rootEntries[] = $e;
+	                    $renderPickerGroup('Root', $rootEntries);
+
+	                    foreach ($dirMap as $dirname => $entries) {
+	                        $renderPickerGroup($dirname, $entries);
+	                    }
+	                ?>
+	            </div>
+	        </div>
+
+	        <div id="linkModalExternal" class="link-modal-section" hidden>
+	            <div class="modal-field">
+	                <label class="modal-label" for="externalLinkText">Link text</label>
+	                <input id="externalLinkText" type="text" class="input" placeholder="e.g. Gold spot price">
+	            </div>
+	            <div class="modal-field">
+	                <label class="modal-label" for="externalLinkUrl">URL</label>
+	                <input id="externalLinkUrl" type="url" class="input" placeholder="https://example.com/">
+	            </div>
+	        </div>
+	    </div>
+	    <div class="modal-footer">
+	        <button type="button" class="btn btn-ghost" id="linkModalCancel">Cancel</button>
+	        <button type="button" class="btn btn-primary" id="linkModalInsert" disabled>Insert link</button>
+	    </div>
+	</div>
 
 <script>
 window.CURRENT_FILE = <?= json_encode($requested ?? '') ?>;
