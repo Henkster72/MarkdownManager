@@ -147,6 +147,22 @@ Copy `.env.example` to `.env` and edit as needed.
 - `SECRET_MDS_PASSWORD` (required for unlocking secret notes)
 - `PLUGINS_DIR` (default: `plugins`)
 
+## Plugins (optional)
+
+Plugins are optional. If the `PLUGINS_DIR` folder doesn’t exist (or is empty), nothing extra is loaded and the app still works normally.
+
+To disable a built-in plugin, remove (or rename) its `.php` file from `PLUGINS_DIR`.
+
+### Built-in plugins
+
+- `plugins/links_plugin.php`: shows the “Shortcuts” section from `links.csv` on the index/overview page.
+- `plugins/html_plugin.php`: shows an `HTML/` folder section (lists `.html/.htm` files recursively) on the index/overview page, only if `HTML/` exists.
+- `plugins/pdfs_plugin.php`: shows a `PDF/` folder section (lists `.pdf` files recursively) on the index/overview page, only if `PDF/` exists.
+
+Notes:
+- Plugins are only loaded in `index.php` (overview/explorer). The editor (`edit.php`) keeps the explorer focused on markdown files.
+- Plugin folders also support the same `?folder=...` filtering behavior as markdown folders.
+
 ### Secret notes
 
 `secret_mds.txt` is a newline-separated list of relative markdown paths to protect:
@@ -164,7 +180,7 @@ Important: “secret” is only a lightweight UI/session gate; it does not encry
 
 ### Shortcuts (`links.csv`)
 
-If `links.csv` exists, it is shown as a “Shortcuts” section (via the `links_plugin.php` plugin).
+If `links.csv` exists, it is shown as a “Shortcuts” section (via the links plugin).
 
 The parser expects a header row and at least two columns:
 
