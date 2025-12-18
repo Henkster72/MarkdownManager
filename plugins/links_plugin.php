@@ -50,7 +50,7 @@ return [
             ?>
             <section class="nav-section">
                 <div class="nav-section-title"<?=$titleStyle?>>
-                    <span class="pi pi-dashboard"></span>
+                    <span class="pi pi-linkchain"></span>
                     <span>Shortcuts</span>
                 </div>
                 <ul class="nav-list">

@@ -27,6 +27,12 @@ function explorer_view_folder_from_path($path) {
     return $d;
 }
 
+function explorer_view_folder_anchor_id($folder) {
+    $folder = (string)$folder;
+    if ($folder === '') $folder = 'root';
+    return 'folder-anchor-' . substr(sha1('folder:' . $folder), 0, 10);
+}
+
 function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) {
     if (function_exists('extract_title_from_file')) {
         return extract_title_from_file($fullPath, $fallbackBasename);
@@ -174,10 +180,12 @@ function explorer_view_render_tree($opts) {
     $fileLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
 
     $folderLink = static function($folder) use ($folderLinkBase, $page, $current_file) {
+        $anchor = explorer_view_folder_anchor_id($folder);
+        $frag = ($page === 'index' && $anchor) ? ('#' . $anchor) : '';
         if ($page === 'edit' && $current_file) {
-            return $folderLinkBase . '?file=' . rawurlencode($current_file) . '&folder=' . rawurlencode($folder);
+            return $folderLinkBase . '?file=' . rawurlencode($current_file) . '&folder=' . rawurlencode($folder) . $frag;
         }
-        return $folderLinkBase . '?folder=' . rawurlencode($folder);
+        return $folderLinkBase . '?folder=' . rawurlencode($folder) . $frag;
     };
 
     $mdHref = static function($p) use ($fileLinkBase, $page) {
@@ -215,6 +223,7 @@ function explorer_view_render_tree($opts) {
     $pluginCtx['folder_from_path'] = fn($p) => explorer_view_folder_from_path($p);
     $pluginCtx['extract_md_title_from_file'] = fn($full, $fallback) => explorer_view_extract_md_title_from_file($full, $fallback);
     $pluginCtx['folder_link'] = $folderLink;
+    $pluginCtx['folder_anchor_id'] = fn($f) => explorer_view_folder_anchor_id($f);
     $pluginCtx['show_back'] = (bool)$folder_filter;
     if ($folder_filter) {
         if ($page === 'edit' && $current_file) {
@@ -235,7 +244,7 @@ function explorer_view_render_tree($opts) {
         $root_children_id = 'folder-children-' . substr(sha1('md:root'), 0, 10);
         $root_default_open = true;
     ?>
-    <section class="nav-section" data-folder-section="root" data-default-open="<?= $root_default_open ? '1' : '0' ?>">
+	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id('root'))?>" class="nav-section" data-folder-section="root" data-default-open="<?= $root_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
             <?php if ($folder_filter && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
                 <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="Back">
@@ -298,7 +307,7 @@ function explorer_view_render_tree($opts) {
         $dir_default_open = ($folder_filter !== null && $folder_filter === $dirname)
             || ($current_file && explorer_view_folder_from_path($current_file) === $dirname);
     ?>
-    <section class="nav-section" data-folder-section="<?=explorer_view_escape($dirname)?>" data-default-open="<?= $dir_default_open ? '1' : '0' ?>">
+	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id($dirname))?>" class="nav-section" data-folder-section="<?=explorer_view_escape($dirname)?>" data-default-open="<?= $dir_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
             <?php if ($folder_filter && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
                 <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="Back">
@@ -346,6 +355,9 @@ function explorer_view_render_tree($opts) {
         <?php endif; ?>
     </li>
     <?php endforeach; ?>
+    <?php if (empty($list)): ?>
+        <li class="nav-empty">No notes yet.</li>
+    <?php endif; ?>
     </ul>
     </div>
     </section>

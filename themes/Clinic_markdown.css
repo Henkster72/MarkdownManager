@@ -1,0 +1,16 @@
+.editor-textarea {
+  font-family: "Nunito", var(--font-sans);
+}
+
+.editor-lines {
+  color: #318e89;
+}
+
+.editor-textarea {
+  caret-color: #318e89;
+}
+
+.editor-textarea::selection {
+  background-color: rgba(49, 142, 137, 0.20);
+}
+

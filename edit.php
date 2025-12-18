@@ -1,7 +1,7 @@
 <?php
 /*******************************
  * MarkdownManager v0.1
- * - Plain CSS (ui.css / markdown.css / htmlpreview.css)
+ * - Static assets in STATIC_DIR (CSS/JS/font)
  * - shared security + secret_mds logic
  *******************************/
 
@@ -60,461 +60,13 @@ function sanitize_md_path($path) {
 /* ESCAPE */
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
-function url_encode_path($path) {
-    $path = str_replace("\\", "/", (string)$path);
-    $segments = explode('/', $path);
-    $segments = array_map('rawurlencode', $segments);
-    return implode('/', $segments);
-}
-
-function is_external_url($url) {
-    $url = (string)$url;
-    if ($url === '') return false;
-    if (str_starts_with($url, '//')) return true;
-    return (bool)preg_match('~^[a-z][a-z0-9+.-]*:~i', $url);
-}
-
-function resolve_rel_url_from_md($url, $mdPath) {
-    $url = (string)$url;
-    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
-    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
-
-    $suffixPos = null;
-    $qPos = strpos($url, '?');
-    $hPos = strpos($url, '#');
-    if ($qPos !== false && $hPos !== false) $suffixPos = min($qPos, $hPos);
-    else if ($qPos !== false) $suffixPos = $qPos;
-    else if ($hPos !== false) $suffixPos = $hPos;
-    $base = ($suffixPos === null) ? $url : substr($url, 0, $suffixPos);
-    $suffix = ($suffixPos === null) ? '' : substr($url, $suffixPos);
-
-    $base = str_replace("\\", "/", $base);
-    if ($base === '') return $url;
-
-    $mdDir = dirname($mdPath);
-    if ($mdDir === '.' || $mdDir === '') return url_encode_path($base) . $suffix;
-
-    $baseParts = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
-    $relParts = explode('/', $base);
-    $out = $baseParts;
-    foreach ($relParts as $p) {
-        if ($p === '' || $p === '.') continue;
-        if ($p === '..') {
-            if (empty($out)) return $url; // don't allow escaping project root
-            array_pop($out);
-            continue;
-        }
-        $out[] = $p;
-    }
-
-    return url_encode_path(implode('/', $out)) . $suffix;
-}
-
-function resolve_rel_href_from_md_link($url, $mdPath) {
-    $url = (string)$url;
-    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
-    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
-
-    $qPos = strpos($url, '?');
-    $hPos = strpos($url, '#');
-
-    $baseEnd = null;
-    if ($qPos !== false && $hPos !== false) $baseEnd = min($qPos, $hPos);
-    else if ($qPos !== false) $baseEnd = $qPos;
-    else if ($hPos !== false) $baseEnd = $hPos;
-
-    $base = ($baseEnd === null) ? $url : substr($url, 0, $baseEnd);
-    $suffix = ($baseEnd === null) ? '' : substr($url, $baseEnd);
-
-    $base = str_replace("\\", "/", $base);
-    if ($base === '') return $url;
-
-    $mdDir = dirname($mdPath);
-    $out = [];
-    if ($mdDir !== '.' && $mdDir !== '') {
-        $out = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
-    }
-
-    $relParts = explode('/', $base);
-    foreach ($relParts as $p) {
-        if ($p === '' || $p === '.') continue;
-        if ($p === '..') {
-            if (empty($out)) return $url; // don't allow escaping project root
-            array_pop($out);
-            continue;
-        }
-        $out[] = $p;
-    }
-
-    $resolved = implode('/', $out);
-    if ($resolved === '') return $url;
-
-    // If it points to a markdown file, route through the app (works in subfolder installs like /md/).
-    if (preg_match('/\\.md$/i', $resolved)) {
-        $href = 'index.php?file=' . rawurlencode($resolved);
-        if ($suffix !== '') {
-            if ($suffix[0] === '?') $href .= '&' . substr($suffix, 1);
-            else $href .= $suffix; // includes #fragment
-        }
-        return $href;
-    }
-
-    return url_encode_path($resolved) . $suffix;
-}
-
-/* INLINE MARKDOWN */
-function fix_mathjax_currency_in_math_delimiters($text) {
-    $replace = static function($m) {
-        $open  = $m[1];
-        $inner = $m[2];
-        $close = $m[3];
-
-        // MathJax (TeX) errors on raw currency symbols like "€" in math mode.
-        // Wrapping it in \text{} makes it parse reliably.
-        $inner = str_replace('€', '\\text{€}', $inner);
-
-        return $open . $inner . $close;
-    };
-
-    // \( ... \)
-    $text = preg_replace_callback('/(\\\\\\()(.+?)(\\\\\\))/s', $replace, $text);
-    // \[ ... \]
-    $text = preg_replace_callback('/(\\\\\\[)(.+?)(\\\\\\])/s', $replace, $text);
-    return $text;
-}
-
-function inline_md($text, $mdPath = null) {
-    // Protect inline code spans from further processing (and MathJax fixes).
-    $codeSpans = [];
-    $text = preg_replace_callback('/`([^`]+)`/', function($m) use (&$codeSpans){
-        $key = '@@MD_CODE_' . count($codeSpans) . '@@';
-        $codeSpans[$key] = $m[1];
-        return $key;
-    }, $text);
-
-    // Fix common MathJax TeX parse issues (e.g. "€" inside \( ... \)).
-    $text = fix_mathjax_currency_in_math_delimiters($text);
-
-    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-
-    // ![alt](url "title")
-    $text = preg_replace_callback(
-        '/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/',
-        function($m) use ($mdPath){
-            $alt = $m[1];
-            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
-            $urlResolved = resolve_rel_url_from_md($urlRaw, $mdPath);
-            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            $titleAttr = isset($m[3]) ? ' title="'.$m[3].'"' : '';
-            return '<img class="md-img" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
-        },
-        $text
-    );
-
-    // **bold**
-    $text = preg_replace(
-        '/\*\*([^*]+)\*\*/',
-        '<strong class="md-strong">$1</strong>',
-        $text
-    );
-
-    // *italic*
-    $text = preg_replace(
-        '/\*([^*]+)\*/',
-        '<em class="md-em">$1</em>',
-        $text
-    );
-
-    // [text](url)
-    $text = preg_replace_callback(
-        '/\[([^\]]+)\]\(([^)]+)\)/',
-        function($m) use ($mdPath){
-            $label = $m[1];
-            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
-            $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
-            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            return '<a class="md-link" href="'.
-                   $urlEsc.
-                   '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
-        },
-        $text
-    );
-
-    // Restore protected inline code spans.
-    if (!empty($codeSpans)) {
-        foreach ($codeSpans as $key => $raw) {
-            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
-            $rawEsc = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
-            $text = str_replace(
-                $keyEsc,
-                '<code class="md-code-inline">'.$rawEsc.'</code>',
-                $text
-            );
-        }
-    }
-
-    return $text;
-}
-
-function split_md_table_row($line) {
-    $line = trim($line);
-    if ($line === '') return [];
-
-    if (str_starts_with($line, '|')) $line = substr($line, 1);
-    if (str_ends_with($line, '|')) $line = substr($line, 0, -1);
-
-    $cells = preg_split('/(?<!\\\\)\|/', $line);
-    $out = [];
-    foreach ($cells as $c) {
-        $c = str_replace('\\|', '|', $c);
-        $out[] = trim($c);
-    }
-    return $out;
-}
-
-function is_md_table_separator($line) {
-    $line = trim($line);
-    if ($line === '') return false;
-    if (strpos($line, '|') === false) return false;
-    return (bool)preg_match('/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/', $line);
-}
-
-function md_table_align_from_spec($spec) {
-    $spec = trim($spec);
-    $left = str_starts_with($spec, ':');
-    $right = str_ends_with($spec, ':');
-    if ($left && $right) return 'center';
-    if ($right) return 'right';
-    return 'left';
-}
-
-function md_indent_width($ws) {
-    $ws = str_replace("\t", "    ", (string)$ws);
-    return strlen($ws);
-}
-
-/* BLOCK MARKDOWN -> HTML */
-function md_to_html($text, $mdPath = null) {
-    $text = str_replace(["\r\n","\r"], "\n", $text);
-    $lines = explode("\n",$text);
-
-    $html = [];
-    $in_codeblock = false;
-    $listStack = [];
-
-    $openList = function($tag, $indent) use (&$html, &$listStack) {
-        $cls = $tag === 'ol' ? 'md-olist' : 'md-list';
-        $html[] = "<$tag class=\"$cls\">";
-        $listStack[] = ['tag' => $tag, 'indent' => (int)$indent, 'liOpen' => false];
-    };
-    $closeOneList = function() use (&$html, &$listStack) {
-        if (empty($listStack)) return;
-        $top = &$listStack[count($listStack) - 1];
-        if (!empty($top['liOpen'])) {
-            $html[] = "</li>";
-            $top['liOpen'] = false;
-        }
-        $tag = $top['tag'];
-        array_pop($listStack);
-        $html[] = "</$tag>";
-    };
-    $closeAllLists = function() use (&$listStack, $closeOneList) {
-        while (!empty($listStack)) $closeOneList();
-    };
-    $closeToIndent = function($indent) use (&$listStack, $closeOneList) {
-        while (!empty($listStack) && $listStack[count($listStack) - 1]['indent'] > $indent) {
-            $closeOneList();
-        }
-    };
-
-    $count = count($lines);
-    for ($i = 0; $i < $count; $i++) {
-        $line = $lines[$i];
-
-        // ``` fenced code blocks (allow indentation, e.g. inside lists)
-        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
-            $closeAllLists();
-            if ($in_codeblock) {
-                $html[] = "</code></pre>";
-                $in_codeblock = false;
-            } else {
-                $in_codeblock = true;
-                $lang = trim((string)($m[1] ?? ''));
-                $langAttr = $lang ? ' class="language-'.htmlspecialchars($lang).'"' : '';
-                $html[] = '<pre class="md-codeblock"><code'.$langAttr.'>';
-            }
-            continue;
-        }
-
-        if ($in_codeblock) {
-            $html[] = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
-            continue;
-        }
-
-        // horizontal rule
-        if (preg_match('/^\s*((\*|-|_)\s*){3,}$/', $line)) {
-            $closeAllLists();
-            $html[] = '<hr class="md-hr">';
-            continue;
-        }
-
-        // blockquote
-        if (preg_match('/^\s*>\s?(.*)$/', $line)) {
-            $closeAllLists();
-
-            $bq = [];
-            while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $m)) {
-                $bq[] = $m[1];
-                $i++;
-            }
-            $i--; // compensate for for-loop increment
-            $inner = implode("\n", $bq);
-            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath) . "\n" . '</blockquote>';
-            continue;
-        }
-
-        // tables (GFM-style)
-        if (strpos($line, '|') !== false && ($i + 1) < $count && is_md_table_separator($lines[$i + 1])) {
-            $closeAllLists();
-
-            $headerCells = split_md_table_row($line);
-            $alignCells = split_md_table_row($lines[$i + 1]);
-            $colCount = max(count($headerCells), count($alignCells));
-            if ($colCount < 1) { continue; }
-
-            $align = [];
-            for ($c = 0; $c < $colCount; $c++) {
-                $align[$c] = md_table_align_from_spec($alignCells[$c] ?? '');
-            }
-
-            $rows = [];
-            $i += 2;
-            while ($i < $count) {
-                $rowLine = $lines[$i];
-                if (trim($rowLine) === '') break;
-                if (strpos($rowLine, '|') === false) break;
-                $cells = split_md_table_row($rowLine);
-                $rows[] = $cells;
-                $i++;
-            }
-            $i--; // for-loop will increment
-
-            $table = [];
-            $table[] = '<table class="md-table">';
-            $table[] = '<thead><tr>';
-            for ($c = 0; $c < $colCount; $c++) {
-                $txt = $headerCells[$c] ?? '';
-                $a = $align[$c];
-                $table[] = '<th class="md-th align-'.$a.'">' . inline_md($txt, $mdPath) . '</th>';
-            }
-            $table[] = '</tr></thead>';
-            $table[] = '<tbody>';
-            foreach ($rows as $r) {
-                $table[] = '<tr>';
-                for ($c = 0; $c < $colCount; $c++) {
-                    $txt = $r[$c] ?? '';
-                    $a = $align[$c];
-                    $table[] = '<td class="md-td align-'.$a.'">' . inline_md($txt, $mdPath) . '</td>';
-                }
-                $table[] = '</tr>';
-            }
-            $table[] = '</tbody></table>';
-            $html[] = implode("\n", $table);
-            continue;
-        }
-
-        // headings
-        if (preg_match('/^(#{1,6})\s+(.*)$/',$line,$m)) {
-            $closeAllLists();
-
-            $level   = strlen($m[1]);
-            $content = $m[2];
-            $tag     = "h$level";
-
-            $clsMap = [
-                1 => "md-h1",
-                2 => "md-h2",
-                3 => "md-h3",
-                4 => "md-h4",
-                5 => "md-h5",
-                6 => "md-h6",
-            ];
-            $cls = $clsMap[$level] ?? "md-heading";
-
-            $html[] = "<$tag class=\"$cls\">".inline_md($content, $mdPath)."</$tag>";
-            continue;
-        }
-
-        // list items (supports nesting via indentation)
-        if (preg_match('/^(\s*)([-*])\s+(.*)$/', $line, $m) || preg_match('/^(\s*)(\d+)\.\s+(.*)$/', $line, $m)) {
-            $isOrdered = is_numeric($m[2]);
-            $tag = $isOrdered ? 'ol' : 'ul';
-            $indent = md_indent_width($m[1] ?? '');
-            $content = (string)($m[3] ?? '');
-
-            if (!empty($listStack)) {
-                $top = $listStack[count($listStack) - 1];
-                if ($indent > $top['indent'] && empty($top['liOpen'])) {
-                    $indent = $top['indent'];
-                }
-            }
-
-            if (empty($listStack)) {
-                $openList($tag, $indent);
-            } else {
-                if ($indent > $listStack[count($listStack) - 1]['indent']) {
-                    $openList($tag, $indent);
-                } else if ($indent < $listStack[count($listStack) - 1]['indent']) {
-                    $closeToIndent($indent);
-                }
-
-                if (empty($listStack)) {
-                    $openList($tag, $indent);
-                } else if ($listStack[count($listStack) - 1]['indent'] === $indent && $listStack[count($listStack) - 1]['tag'] !== $tag) {
-                    $closeOneList();
-                    $openList($tag, $indent);
-                } else if ($listStack[count($listStack) - 1]['indent'] !== $indent) {
-                    $openList($tag, $indent);
-                }
-            }
-
-            $topIndex = count($listStack) - 1;
-            if (!empty($listStack[$topIndex]['liOpen'])) {
-                $html[] = "</li>";
-                $listStack[$topIndex]['liOpen'] = false;
-            }
-
-            $html[] = '<li class="md-li">' . inline_md($content, $mdPath);
-            $listStack[$topIndex]['liOpen'] = true;
-            continue;
-        }
-
-        // normal paragraph / blank
-        if (trim($line)==="") {
-            $html[]="";
-        } else {
-            $closeAllLists();
-            $html[]='<p class="md-p">'.inline_md($line, $mdPath).'</p>';
-        }
-    }
-
-    $closeAllLists();
-    if ($in_codeblock) $html[]="</code></pre>";
-
-    return implode("\n",$html);
-}
-
-/* TITLE FROM MD */
-function extract_title($raw){
-    $raw = str_replace(["\r\n","\r"], "\n", $raw);
-    foreach (explode("\n",$raw) as $l){
-        if (preg_match('/^#\s+(.*)$/',$l,$m)) return trim($m[1]);
-    }
-    foreach (explode("\n",$raw) as $l){
-        if (trim($l)!=='') return trim($l);
-    }
-    return "Untitled";
-}
+require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/themes_lib.php';
+
+$STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
+$IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
+$THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+$themesList = list_available_themes($THEMES_DIR);
 
 /* DATE PARSE */
 function parse_ymd_from_filename($basename) {
@@ -561,6 +113,20 @@ function list_md_root_sorted(){
 
 /* SUBDIR FILES */
 function list_md_by_subdir_sorted(){
+    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+    $staticDir = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
+    $imagesDir = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
+    $themesDir = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+    $exclude = [
+        'root' => true,
+        'HTML' => true,
+        'PDF' => true,
+        basename($pluginsDir) => true,
+        $staticDir => true,
+        $imagesDir => true,
+        $themesDir => true,
+    ];
+
     $dirs = array_filter(glob('*'), function($f){
         return is_dir($f) && $f[0]!=='.';
     });
@@ -569,20 +135,22 @@ function list_md_by_subdir_sorted(){
 
     $map=[];
     foreach($dirs as $dir){
+        if (isset($exclude[$dir])) continue;
         $mds = glob($dir.'/*.md');
-        if(!$mds) continue;
 
         $tmp=[];
-        foreach($mds as $path){
-            $base = basename($path);
-            [$yy,$mm,$dd] = parse_ymd_from_filename($base);
-            $tmp[] = [
-                'path'     => $path,
-                'basename' => $base,
-                'yy'       => $yy,
-                'mm'       => $mm,
-                'dd'       => $dd,
-            ];
+        if ($mds) {
+            foreach($mds as $path){
+                $base = basename($path);
+                [$yy,$mm,$dd] = parse_ymd_from_filename($base);
+                $tmp[] = [
+                    'path'     => $path,
+                    'basename' => $base,
+                    'yy'       => $yy,
+                    'mm'       => $mm,
+                    'dd'       => $dd,
+                ];
+            }
         }
 
         usort($tmp, 'compare_entries_desc_date');
@@ -769,10 +337,10 @@ if ($requested) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($current_title)?> • md edit</title>
 
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="markdown.css">
-<link rel="stylesheet" href="htmlpreview.css">
-<link rel="stylesheet" href="popicon.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/htmlpreview.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/popicon.css">
 
 <script>
 // theme bootstrap (zonder Tailwind)
@@ -805,20 +373,20 @@ window.MathJax = {
     <header class="app-header">
         <div class="app-header-inner">
 	            <div class="app-header-main">
-	                <span class="app-logo" aria-hidden="true">
-	                    <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
-	                     <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
-	                     <g stroke="#fff" stroke-width="20">
-	                      <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
+		                <a class="app-logo" href="index.php" aria-label="Go to index">
+		                    <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
+		                     <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
+		                     <g stroke="#fff" stroke-width="20">
+		                      <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
 	                      <path d="m10 130h663"/>
 	                      <path class="B C" d="M550 70H216"/>
 	                      <path d="m172 70a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm-70 0a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm713 109c10-10 10-27 0-38l-18-18c-10-10-27-10-37 0l-294 297-48 90c-6 9 5 20 14 14l89-49 294-296zm-299 296-51-52"/>
 	                      <path d="m796 197-55-55z"/>
 	                      <path class="B C" d="M72 499h165M72 447h330M72 397h330M72 348h330"/>
-	                      <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
-	                     </g>
-	                    </svg>
-	                </span>
+		                      <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
+		                     </g>
+		                    </svg>
+		                </a>
 	                <div class="app-header-text">
 	                    <div class="app-title-row">
 	                        <div class="app-title"><?=h($current_title)?></div>
@@ -839,20 +407,23 @@ window.MathJax = {
 	                    </div>
 	                </div>
 	            </div>
-	            <div class="app-header-actions">
-                <?php if ($saved_flag && !$save_error): ?>
-                    <div class="chip" style="background-color: #166534; color: white;">Opgeslagen</div>
-                <?php elseif ($save_error): ?>
-                    <div class="chip" style="background-color: var(--danger); color: white;"><?=h($save_error)?></div>
-                <?php endif; ?>
+		            <div class="app-header-actions">
+	                <?php if ($saved_flag && !$save_error): ?>
+	                    <div class="chip" style="background-color: #166534; color: white;">Opgeslagen</div>
+	                <?php elseif ($save_error): ?>
+	                    <div class="chip" style="background-color: var(--danger); color: white;"><?=h($save_error)?></div>
+	                <?php endif; ?>
 
-	                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="Toon files">
-	                    <span class="pi pi-list"></span>
-	                </button>
-	                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
-	            </div>
-        </div>
-    </header>
+		                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="Toon files">
+		                    <span class="pi pi-list"></span>
+		                </button>
+		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="Theme settings" aria-label="Theme settings">
+		                    <span class="pi pi-gear"></span>
+		                </button>
+		                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
+		            </div>
+	        </div>
+	    </header>
 
     <div class="nav-overlay" id="navOverlay"></div>
 
@@ -910,16 +481,20 @@ window.MathJax = {
                                 <span class="icon-text-logo">MD</span>
                                 <span>Markdown</span>
                             </div>
-	                            <div class="pane-header-actions">
-	                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="Add link">
-	                                    <span class="pi pi-linkchain"></span>
-	                                    <span class="btn-label">Link</span>
-	                                </button>
-	                                <button type="submit" form="editor-form" class="btn btn-ghost">
-	                                    <span class="pi pi-floppydisk"></span>
-	                                    <span class="btn-label">Save</span>
-	                                </button>
-	                                <button type="button" id="btnRevert" class="btn btn-ghost">
+		                            <div class="pane-header-actions">
+		                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="Add link">
+		                                    <span class="pi pi-linkchain"></span>
+		                                    <span class="btn-label">Link</span>
+		                                </button>
+		                                <button type="button" id="addImageBtn" class="btn btn-ghost" title="Insert image">
+		                                    <span class="pi pi-image"></span>
+		                                    <span class="btn-label">Image</span>
+		                                </button>
+		                                <button type="submit" form="editor-form" class="btn btn-ghost">
+		                                    <span class="pi pi-floppydisk"></span>
+		                                    <span class="btn-label">Save</span>
+		                                </button>
+		                                <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label">Revert</span>
                                 </button>
@@ -972,6 +547,16 @@ window.MathJax = {
                                 <span class="pi pi-eye"></span>
                                 <span>HTML preview</span>
                             </div>
+                            <div class="pane-header-actions">
+                                <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="Download a plain HTML export" <?= $requested ? '' : 'disabled' ?>>
+                                    <span class="pi pi-download"></span>
+                                    <span class="btn-label">HTML download</span>
+                                </button>
+                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost" title="Copy plain HTML to clipboard" <?= $requested ? '' : 'disabled' ?>>
+                                    <span class="pi pi-copy"></span>
+                                    <span class="btn-label">Copy HTML</span>
+                                </button>
+                            </div>
                         </div>
                     </header>
                     <div class="pane-body preview-body">
@@ -986,22 +571,22 @@ window.MathJax = {
     </div>
 </main>
 
-	    <footer class="app-footer">
-	        flat md site • <?=date('Y')?> • no db, no cms, no bloat
-	    </footer>
+		    <footer class="app-footer">
+		        <?=date('Y')?> • <a href="https://github.com/Henkster72/MarkdownManager" target="_blank" rel="noopener noreferrer">Markdown Manager</a> • <a href="https://allroundwebsite.com" target="_blank" rel="noopener noreferrer">Allroundwebsite.com</a>
+		    </footer>
 
-	<div class="modal-overlay" id="linkModalOverlay" hidden></div>
-	<div class="modal" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle" hidden>
-	    <div class="modal-header">
-	        <div class="modal-title" id="linkModalTitle">Add link</div>
-	        <button type="button" class="btn btn-ghost icon-button" id="linkModalClose" aria-label="Close">
-	            <span class="pi pi-cross"></span>
-	        </button>
-	    </div>
-	    <div class="modal-body">
-	        <div class="modal-row">
-	            <label class="radio">
-	                <input type="radio" name="linkMode" value="internal" checked>
+		<div class="modal-overlay" id="linkModalOverlay" hidden></div>
+		<div class="modal" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle" hidden>
+		    <div class="modal-header">
+		        <div class="modal-title" id="linkModalTitle">Add link</div>
+		        <button type="button" class="btn btn-ghost icon-button" id="linkModalClose" aria-label="Close">
+		            <span class="pi pi-cross"></span>
+		        </button>
+			</div>
+		    <div class="modal-body">
+		        <div class="modal-row">
+		            <label class="radio">
+		                <input type="radio" name="linkMode" value="internal" checked>
 	                <span>Internal</span>
 	            </label>
 	            <label class="radio">
@@ -1074,19 +659,133 @@ window.MathJax = {
 	            </div>
 	        </div>
 	    </div>
-	    <div class="modal-footer">
-	        <button type="button" class="btn btn-ghost" id="linkModalCancel">Cancel</button>
-	        <button type="button" class="btn btn-primary" id="linkModalInsert" disabled>Insert link</button>
-	    </div>
-	</div>
+		    <div class="modal-footer">
+		        <button type="button" class="btn btn-ghost" id="linkModalCancel">Cancel</button>
+		        <button type="button" class="btn btn-primary" id="linkModalInsert" disabled>Insert link</button>
+		    </div>
+		</div>
 
-<script>
-window.CURRENT_FILE = <?= json_encode($requested ?? '') ?>;
-window.initialContent = <?= json_encode($current_content ?? '') ?>;
-window.IS_SECRET_AUTHENTICATED = <?= json_encode(is_secret_authenticated()) ?>;
-</script>
+			<div class="modal-overlay" id="imageModalOverlay" hidden></div>
+			<div class="modal" id="imageModal" role="dialog" aria-modal="true" aria-labelledby="imageModalTitle" hidden>
+			    <div class="modal-header">
+			        <div class="modal-title" id="imageModalTitle">Insert image</div>
+		        <button type="button" class="btn btn-ghost icon-button" id="imageModalClose" aria-label="Close">
+		            <span class="pi pi-cross"></span>
+		        </button>
+		    </div>
+		    <div class="modal-body">
+		        <input type="hidden" id="imageCsrf" value="<?=h($CSRF_TOKEN)?>">
+		        <div class="modal-row" style="gap: 0.6rem;">
+		            <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+		                <input id="imageUploadInput" type="file" class="input" accept="image/*" style="flex: 1 1 16rem;">
+		                <button type="button" class="btn btn-primary btn-small" id="imageUploadBtn">Upload</button>
+		            </div>
+		            <div style="display:flex; gap:0.6rem; align-items:center;">
+		                <input id="imageAltInput" type="text" class="input" placeholder="Alt text (optional)" style="flex: 1 1 auto;">
+		            </div>
+		            <div class="status-text" id="imageStatus" style="min-height: 1.2em;"></div>
+		        </div>
 
-<script defer src="base.js"></script>
+		        <div class="modal-row" style="gap: 0.6rem;">
+		            <div style="display:flex; gap:0.6rem; align-items:center;">
+		                <input id="imageFilter" type="text" class="input" placeholder="Search images..." style="flex: 1 1 auto;">
+		                <button type="button" class="btn btn-ghost btn-small" id="imageFilterClear" aria-label="Clear">Clear</button>
+		            </div>
+		            <div id="imageList" style="max-height: 55vh; overflow:auto; border: 1px solid var(--border-soft); border-radius: 0.75rem; padding: 0.5rem;"></div>
+		            <div class="status-text" style="margin-top: 0.25rem;">
+		                Tip: click an image to insert <code>![]()</code> at the cursor.
+		            </div>
+		        </div>
+			    </div>
+			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+			        <button type="button" class="btn btn-ghost btn-small" id="imageModalCancel">Close</button>
+			    </div>
+			</div>
+
+			<div class="modal-overlay" id="themeModalOverlay" hidden></div>
+			<div class="modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
+			    <div class="modal-header">
+			        <div class="modal-title" id="themeModalTitle">Theme</div>
+			        <button type="button" class="btn btn-ghost icon-button" id="themeModalClose" aria-label="Close">
+			            <span class="pi pi-cross"></span>
+			        </button>
+			    </div>
+			    <div class="modal-body">
+				        <div class="modal-field">
+				            <label class="modal-label" for="themePreset">Preset</label>
+				            <div style="display:flex; align-items:center; gap:0.6rem;">
+					            <select id="themePreset" class="input" style="flex: 1 1 auto;">
+				                <option value="default">Default</option>
+				                <?php foreach ($themesList as $t): ?>
+				                    <?php
+				                        $label = (isset($t['label']) && is_string($t['label']) && $t['label'] !== '') ? $t['label'] : $t['name'];
+				                        if (isset($t['color']) && is_string($t['color']) && $t['color'] !== '') $label .= ' • ' . $t['color'];
+				                    ?>
+				                    <option value="<?=h($t['name'])?>"><?=h($label)?></option>
+				                <?php endforeach; ?>
+					            </select>
+					            <div aria-hidden="true" style="display:flex; gap:0.35rem; align-items:center;">
+					                <span id="themeSwatchPrimary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+					                <span id="themeSwatchSecondary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+					            </div>
+				            </div>
+				            <div id="themePresetPreview" style="margin-top: 0.5rem; padding: 0.55rem 0.65rem; border-radius: 0.75rem; border: 1px solid var(--border-soft);"></div>
+				            <div class="status-text" style="margin-top: 0.4rem;">
+				                Applies only to the Markdown editor + HTML preview.
+				            </div>
+				        </div>
+
+				        <details style="margin-top: 0.8rem;">
+				            <summary style="cursor:pointer; user-select:none; font-weight: 600;">Overrides (optional)</summary>
+				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+				                <div class="status-text">
+				                    Overrides are saved in your browser (localStorage) automatically as you type.
+				                    <span id="themeOverridesStatus" style="margin-left: 0.35rem;"></span>
+				                </div>
+				                <div class="modal-field">
+				                    <div class="modal-label" style="margin-bottom: 0.35rem;">HTML preview</div>
+				                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+			                        <input id="themePreviewBg" type="text" class="input" placeholder="Background (e.g. #ffffff)">
+			                        <input id="themePreviewText" type="text" class="input" placeholder="Text color (e.g. #111827)">
+			                        <input id="themePreviewFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
+			                        <input id="themePreviewFontSize" type="text" class="input" placeholder="Font size (e.g. 16px)">
+			                        <input id="themeHeadingFont" type="text" class="input" placeholder="Heading font family (e.g. Montserrat)">
+			                        <input id="themeHeadingColor" type="text" class="input" placeholder="Heading color (e.g. rgb(229,33,157))">
+			                        <input id="themeListColor" type="text" class="input" placeholder="List color (optional)">
+			                        <input id="themeBlockquoteTint" type="text" class="input" placeholder="Blockquote tint (optional)">
+			                    </div>
+			                </div>
+
+			                <div class="modal-field">
+			                    <div class="modal-label" style="margin-bottom: 0.35rem;">Markdown editor</div>
+			                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+			                        <input id="themeEditorFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
+			                        <input id="themeEditorFontSize" type="text" class="input" placeholder="Font size (e.g. 15px)">
+			                        <input id="themeEditorAccent" type="text" class="input" placeholder="Accent color (e.g. rgb(229,33,157))">
+			                    </div>
+				                </div>
+
+				                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
+				                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="Save overrides now">Save overrides</button>
+				                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="Clear overrides">Reset overrides</button>
+				                </div>
+				            </div>
+				        </details>
+			    </div>
+			    <div class="modal-footer">
+			        <button type="button" class="btn btn-ghost" id="themeModalCancel">Close</button>
+			    </div>
+			</div>
+
+	<script>
+	window.CURRENT_FILE = <?= json_encode($requested ?? '') ?>;
+	window.initialContent = <?= json_encode($current_content ?? '') ?>;
+	window.IS_SECRET_AUTHENTICATED = <?= json_encode(is_secret_authenticated()) ?>;
+	window.MDW_THEMES_DIR = <?= json_encode($THEMES_DIR) ?>;
+	window.MDW_THEMES = <?= json_encode($themesList) ?>;
+	</script>
+
+<script defer src="<?=h($STATIC_DIR)?>/base.js"></script>
 
 </body>
 </html>

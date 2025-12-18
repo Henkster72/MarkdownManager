@@ -1,0 +1,41 @@
+.preview-content {
+  --theme-bg: #ffffff;
+  --theme-primary: rgb(229, 33, 157);
+  --theme-secondary: #FCE7F3;
+  background: var(--theme-bg);
+  color: #111827;
+  font-family: "Montserrat", var(--font-sans);
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3,
+.preview-content h4,
+.preview-content h5,
+.preview-content h6 {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content blockquote {
+  border-left-color: rgba(229, 33, 157, 0.65);
+  background-color: var(--theme-secondary);
+  color: rgba(122, 19, 80, 0.95);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background-color: var(--theme-secondary);
+  color: rgba(122, 19, 80, 0.95);
+  border: 1px solid rgba(229, 33, 157, 0.18);
+}
+
+.preview-content pre {
+  background-color: var(--theme-secondary);
+  border-color: rgba(229, 33, 157, 0.18);
+}

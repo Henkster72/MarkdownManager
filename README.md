@@ -8,6 +8,7 @@ Sharpen your thinking.
 
 ## Changelog
 
+- 0.2.1: Theme support (file-based themes + per-user overrides), HTML export/copy from the editor, built-in image manager (upload + browse + insert), reserved `themes/` + `images/` folders (configurable in `.env`), improved MathJax rendering in live preview, and a handful of editor/mobile UX fixes (modal overlap, responsive toolbar)
 - 0.2: Plugin-based explorer (HTML/PDF/links), shared `explorer_view.php`, improved folder UX (toggle state, back caret), header SVG logo, +MD folder dropdown, internal/external link modal (with search), and `.md` links route via `index.php?file=...` for subfolder installs
 - 0.1.2: Clear filter button + Delete key deletes the current note (preview mode)
 - 0.1.1: Markdown images (`![alt](url)`) + relative paths resolved from the `.md` directory
@@ -18,9 +19,12 @@ Sharpen your thinking.
 - [x] Folder toggle in overview (`index.php`): subdirs start collapsed; clicking the folder icon toggles children; use `pi pi-openfolder` for “open” state
 - [x] Internal linking between notes (`edit.php` “Add link”): support subdirs + content-aware picker; allow external URLs too with a simple modal
 - [x] Add plugins for viewing of different files like PDF and HTML
+- [x] Export HTML preview to plain HTML file
+- [x] Bug fixes with adding MD files and adding md extension by default 
+- [x] Add theming for markdown editor and html preview in edit mode
+- [x] Add image upload + insert in edit mode
 - [ ] Add functionality for the explorer to drag and drop md files to other folders 
 - [ ] Tagging (frontmatter or inline `#tags`) + tag browser
-- [ ] Add theming for markdown editor and html preview in edit mode
 - [ ] Improve Markdown parser edge cases (nested lists, tables, better code fences)
 - [ ] Syntax highlighting in preview (server-side or client-side)
 - [ ] Offline-friendly MathJax option (self-hosted instead of CDN)
@@ -96,12 +100,23 @@ Everything you read and edit is stored as normal `*.md` files in this directory 
 .
 ├─ index.php          # viewer (overview + reader + create/delete)
 ├─ edit.php           # editor (3-pane desktop, 2-row mobile)
-├─ base.js            # client-side behavior (filtering, preview, resizers, shortcuts)
-├─ ui.css             # application layout + UI components
-├─ markdown.css       # markdown typography (editor + viewer)
-├─ htmlpreview.css    # preview container styling
-├─ popicon.css        # icon font classes (pi pi-*)
-├─ popicon.woff2      # icon font file
+├─ html_preview.php    # shared Markdown→HTML rendering + URL resolution
+├─ image_manager.php   # upload/list endpoint for the image manager modal
+├─ themes_lib.php      # theme discovery (meta + fonts + available CSS)
+├─ static/            # reserved system folder (not shown in overview)
+│  ├─ base.js         # client-side behavior (filtering, preview, resizers, shortcuts)
+│  ├─ ui.css          # application layout + UI components
+│  ├─ markdown.css    # markdown typography (editor + viewer)
+│  ├─ htmlpreview.css # preview container styling
+│  ├─ popicon.css     # icon font classes (pi pi-*)
+│  └─ popicon.woff2   # icon font file
+├─ themes/            # reserved system folder (not shown in overview)
+│  ├─ Candy_htmlpreview.css
+│  ├─ Candy_markdown.css
+│  ├─ Candy_meta.json
+│  ├─ Candy_fonts.json
+│  └─ ...
+├─ images/            # reserved system folder for uploads (not shown in overview)
 ├─ links.csv          # optional shortcuts (CSV)
 ├─ secret_mds.txt     # optional list of “secret” markdown paths
 └─ <folders>/*.md     # your notes
@@ -146,6 +161,107 @@ Copy `.env.example` to `.env` and edit as needed.
 - `SECRET_MDS_FILE` (default: `secret_mds.txt`)
 - `SECRET_MDS_PASSWORD` (required for unlocking secret notes)
 - `PLUGINS_DIR` (default: `plugins`)
+- `STATIC_DIR` (default: `static`) — reserved folder for CSS/JS/fonts (not shown in the overview)
+- `IMAGES_DIR` (default: `images`) — reserved folder for uploaded images (not shown in the overview)
+- `THEMES_DIR` (default: `themes`) — reserved folder for optional theme files (not shown in the overview)
+
+## Theme support (0.2.1)
+
+Theme support is intentionally minimal and scoped: it only styles the Markdown editor text area + the HTML preview container. It does not affect the rest of the UI (`static/ui.css`).
+
+### Selecting a theme
+
+- Click the **gear** icon in the header to open the Theme modal.
+- Select a preset from the dropdown:
+  - The app always loads `static/markdown.css` + `static/htmlpreview.css` first.
+  - Then it loads your selected theme CSS (if present) to override the defaults.
+- Optional: tweak overrides under “Overrides (optional)” (see below).
+
+### How themes are stored (files)
+
+Themes live in `THEMES_DIR` (default: `themes/`) and follow a naming pattern:
+
+- `ThemeName_htmlpreview.css` — optional, overrides `static/htmlpreview.css`
+- `ThemeName_markdown.css` — optional, overrides `static/markdown.css`
+
+You can provide only one of them; the other area simply keeps the defaults.
+
+### Theme metadata (optional)
+
+`ThemeName_meta.json` lets the app show a nicer label and color swatches:
+
+```json
+{
+  "label": "Candy",
+  "color": "#E5219D",
+  "bg": "#FFFFFF",
+  "secondary": "#FCE7F3"
+}
+```
+
+- `color`: primary/accent color (used for the theme picker styling + swatch)
+- `bg`: the “HTML preview background” used in the theme picker preview
+- `secondary`: a softer secondary tone (used by themes for blockquote/code backgrounds)
+
+### Theme fonts (optional)
+
+If your theme uses Google Fonts, add `ThemeName_fonts.json`:
+
+```json
+{
+  "preconnect": [
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com"
+  ],
+  "stylesheets": [
+    "https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap"
+  ]
+}
+```
+
+When the theme is active, the app injects the relevant `<link rel="preconnect">` and `<link rel="stylesheet">` tags. If you are offline, the browser will fall back to local fonts.
+
+### Overrides (per-user, optional)
+
+Overrides are per-browser/per-device: they’re stored in `localStorage` and applied as an extra `<style>` tag.
+
+- Storage key: `mdw-theme-overrides`
+- Save behavior: auto-saves as you type; “Save overrides” forces a save immediately.
+- “Reset overrides” clears them and returns to pure theme+defaults.
+
+This is meant for small personal tweaks like background color, font size, or accent color—without having to edit theme files on disk.
+
+## HTML export & copy (0.2.1)
+
+In `edit.php`, the HTML preview pane has two extra buttons:
+
+- **HTML download**: downloads a clean standalone `.html` file of the current preview
+- **Copy HTML**: copies the same standalone HTML to your clipboard
+
+Notes:
+- The export uses the current server-rendered preview (same output as the live preview).
+- Internal `index.php?file=...` links are rewritten to relative `.md` links so exported HTML is more portable.
+- CSS classes are stripped to keep the export “plain”.
+
+## Image manager (0.2.1)
+
+In `edit.php`, click the **image** icon to open the image manager modal:
+
+- Browse existing images in `IMAGES_DIR` (default: `images/`)
+- Upload a new image
+- Insert Markdown at the cursor: `![alt](images/filename.ext)`
+
+Implementation notes:
+- Upload/list endpoint: `image_manager.php`
+- Uses a CSRF token stored in the session.
+- If the GD extension is available, uploads may be converted/resized to WebP for consistency; otherwise the original image is stored.
+- `IMAGES_DIR` is a reserved folder: it is excluded from the explorer list and folder dropdowns.
+
+## Notable bug fixes (0.2.1)
+
+- Fixed MathJax not reliably typesetting after live-preview updates.
+- Fixed the image modal being “nested” inside the link modal (it only appeared after opening the link modal) and ensured modals don’t overlap.
+- Improved mobile ergonomics: responsive toolbar labels and more space for editing/preview.
 
 ## Plugins (optional)
 

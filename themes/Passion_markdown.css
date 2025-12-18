@@ -1,0 +1,16 @@
+.editor-textarea {
+  font-family: "Lato", var(--font-sans);
+}
+
+.editor-lines {
+  color: #D51801;
+}
+
+.editor-textarea {
+  caret-color: #D51801;
+}
+
+.editor-textarea::selection {
+  background-color: rgba(213, 24, 1, 0.22);
+}
+

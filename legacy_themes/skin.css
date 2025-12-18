@@ -1,0 +1,506 @@
+
+/* Geomanist Regular (300–400, used for font-light and font-normal) */
+@font-face {
+    font-family: "geomanist";
+    font-style: normal;
+    font-weight: 300 400;
+    font-display: swap;
+    src: url("geomanist-regular-webfont.woff2") format("woff2");
+    unicode-range: U+0000-00FF;
+  }
+  
+  /* Geomanist SemiBold (500) */
+  @font-face {
+    font-family: "geomanist";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("geomanist-semibold-webfont.woff2") format("woff2");
+    unicode-range: U+0000-00FF;
+  }
+  
+  /* Geomanist Bold (600–700) */
+  @font-face {
+    font-family: "geomanistbold";
+    font-style: normal;
+    font-weight: 600 700;
+    font-display: swap;
+    src: url("geomanist-bold-webfont.woff2") format("woff2");
+    unicode-range: U+0000-00FF;
+  }
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    }
+    
+    html, body, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+    a, abbr, address, cite, code, del, dfn, em, img, ins, kbd,
+    q, s, samp, small, strong, sub, sup, var, b, i, dl, dt, dd,
+    ol, ul, li, fieldset, form, label, legend, table, caption,
+    tbody, tfoot, thead, tr, th, td, article, aside, canvas,
+    details, embed, figure, figcaption, footerbar, header, hgroup,
+    menu, nav, output, ruby, section, summary, time, mark, audio,
+    video {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        vertical-align: baseline;
+    }
+    
+    .video-overlay {
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: #ffffff;
+        font-weight: 600;
+        z-index: 10; /* Ensure overlay is on top of video */
+      }
+      .video-overlay.hidden {
+        display: none;
+      }
+    
+    a {
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    hr {
+        border: none;
+        height: 1rem;
+        background-color: var(--baselight);
+    }
+    
+    button {
+        background-color: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        color: inherit;
+        text-align: inherit;
+        cursor: pointer;
+    }
+    
+    body, html {
+        background-color: #fcf9f99e;
+        color: #000;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-size: var(--default-size);
+        font-family: "geomanist", sans-serif;
+    }
+    #ts { display:inline-block; max-width:100%; overflow:hidden; }
+    blockquote {
+        border-inline-start-width: 4px;
+        background-color: #d1dddd;
+        margin-bottom: 1rem;
+        margin-top: 1rem;
+        border-color: var(--baselight);
+        padding: 3rem;
+        line-height: 1.625;
+        /* border-radius: .5rem; */
+        font-size: .9rem;
+    }
+    blockquote img {
+        object-fit: cover;
+        display: block;
+    }
+
+            
+.roundimage, .biground {
+        border-radius: 50% !important;
+        object-fit: cover;
+        display: block;
+}
+.roundimage {
+    border:5px solid var(--base); 
+    height: 200px !important;
+    width: 200px !important;
+}
+.biground {
+    border:10px solid var(--base); 
+    height: 310px !important;
+    width: 310px !important;
+}
+/*gallery*/
+.gallery-container {
+    /* justify-content: center; */ /* Centering done by mx-auto usually */
+    /* align-items: center; */
+    max-width: 80rem;
+    /* max-width: 1000px; */ /* Overridden by Tailwind max-w-4xl in this case */
+    margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+}
+
+/* .caption CSS removed as it's not used in this specific implementation */
+
+.gallery-item {
+    /* min-width: 100%; */ /* Overridden by Tailwind w-1/2 */
+    height: auto;
+    display: flex; /* This will apply to the item wrapper */
+    justify-content: center; /* This will apply to the item wrapper */
+    align-items: center; /* This will apply to the item wrapper */
+    position: relative;
+    /* overflow: hidden; */ /* Might clip hover effects if applied here */
+}
+
+.gallery-card {
+    padding: 3vw;
+    text-align: center;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    /* border-radius: .5rem; */
+    background-color: #fff;
+}
+.gallery-item img {
+    /* width: 92%; */ /* Likely overridden by Tailwind w-full on the img tag */
+/*    object-fit: cover; */ /* Handled by Tailwind object-cover */
+}
+
+.gallery-carousel {
+    display: flex; 
+    /* Adjusted transition for smoother feel */
+    transition: transform 0.6s ease-in-out;
+}
+
+
+.glasseffect {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  /* border-radius: inherit; */
+  /* text-shadow: #fff 1px 0 10px; */
+  border: var(--glass-border-width, 4px) solid #dfc7bf55;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.glasseffect::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* border-radius: inherit; */
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    transparent 100%
+  );
+  z-index: 101;
+  pointer-events: none;
+}
+
+.bigtextcard {
+    width: 100%;
+    text-align: left;
+    padding: 2rem;
+    /* border-radius: .5rem; */
+    --glass-border-width: .1rem;
+}
+
+.gallery-nav-buttons {
+    position: absolute;
+    top: 80%;
+    /* Adjusted width slightly to avoid overlap with padding/margins */
+    width: calc(100% + 1rem); /* Example adjustment, fine-tune as needed */
+    left: 50%; /* Center the button container */
+    transform: translate(-50%, -50%); /* Center vertically and horizontally */
+    display: flex;
+    justify-content: space-between;
+    padding: 0 1rem; /* Add some padding so buttons aren't edge-to-edge */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+.gallery-nav-button {
+    background: rgba(255, 255, 255, 0.7);
+    border: none;
+    font-size: 1.5rem; /* Tailwind text-xl is 1.25rem, text-2xl is 1.5rem */
+    padding: 10px; /* Tailwind p-2.5 is 10px */
+    cursor: pointer;
+    z-index: 20; /* Ensure buttons are on top */
+    width: 3rem; /* Tailwind w-12 */
+    height: 3rem; /* Tailwind h-12 */
+    border-radius: 50%; /* Tailwind rounded-full */
+    display: flex;
+    align-items: center; /* Tailwind items-center */
+    justify-content: center; /* Tailwind justify-center */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add subtle shadow */
+}
+.gallery-nav-button:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+:root{
+    --basedark: #805a4e;
+    --base: #BD8D7D;
+    --baselight: #dfc7bf55;
+    --offwhite: #fcf9f9;
+    --accent: #7db7bd;
+    --link: #458187;
+    --error: #E02D00;
+    --default-size: calc(.9rem + .15vw);
+    --default-rounding: 5px;
+    --default-space: 3rem;
+    --freecol: #7c9364;
+    /* --freecol: #4d9198; */
+    --menu-height: 4rem;
+}
+img {
+    color: var(--error); 
+}
+.text-warning{
+    color:var(--error);
+}
+
+.scroll-watcher {
+    height: 5px;
+    position: fixed;
+    top: calc(var(--menu-height) - 6px);
+    z-index: 50;
+    background-color: var(--basedark);
+    width: 100%;
+    scale: 0 1;
+    transform-origin: left;
+    animation: scroll-watcher linear;
+    animation-timeline: scroll();
+  }
+  
+  @keyframes scroll-watcher {
+    to {
+      scale: 1 1;
+    }
+  }
+  
+.search-wrapper {
+    width: 95%;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+    .search-wrapper {
+        width: 50%;
+    }
+}
+
+.search-bar-container {
+    position: relative;
+}
+
+#searchBar {
+    width: 100%;
+    border: 0;
+    border-bottom: 2px solid #000;
+    border-radius: 0;
+    padding: 0.9rem 2.75rem 0.9rem 3rem;
+    min-height: 3.25rem;
+    font-size: 1.1rem;
+    display: block;
+    box-sizing: border-box;
+    background-color: transparent;
+    box-shadow: none;
+    appearance: none;
+    transition: border-bottom-color 150ms ease, border-bottom-width 150ms ease;
+    font-weight: 900;
+}
+
+#searchBar:focus,
+#searchBar:focus-visible {
+    outline: none;
+    border-bottom-color: var(--base);
+    border-bottom-width: 3px;
+    padding-bottom: calc(0.9rem - 1px);
+    box-shadow: none;
+}
+
+.search-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+/* Home page search bar (no Tailwind) */
+.site-search {
+    width: 100%;
+    max-width: 20rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+@media (min-width: 768px) {
+    .site-search {
+        max-width: 32rem;
+        padding: 1.25rem;
+    }
+}
+
+.site-search__bar {
+    position: relative;
+}
+
+.site-search__icon {
+    position: absolute;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 1.15rem;
+    color: #000;
+}
+.edit-fab-link {
+    position: absolute;
+    bottom: .5rem;
+    right: .7rem;
+    padding: .3rem .6rem;
+    background: #fffc;
+    border-radius: 9999px;
+    box-shadow: 0 2px 8px #00000012;
+    opacity: 0;
+    transition: opacity .2s;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    pointer-events: auto!important;
+}
+.edit-image-relative-wrap:hover .edit-fab-link,
+.edit-fab-link:focus,
+.edit-fab-link:hover {
+  opacity: 1 !important;
+  pointer-events: auto !important; /* ensure it's clickable */
+}
+
+#articleCount {
+    margin-top: 0.7rem;
+    text-align: center;
+}
+p{
+    line-height: calc(1.8rem + .4vw);
+    margin: .5rem 0 2rem 0;
+    color: #000;
+    font-weight: 400;
+}
+.smalltext {
+    font-size: calc(.7rem + .1vw);
+}
+.m_space {
+    margin: var(--default-space) !important;
+}
+.my_space {
+    margin-top: var(--default-space) !important;
+    margin-bottom: var(--default-space) !important;
+}
+
+.text-left {	text-align: left;}
+.text-center {	text-align: center;}
+.text-right {	text-align: right; display: block;}
+
+sup {
+    vertical-align: super;
+    font-size: smaller;
+}
+h1{
+    font-weight: 700 !important;
+    line-height: 1.8;
+    padding: 1.5rem 0;
+    font-size: 3.5rem;
+}
+h2 {
+    padding: 1.3rem 0;
+    font-size: 1.6rem;
+    z-index: 10;
+    position: relative;
+    font-weight: 500 !important;
+    line-height: 1.8;
+}
+
+h3 {
+    padding: 1.2rem 0;
+    padding-bottom: 1rem;
+    font-size: 1.4rem;
+    font-weight: 400;
+}
+h4 {
+    padding-top: .5rem;
+    padding-bottom: .3rem;
+    font-size: 1.1rem;
+}
+
+
+.bg-base{
+    background-color: var(--base) !important;
+}
+.bg-dark{
+    background-color: var(--basedark) !important;
+}
+.bg-light{
+    background-color: var(--offwhite) !important;
+}
+.bg-accent{
+    background-color: var(--accent) !important;
+}
+.basecol{
+    color: var(--base) !important;
+}
+.darkcol{
+    color: var(--basedark) !important;
+}
+.accentcol{
+    color: var(--accent) !important;
+}
+
+.blackshadow{
+    text-shadow: rgba(0, 0, 0, 1) 3px 3px 3px;
+}
+.whiteshadow{
+    text-shadow: rgba(255, 255, 255, .8) 3px 3px 3px;
+}
+.baseshadow {
+    text-shadow: #BD8D7De6 3px 3px 3px;
+}
+
+.bg-glass {
+  background-color: #BD8D7D44 !important;
+  backdrop-filter: blur(1px);
+  padding: 1rem;
+  border-radius: var(--default-rounding);
+}
+.bg-offwhite{
+    background-color:var(--offwhite) !important;
+}
+
+.blackbshadow{
+    box-shadow: rgba(0, 0, 0, 1) 3px 3px 3px;
+}
+
+.graybshadow{
+    box-shadow: rgba(0, 0, 0, .5) 3px 3px 3px;
+}
+.whitebshadow{
+    box-shadow: rgba(255, 255, 255, .8) 3px 3px 3px;
+}
+.basebshadow {
+    box-shadow: rgba(45,151,147, .9) 3px 2px 8px;
+}
+.flag{
+    height: .8rem;
+    width: auto;
+    padding-left: .2rem;
+}

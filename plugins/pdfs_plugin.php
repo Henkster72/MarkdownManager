@@ -108,13 +108,15 @@ return [
             $esc = $ctx['escape'] ?? fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             $urlEncodePath = $ctx['url_encode_path'] ?? fn($p) => (string)$p;
             $folderLink = $ctx['folder_link'] ?? fn($folder) => 'index.php?folder=' . rawurlencode((string)$folder);
+            $folderAnchorId = $ctx['folder_anchor_id'] ?? null;
             $showBack = !empty($ctx['show_back']) && !empty($ctx['back_href']);
             $backHref = $ctx['back_href'] ?? null;
 
             $childrenId = 'folder-children-' . substr(sha1('plugin:pdfs:PDF'), 0, 10);
-            $defaultOpen = true;
+            $defaultOpen = ($ctx['folder_filter'] ?? null) === 'PDF';
+            $sectionId = is_callable($folderAnchorId) ? (string)$folderAnchorId('PDF') : '';
             ?>
-            <section class="nav-section" data-folder-section="PDF" data-default-open="<?= $defaultOpen ? '1' : '0' ?>">
+            <section <?= $sectionId ? 'id="'.$esc($sectionId).'"' : '' ?> class="nav-section" data-folder-section="PDF" data-default-open="<?= $defaultOpen ? '1' : '0' ?>">
                 <h2 class="note-group-title">
                     <?php if ($showBack): ?>
                         <a class="icon-button folder-back" href="<?= $esc($backHref) ?>" title="Back">

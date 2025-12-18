@@ -1,0 +1,16 @@
+.editor-textarea {
+  font-family: "Montserrat", var(--font-sans);
+}
+
+.editor-lines {
+  color: #BD8D7D;
+}
+
+.editor-textarea {
+  caret-color: #BD8D7D;
+}
+
+.editor-textarea::selection {
+  background-color: rgba(189, 141, 125, 0.22);
+}
+

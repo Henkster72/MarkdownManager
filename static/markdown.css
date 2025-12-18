@@ -115,6 +115,18 @@
     margin: 0.15rem 0;
 }
 
+.md-math-block {
+    margin: 0.5rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.md-math-block mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
 /* code blocks */
 
 .md-codeblock {

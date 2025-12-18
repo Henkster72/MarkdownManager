@@ -64,6 +64,12 @@ function sanitize_new_md_path($path) {
     $path = trim($path);
     $path = str_replace("\\", "/", $path);
     $path = ltrim($path, "/");
+    if ($path === '' || str_ends_with($path, '/')) return null;
+
+    // Always enforce .md extension (append if missing).
+    if (!preg_match('/\\.md$/i', $path)) {
+        $path .= '.md';
+    }
 
     $parts = explode('/', $path);
     foreach ($parts as $p) {
@@ -71,8 +77,6 @@ function sanitize_new_md_path($path) {
         // allow unicode letters/numbers plus . _ -
         if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $p)) return null;
     }
-
-    if (!preg_match('/\.md$/i', end($parts))) return null;
 
     return $path;
 }
@@ -98,460 +102,13 @@ function folder_from_path($path) {
 /* ESCAPE */
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
-function url_encode_path($path) {
-    $path = str_replace("\\", "/", (string)$path);
-    $segments = explode('/', $path);
-    $segments = array_map('rawurlencode', $segments);
-    return implode('/', $segments);
-}
-
-function is_external_url($url) {
-    $url = (string)$url;
-    if ($url === '') return false;
-    if (str_starts_with($url, '//')) return true;
-    return (bool)preg_match('~^[a-z][a-z0-9+.-]*:~i', $url);
-}
-
-function resolve_rel_url_from_md($url, $mdPath) {
-    $url = (string)$url;
-    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
-    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
-
-    $suffixPos = null;
-    $qPos = strpos($url, '?');
-    $hPos = strpos($url, '#');
-    if ($qPos !== false && $hPos !== false) $suffixPos = min($qPos, $hPos);
-    else if ($qPos !== false) $suffixPos = $qPos;
-    else if ($hPos !== false) $suffixPos = $hPos;
-    $base = ($suffixPos === null) ? $url : substr($url, 0, $suffixPos);
-    $suffix = ($suffixPos === null) ? '' : substr($url, $suffixPos);
-
-    $base = str_replace("\\", "/", $base);
-    if ($base === '') return $url;
-
-    $mdDir = dirname($mdPath);
-    if ($mdDir === '.' || $mdDir === '') return url_encode_path($base) . $suffix;
-
-    $baseParts = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
-    $relParts = explode('/', $base);
-    $out = $baseParts;
-    foreach ($relParts as $p) {
-        if ($p === '' || $p === '.') continue;
-        if ($p === '..') {
-            if (empty($out)) return $url; // don't allow escaping project root
-            array_pop($out);
-            continue;
-        }
-        $out[] = $p;
-    }
-
-    return url_encode_path(implode('/', $out)) . $suffix;
-}
-
-function resolve_rel_href_from_md_link($url, $mdPath) {
-    $url = (string)$url;
-    if ($url === '' || $mdPath === null || $mdPath === '') return $url;
-    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
-
-    $qPos = strpos($url, '?');
-    $hPos = strpos($url, '#');
-
-    $baseEnd = null;
-    if ($qPos !== false && $hPos !== false) $baseEnd = min($qPos, $hPos);
-    else if ($qPos !== false) $baseEnd = $qPos;
-    else if ($hPos !== false) $baseEnd = $hPos;
-
-    $base = ($baseEnd === null) ? $url : substr($url, 0, $baseEnd);
-    $suffix = ($baseEnd === null) ? '' : substr($url, $baseEnd);
-
-    $base = str_replace("\\", "/", $base);
-    if ($base === '') return $url;
-
-    $mdDir = dirname($mdPath);
-    $out = [];
-    if ($mdDir !== '.' && $mdDir !== '') {
-        $out = array_values(array_filter(explode('/', trim($mdDir, '/')), fn($p) => $p !== ''));
-    }
-
-    $relParts = explode('/', $base);
-    foreach ($relParts as $p) {
-        if ($p === '' || $p === '.') continue;
-        if ($p === '..') {
-            if (empty($out)) return $url; // don't allow escaping project root
-            array_pop($out);
-            continue;
-        }
-        $out[] = $p;
-    }
-
-    $resolved = implode('/', $out);
-    if ($resolved === '') return $url;
-
-    // If it points to a markdown file, route through the app (works in subfolder installs like /md/).
-    if (preg_match('/\\.md$/i', $resolved)) {
-        $href = 'index.php?file=' . rawurlencode($resolved);
-        if ($suffix !== '') {
-            if ($suffix[0] === '?') $href .= '&' . substr($suffix, 1);
-            else $href .= $suffix; // includes #fragment
-        }
-        return $href;
-    }
-
-    return url_encode_path($resolved) . $suffix;
-}
-
-/* INLINE MARKDOWN */
-function fix_mathjax_currency_in_math_delimiters($text) {
-    $replace = static function($m) {
-        $open  = $m[1];
-        $inner = $m[2];
-        $close = $m[3];
-
-        // MathJax (TeX) errors on raw currency symbols like "€" in math mode.
-        // Wrapping it in \text{} makes it parse reliably.
-        $inner = str_replace('€', '\\text{€}', $inner);
-
-        return $open . $inner . $close;
-    };
-
-    // \( ... \)
-    $text = preg_replace_callback('/(\\\\\\()(.+?)(\\\\\\))/s', $replace, $text);
-    // \[ ... \]
-    $text = preg_replace_callback('/(\\\\\\[)(.+?)(\\\\\\])/s', $replace, $text);
-    return $text;
-}
-
-function inline_md($text, $mdPath = null) {
-    // Protect inline code spans from further processing (and MathJax fixes).
-    $codeSpans = [];
-    $text = preg_replace_callback('/`([^`]+)`/', function($m) use (&$codeSpans){
-        $key = '@@MD_CODE_' . count($codeSpans) . '@@';
-        $codeSpans[$key] = $m[1];
-        return $key;
-    }, $text);
-
-    // Fix common MathJax TeX parse issues (e.g. "€" inside \( ... \)).
-    $text = fix_mathjax_currency_in_math_delimiters($text);
-
-    $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-
-    // ![alt](url "title")
-    $text = preg_replace_callback(
-        '/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/',
-        function($m) use ($mdPath){
-            $alt = $m[1];
-            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
-            $urlResolved = resolve_rel_url_from_md($urlRaw, $mdPath);
-            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            $titleAttr = isset($m[3]) ? ' title="'.$m[3].'"' : '';
-            return '<img class="md-img" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
-        },
-        $text
-    );
-
-    // **bold**
-    $text = preg_replace(
-        '/\*\*([^*]+)\*\*/',
-        '<strong class="font-semibold text-neutral-900 dark:text-neutral-100">$1</strong>',
-        $text
-    );
-
-    // *italic*
-    $text = preg_replace(
-        '/\*([^*]+)\*/',
-        '<em class="italic text-neutral-600 dark:text-neutral-300">$1</em>',
-        $text
-    );
-
-    // [text](url)
-    $text = preg_replace_callback(
-        '/\[([^\]]+)\]\(([^)]+)\)/',
-        function($m) use ($mdPath){
-            $label = $m[1];
-            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
-            $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
-            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            return '<a class="underline text-blue-600 dark:text-blue-400 hover:opacity-80" href="'.
-                   $urlEsc.
-                   '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
-        },
-        $text
-    );
-
-    // Restore protected inline code spans.
-    if (!empty($codeSpans)) {
-        foreach ($codeSpans as $key => $raw) {
-            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
-            $rawEsc = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
-            $text = str_replace(
-                $keyEsc,
-                '<code class="bg-neutral-800 text-neutral-100 px-1.5 py-0.5 rounded text-[0.8em]">'.$rawEsc.'</code>',
-                $text
-            );
-        }
-    }
-
-    return $text;
-}
-
-function split_md_table_row($line) {
-    $line = trim($line);
-    if ($line === '') return [];
-
-    if (str_starts_with($line, '|')) $line = substr($line, 1);
-    if (str_ends_with($line, '|')) $line = substr($line, 0, -1);
-
-    $cells = preg_split('/(?<!\\\\)\|/', $line);
-    $out = [];
-    foreach ($cells as $c) {
-        $c = str_replace('\\|', '|', $c);
-        $out[] = trim($c);
-    }
-    return $out;
-}
-
-function is_md_table_separator($line) {
-    $line = trim($line);
-    if ($line === '') return false;
-    if (strpos($line, '|') === false) return false;
-    return (bool)preg_match('/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/', $line);
-}
-
-function md_table_align_from_spec($spec) {
-    $spec = trim($spec);
-    $left = str_starts_with($spec, ':');
-    $right = str_ends_with($spec, ':');
-    if ($left && $right) return 'center';
-    if ($right) return 'right';
-    return 'left';
-}
-
-function md_indent_width($ws) {
-    $ws = str_replace("\t", "    ", (string)$ws);
-    return strlen($ws);
-}
-
-/* BLOCK MARKDOWN -> HTML */
-function md_to_html($text, $mdPath = null) {
-    $text = str_replace(["\r\n","\r"], "\n", $text);
-    $lines = explode("\n",$text);
-
-    $html = [];
-    $in_codeblock = false;
-    $listStack = [];
-
-    $openList = function($tag, $indent) use (&$html, &$listStack) {
-        $html[] = "<$tag>";
-        $listStack[] = ['tag' => $tag, 'indent' => (int)$indent, 'liOpen' => false];
-    };
-    $closeOneList = function() use (&$html, &$listStack) {
-        if (empty($listStack)) return;
-        $top = &$listStack[count($listStack) - 1];
-        if (!empty($top['liOpen'])) {
-            $html[] = "</li>";
-            $top['liOpen'] = false;
-        }
-        $tag = $top['tag'];
-        array_pop($listStack);
-        $html[] = "</$tag>";
-    };
-    $closeAllLists = function() use (&$listStack, $closeOneList) {
-        while (!empty($listStack)) $closeOneList();
-    };
-    $closeToIndent = function($indent) use (&$listStack, $closeOneList) {
-        while (!empty($listStack) && $listStack[count($listStack) - 1]['indent'] > $indent) {
-            $closeOneList();
-        }
-    };
-
-    $count = count($lines);
-    for ($i = 0; $i < $count; $i++) {
-        $line = $lines[$i];
-
-        // ``` fenced code blocks (allow indentation, e.g. inside lists)
-        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
-            $closeAllLists();
-            if ($in_codeblock) {
-                $html[] = "</code></pre>";
-                $in_codeblock = false;
-            } else {
-                $in_codeblock = true;
-                $lang = trim((string)($m[1] ?? ''));
-                $langAttr = $lang ? ' class="language-'.htmlspecialchars($lang).'"' : '';
-                $html[] = '<pre class="rounded-xl bg-neutral-900 text-neutral-100 p-4 overflow-x-auto text-sm ring-1 ring-neutral-700/50"><code'.$langAttr.'>';
-            }
-            continue;
-        }
-
-        if ($in_codeblock) {
-            $html[] = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
-            continue;
-        }
-
-        // horizontal rule
-        if (preg_match('/^\s*((\*|-|_)\s*){3,}$/', $line)) {
-            $closeAllLists();
-            $html[] = '<hr>';
-            continue;
-        }
-
-        // blockquote
-        if (preg_match('/^\s*>\s?(.*)$/', $line)) {
-            $closeAllLists();
-
-            $bq = [];
-            while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $m)) {
-                $bq[] = $m[1];
-                $i++;
-            }
-            $i--;
-            $inner = implode("\n", $bq);
-            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath) . "\n" . '</blockquote>';
-            continue;
-        }
-
-        // tables (GFM-style)
-        if (strpos($line, '|') !== false && ($i + 1) < $count && is_md_table_separator($lines[$i + 1])) {
-            $closeAllLists();
-
-            $headerCells = split_md_table_row($line);
-            $alignCells = split_md_table_row($lines[$i + 1]);
-            $colCount = max(count($headerCells), count($alignCells));
-            if ($colCount < 1) { continue; }
-
-            $align = [];
-            for ($c = 0; $c < $colCount; $c++) {
-                $align[$c] = md_table_align_from_spec($alignCells[$c] ?? '');
-            }
-
-            $rows = [];
-            $i += 2;
-            while ($i < $count) {
-                $rowLine = $lines[$i];
-                if (trim($rowLine) === '') break;
-                if (strpos($rowLine, '|') === false) break;
-                $cells = split_md_table_row($rowLine);
-                $rows[] = $cells;
-                $i++;
-            }
-            $i--;
-
-            $table = [];
-            $table[] = '<table>';
-            $table[] = '<thead><tr>';
-            for ($c = 0; $c < $colCount; $c++) {
-                $txt = $headerCells[$c] ?? '';
-                $a = $align[$c];
-                $table[] = '<th class="align-'.$a.'">' . inline_md($txt, $mdPath) . '</th>';
-            }
-            $table[] = '</tr></thead>';
-            $table[] = '<tbody>';
-            foreach ($rows as $r) {
-                $table[] = '<tr>';
-                for ($c = 0; $c < $colCount; $c++) {
-                    $txt = $r[$c] ?? '';
-                    $a = $align[$c];
-                    $table[] = '<td class="align-'.$a.'">' . inline_md($txt, $mdPath) . '</td>';
-                }
-                $table[] = '</tr>';
-            }
-            $table[] = '</tbody></table>';
-            $html[] = implode("\n", $table);
-            continue;
-        }
-
-        // headings
-        if (preg_match('/^(#{1,6})\s+(.*)$/',$line,$m)) {
-            $closeAllLists();
-
-            $level   = strlen($m[1]);
-            $content = $m[2];
-            $tag     = "h$level";
-
-            $clsMap = [
-                1 => "text-3xl font-bold mt-10 mb-4 text-neutral-900 dark:text-neutral-100 text-center",
-                2 => "text-2xl font-semibold mt-8 mb-3 text-neutral-900 dark:text-neutral-100",
-                3 => "text-xl font-semibold mt-6 mb-2 text-neutral-900 dark:text-neutral-100",
-                4 => "text-lg font-semibold mt-4 mb-2 text-neutral-800 dark:text-neutral-200",
-                5 => "text-base font-semibold mt-3 mb-2 text-neutral-800 dark:text-neutral-200",
-                6 => "text-sm font-semibold mt-3 mb-2 uppercase tracking-wide text-neutral-600 dark:text-neutral-400",
-            ];
-            $cls = $clsMap[$level] ?? "font-bold mt-4 mb-2";
-
-            $html[] = "<$tag class=\"$cls\">".inline_md($content, $mdPath)."</$tag>";
-            continue;
-        }
-
-        // list items (supports nesting via indentation)
-        if (preg_match('/^(\s*)([-*])\s+(.*)$/', $line, $m) || preg_match('/^(\s*)(\d+)\.\s+(.*)$/', $line, $m)) {
-            $isOrdered = is_numeric($m[2]);
-            $tag = $isOrdered ? 'ol' : 'ul';
-            $indent = md_indent_width($m[1] ?? '');
-            $content = (string)($m[3] ?? '');
-
-            if (!empty($listStack)) {
-                $top = $listStack[count($listStack) - 1];
-                if ($indent > $top['indent'] && empty($top['liOpen'])) {
-                    $indent = $top['indent'];
-                }
-            }
-
-            if (empty($listStack)) {
-                $openList($tag, $indent);
-            } else {
-                if ($indent > $listStack[count($listStack) - 1]['indent']) {
-                    $openList($tag, $indent);
-                } else if ($indent < $listStack[count($listStack) - 1]['indent']) {
-                    $closeToIndent($indent);
-                }
-
-                if (empty($listStack)) {
-                    $openList($tag, $indent);
-                } else if ($listStack[count($listStack) - 1]['indent'] === $indent && $listStack[count($listStack) - 1]['tag'] !== $tag) {
-                    $closeOneList();
-                    $openList($tag, $indent);
-                } else if ($listStack[count($listStack) - 1]['indent'] !== $indent) {
-                    $openList($tag, $indent);
-                }
-            }
-
-            $topIndex = count($listStack) - 1;
-            if (!empty($listStack[$topIndex]['liOpen'])) {
-                $html[] = "</li>";
-                $listStack[$topIndex]['liOpen'] = false;
-            }
-
-            $html[] = '<li>' . inline_md($content, $mdPath);
-            $listStack[$topIndex]['liOpen'] = true;
-            continue;
-        }
-
-        // normal paragraph / blank
-        if (trim($line)==="") {
-            $html[]="";
-        } else {
-            $closeAllLists();
-            $html[]='<p class="leading-relaxed my-4 text-neutral-700 dark:text-neutral-300">'.inline_md($line, $mdPath).'</p>';
-        }
-    }
-
-    $closeAllLists();
-    if ($in_codeblock) $html[]="</code></pre>";
-
-    return implode("\n",$html);
-}
-
-/* GET FIRST TITLE FROM MD */
-function extract_title($raw){
-    $raw = str_replace(["\r\n","\r"], "\n", $raw);
-    foreach (explode("\n",$raw) as $l){
-        if (preg_match('/^#\s+(.*)$/',$l,$m)) return trim($m[1]);
-    }
-    foreach (explode("\n",$raw) as $l){
-        if (trim($l)!=='') return trim($l);
-    }
-    return "Untitled";
-}
+require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/themes_lib.php';
+
+$STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
+$IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
+$THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+$themesList = list_available_themes($THEMES_DIR);
 
 function extract_title_from_file($fullPath, $fallbackBasename) {
     if (!is_string($fullPath) || $fullPath === '' || !is_file($fullPath)) return $fallbackBasename;
@@ -635,6 +192,20 @@ function list_md_root_sorted(){
 
 /* SUBDIR FILES newest-first per dir, dirs A→Z */
 function list_md_by_subdir_sorted(){
+    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+    $staticDir = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
+    $imagesDir = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
+    $themesDir = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+    $exclude = [
+        'root' => true,
+        'HTML' => true,
+        'PDF' => true,
+        basename($pluginsDir) => true,
+        $staticDir => true,
+        $imagesDir => true,
+        $themesDir => true,
+    ];
+
     $dirs = array_filter(glob('*'), function($f){
         return is_dir($f) && $f[0]!=='.';
     });
@@ -643,20 +214,22 @@ function list_md_by_subdir_sorted(){
 
     $map=[];
     foreach($dirs as $dir){
+        if (isset($exclude[$dir])) continue;
         $mds = glob($dir.'/*.md');
-        if(!$mds) continue;
 
         $tmp=[];
-        foreach($mds as $path){
-            $base = basename($path);
-            [$yy,$mm,$dd] = parse_ymd_from_filename($base);
-            $tmp[] = [
-                'path'     => $path,
-                'basename' => $base,
-                'yy'       => $yy,
-                'mm'       => $mm,
-                'dd'       => $dd,
-            ];
+        if ($mds) {
+            foreach($mds as $path){
+                $base = basename($path);
+                [$yy,$mm,$dd] = parse_ymd_from_filename($base);
+                $tmp[] = [
+                    'path'     => $path,
+                    'basename' => $base,
+                    'yy'       => $yy,
+                    'mm'       => $mm,
+                    'dd'       => $dd,
+                ];
+            }
         }
 
         usort($tmp, 'compare_entries_desc_date');
@@ -743,16 +316,16 @@ function try_secret_login($passwordInput) {
     return hash_equals($SECRET_MDS_PASSWORD, $passwordInput);
 }
 
-/* ACTIONS (create/delete) */
-$open_new_panel = isset($_GET['new']) && $_GET['new'] === '1';
+	/* ACTIONS (create/delete) */
+	$open_new_panel = isset($_GET['new']) && $_GET['new'] === '1';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
-    if (!hash_equals($CSRF_TOKEN, $csrf)) {
-        $_SESSION['flash_error'] = 'Ongeldige sessie (CSRF). Herlaad de pagina.';
-        header('Location: index.php');
-        exit;
-    } else if ($_POST['action'] === 'delete') {
+	if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+	    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
+	    if (!hash_equals($CSRF_TOKEN, $csrf)) {
+	        $_SESSION['flash_error'] = 'Ongeldige sessie (CSRF). Herlaad de pagina.';
+	        header('Location: index.php');
+	        exit;
+	    } else if ($_POST['action'] === 'delete') {
         $postedFile = isset($_POST['file']) ? (string)$_POST['file'] : '';
         $san = sanitize_md_path($postedFile);
         if (!$san) {
@@ -775,26 +348,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $_SESSION['flash_error'] = $msg;
             }
         }
-        header('Location: index.php');
-        exit;
-    } else if ($_POST['action'] === 'create') {
-        $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
-        if (trim($postedPath) === '') {
-            $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
+	        header('Location: index.php');
+	        exit;
+	    } else if ($_POST['action'] === 'create_folder') {
+	        $nameRaw = isset($_POST['folder_name']) ? (string)$_POST['folder_name'] : '';
+	        $name = sanitize_folder_name($nameRaw);
+	        if (!$name) {
+	            $_SESSION['flash_error'] = 'Ongeldige foldernaam.';
+	            header('Location: index.php');
+	            exit;
+	        }
+
+	        $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+	        $reserved = [
+	            'root' => true,
+	            'HTML' => true,
+	            'PDF' => true,
+	            basename($pluginsDir) => true,
+	            $STATIC_DIR => true,
+	            $IMAGES_DIR => true,
+	            $THEMES_DIR => true,
+	        ];
+	        if (isset($reserved[$name])) {
+	            $_SESSION['flash_error'] = 'Deze foldernaam is gereserveerd.';
+	            header('Location: index.php');
+	            exit;
+	        }
+
+	        $full = __DIR__ . '/' . $name;
+	        if (is_dir($full)) {
+	            $_SESSION['flash_error'] = 'Folder bestaat al: ' . $name;
+	            header('Location: index.php?folder=' . rawurlencode($name));
+	            exit;
+	        }
+	        if (file_exists($full)) {
+	            $_SESSION['flash_error'] = 'Pad bestaat al (geen folder): ' . $name;
+	            header('Location: index.php');
+	            exit;
+	        }
+
+	        if (!@mkdir($full, 0755, false)) {
+	            $err = error_get_last();
+	            $msg = 'Kon folder niet aanmaken.';
+	            if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
+	            $_SESSION['flash_error'] = $msg;
+	            header('Location: index.php');
+	            exit;
+	        }
+
+	        $_SESSION['flash_ok'] = 'Folder aangemaakt: ' . $name;
+	        header('Location: index.php?folder=' . rawurlencode($name));
+	        exit;
+	    } else if ($_POST['action'] === 'create') {
+	        $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
+	        $prefixDate = isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
+	        if (trim($postedPath) === '') {
+	            $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
             $folder = sanitize_folder_name($folder) ?? 'root';
             $file = isset($_POST['new_file']) ? (string)$_POST['new_file'] : '';
             $file = trim(str_replace("\\", "/", $file));
             $file = ltrim($file, "/");
+            if ($prefixDate && !preg_match('/^\d{2}-\d{2}-\d{2}-/', $file)) {
+                $file = date('y-m-d-') . $file;
+            }
             $postedPath = ($folder && $folder !== 'root') ? ($folder . '/' . $file) : $file;
+        } else if ($prefixDate) {
+            $tmp = trim(str_replace("\\", "/", $postedPath));
+            $tmp = ltrim($tmp, "/");
+            $d = dirname($tmp);
+            $b = basename($tmp);
+            if (!preg_match('/^\d{2}-\d{2}-\d{2}-/', $b)) {
+                $b = date('y-m-d-') . $b;
+            }
+            $postedPath = ($d === '.' || $d === '') ? $b : ($d . '/' . $b);
         }
 
-        $sanNew = sanitize_new_md_path($postedPath);
-        $open_new_panel = true;
-        if (!$sanNew) {
-            $_SESSION['flash_error'] = 'Ongeldige bestandsnaam. Gebruik een relative path en eindig op .md';
-        } else if (is_secret_file($sanNew) && !is_secret_authenticated()) {
-            $_SESSION['flash_error'] = 'Dit pad staat als secret gemarkeerd. Ontgrendel eerst via de viewer.';
-        } else {
+	        $sanNew = sanitize_new_md_path($postedPath);
+	        $open_new_panel = true;
+	        if (!$sanNew) {
+	            $_SESSION['flash_error'] = 'Ongeldige bestandsnaam. Gebruik een relative path (de app voegt automatisch .md toe).';
+	        } else if (is_secret_file($sanNew) && !is_secret_authenticated()) {
+	            $_SESSION['flash_error'] = 'Dit pad staat als secret gemarkeerd. Ontgrendel eerst via de viewer.';
+	        } else {
             $dir = dirname($sanNew);
             if ($dir !== '.' && !is_dir(__DIR__ . '/' . $dir)) {
                 $_SESSION['flash_error'] = 'Folder bestaat niet: ' . $dir;
@@ -861,14 +496,14 @@ if ($requested) {
                 $mode = 'view';
                 $raw = file_get_contents($full);
                 $article_title = extract_title($raw);
-                $article_html  = md_to_html($raw, $requested);
+                $article_html  = md_to_html($raw, $requested, 'view');
             }
         } else {
             // normaal, niet-secret bestand
             $mode='view';
             $raw = file_get_contents($full);
             $article_title = extract_title($raw);
-            $article_html  = md_to_html($raw, $requested);
+            $article_html  = md_to_html($raw, $requested, 'view');
         }
     }
 }
@@ -879,14 +514,15 @@ if ($requested) {
 	$secretMap = load_secret_mds(); // voor index-weergave
 	$existingFolders = [];
 	$default_new_folder = 'root';
-	if ($mode === 'index') {
-	    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-	    $exclude = [basename($pluginsDir), 'HTML', 'PDF'];
-	    $existingFolders = list_existing_folders_sorted($exclude);
-	    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
-	        $default_new_folder = $folder_filter;
-	    }
-	}
+	$today_prefix = date('y-m-d-');
+		if ($mode === 'index') {
+		    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+		    $exclude = [basename($pluginsDir), 'HTML', 'PDF', $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR];
+		    $existingFolders = list_existing_folders_sorted($exclude);
+		    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
+		        $default_new_folder = $folder_filter;
+		    }
+		}
 
 
 ?>
@@ -897,10 +533,10 @@ if ($requested) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($article_title)?></title>
 
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="markdown.css">
-<link rel="stylesheet" href="htmlpreview.css">
-<link rel="stylesheet" href="popicon.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/htmlpreview.css">
+<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/popicon.css">
 
 <script>
 (function(){
@@ -933,20 +569,20 @@ window.MathJax = {
 	<header class="app-header">
 	    <div class="app-header-inner">
 	        <div class="app-header-main">
-	            <span class="app-logo" aria-hidden="true">
-	                <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
-	                 <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
-	                 <g stroke="#fff" stroke-width="20">
-	                  <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
+		            <a class="app-logo" href="index.php" aria-label="Go to index">
+		                <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
+		                 <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
+		                 <g stroke="#fff" stroke-width="20">
+		                  <path class="B C" d="M673 371v198c0 16-13 28-28 28H39c-15 0-28-13-28-28V38c0-16 13-28 28-28h606c16-.1 28 12 28 28v133"/>
 	                  <path d="m10 130h663"/>
 	                  <path class="B C" d="M550 70H216"/>
 	                  <path d="m172 70a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm-70 0a24 24 0 1 1-48 0 24 24 0 0 1 48 0zm713 109c10-10 10-27 0-38l-18-18c-10-10-27-10-37 0l-294 297-48 90c-6 9 5 20 14 14l89-49 294-296zm-299 296-51-52"/>
 	                  <path d="m796 197-55-55z"/>
 	                  <path class="B C" d="M72 499h165M72 447h330M72 397h330M72 348h330"/>
-	                  <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
-	                 </g>
-	                </svg>
-	            </span>
+		                  <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
+		                 </g>
+		                </svg>
+		            </a>
 	            <div class="app-header-text">
 	                <div class="app-title-row">
 	                    <div class="app-title">
@@ -958,12 +594,12 @@ window.MathJax = {
 	                </div>
 	                <div class="app-breadcrumb">
 	                <a class="breadcrumb-link" href="index.php">/index</a>
-	                <?php if ($active_folder_for_breadcrumb): ?>
-	                    <span class="breadcrumb-sep">/</span>
-	                    <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($active_folder_for_breadcrumb)?>">
-                        <?=h($active_folder_for_breadcrumb)?>
-                    </a>
-                <?php endif; ?>
+		                <?php if ($active_folder_for_breadcrumb): ?>
+		                    <span class="breadcrumb-sep">/</span>
+		                    <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($active_folder_for_breadcrumb)?>#contentList">
+	                        <?=h($active_folder_for_breadcrumb)?>
+	                    </a>
+	                <?php endif; ?>
 	                <?php if ($mode==='view' && $requested): ?>
 	                    <span class="breadcrumb-sep">/</span>
 	                    <span class="app-path-segment"><?=h(basename($requested))?></span>
@@ -972,10 +608,19 @@ window.MathJax = {
 	            </div>
 	        </div>
 	        <div class="app-header-actions">
-            <?php if ($mode==='index'): ?>
-            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
-            <?php endif; ?>
-            <?php if ($mode==='view' && $requested): ?>
+	            <?php if ($mode==='index'): ?>
+	            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
+	            <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="Create a new folder">
+	                <span class="pi pi-folder"></span>
+	                <span>+</span>
+	            </button>
+	            <form id="newFolderForm" method="post" style="display:none;">
+	                <input type="hidden" name="action" value="create_folder">
+	                <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+	                <input type="hidden" name="folder_name" id="newFolderName" value="">
+	            </form>
+	            <?php endif; ?>
+	            <?php if ($mode==='view' && $requested): ?>
             <?php $hdrFolder = folder_from_path($requested); ?>
             <a href="edit.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($hdrFolder)?>" class="btn btn-ghost icon-button" title="Edit">
                 <span class="pi pi-edit"></span>
@@ -988,11 +633,14 @@ window.MathJax = {
                     <span class="pi pi-bin"></span>
                 </button>
             </form>
-            <?php endif; ?>
-            <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
-        </div>
-    </div>
-</header>
+	            <?php endif; ?>
+	            <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="Theme settings" aria-label="Theme settings">
+	                <span class="pi pi-gear"></span>
+	            </button>
+	            <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
+	        </div>
+	    </div>
+	</header>
 
 <main class="app-main">
 <div class="app-main-inner" id="links_md_overview" tabindex="0">
@@ -1025,19 +673,25 @@ window.MathJax = {
 	    <form method="post" style="margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem;">
 	        <input type="hidden" name="action" value="create">
 	        <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-	        <div style="display: flex; gap: 0.6rem; align-items: center;">
-	            <select name="new_folder" class="input" style="width: auto; flex: 0 0 10rem;" aria-label="Folder">
-	                <option value="root" <?= $default_new_folder === 'root' ? 'selected' : '' ?>>Root</option>
-	                <?php foreach ($existingFolders as $folder): ?>
-	                    <option value="<?=h($folder)?>" <?= $default_new_folder === $folder ? 'selected' : '' ?>><?=h($folder)?></option>
-	                <?php endforeach; ?>
-	            </select>
-	            <input name="new_file" class="input" style="flex: 1 1 auto;" type="text" placeholder="yy-mm-dd-title.md" required>
-	        </div>
-	        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="# Title&#10;&#10;Start writing..."></textarea>
-	        <div style="display: flex; justify-content: flex-end;">
-	            <button type="submit" class="btn btn-primary btn-small">Create & edit</button>
-	        </div>
+		        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+		            <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+		                <select name="new_folder" class="input" style="width: auto; flex: 1 1 12rem; min-width: 10rem;" aria-label="Folder">
+		                <option value="root" <?= $default_new_folder === 'root' ? 'selected' : '' ?>>Root</option>
+		                <?php foreach ($existingFolders as $folder): ?>
+		                    <option value="<?=h($folder)?>" <?= $default_new_folder === $folder ? 'selected' : '' ?>><?=h($folder)?></option>
+		                <?php endforeach; ?>
+		            </select>
+		            <label class="status-text" style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;" title="Adds a yy-mm-dd- prefix so notes sort nicely by date.">
+		                <input id="newMdPrefixDate" type="checkbox" name="prefix_date" value="1" checked data-date-prefix="<?=h($today_prefix)?>">
+		                <span>yy-mm-dd-</span>
+		            </label>
+		            </div>
+		            <input id="newMdFile" name="new_file" class="input" style="width: 100%;" type="text" value="<?=h($today_prefix)?>" placeholder="title.md" required>
+		        </div>
+		        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="# Title&#10;&#10;Start writing..."></textarea>
+		        <div style="display: flex; justify-content: flex-end;">
+		            <button type="submit" class="btn btn-primary btn-small">Create & edit</button>
+		        </div>
 	    </form>
 </section>
 
@@ -1116,11 +770,91 @@ window.MathJax = {
 </div>
 </main>
 
-<footer class="app-footer">
-    flat md site • <?=date('Y')?> • no db, no cms, no bloat
-</footer>
+	<footer class="app-footer">
+	    <?=date('Y')?> • <a href="https://github.com/Henkster72/MarkdownManager" target="_blank" rel="noopener noreferrer">Markdown Manager</a> • <a href="https://allroundwebsite.com" target="_blank" rel="noopener noreferrer">Allroundwebsite.com</a>
+	</footer>
 
-<script defer src="base.js"></script>
+	<div class="modal-overlay" id="themeModalOverlay" hidden></div>
+	<div class="modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
+	    <div class="modal-header">
+	        <div class="modal-title" id="themeModalTitle">Theme</div>
+	        <button type="button" class="btn btn-ghost icon-button" id="themeModalClose" aria-label="Close">
+	            <span class="pi pi-cross"></span>
+	        </button>
+	    </div>
+	    <div class="modal-body">
+	        <div class="modal-field">
+	            <label class="modal-label" for="themePreset">Preset</label>
+	            <div style="display:flex; align-items:center; gap:0.6rem;">
+		            <select id="themePreset" class="input" style="flex: 1 1 auto;">
+	                <option value="default">Default</option>
+	                <?php foreach ($themesList as $t): ?>
+	                    <?php
+	                        $label = (isset($t['label']) && is_string($t['label']) && $t['label'] !== '') ? $t['label'] : $t['name'];
+	                        if (isset($t['color']) && is_string($t['color']) && $t['color'] !== '') $label .= ' • ' . $t['color'];
+	                    ?>
+	                    <option value="<?=h($t['name'])?>"><?=h($label)?></option>
+	                <?php endforeach; ?>
+		            </select>
+		            <div aria-hidden="true" style="display:flex; gap:0.35rem; align-items:center;">
+		                <span id="themeSwatchPrimary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+		                <span id="themeSwatchSecondary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+		            </div>
+	            </div>
+	            <div id="themePresetPreview" style="margin-top: 0.5rem; padding: 0.55rem 0.65rem; border-radius: 0.75rem; border: 1px solid var(--border-soft);"></div>
+	            <div class="status-text" style="margin-top: 0.4rem;">
+	                Applies only to the Markdown editor + HTML preview.
+	            </div>
+	        </div>
 
-</body>
-</html>
+	        <details style="margin-top: 0.8rem;">
+	            <summary style="cursor:pointer; user-select:none; font-weight: 600;">Overrides (optional)</summary>
+	            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+	                <div class="status-text">
+	                    Overrides are saved in your browser (localStorage) automatically as you type.
+	                    <span id="themeOverridesStatus" style="margin-left: 0.35rem;"></span>
+	                </div>
+	                <div class="modal-field">
+	                    <div class="modal-label" style="margin-bottom: 0.35rem;">HTML preview</div>
+	                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+	                        <input id="themePreviewBg" type="text" class="input" placeholder="Background (e.g. #ffffff)">
+	                        <input id="themePreviewText" type="text" class="input" placeholder="Text color (e.g. #111827)">
+	                        <input id="themePreviewFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
+	                        <input id="themePreviewFontSize" type="text" class="input" placeholder="Font size (e.g. 16px)">
+	                        <input id="themeHeadingFont" type="text" class="input" placeholder="Heading font family (e.g. Montserrat)">
+	                        <input id="themeHeadingColor" type="text" class="input" placeholder="Heading color (e.g. rgb(229,33,157))">
+	                        <input id="themeListColor" type="text" class="input" placeholder="List color (optional)">
+	                        <input id="themeBlockquoteTint" type="text" class="input" placeholder="Blockquote tint (optional)">
+	                    </div>
+	                </div>
+
+	                <div class="modal-field">
+	                    <div class="modal-label" style="margin-bottom: 0.35rem;">Markdown editor</div>
+	                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+	                        <input id="themeEditorFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
+	                        <input id="themeEditorFontSize" type="text" class="input" placeholder="Font size (e.g. 15px)">
+	                        <input id="themeEditorAccent" type="text" class="input" placeholder="Accent color (e.g. rgb(229,33,157))">
+	                    </div>
+	                </div>
+
+	                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
+	                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="Save overrides now">Save overrides</button>
+	                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="Clear overrides">Reset overrides</button>
+	                </div>
+	            </div>
+	        </details>
+	    </div>
+	    <div class="modal-footer">
+	        <button type="button" class="btn btn-ghost" id="themeModalCancel">Close</button>
+	    </div>
+	</div>
+
+	<script>
+	window.MDW_THEMES_DIR = <?= json_encode($THEMES_DIR) ?>;
+	window.MDW_THEMES = <?= json_encode($themesList) ?>;
+	</script>
+
+	<script defer src="<?=h($STATIC_DIR)?>/base.js"></script>
+
+	</body>
+	</html>

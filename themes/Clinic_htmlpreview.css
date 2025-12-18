@@ -1,0 +1,37 @@
+.preview-content {
+  --theme-bg: #FFFFFF;
+  --theme-primary: #318e89;
+  --theme-secondary: #E6F4F3;
+  background: var(--theme-bg);
+  color: #003D47;
+  font-family: "Nunito", var(--font-sans);
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: #318e89;
+}
+
+.preview-content a {
+  color: #3267B5;
+  text-decoration-color: rgba(50, 103, 181, 0.55);
+}
+
+.preview-content blockquote {
+  border-left-color: rgba(49, 142, 137, 0.6);
+  background-color: var(--theme-secondary);
+  color: rgba(0, 61, 71, 0.95);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background-color: var(--theme-secondary);
+  color: rgba(0, 61, 71, 0.95);
+  border: 1px solid rgba(49, 142, 137, 0.18);
+}
+
+.preview-content pre {
+  background-color: var(--theme-secondary);
+  border-color: rgba(49, 142, 137, 0.18);
+}
