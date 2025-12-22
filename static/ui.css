@@ -140,6 +140,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -154,6 +155,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .app-logo {
@@ -182,6 +184,8 @@ a:hover {
 .app-title {
   font-size: 0.98rem;
   font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .app-subtitle {
@@ -193,6 +197,7 @@ a:hover {
   font-size: 0.7rem;
   color: var(--text-muted);
   word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .breadcrumb-sep {
@@ -231,6 +236,10 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
 }
 
 .btn.mobile-nav-toggle,
@@ -265,6 +274,43 @@ a:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.auth-locked body.app-body {
+  overflow: hidden;
+}
+
+.auth-locked .app-header,
+.auth-locked .app-main,
+.auth-locked .app-footer {
+  visibility: hidden;
+}
+
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+}
+
+.auth-overlay[hidden] {
+  display: none !important;
+}
+
+.auth-modal {
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+}
+
+.auth-logout-icon {
+  display: inline-block;
+  transform: rotate(90deg);
 }
 
 .modal[hidden],
@@ -369,6 +415,39 @@ a:hover {
   letter-spacing: 0.08em;
 }
 
+.badge-publish {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-panel-alt);
+  color: var(--text-main);
+}
+
+.badge-publish.publish-concept {
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-panel-alt));
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border-soft));
+  color: color-mix(in srgb, var(--danger) 70%, #ffffff);
+}
+
+.badge-publish.publish-topublish,
+.badge-publish.publish-processing {
+  background: color-mix(in srgb, #f59e0b 18%, var(--bg-panel-alt));
+  border-color: color-mix(in srgb, #f59e0b 35%, var(--border-soft));
+  color: color-mix(in srgb, #f59e0b 72%, #ffffff);
+}
+
+.badge-publish.publish-published {
+  background: color-mix(in srgb, #16a34a 18%, var(--bg-panel-alt));
+  border-color: color-mix(in srgb, #16a34a 35%, var(--border-soft));
+  color: color-mix(in srgb, #16a34a 72%, #ffffff);
+}
+
 /* Buttons ----------------------------------------------------------------- */
 
 .btn {
@@ -465,6 +544,35 @@ a:hover {
   min-width: 0;
 }
 
+/* Explicit placement: prevents auto-flow issues when panes are hidden/collapsed */
+.edit-page #links_md_overview { grid-column: 1; grid-row: 1; }
+.edit-page .col-resizer[data-resizer="left"] { grid-column: 2; grid-row: 1; }
+.edit-page #paneMarkdown { grid-column: 3; grid-row: 1; }
+.edit-page .col-resizer[data-resizer="right"] { grid-column: 4; grid-row: 1; }
+.edit-page #panePreview { grid-column: 5; grid-row: 1; }
+
+/* Edit: collapse/expand explorer (left pane) */
+.mdw-explorer-collapsed .editor-grid {
+  grid-template-columns: 2.25rem 0px calc(100% - var(--col-right) - 4px - 2.25rem) 4px var(--col-right);
+}
+.mdw-explorer-collapsed #links_md_overview {
+  padding: 0.35rem;
+}
+.mdw-explorer-collapsed #links_md_overview .pane-title,
+.mdw-explorer-collapsed #links_md_overview .pane-subtitle,
+.mdw-explorer-collapsed #links_md_overview .nav-filter-row,
+.mdw-explorer-collapsed #links_md_overview .pane-body,
+.mdw-explorer-collapsed #links_md_overview #mobileNavClose {
+  display: none;
+}
+.mdw-explorer-collapsed #links_md_overview .pane-title-row {
+  justify-content: center;
+}
+.mdw-explorer-collapsed #links_md_overview .pane-title-actions {
+  justify-content: center;
+  width: 100%;
+}
+
 /* Wrapper voor de grid, moet flex-grow hebben */
 .editor-shell {
   flex: 1 1 auto;
@@ -482,6 +590,7 @@ a:hover {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
   min-width: 0; /* voorkomt dat flex-items te breed worden */
   min-height: 0; /* cruciaal voor scrollen binnen flex-items */
 }
@@ -522,6 +631,28 @@ a:hover {
 }
 .pane-header-actions form {
   margin: 0;
+}
+
+@supports (container-type: inline-size) {
+  @container (max-width: 520px) {
+    .pane-header-actions .btn-label {
+      display: none;
+    }
+  }
+
+  @container (min-width: 521px) {
+    .pane-header-actions .btn-label {
+      display: inline-flex;
+    }
+  }
+}
+
+@supports not (container-type: inline-size) {
+  @media (max-width: 960px) {
+    .edit-page .pane-header-actions .btn-label {
+      display: none;
+    }
+  }
 }
 .pane-subtitle {
   font-size: 0.7rem;
@@ -749,6 +880,26 @@ a:hover {
   color: var(--text-muted);
   margin-top: 0.2rem;
   word-break: break-all;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.nav-item-date {
+  font-size: 0.56rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.nav-item-date::before {
+  content: " | ";
+  opacity: 0.6;
+}
+
+.nav-item-slug {
+  word-break: break-all;
 }
 
 /* Navigation (edit.php left pane) ---------------------------------------- */
@@ -761,6 +912,42 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.nav-sort-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.2rem;
+}
+
+.nav-sort-row.nav-sort-inline {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.nav-sort-row.nav-sort-inline .nav-sort-label {
+  display: none;
+}
+
+.nav-sort-row.nav-sort-inline .input {
+  flex: 0 0 auto;
+}
+
+.nav-sort-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.nav-sort-select.input {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+.nav-sort-row.nav-sort-inline .nav-sort-select.input {
+  min-width: 6.5rem;
 }
 
 .nav-filter-row .input {
@@ -981,6 +1168,47 @@ a:hover {
   overflow: auto;
 }
 
+.mdw-wrap-on .editor-textarea {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mdw-lines-off .editor-body { grid-template-columns: 1fr; }
+.mdw-lines-off .editor-lines { display: none; }
+
+.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.toggle-btn .toggle-box {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+.toggle-btn .toggle-box .pi-checkmark {
+  font-size: 0.7rem;
+  opacity: 0;
+}
+
+.toggle-btn[aria-pressed="true"] .toggle-box {
+  background: var(--active-bg);
+  border-color: var(--border-strong);
+}
+
+.toggle-btn[aria-pressed="true"] .toggle-box .pi-checkmark {
+  opacity: 1;
+}
+
 .editor-textarea:focus {
   outline: none;
 }
@@ -995,6 +1223,9 @@ a:hover {
   font-size: 0.8rem;
   line-height: 1.5;
   color: var(--text-main);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 /* eenvoudige typografie als markdown.css ontbreekt */
@@ -1063,32 +1294,71 @@ a:hover {
     height: auto;
   }
 
-  .editor-grid {
+  .edit-page .editor-grid {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(320px, 50vh) minmax(260px, 45vh);
     height: auto;
     row-gap: 0.75rem;
   }
 
-  #paneMarkdown,
-  #panePreview {
+  .edit-page #paneMarkdown,
+  .edit-page #panePreview {
     grid-column: 1 / -1;
   }
 
-  #paneMarkdown { grid-row: 1; }
-  #panePreview { grid-row: 2; }
+  .edit-page #paneMarkdown { grid-row: 1; }
+  .edit-page #panePreview { grid-row: 2; }
 
   .edit-page #links_md_overview {
-    display: none;
+    display: flex;
+    position: fixed;
+    inset: calc(1rem + var(--app-header-gap)) 1rem 1rem 1rem;
+    max-width: min(440px, calc(100% - 2rem));
+    width: min(440px, calc(100% - 2rem));
+    z-index: 90;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    transform: translateX(calc(-100% - 1rem));
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
   }
 
   .col-resizer {
     display: none;
   }
 
+  /* Mobile edit mode: default wrap on, line numbers off (toggles hidden) */
+  .edit-page .pane-header-actions #wrapToggle,
+  .edit-page .pane-header-actions #lineNumbersToggle {
+    display: none;
+  }
+
+  .edit-page .editor-lines {
+    display: none;
+  }
+
+  .edit-page .editor-body {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-page .editor-textarea {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .btn.mobile-nav-toggle,
   .btn.mobile-nav-close {
     display: inline-flex;
+  }
+
+  #explorerCollapseToggle {
+    display: none;
+  }
+
+  .edit-page .pane-header-actions .btn {
+    padding: 0.35rem 0.45rem;
+    gap: 0.25rem;
   }
 
   .nav-overlay {
@@ -1112,32 +1382,79 @@ a:hover {
     overflow: hidden;
   }
 
-  .edit-page.nav-open #links_md_overview {
-    display: flex;
-    position: fixed;
-    inset: calc(1rem + var(--app-header-gap)) 1rem 1rem 1rem;
-    max-width: min(440px, calc(100% - 2rem));
-    width: min(440px, calc(100% - 2rem));
-    z-index: 90;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  .edit-page .nav-filter-row {
+    flex-wrap: nowrap;
   }
 
-  .edit-page.nav-open #links_md_overview .pane-body {
+  .edit-page .nav-filter-row .input {
+    width: auto;
+    min-width: 0;
+  }
+
+  .edit-page .folder-back {
+    display: none;
+  }
+
+  .nav-open .edit-page #links_md_overview {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-open .edit-page #links_md_overview .pane-body {
     overflow: auto;
   }
 }
 
 @media (max-width: 560px) {
+  .app-header {
+    padding: 0.6rem 0.9rem;
+  }
+
+  .app-header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .app-header-main {
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .app-header-text {
+    gap: 0.2rem;
+  }
+
+  .app-title {
+    font-size: clamp(0.8rem, 3.8vw, 0.95rem);
+  }
+
+  .app-subtitle,
+  .app-breadcrumb {
+    font-size: clamp(0.6rem, 2.8vw, 0.72rem);
+  }
+
+  .app-logo {
+    font-size: clamp(1rem, 4.6vw, 1.15rem);
+  }
+
+  .app-logo svg {
+    width: clamp(1.6rem, 7vw, 2rem);
+    height: clamp(1.1rem, 4.4vw, 1.45rem);
+  }
+
+  .app-header-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.45rem;
+  }
+
   .edit-page .pane-header-actions {
     gap: 0.25rem;
   }
 
   .edit-page .pane-header-actions .btn {
-    padding: 0.35rem 0.45rem;
-    gap: 0.25rem;
-  }
-
-  .edit-page .pane-header-actions .btn-label {
-    display: none;
+    padding: 0.3rem 0.4rem;
   }
 }

@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #fff9c4;
+  --theme-primary: #374151;
+  --theme-secondary: #ef4444;
+  --theme-surface: #fffbeb;
+  --theme-border: #94a3b8;
+  background: var(--theme-bg);
+  color: #1f2937;
+  font-family: "Patrick Hand", cursive;
+  font-size: 16px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 1px;
+  background: var(--theme-surface);
+  color: #4b5563;
+  border-radius: 2px;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #1f2937;
+  border: 1px solid var(--theme-border);
+  border-radius: 2px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #1f2937;
+  border: 1px solid var(--theme-border);
+  border-radius: 2px;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}

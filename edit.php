@@ -9,6 +9,7 @@ session_start();
 
 /* CONFIG */
 require_once __DIR__ . '/env_loader.php';
+require_once __DIR__ . '/i18n.php';
 
 $LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
 $SECRET_MDS_FILE     = env_path('SECRET_MDS_FILE', __DIR__ . '/secret_mds.txt');
@@ -18,6 +19,11 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
 }
 $CSRF_TOKEN = $_SESSION['csrf_token'];
+
+$TRANSLATIONS_DIR = mdw_i18n_dir();
+$MDW_LANGS = mdw_i18n_list_languages(__DIR__, $TRANSLATIONS_DIR);
+$MDW_LANG = mdw_i18n_pick_lang($MDW_LANGS);
+mdw_i18n_load(__DIR__, $TRANSLATIONS_DIR, $MDW_LANG);
 
 function sanitize_folder_name($folder) {
     if (!is_string($folder)) return null;
@@ -67,6 +73,32 @@ $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'st
 $IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
 $THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
 $themesList = list_available_themes($THEMES_DIR);
+$META_CFG = mdw_metadata_load_config();
+$META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
+$MDW_SETTINGS = (isset($META_CFG['_settings']) && is_array($META_CFG['_settings'])) ? $META_CFG['_settings'] : [];
+$MDW_PUBLISHER_MODE = !empty($MDW_SETTINGS['publisher_mode']);
+$MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
+$MDW_AUTH_META = [
+    'has_user' => !empty($MDW_AUTH['user_hash']),
+    'has_superuser' => !empty($MDW_AUTH['superuser_hash']),
+];
+$APP_TITLE_OVERRIDE = trim((string)($MDW_SETTINGS['app_title'] ?? ''));
+$APP_NAME = $APP_TITLE_OVERRIDE !== '' ? $APP_TITLE_OVERRIDE : 'Markdown Manager';
+$META_CFG_CLIENT = $META_CFG;
+if (is_array($META_CFG_CLIENT) && array_key_exists('_auth', $META_CFG_CLIENT)) {
+    unset($META_CFG_CLIENT['_auth']);
+}
+
+function mdw_editor_title_from_raw($raw, $publisherMode = false) {
+    $raw = (string)$raw;
+    $fallback = extract_title($raw);
+    if (!$publisherMode) return $fallback;
+    if (!function_exists('mdw_hidden_meta_extract_and_remove_all')) return $fallback;
+    $meta = [];
+    mdw_hidden_meta_extract_and_remove_all($raw, $meta);
+    $pageTitle = trim((string)($meta['page_title'] ?? ''));
+    return $pageTitle !== '' ? $pageTitle : $fallback;
+}
 
 /* DATE PARSE */
 function parse_ymd_from_filename($basename) {
@@ -117,6 +149,7 @@ function list_md_by_subdir_sorted(){
     $staticDir = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
     $imagesDir = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
     $themesDir = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+    $translationsDir = function_exists('mdw_i18n_dir') ? mdw_i18n_dir() : 'translations';
     $exclude = [
         'root' => true,
         'HTML' => true,
@@ -125,6 +158,7 @@ function list_md_by_subdir_sorted(){
         $staticDir => true,
         $imagesDir => true,
         $themesDir => true,
+        $translationsDir => true,
     ];
 
     $dirs = array_filter(glob('*'), function($f){
@@ -184,6 +218,8 @@ function read_shortcuts_csv($csv){
 
 /* SECRET MDS */
 function load_secret_mds() {
+    global $MDW_PUBLISHER_MODE;
+    if (!empty($MDW_PUBLISHER_MODE)) return [];
     global $SECRET_MDS_FILE;
     static $cache = null;
 
@@ -234,6 +270,8 @@ $folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
 
 $save_error = null;
 $saved_flag = isset($_GET['saved']) ? true : false;
+$use_posted_content = false;
+$posted_content_for_render = '';
 
 /* HANDLE PREVIEW ENDPOINT (AJAX) */
 if (isset($_GET['preview']) && $_GET['preview'] === '1') {
@@ -255,7 +293,7 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
 
         echo json_encode([
             'file'    => $requested,
-            'title'   => extract_title($raw_content),
+            'title'   => mdw_editor_title_from_raw($raw_content, !empty($MDW_PUBLISHER_MODE)),
             'content' => $raw_content,
             'html'    => md_to_html($raw_content, $requested),
             'is_secret' => (bool)$is_secret_req_json,
@@ -283,25 +321,112 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             header('Location: index.php?file='.rawurlencode($san));
             exit;
         }
-        $full = __DIR__ . '/' . $san;
-        $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
-        // Normalize line endings so the editor doesn't appear "dirty" after save.
-        $content = str_replace(["\r\n", "\r"], "\n", $content);
+	        $full = __DIR__ . '/' . $san;
+	        $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
+            $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
+            $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+            $authIsSuperuser = function_exists('mdw_auth_verify_token')
+                ? mdw_auth_verify_token('superuser', $authToken)
+                : false;
+	        // Normalize line endings so the editor doesn't appear "dirty" after save.
+	        $content = str_replace(["\r\n", "\r"], "\n", $content);
+	        $submittedMeta = [];
+	        mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
+            $publishAction = isset($_POST['publish_action']) ? trim((string)$_POST['publish_action']) : '';
+            $publishStateInput = isset($_POST['publish_state']) ? trim((string)$_POST['publish_state']) : '';
+            $existingMeta = [];
+            if (is_file($full)) {
+                mdw_hidden_meta_extract_and_remove_all((string)@file_get_contents($full), $existingMeta);
+            }
+            $existingState = mdw_publisher_normalize_publishstate($existingMeta['publishstate'] ?? '');
+            if ($existingState === '') $existingState = 'Concept';
+            $desiredPublishState = null;
+            $allowedPublishStates = ['Concept', 'Processing', 'Published'];
+            if (!empty($MDW_PUBLISHER_MODE)) {
+                if ($authIsSuperuser) {
+                    if ($publishStateInput !== '') {
+                        $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
+                        if (in_array($candidate, $allowedPublishStates, true)) {
+                            $desiredPublishState = $candidate;
+                        }
+                    }
+                } else {
+                    if ($existingState === 'Published') {
+                        $desiredPublishState = 'Published';
+                    } else if ($publishAction === 'publish') {
+                        $desiredPublishState = 'Processing';
+                    } else {
+                        $desiredPublishState = $existingState !== '' ? $existingState : 'Concept';
+                    }
+                }
+            }
+	        if (!empty($MDW_PUBLISHER_MODE)) {
+	            $author = isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '';
+	            if ($author === '') {
+	                $save_error = mdw_t('flash.publisher_author_required', 'Website publisher mode requires an author name.');
+	            } else {
+	                $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
+	                if ($pageTitle === '') {
+	                    $save_error = mdw_t('flash.publisher_requires_page_title', 'Website publisher mode requires a page_title metadata line.');
+	                } else {
+	                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
+	                    if ($pagePicture === '') {
+	                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'Website publisher mode requires a page_picture metadata line.');
+	                    }
+	                }
+	            }
+	            if ($save_error === null) {
+	                $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
+	                if ($requireH2 && !mdw_md_has_h2($content)) {
+	                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'Website publisher mode requires a subtitle line starting with "##".');
+	                }
+	            }
+	        }
 
-        $tmp = $full . '.tmp';
-        if (file_put_contents($tmp, $content) === false) {
-            $save_error = 'Kon tijdelijke file niet schrijven.';
-        } else {
+	        if ($save_error === null) {
+                $metaOverrides = [];
+                $fieldCfg = function_exists('mdw_metadata_all_field_configs')
+                    ? mdw_metadata_all_field_configs(!empty($MDW_PUBLISHER_MODE))
+                    : [];
+                foreach ($fieldCfg as $k => $f) {
+                    $kk = strtolower((string)$k);
+                    $mdVis = isset($f['markdown_visible']) ? (bool)$f['markdown_visible'] : true;
+                    if ($mdVis) continue;
+                    $hasExisting = array_key_exists($kk, $existingMeta);
+                    $hasSubmitted = array_key_exists($kk, $submittedMeta);
+                    if ($hasExisting) {
+                        $metaOverrides[$kk] = (string)$existingMeta[$kk];
+                    } else if ($hasSubmitted) {
+                        $metaOverrides[$kk] = '';
+                    }
+                }
+
+                if ($desiredPublishState !== null) {
+                    $metaOverrides['publishstate'] = $desiredPublishState;
+                }
+	            // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
+	            $opts = !empty($metaOverrides) ? ['set' => $metaOverrides] : [];
+	            $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
+
+	        $tmp = $full . '.tmp';
+	        if (file_put_contents($tmp, $content) === false) {
+	            $save_error = 'Kon tijdelijke file niet schrijven.';
+	        } else {
             if (!rename($tmp, $full)) {
                 $save_error = 'Kon originele file niet overschrijven.';
             } else {
                 header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
                 exit;
-            }
-        }
-        $requested = $san;
-    }
-}
+	            }
+	        }
+	        }
+	        $requested = $san;
+	        if ($save_error !== null) {
+	            $use_posted_content = true;
+	            $posted_content_for_render = $content;
+	        }
+	    }
+	}
 
 /* LOAD REQUESTED FILE CONTENT */
 $current_title   = 'Editor';
@@ -316,26 +441,81 @@ if ($requested) {
         exit;
     }
 
-    $full = __DIR__ . '/' . $requested;
-    if (is_file($full)) {
-        $raw             = file_get_contents($full);
-        $current_content = (string)$raw;
-        $current_title   = extract_title($raw);
-        $current_html    = md_to_html($raw, $requested);
-    } else {
-        $save_error = 'Bestand niet gevonden.';
-    }
+	$full = __DIR__ . '/' . $requested;
+	if ($use_posted_content && $posted_content_for_render !== '') {
+	    $raw             = $posted_content_for_render;
+	    $current_content = (string)$raw;
+	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
+	    $current_html    = md_to_html($raw, $requested);
+	} else if (is_file($full)) {
+	    $raw             = file_get_contents($full);
+	    $current_content = (string)$raw;
+	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
+	    $current_html    = md_to_html($raw, $requested);
+	} else {
+	    $save_error = 'Bestand niet gevonden.';
+	}
 } else {
     $current_title = 'Geen bestand geselecteerd';
 }
 
+$current_publish_state = 'Concept';
+if (!empty($MDW_PUBLISHER_MODE)) {
+    $meta = [];
+    if ($current_content !== '') {
+        mdw_hidden_meta_extract_and_remove_all($current_content, $meta);
+    }
+    $current_publish_state = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
+    if ($current_publish_state === '') $current_publish_state = 'Concept';
+}
+$current_publish_state_lower = strtolower($current_publish_state);
+
 ?>
 <!DOCTYPE html>
-<html lang="en" class="no-js">
+<html lang="<?=h($MDW_LANG)?>" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($current_title)?> • md edit</title>
+
+<script>
+// Bootstrap editor pane widths early (pre-CSS) to avoid layout shift on reload/save.
+(function(){
+    try {
+        const raw = localStorage.getItem('mdw_editor_col_widths');
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        const ok = (v) => (typeof v === 'string') && /^\d+(\.\d+)?%$/.test(v);
+        if (!saved || !ok(saved.left) || !ok(saved.mid) || !ok(saved.right)) return;
+        const root = document.documentElement;
+        root.style.setProperty('--col-left', saved.left);
+        root.style.setProperty('--col-mid', saved.mid);
+        root.style.setProperty('--col-right', saved.right);
+    } catch {}
+})();
+</script>
+
+<script>
+// Bootstrap editor word wrap early (pre-CSS) to avoid layout shift on reload/save.
+(function(){
+    try {
+        if (localStorage.getItem('mdw_editor_wrap') === '1') {
+            document.documentElement.classList.add('mdw-wrap-on');
+        }
+    } catch {}
+})();
+</script>
+
+<script>
+// Bootstrap line numbers early (pre-CSS) to avoid layout shift on reload/save.
+(function(){
+    try {
+        if (localStorage.getItem('mdw_editor_lines') === '0') {
+            document.documentElement.classList.add('mdw-lines-off');
+        }
+    } catch {}
+})();
+</script>
 
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
@@ -351,6 +531,19 @@ if ($requested) {
     const useDark = mode === 'dark';
     document.documentElement.classList.toggle('dark', useDark);
     document.documentElement.classList.toggle('theme-light', !useDark);
+})();
+</script>
+<script>
+(function(){
+    try {
+        const hasUser = <?= $MDW_AUTH_META['has_user'] ? 'true' : 'false' ?>;
+        const hasSuper = <?= $MDW_AUTH_META['has_superuser'] ? 'true' : 'false' ?>;
+        const role = localStorage.getItem('mdw_auth_role') || '';
+        const token = localStorage.getItem('mdw_auth_token') || '';
+        if (!role || !token || (!hasUser && !hasSuper)) {
+            document.documentElement.classList.add('auth-locked');
+        }
+    } catch {}
 })();
 </script>
 
@@ -390,7 +583,7 @@ window.MathJax = {
 	                <div class="app-header-text">
 	                    <div class="app-title-row">
 	                        <div class="app-title"><?=h($current_title)?></div>
-	                        <span id="dirtyStar" class="dirty-star" style="display:none;" title="Unsaved changes">*</span>
+	                        <span id="dirtyStar" class="dirty-star" style="display:none;" title="<?=h(mdw_t('edit.unsaved_title','Unsaved changes'))?>">*</span>
 	                    </div>
 	                    <div class="app-breadcrumb">
 	                    <a class="breadcrumb-link" href="index.php">/index</a>
@@ -400,25 +593,28 @@ window.MathJax = {
                         <a class="breadcrumb-link" href="edit.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($crumbFolder)?>">
                             <?=h($crumbFolder)?>
                         </a>
-                        <span class="breadcrumb-sep">/</span>
+	                        <span class="breadcrumb-sep">/</span>
 	                        <span class="app-path-segment"><?=h(basename($requested))?></span>
-	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>">secret</span>
+	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>"><?=h(mdw_t('common.secret','secret'))?></span>
 	                    <?php endif; ?>
 	                    </div>
 	                </div>
 	            </div>
 		            <div class="app-header-actions">
 	                <?php if ($saved_flag && !$save_error): ?>
-	                    <div class="chip" style="background-color: #166534; color: white;">Opgeslagen</div>
+	                    <div class="chip" style="background-color: #166534; color: white;"><?=h(mdw_t('common.saved','Saved'))?></div>
 	                <?php elseif ($save_error): ?>
 	                    <div class="chip" style="background-color: var(--danger); color: white;"><?=h($save_error)?></div>
 	                <?php endif; ?>
 
-		                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="Toon files">
+		                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
 		                    <span class="pi pi-list"></span>
 		                </button>
-		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="Theme settings" aria-label="Theme settings">
+		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('theme.settings_title','Settings'))?>" aria-label="<?=h(mdw_t('theme.settings_title','Settings'))?>" data-auth-superuser="1">
 		                    <span class="pi pi-gear"></span>
+		                </button>
+		                <button id="authToggleBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('auth.logout','Logout'))?>" aria-label="<?=h(mdw_t('auth.logout','Logout'))?>">
+		                    <span class="pi pi-upload auth-logout-icon"></span>
 		                </button>
 		                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
 		            </div>
@@ -438,32 +634,36 @@ window.MathJax = {
                         <div class="pane-title-row">
                             <div class="pane-title">
                                 <span class="pi pi-notebook"></span>
-                                <span>Notes</span>
+                                <span><?=h(mdw_t('common.notes','Notes'))?></span>
                             </div>
 	                                <div class="pane-title-actions">
-	                                <div class="pane-subtitle" id="navCount">0 items</div>
-	                                <button type="button" id="mobileNavClose" class="btn btn-ghost icon-button mobile-nav-close" aria-label="Sluit files">
+	                                <button type="button" id="explorerCollapseToggle" class="btn btn-ghost icon-button" title="<?=h(mdw_t('edit.nav.collapse_overview','Collapse overview'))?>" aria-label="<?=h(mdw_t('edit.nav.collapse_overview','Collapse overview'))?>">
+	                                    <span class="pi pi-leftcaret"></span>
+	                                </button>
+	                                <div class="pane-subtitle" id="navCount">0 <?=h(mdw_t('common.items','items'))?></div>
+	                                <button type="button" id="mobileNavClose" class="btn btn-ghost icon-button mobile-nav-close" aria-label="<?=h(mdw_t('edit.nav.close_files_aria','Close files'))?>">
 	                                    <span class="pi pi-cross"></span>
 	                                </button>
 	                            </div>
                         </div>
 	                        <div class="nav-filter-row">
-	                            <input id="filterInput" class="input" type="text" placeholder="Filter…">
+	                            <input id="filterInput" class="input" type="text" placeholder="<?=h(mdw_t('common.filter_placeholder','Filter…'))?>">
 	                        </div>
 	                    </header>
 	                    <div class="pane-body nav-body">
 	                        <?php
 	                            require_once __DIR__ . '/explorer_view.php';
-	                            explorer_view_render_tree([
-	                                'page' => 'edit',
-	                                'rootList' => $rootList,
-	                                'dirMap' => $dirMap,
-	                                'secretMap' => $secretMap,
-	                                'folder_filter' => $folder_filter,
-	                                'current_file' => $requested,
-	                                'show_actions' => false,
-	                                'plugins_enabled' => false,
-	                            ]);
+		                            explorer_view_render_tree([
+		                                'page' => 'edit',
+		                                'rootList' => $rootList,
+		                                'dirMap' => $dirMap,
+		                                'secretMap' => $secretMap,
+		                                'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+		                                'folder_filter' => $folder_filter,
+		                                'current_file' => $requested,
+		                                'show_actions' => false,
+		                                'plugins_enabled' => false,
+		                            ]);
 	                        ?>
 	                    </div>
 	                </div>
@@ -479,24 +679,43 @@ window.MathJax = {
                         <div class="pane-title-row">
                             <div class="pane-title">
                                 <span class="icon-text-logo">MD</span>
-                                <span>Markdown</span>
+                                <span><?=h(mdw_t('common.markdown','Markdown'))?></span>
                             </div>
-		                            <div class="pane-header-actions">
-		                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="Add link">
-		                                    <span class="pi pi-linkchain"></span>
-		                                    <span class="btn-label">Link</span>
-		                                </button>
-		                                <button type="button" id="addImageBtn" class="btn btn-ghost" title="Insert image">
-		                                    <span class="pi pi-image"></span>
-		                                    <span class="btn-label">Image</span>
-		                                </button>
-		                                <button type="submit" form="editor-form" class="btn btn-ghost">
-		                                    <span class="pi pi-floppydisk"></span>
-		                                    <span class="btn-label">Save</span>
-		                                </button>
+			                            <div class="pane-header-actions">
+			                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="<?=h(mdw_t('link_modal.title','Add link'))?>">
+			                                    <span class="pi pi-linkchain"></span>
+			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
+			                                </button>
+			                                <button type="button" id="addImageBtn" class="btn btn-ghost" title="<?=h(mdw_t('image_modal.title','Insert image'))?>">
+			                                    <span class="pi pi-image"></span>
+			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
+			                                </button>
+			                                <button type="submit" form="editor-form" class="btn btn-ghost">
+			                                    <span class="pi pi-floppydisk"></span>
+			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
+			                                </button>
+			                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+			                                    <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-regular="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
+			                                        <span class="pi pi-upload"></span>
+			                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
+			                                    </button>
+			                                    <select id="publishStateSelect" name="publish_state" form="editor-form" class="input" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
+			                                        <?php
+			                                            $stateOptions = [
+			                                                'Concept' => mdw_t('edit.publish_state.concept', 'Concept'),
+			                                                'Processing' => mdw_t('edit.publish_state.processing', 'Processing'),
+			                                                'Published' => mdw_t('edit.publish_state.published', 'Published'),
+			                                            ];
+			                                            foreach ($stateOptions as $val => $label):
+			                                                $selected = ($current_publish_state === $val) ? 'selected' : '';
+			                                        ?>
+			                                            <option value="<?=h($val)?>" <?= $selected ?>><?=h($label)?></option>
+			                                        <?php endforeach; ?>
+			                                    </select>
+			                                <?php endif; ?>
 		                                <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
-                                    <span class="btn-label">Revert</span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
                                 </button>
                                 <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=h($requested ?? '')?>">
                                     <input type="hidden" name="action" value="delete">
@@ -504,7 +723,7 @@ window.MathJax = {
                                     <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
                                     <button type="submit" class="btn btn-ghost" <?= $requested ? '' : 'disabled' ?>>
                                         <span class="pi pi-bin"></span>
-                                        <span class="btn-label">Delete</span>
+                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.delete','Delete'))?></span>
                                     </button>
                                 </form>
                             </div>
@@ -545,16 +764,16 @@ window.MathJax = {
                         <div class="pane-title-row">
                             <div class="pane-title">
                                 <span class="pi pi-eye"></span>
-                                <span>HTML preview</span>
+                                <span><?=h(mdw_t('edit.preview_title','HTML preview'))?></span>
                             </div>
                             <div class="pane-header-actions">
-                                <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="Download a plain HTML export" <?= $requested ? '' : 'disabled' ?>>
+                                <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.export_title','Download a plain HTML export'))?>" <?= $requested ? '' : 'disabled' ?>>
                                     <span class="pi pi-download"></span>
-                                    <span class="btn-label">HTML download</span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.preview.export_btn','HTML download'))?></span>
                                 </button>
-                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost" title="Copy plain HTML to clipboard" <?= $requested ? '' : 'disabled' ?>>
+                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.copy_title','Copy plain HTML to clipboard'))?>" <?= $requested ? '' : 'disabled' ?>>
                                     <span class="pi pi-copy"></span>
-                                    <span class="btn-label">Copy HTML</span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.preview.copy_btn','Copy HTML'))?></span>
                                 </button>
                             </div>
                         </div>
@@ -578,27 +797,31 @@ window.MathJax = {
 		<div class="modal-overlay" id="linkModalOverlay" hidden></div>
 		<div class="modal" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle" hidden>
 		    <div class="modal-header">
-		        <div class="modal-title" id="linkModalTitle">Add link</div>
-		        <button type="button" class="btn btn-ghost icon-button" id="linkModalClose" aria-label="Close">
+		        <div class="modal-title" id="linkModalTitle"><?=h(mdw_t('link_modal.title','Add link'))?></div>
+		        <button type="button" class="btn btn-ghost icon-button" id="linkModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
 		            <span class="pi pi-cross"></span>
 		        </button>
 			</div>
-		    <div class="modal-body">
-		        <div class="modal-row">
-		            <label class="radio">
-		                <input type="radio" name="linkMode" value="internal" checked>
-	                <span>Internal</span>
+	        <div class="modal-body">
+	            <div class="modal-row">
+	                <label class="radio">
+	                    <input type="radio" name="linkMode" value="internal" checked>
+	                <span><?=h(mdw_t('link_modal.mode_internal','Internal'))?></span>
 	            </label>
 	            <label class="radio">
 	                <input type="radio" name="linkMode" value="external">
-	                <span>External</span>
+	                <span><?=h(mdw_t('link_modal.mode_external','External'))?></span>
 	            </label>
+                <label class="radio">
+                    <input type="radio" name="linkMode" value="youtube">
+                    <span><?=h(mdw_t('link_modal.mode_youtube','YouTube'))?></span>
+                </label>
 	        </div>
 
 	        <div id="linkModalInternal" class="link-modal-section">
 	            <div class="link-picker-filter-row">
-	                <input id="linkPickerFilter" type="text" class="input" placeholder="Search notes...">
-	                <button type="button" class="btn btn-ghost icon-button" id="linkPickerFilterClear" aria-label="Clear search" style="display:none;">
+	                <input id="linkPickerFilter" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.search_notes','Search notes...'))?>">
+	                <button type="button" class="btn btn-ghost icon-button" id="linkPickerFilterClear" aria-label="<?=h(mdw_t('link_modal.clear_search_aria','Clear search'))?>" style="display:none;">
 	                    <span class="pi pi-cross"></span>
 	                </button>
 	            </div>
@@ -626,7 +849,7 @@ window.MathJax = {
 	                                        <div class="note-title" style="justify-content: space-between;">
 	                                            <span><?=h($t)?></span>
 	                                            <?php if ($isSecret): ?>
-	                                                <span class="badge-secret">secret</span>
+	                                                <span class="badge-secret"><?=h(mdw_t('common.secret','secret'))?></span>
 	                                            <?php endif; ?>
 	                                        </div>
 	                                    </button>
@@ -639,7 +862,7 @@ window.MathJax = {
 
 	                    $rootEntries = [];
 	                    foreach ($rootList as $e) $rootEntries[] = $e;
-	                    $renderPickerGroup('Root', $rootEntries);
+	                    $renderPickerGroup(mdw_t('common.root','Root'), $rootEntries);
 
 	                    foreach ($dirMap as $dirname => $entries) {
 	                        $renderPickerGroup($dirname, $entries);
@@ -650,132 +873,314 @@ window.MathJax = {
 
 	        <div id="linkModalExternal" class="link-modal-section" hidden>
 	            <div class="modal-field">
-	                <label class="modal-label" for="externalLinkText">Link text</label>
-	                <input id="externalLinkText" type="text" class="input" placeholder="e.g. Gold spot price">
+	                <label class="modal-label" for="externalLinkText"><?=h(mdw_t('link_modal.link_text_label','Link text'))?></label>
+	                <input id="externalLinkText" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.link_text_placeholder','e.g. Gold spot price'))?>">
 	            </div>
 	            <div class="modal-field">
-	                <label class="modal-label" for="externalLinkUrl">URL</label>
-	                <input id="externalLinkUrl" type="url" class="input" placeholder="https://example.com/">
+	                <label class="modal-label" for="externalLinkUrl"><?=h(mdw_t('link_modal.url_label','URL'))?></label>
+	                <input id="externalLinkUrl" type="url" class="input" placeholder="<?=h(mdw_t('link_modal.url_placeholder','https://example.com/'))?>">
+	            </div>
+	        </div>
+	        <div id="linkModalYoutube" class="link-modal-section" hidden>
+	            <div class="modal-field">
+	                <label class="modal-label" for="youtubeLinkInput"><?=h(mdw_t('link_modal.youtube_label','YouTube ID or URL'))?></label>
+	                <input id="youtubeLinkInput" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.youtube_placeholder','yob8SkcOKaYv or https://youtu.be/'))?>">
 	            </div>
 	        </div>
 	    </div>
 		    <div class="modal-footer">
-		        <button type="button" class="btn btn-ghost" id="linkModalCancel">Cancel</button>
-		        <button type="button" class="btn btn-primary" id="linkModalInsert" disabled>Insert link</button>
+		        <button type="button" class="btn btn-ghost" id="linkModalCancel"><?=h(mdw_t('common.cancel','Cancel'))?></button>
+		        <button type="button" class="btn btn-primary" id="linkModalInsert" disabled><?=h(mdw_t('link_modal.insert','Insert link'))?></button>
 		    </div>
 		</div>
 
 			<div class="modal-overlay" id="imageModalOverlay" hidden></div>
 			<div class="modal" id="imageModal" role="dialog" aria-modal="true" aria-labelledby="imageModalTitle" hidden>
 			    <div class="modal-header">
-			        <div class="modal-title" id="imageModalTitle">Insert image</div>
-		        <button type="button" class="btn btn-ghost icon-button" id="imageModalClose" aria-label="Close">
+			        <div class="modal-title" id="imageModalTitle"><?=h(mdw_t('image_modal.title','Insert image'))?></div>
+		        <button type="button" class="btn btn-ghost icon-button" id="imageModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
 		            <span class="pi pi-cross"></span>
 		        </button>
 		    </div>
 		    <div class="modal-body">
 		        <input type="hidden" id="imageCsrf" value="<?=h($CSRF_TOKEN)?>">
 		        <div class="modal-row" style="gap: 0.6rem;">
+		            <div style="display:flex; gap:0.6rem; align-items:center;">
+		                <input id="imageFilter" type="text" class="input" placeholder="<?=h(mdw_t('image_modal.search_images','Search images...'))?>" style="flex: 1 1 auto;">
+		                <button type="button" class="btn btn-ghost btn-small" id="imageFilterClear" aria-label="<?=h(mdw_t('common.clear','Clear'))?>"><?=h(mdw_t('common.clear','Clear'))?></button>
+		            </div>
+		        </div>
+
+		        <div class="modal-row" style="gap: 0.6rem;">
 		            <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
-		                <input id="imageUploadInput" type="file" class="input" accept="image/*" style="flex: 1 1 16rem;">
-		                <button type="button" class="btn btn-primary btn-small" id="imageUploadBtn">Upload</button>
+		                <input id="imageUploadInput" type="file" accept="image/*" style="display:none;">
+		                <button type="button" class="btn btn-ghost btn-small" id="imagePickBtn"><?=h(mdw_t('image_modal.choose_file','Choose file'))?></button>
+		                <span class="status-text" id="imagePickLabel"><?=h(mdw_t('image_modal.no_file','No file chosen'))?></span>
+		                <button type="button" class="btn btn-primary btn-small" id="imageUploadBtn"><?=h(mdw_t('image_modal.upload','Upload'))?></button>
 		            </div>
 		            <div style="display:flex; gap:0.6rem; align-items:center;">
-		                <input id="imageAltInput" type="text" class="input" placeholder="Alt text (optional)" style="flex: 1 1 auto;">
+		                <input id="imageAltInput" type="text" class="input" placeholder="<?=h(mdw_t('image_modal.alt_placeholder','Alt text (optional)'))?>" style="flex: 1 1 auto;">
 		            </div>
 		            <div class="status-text" id="imageStatus" style="min-height: 1.2em;"></div>
 		        </div>
 
 		        <div class="modal-row" style="gap: 0.6rem;">
-		            <div style="display:flex; gap:0.6rem; align-items:center;">
-		                <input id="imageFilter" type="text" class="input" placeholder="Search images..." style="flex: 1 1 auto;">
-		                <button type="button" class="btn btn-ghost btn-small" id="imageFilterClear" aria-label="Clear">Clear</button>
-		            </div>
-		            <div id="imageList" style="max-height: 55vh; overflow:auto; border: 1px solid var(--border-soft); border-radius: 0.75rem; padding: 0.5rem;"></div>
+		            <div id="imageList" style="max-height: 38vh; overflow:auto; border: 1px solid var(--border-soft); border-radius: 0.75rem; padding: 0.5rem;"></div>
 		            <div class="status-text" style="margin-top: 0.25rem;">
-		                Tip: click an image to insert <code>![]()</code> at the cursor.
+		                <?=h(mdw_t('image_modal.tip_insert','Tip: click an image to insert'))?> <code>![]({{ }})</code> <?=h(mdw_t('image_modal.tip_at_cursor','at the cursor.'))?>
 		            </div>
 		        </div>
 			    </div>
 			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
-			        <button type="button" class="btn btn-ghost btn-small" id="imageModalCancel">Close</button>
+			        <button type="button" class="btn btn-ghost btn-small" id="imageModalCancel"><?=h(mdw_t('common.close','Close'))?></button>
 			    </div>
 			</div>
 
+			<div class="auth-overlay" id="authOverlay" hidden>
+				<div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+					<div class="modal-header">
+						<div class="modal-title" id="authModalTitle"><?=h($APP_NAME)?></div>
+					</div>
+					<div class="modal-body">
+						<div id="authSetupFields" hidden>
+							<div class="modal-field">
+								<label class="modal-label" for="authSetupUserPassword">User password</label>
+								<input id="authSetupUserPassword" type="password" class="input" autocomplete="new-password">
+							</div>
+							<div class="modal-field">
+								<label class="modal-label" for="authSetupSuperPassword">Superuser password</label>
+								<input id="authSetupSuperPassword" type="password" class="input" autocomplete="new-password">
+							</div>
+							<div class="status-text" style="margin-top: 0.35rem;">Set both passwords to finish setup.</div>
+						</div>
+						<div id="authLoginFields" hidden>
+							<div class="modal-field">
+								<label class="modal-label" for="authLoginPassword">Password</label>
+								<input id="authLoginPassword" type="password" class="input" autocomplete="current-password">
+							</div>
+						</div>
+						<div id="authStatus" class="status-text" style="margin-top: 0.5rem;"></div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-ghost" id="authSubmitBtn">
+							<span class="pi pi-login"></span>
+							<span class="btn-label">Login</span>
+						</button>
+					</div>
+				</div>
+			</div>
+
 			<div class="modal-overlay" id="themeModalOverlay" hidden></div>
-			<div class="modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
-			    <div class="modal-header">
-			        <div class="modal-title" id="themeModalTitle">Theme</div>
-			        <button type="button" class="btn btn-ghost icon-button" id="themeModalClose" aria-label="Close">
-			            <span class="pi pi-cross"></span>
-			        </button>
-			    </div>
-			    <div class="modal-body">
-				        <div class="modal-field">
-				            <label class="modal-label" for="themePreset">Preset</label>
-				            <div style="display:flex; align-items:center; gap:0.6rem;">
-					            <select id="themePreset" class="input" style="flex: 1 1 auto;">
-				                <option value="default">Default</option>
-				                <?php foreach ($themesList as $t): ?>
-				                    <?php
-				                        $label = (isset($t['label']) && is_string($t['label']) && $t['label'] !== '') ? $t['label'] : $t['name'];
-				                        if (isset($t['color']) && is_string($t['color']) && $t['color'] !== '') $label .= ' • ' . $t['color'];
-				                    ?>
-				                    <option value="<?=h($t['name'])?>"><?=h($label)?></option>
-				                <?php endforeach; ?>
-					            </select>
-					            <div aria-hidden="true" style="display:flex; gap:0.35rem; align-items:center;">
-					                <span id="themeSwatchPrimary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
-					                <span id="themeSwatchSecondary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+				<div class="modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
+				    <div class="modal-header">
+				        <div class="modal-title" id="themeModalTitle"><?=h(mdw_t('theme.title','Settings'))?></div>
+				        <button type="button" class="btn btn-ghost icon-button" id="themeModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
+				            <span class="pi pi-cross"></span>
+				        </button>
+				    </div>
+				    <div class="modal-body">
+					        <div class="modal-field">
+					            <label class="modal-label" for="themePreset"><?=h(mdw_t('theme.preset','Preset'))?></label>
+					            <div style="display:flex; align-items:center; gap:0.6rem;">
+						            <select id="themePreset" class="input" style="flex: 1 1 auto;">
+					                <option value="default"><?=h(mdw_t('theme.default','Default'))?></option>
+					                <?php foreach ($themesList as $t): ?>
+					                    <?php
+					                        $label = (isset($t['label']) && is_string($t['label']) && $t['label'] !== '') ? $t['label'] : $t['name'];
+					                        if (isset($t['color']) && is_string($t['color']) && $t['color'] !== '') $label .= ' • ' . $t['color'];
+					                    ?>
+					                    <option value="<?=h($t['name'])?>"><?=h($label)?></option>
+					                <?php endforeach; ?>
+						            </select>
+						            <div aria-hidden="true" style="display:flex; gap:0.35rem; align-items:center;">
+						                <span id="themeSwatchPrimary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+						                <span id="themeSwatchSecondary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
+						            </div>
 					            </div>
-				            </div>
-				            <div id="themePresetPreview" style="margin-top: 0.5rem; padding: 0.55rem 0.65rem; border-radius: 0.75rem; border: 1px solid var(--border-soft);"></div>
+					            <div id="themePresetPreview" style="margin-top: 0.5rem; padding: 0.55rem 0.65rem; border-radius: 0.75rem; border: 1px solid var(--border-soft);"></div>
 				            <div class="status-text" style="margin-top: 0.4rem;">
-				                Applies only to the Markdown editor + HTML preview.
+				                <?=h(mdw_t('theme.applies_hint','Applies only to the Markdown editor + HTML preview.'))?>
 				            </div>
 				        </div>
 
 				        <details style="margin-top: 0.8rem;">
-				            <summary style="cursor:pointer; user-select:none; font-weight: 600;">Overrides (optional)</summary>
+				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.overrides.summary','Overrides (optional)'))?></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 				                <div class="status-text">
-				                    Overrides are saved in your browser (localStorage) automatically as you type.
+				                    <?=h(mdw_t('theme.overrides.saved_auto','Overrides are saved in your browser (localStorage) automatically as you type.'))?>
 				                    <span id="themeOverridesStatus" style="margin-left: 0.35rem;"></span>
 				                </div>
 				                <div class="modal-field">
-				                    <div class="modal-label" style="margin-bottom: 0.35rem;">HTML preview</div>
+				                    <div class="modal-label" style="margin-bottom: 0.35rem;"><?=h(mdw_t('theme.overrides.preview_section','HTML preview'))?></div>
 				                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
-			                        <input id="themePreviewBg" type="text" class="input" placeholder="Background (e.g. #ffffff)">
-			                        <input id="themePreviewText" type="text" class="input" placeholder="Text color (e.g. #111827)">
-			                        <input id="themePreviewFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
-			                        <input id="themePreviewFontSize" type="text" class="input" placeholder="Font size (e.g. 16px)">
-			                        <input id="themeHeadingFont" type="text" class="input" placeholder="Heading font family (e.g. Montserrat)">
-			                        <input id="themeHeadingColor" type="text" class="input" placeholder="Heading color (e.g. rgb(229,33,157))">
-			                        <input id="themeListColor" type="text" class="input" placeholder="List color (optional)">
-			                        <input id="themeBlockquoteTint" type="text" class="input" placeholder="Blockquote tint (optional)">
-			                    </div>
-			                </div>
+				                        <input id="themePreviewBg" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.preview_bg','Background (e.g. #ffffff)'))?>">
+				                        <input id="themePreviewText" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.preview_text','Text color (e.g. #111827)'))?>">
+				                        <input id="themePreviewFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.preview_font','Font family (e.g. Playfair Display)'))?>">
+				                        <input id="themePreviewFontSize" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.preview_font_size','Font size (e.g. 16px)'))?>">
+				                        <input id="themeHeadingFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.heading_font','Heading font family (e.g. Montserrat)'))?>">
+				                        <input id="themeHeadingColor" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.heading_color','Heading color (e.g. rgb(229,33,157))'))?>">
+				                        <input id="themeListColor" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.list_color','List color (optional)'))?>">
+				                        <input id="themeBlockquoteTint" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.blockquote_tint','Blockquote tint (optional)'))?>">
+				                    </div>
+				                </div>
 
-			                <div class="modal-field">
-			                    <div class="modal-label" style="margin-bottom: 0.35rem;">Markdown editor</div>
-			                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
-			                        <input id="themeEditorFont" type="text" class="input" placeholder="Font family (e.g. Playfair Display)">
-			                        <input id="themeEditorFontSize" type="text" class="input" placeholder="Font size (e.g. 15px)">
-			                        <input id="themeEditorAccent" type="text" class="input" placeholder="Accent color (e.g. rgb(229,33,157))">
-			                    </div>
+				                <div class="modal-field">
+				                    <div class="modal-label" style="margin-bottom: 0.35rem;"><?=h(mdw_t('theme.overrides.editor_section','Markdown editor'))?></div>
+				                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+				                        <input id="themeEditorFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font','Font family (e.g. Playfair Display)'))?>">
+				                        <input id="themeEditorFontSize" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font_size','Font size (e.g. 15px)'))?>">
+				                        <input id="themeEditorAccent" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_accent','Accent color (e.g. rgb(229,33,157))'))?>">
+				                    </div>
 				                </div>
 
 				                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
-				                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="Save overrides now">Save overrides</button>
-				                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="Clear overrides">Reset overrides</button>
+				                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save overrides now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save overrides'))?></button>
+				                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear overrides'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset overrides'))?></button>
 				                </div>
 				            </div>
 				        </details>
-			    </div>
-			    <div class="modal-footer">
-			        <button type="button" class="btn btn-ghost" id="themeModalCancel">Close</button>
-			    </div>
-			</div>
+
+				        <div class="modal-field">
+				            <div class="modal-label"><?=h(mdw_t('theme.editor_view.title','Editor view'))?></div>
+				            <div class="modal-row" style="gap: 0.6rem; margin: 0; flex-wrap: wrap;">
+				                <button type="button" id="wrapToggle" class="btn btn-ghost btn-small toggle-btn" title="<?=h(mdw_t('edit.toolbar.wrap_title','Word wrap'))?>" aria-pressed="false" aria-label="<?=h(mdw_t('edit.toolbar.wrap_title','Word wrap'))?>">
+				                    <span class="toggle-box" aria-hidden="true"><span class="pi pi-checkmark"></span></span>
+				                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.wrap','Wrap'))?></span>
+				                </button>
+				                <button type="button" id="lineNumbersToggle" class="btn btn-ghost btn-small toggle-btn" title="<?=h(mdw_t('edit.toolbar.lines_title','Line numbers'))?>" aria-pressed="true" aria-label="<?=h(mdw_t('edit.toolbar.lines_title','Line numbers'))?>">
+				                    <span class="toggle-box" aria-hidden="true"><span class="pi pi-checkmark"></span></span>
+				                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.lines','Lines'))?></span>
+				                </button>
+				            </div>
+				        </div>
+
+				        <div class="modal-field">
+				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts modifier'))?></div>
+				            <div class="modal-row" style="gap: 1rem; margin: 0;">
+				                <label class="radio">
+				                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModOption" value="option">
+			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Ctrl + Option (⌃⌥)'))?></span>
+			                </label>
+			                <label class="radio">
+			                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModCommand" value="command">
+			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Ctrl + Command (⌃⌘)'))?></span>
+			                </label>
+			            </div>
+			            <div class="status-text">
+			                <?=h(mdw_t('theme.kbd_modifier.tip','Tip: macOS VoiceOver uses Ctrl+Option; choose Ctrl+Command to avoid conflicts.'))?>
+			            </div>
+			        </div>
+
+			        <div class="modal-field">
+			            <label class="modal-label" for="langSelect"><?=h(mdw_t('theme.language.label','Language'))?></label>
+			            <select id="langSelect" class="input" style="width: 100%;">
+			                <?php foreach ($MDW_LANGS as $l): ?>
+			                    <?php
+			                        $code = (string)($l['code'] ?? '');
+			                        $label = (string)($l['native'] ?? ($l['label'] ?? $code));
+			                    ?>
+			                    <option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
+			                <?php endforeach; ?>
+			            </select>
+			            <div class="status-text" style="margin-top: 0.35rem;">
+			                <?=h(mdw_t('theme.language.hint','Choose UI language (auto-detected from translations/*.json).'))?>
+				            </div>
+			        </div>
+
+			        <div class="modal-field" data-auth-superuser="1">
+			            <label class="modal-label" for="appTitleInput"><?=h(mdw_t('theme.app_title.label','App title'))?></label>
+			            <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+			                <input id="appTitleInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.app_title.placeholder','Markdown Manager'))?>" value="<?=h($APP_TITLE_OVERRIDE)?>" data-auth-superuser-enable="1">
+			                <button type="button" class="btn btn-ghost btn-small" id="appTitleSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.app_title.save','Save title'))?></button>
+			            </div>
+			            <div id="appTitleStatus" class="status-text" style="margin-top: 0.35rem;">
+			                <?=h(mdw_t('theme.app_title.hint','Leave blank to use the default.'))?>
+			            </div>
+			        </div>
+
+				        <details style="margin-top: 0.8rem;">
+				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.metadata.title','Metadata'))?></summary>
+				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+				                <?php
+				                    $publisherMode = !empty(($META_CFG['_settings']['publisher_mode'] ?? false));
+				                    $publisherAuthor = (string)($META_CFG['_settings']['publisher_default_author'] ?? '');
+				                    $publisherRequireH2 = !array_key_exists('publisher_require_h2', ($META_CFG['_settings'] ?? []))
+				                        ? true
+				                        : !empty($META_CFG['_settings']['publisher_require_h2']);
+				                ?>
+				                <div class="modal-field" style="margin: 0;">
+				                    <div class="modal-label"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                        <input id="publisherModeToggle" type="checkbox" <?= $publisherMode ? 'checked' : '' ?>>
+				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable website publisher mode'))?></span>
+				                    </label>
+				                    <div class="status-text" style="margin-top: 0.35rem;">
+				                        <?=h(mdw_t('theme.publisher.hint','Adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
+				                    </div>
+				                    <div style="display:grid; grid-template-columns: 1fr; gap: 0.35rem; margin-top: 0.6rem;">
+				                        <label class="status-text" for="publisherAuthorInput"><?=h(mdw_t('theme.publisher.author_label','Author name'))?></label>
+				                        <input id="publisherAuthorInput" type="text" class="input" value="<?=h($publisherAuthor)?>" placeholder="<?=h(mdw_t('theme.publisher.author_placeholder','Your name'))?>">
+				                    </div>
+				                    <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.6rem;">
+				                        <input id="publisherRequireH2Toggle" type="checkbox" <?= $publisherRequireH2 ? 'checked' : '' ?>>
+				                        <span class="status-text"><?=h(mdw_t('theme.publisher.require_subtitle','Require subtitle (##)'))?></span>
+				                    </label>
+				                </div>
+				                <div class="status-text">
+				                    <?=h(mdw_t('theme.metadata.hint','Control whether metadata is shown in the Markdown editor and/or HTML preview. If hidden in Markdown, it is also hidden in HTML preview.'))?>
+				                </div>
+				                <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                    <?php foreach (($META_CFG['fields'] ?? []) as $k => $f): ?>
+				                        <?php
+				                            $label = (string)($f['label'] ?? $k);
+				                            $mdVis = !empty($f['markdown_visible']);
+				                            $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                        ?>
+				                        <div><?=h($label)?></div>
+				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="markdown" <?= $mdVis ? 'checked' : '' ?>>
+				                        </label>
+				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
+				                        </label>
+				                    <?php endforeach; ?>
+				                </div>
+				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
+				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                        <?php foreach (($META_PUBLISHER_CFG['fields'] ?? []) as $k => $f): ?>
+				                            <?php
+				                                $label = (string)($f['label'] ?? $k);
+				                                $mdVis = !empty($f['markdown_visible']);
+				                                $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                            ?>
+				                            <div><?=h($label)?></div>
+				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="markdown" <?= $mdVis ? 'checked' : '' ?>>
+				                            </label>
+				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
+				                            </label>
+				                        <?php endforeach; ?>
+				                    </div>
+				                </div>
+				                <div style="display:flex; align-items:center; gap: 0.6rem; justify-content:flex-end;">
+				                    <span id="metaSettingsStatus" class="status-text"></span>
+				                    <button type="button" class="btn btn-ghost btn-small" id="metaSettingsSaveBtn"><?=h(mdw_t('theme.metadata.save','Save metadata settings'))?></button>
+				                </div>
+				            </div>
+				        </details>
+				    </div>
+				    <div class="modal-footer">
+				        <button type="button" class="btn btn-ghost" id="themeModalCancel"><?=h(mdw_t('common.close','Close'))?></button>
+				    </div>
+				</div>
 
 	<script>
 	window.CURRENT_FILE = <?= json_encode($requested ?? '') ?>;
@@ -783,6 +1188,14 @@ window.MathJax = {
 	window.IS_SECRET_AUTHENTICATED = <?= json_encode(is_secret_authenticated()) ?>;
 	window.MDW_THEMES_DIR = <?= json_encode($THEMES_DIR) ?>;
 	window.MDW_THEMES = <?= json_encode($themesList) ?>;
+	window.MDW_TRANSLATIONS_DIR = <?= json_encode($TRANSLATIONS_DIR) ?>;
+	window.MDW_LANG = <?= json_encode($MDW_LANG) ?>;
+	window.MDW_LANGS = <?= json_encode($MDW_LANGS) ?>;
+	window.MDW_I18N = <?= json_encode($GLOBALS['MDW_I18N'] ?? new stdClass(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+	window.MDW_CSRF = <?= json_encode($CSRF_TOKEN) ?>;
+	window.MDW_AUTH_META = <?= json_encode($MDW_AUTH_META) ?>;
+	window.MDW_META_CONFIG = <?= json_encode($META_CFG_CLIENT, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+	window.MDW_META_PUBLISHER_CONFIG = <?= json_encode($META_PUBLISHER_CFG, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 	</script>
 
 <script defer src="<?=h($STATIC_DIR)?>/base.js"></script>

@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "version": 1
+  },
+  "_auth": {
+    "user_hash": "",
+    "superuser_hash": ""
+  },
+  "_settings": {
+    "publisher_mode": false,
+    "publisher_default_author": "",
+    "publisher_require_h2": true,
+    "ui_theme": "",
+    "theme_preset": "default",
+    "app_title": ""
+  },
+  "fields": {
+    "date": {
+      "label": "Date",
+      "markdown_visible": true,
+      "html_visible": false
+    }
+  }
+}

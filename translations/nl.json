@@ -1,0 +1,255 @@
+{
+  "_meta": { "label": "Dutch", "native": "Nederlands" },
+  "common": {
+    "back": "Terug",
+    "close": "Sluiten",
+    "clear": "Wissen",
+    "cancel": "Annuleren",
+    "edit": "Bewerken",
+    "delete": "Verwijderen",
+    "saved": "Opgeslagen",
+    "secret": "geheim",
+    "folder": "Map",
+    "root": "Root",
+    "notes": "Overzicht",
+    "markdown": "Markdown",
+    "items": "items",
+    "filter_placeholder": "Filter…",
+    "item_count_one": "{n} item",
+    "item_count_other": "{n} items",
+    "total_items": "{n} items totaal"
+  },
+  "index": {
+    "contents": "Overzicht",
+    "filter_desc": "Filter op titel. Nieuwste eerst (op basis van bestandsnaam-prefix yy-mm-dd-).",
+    "filter_placeholder": "Typ om te filteren...",
+    "filter_clear": "Filter wissen",
+    "title_rule": {
+      "prefix": "Eerste",
+      "middle": "in elke .md wordt de titel; HTML gebruikt",
+      "or": "(of",
+      "suffix": ")."
+    },
+    "new_markdown": {
+      "title": "Nieuwe markdown",
+      "close": "Sluiten",
+      "create_edit": "Aanmaken & bewerken",
+      "relative_path": "Relatief pad, bijv.",
+      "date_prefix_title": "Voegt een yy-mm-dd- prefix toe zodat notities netjes op datum sorteren.",
+      "filename_placeholder": "titel.md",
+      "content_placeholder": "# Titel\n\nBegin met schrijven..."
+    },
+    "new_folder_title": "Nieuwe map maken"
+  },
+  "edit": {
+    "unsaved_title": "Niet-opgeslagen wijzigingen",
+    "toolbar": {
+      "link": "Link",
+      "image": "Afbeelding",
+      "save": "Opslaan",
+      "publish": "Publiceren",
+      "publish_title": "Naar verwerking",
+      "revert": "Terugzetten",
+      "delete": "Verwijderen",
+      "wrap": "Wrap",
+      "wrap_title": "Regelafbreking",
+      "lines": "Regels",
+      "lines_title": "Regelnummers"
+    },
+    "publish_state_label": "Publicatiestatus",
+    "publish_state": {
+      "concept": "Concept",
+      "processing": "Verwerking",
+      "published": "Gepubliceerd"
+    },
+    "preview_title": "HTML-voorbeeld",
+    "preview": {
+      "export_title": "Download een eenvoudige HTML-export",
+      "export_btn": "HTML downloaden",
+      "copy_title": "Kopieer eenvoudige HTML naar het klembord",
+      "copy_btn": "HTML kopiëren"
+    },
+    "nav": {
+      "open_files_aria": "Bestanden tonen",
+      "close_files_aria": "Sluit bestanden",
+      "collapse_overview": "Overzicht inklappen",
+      "expand_overview": "Overzicht uitklappen"
+    }
+  },
+  "theme": {
+    "settings_title": "Instellingen",
+    "title": "Instellingen",
+    "preset": "Preset",
+    "default": "Standaard",
+    "applies_hint": "Geldt alleen voor de Markdown editor + HTML-voorbeeld.",
+    "default_preview": "Standaard thema (gebruikt ingebouwde stijlen)",
+    "preview_label": "voorbeeld",
+    "swatch": {
+      "primary": "Primair",
+      "secondary": "Secundair"
+    },
+    "kbd_modifier": {
+      "label": "Sneltoets-modifier",
+      "option": "Ctrl + Option (⌃⌥)",
+      "command": "Ctrl + Command (⌃⌘)",
+      "tip": "Tip: macOS VoiceOver gebruikt Ctrl+Option; kies Ctrl+Command om conflicten te voorkomen."
+    },
+    "language": {
+      "label": "Taal",
+      "hint": "Kies de UI-taal (automatisch gevonden via translations/*.json)."
+    },
+    "app_title": {
+      "label": "App-titel",
+      "placeholder": "Markdown Manager",
+      "save": "Titel opslaan",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt",
+      "hint": "Laat leeg om de standaard te gebruiken."
+    },
+    "editor_view": {
+      "title": "Editorweergave"
+    },
+    "overrides": {
+      "summary": "Aanpassingen (optioneel)",
+      "saved_auto": "Aanpassingen worden in je browser (localStorage) automatisch opgeslagen terwijl je typt.",
+      "preview_section": "HTML-voorbeeld",
+      "editor_section": "Markdown-editor",
+      "save_title": "Aanpassingen nu opslaan",
+      "save_btn": "Aanpassingen opslaan",
+      "reset_title": "Aanpassingen wissen",
+      "reset_btn": "Aanpassingen resetten",
+      "saved": "Opgeslagen",
+      "cleared": "Gewist",
+      "placeholders": {
+        "preview_bg": "Achtergrond (bijv. #ffffff)",
+        "preview_text": "Tekstkleur (bijv. #111827)",
+        "preview_font": "Lettertype (bijv. Playfair Display)",
+        "preview_font_size": "Lettergrootte (bijv. 16px)",
+        "heading_font": "Koptekst-lettertype (bijv. Montserrat)",
+        "heading_color": "Koptekst-kleur (bijv. rgb(229,33,157))",
+        "list_color": "Lijstkleur (optioneel)",
+        "blockquote_tint": "Blockquote-tint (optioneel)",
+        "editor_font": "Lettertype (bijv. Playfair Display)",
+        "editor_font_size": "Lettergrootte (bijv. 15px)",
+        "editor_accent": "Accentkleur (bijv. rgb(229,33,157))"
+      }
+    }
+    ,
+    "metadata": {
+      "title": "Metadata",
+      "hint": "Bepaal of metadata zichtbaar is in de Markdown editor en/of HTML-voorbeeld. Als het verborgen is in Markdown, is het ook verborgen in HTML-voorbeeld.",
+      "field": "Veld",
+      "show_markdown": "Markdown",
+      "show_html": "HTML",
+      "save": "Metadata-instellingen opslaan",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
+    "publisher": {
+      "title": "Website publicatiemodus",
+      "enable": "Website publicatiemodus inschakelen",
+      "hint": "Voegt publicatiestatussen toe (Concept / Verwerking / Gepubliceerd) en toont ze in het overzicht. Schakelt geheime notities uit. Vereist een auteurnaam; subtitel is optioneel.",
+      "author_label": "Auteurnaam",
+      "author_placeholder": "Jouw naam",
+      "author_required": "Vul een auteurnaam in om de publicatiemodus in te schakelen.",
+      "require_subtitle": "Subtitel (##) vereisen"
+    }
+  },
+  "auth": {
+    "superuser_required": "Superuser-login vereist.",
+    "login_title": "Inloggen",
+    "setup_title": "Wachtwoorden instellen",
+    "login_submit": "Inloggen",
+    "setup_submit": "Wachtwoorden opslaan"
+  },
+  "link_modal": {
+    "title": "Link toevoegen",
+    "mode_internal": "Intern",
+    "mode_external": "Extern",
+    "mode_youtube": "YouTube",
+    "search_notes": "Zoek notities...",
+    "clear_search_aria": "Zoekveld wissen",
+    "link_text_label": "Linktekst",
+    "link_text_placeholder": "bijv. bijwerkingen",
+    "url_label": "URL",
+    "url_placeholder": "https://www.nu.nl/",
+    "youtube_label": "YouTube-ID of URL",
+    "youtube_placeholder": "yob8SkcOKaYv of https://youtu.be/",
+    "insert": "Link invoegen"
+  },
+  "image_modal": {
+    "title": "Afbeelding invoegen",
+    "choose_file": "Kies bestand",
+    "no_file": "Geen bestand gekozen",
+    "upload": "Uploaden",
+    "alt_placeholder": "Alt-tekst (optioneel)",
+    "search_images": "Zoek afbeeldingen...",
+    "tip_insert": "Tip: klik op een afbeelding om",
+    "tip_at_cursor": "bij de cursor in te voegen."
+  },
+  "nav": {
+    "collapse_folder": "Map inklappen",
+    "expand_folder": "Map uitklappen",
+    "sort_label": "Sorteren",
+    "sort_date": "Datum",
+    "sort_title": "Titel",
+    "sort_slug": "Bestandsnaam",
+    "no_notes_yet": "Nog geen notities.",
+    "nothing_here_yet": "Hier is nog niets."
+  },
+  "js": {
+    "confirm_delete": "\"{file}\" verwijderen?",
+    "this_file": "dit bestand",
+    "prompt_new_folder": "Nieuwe mapnaam (geen slashes):",
+    "invalid_folder_alert": "Ongeldige mapnaam.",
+    "unsaved_confirm": "Je hebt niet-opgeslagen wijzigingen. Weggooien en doorgaan?",
+    "export_failed": "Export mislukt. Controleer de console voor details.",
+    "copy_failed": "Kopiëren mislukt. Controleer de console voor details.",
+    "copied": "Gekopieerd",
+    "new_md": {
+      "enter_title": "Geef een titel op voor de bestandsnaam.",
+      "no_trailing_slash": "De bestandsnaam mag niet eindigen met een slash.",
+      "no_empty_parts": "De bestandsnaam mag geen lege mapdelen bevatten.",
+      "adjust_title": "Pas de titel aan zodat er letters/cijfers in staan (spaties worden underscores).",
+      "no_dot_parts": "De bestandsnaam mag geen \".\" of \"..\" mapdelen bevatten.",
+      "invalid_filename": "Ongeldige bestandsnaam.",
+      "adjusted_hint": "Aangepaste bestandsnaam: spaties → underscores; niet-ondersteunde tekens verwijderd."
+    }
+  },
+  "flash": {
+    "csrf_invalid": "Ongeldige sessie (CSRF). Herlaad de pagina.",
+    "invalid_file_path": "Ongeldig bestandspad.",
+    "secret_locked": "Geheime notitie is vergrendeld. Ontgrendel eerst via de viewer.",
+    "deleted_prefix": "Verwijderd:",
+    "delete_failed": "Kon bestand niet verwijderen.",
+    "no_write_permissions": "geen schrijfrechten",
+    "invalid_folder_name": "Ongeldige mapnaam.",
+    "reserved_folder_name": "Deze mapnaam is gereserveerd.",
+    "folder_exists_prefix": "Map bestaat al:",
+    "path_exists_not_folder_prefix": "Pad bestaat al (geen map):",
+    "folder_create_failed": "Kon map niet aanmaken.",
+    "folder_created_prefix": "Map aangemaakt:",
+    "invalid_filename_hint": "Bestandsnaam bevat ongeldige tekens. Pas de titel aan (spaties worden underscores) en probeer opnieuw.",
+    "secret_marked_locked": "Dit pad staat als geheim gemarkeerd. Ontgrendel eerst via de viewer.",
+    "folder_not_exist_prefix": "Map bestaat niet:",
+    "file_exists_prefix": "Bestand bestaat al:",
+    "file_create_failed": "Kon bestand niet aanmaken.",
+    "publisher_requires_subtitle": "Website publicatiemodus vereist een subtitelregel die begint met \"##\".",
+    "publisher_author_required": "Website publicatiemodus vereist een auteurnaam.",
+    "publisher_requires_page_title": "Website publicatiemodus vereist een page_title metaregel.",
+    "publisher_requires_page_picture": "Website publicatiemodus vereist een page_picture metaregel."
+  },
+  "secret": {
+    "wrong_password": "Onjuist wachtwoord.",
+    "title": "Beveiligd document",
+    "desc": "Deze notitie is beveiligd. Voer het wachtwoord in om verder te gaan.",
+    "password_placeholder": "Wachtwoord",
+    "unlock_btn": "Ontgrendelen",
+    "back_to_index": "Terug naar index"
+  },
+  "readme": {
+    "shortcut_modifier_note": "Sneltoets-modifier: standaard gebruiken sneltoetsen Ctrl+Alt (Windows/Linux). Op macOS kun je in Instellingen overschakelen naar Ctrl+Command; vervang dan Alt door ⌘ in de sneltoetsen hieronder."
+  }
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Bangers", cursive;
+}
+
+.editor-lines {
+  color: #ed1c24;
+}
+
+.editor-textarea {
+  caret-color: #ed1c24;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #ed1c24 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 18px;
+}

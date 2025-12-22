@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Orbitron", sans-serif;
+}
+
+.editor-lines {
+  color: #00ffff;
+}
+
+.editor-textarea {
+  caret-color: #00ffff;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #00ffff 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

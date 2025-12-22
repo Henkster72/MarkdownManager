@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Comic Neue", cursive;
+}
+
+.editor-lines {
+  color: #ec4899;
+}
+
+.editor-textarea {
+  caret-color: #ec4899;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #ec4899 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 16px;
+}

@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #000000;
+  --theme-primary: #1d9bf0;
+  --theme-secondary: #eff3f4;
+  --theme-surface: #16181c;
+  --theme-border: #2f3336;
+  background: var(--theme-bg);
+  color: #e7e9ea;
+  font-family: -apple-system, sans-serif;
+  font-size: 15px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 1px;
+  background: var(--theme-surface);
+  color: #71767b;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #e7e9ea;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #e7e9ea;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: none;
+}

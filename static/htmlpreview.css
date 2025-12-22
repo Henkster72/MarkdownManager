@@ -1,11 +1,39 @@
 .preview-content {
+    --preview-accent: var(--accent);
+    --accent: var(--theme-secondary, var(--preview-accent));
     font-family: var(--font-sans);
     font-size: 0.87rem;
     line-height: 1.55;
     color: var(--text-main);
     max-width: 100%;
+    min-width: 0;
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+/* Metadata block rendered from hidden _key: value_ lines */
+.md-meta {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+.md-meta-row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  padding: 0.15rem 0;
+}
+.md-meta dt {
+  font-weight: 700;
+  opacity: 0.85;
+}
+.md-meta dd {
+  margin: 0;
+  opacity: 0.95;
+  overflow-wrap: anywhere;
 }
 
 .preview-content h1,
@@ -80,6 +108,30 @@
     text-decoration: underline;
     text-decoration-color: rgba(148, 163, 184, 0.55);
     text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.preview-content .externlink,
+.preview-content .pdflink,
+.preview-content .link {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.preview-content .externlink:after {
+    font-family: "Pop Icon";
+    content: "\e949";
+    margin-left: 0.2rem;
+    text-decoration: none !important;
+}
+
+.preview-content .pdflink:before {
+    font-family: "Pop Icon";
+    font-size: 1.3rem;
+    content: "\e985";
+    margin-right: 0.2rem;
+    text-decoration: none !important;
 }
 
 .preview-content code {
@@ -89,6 +141,11 @@
     border-radius: 0.25rem;
     font-size: 0.78em;
     font-family: var(--font-mono);
+    display: inline-block;
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .preview-content pre {
@@ -100,7 +157,29 @@
     font-family: var(--font-mono);
     font-size: 0.78rem;
     overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
     border: 1px solid var(--surface-code-border);
+    position: relative;
+}
+
+.preview-content pre[data-lang] {
+    padding-top: 1.35rem;
+}
+
+.preview-content pre[data-lang]::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0.35rem;
+    left: 0.55rem;
+    font-size: 0.62rem;
+    line-height: 1;
+    opacity: 0.75;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    font-family: var(--font-mono);
+    pointer-events: none;
+    user-select: none;
 }
 
 .preview-content pre code {
@@ -163,4 +242,39 @@
     font-style: italic;
     background-color: rgba(148,163,184,0.08);
     border-radius: 0.4rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Mobile: aggressively wrap long tokens (URLs, hashes, code) to avoid viewport overflow */
+@media (max-width: 700px) {
+    .preview-container {
+        overflow-x: hidden;
+    }
+
+    .preview-content a,
+    .preview-content code {
+        display: inline;
+        white-space: normal;
+        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+
+    .preview-content {
+        overflow-x: hidden;
+    }
+
+    /* Prefer wrapping over horizontal scrolling for fenced code blocks on small screens */
+    .preview-content pre {
+        overflow-x: hidden;
+        white-space: pre-wrap;
+    }
+
+    .preview-content pre code {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-all;
+    }
 }

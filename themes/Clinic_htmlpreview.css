@@ -13,6 +13,13 @@
   color: #318e89;
 }
 
+.preview-content h1 {
+  font-size: calc(1.9rem + 0.5vw);
+  padding: 1.5rem 0;
+  font-family: "Noto Serif", "Times New Roman", Times, serif;
+  text-align: left;
+}
+
 .preview-content a {
   color: #3267B5;
   text-decoration-color: rgba(50, 103, 181, 0.55);

@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #fff0f5;
+  --theme-primary: #ec4899;
+  --theme-secondary: #06b6d4;
+  --theme-surface: #ffffff;
+  --theme-border: #f9a8d4;
+  background: var(--theme-bg);
+  color: #1f2937;
+  font-family: "Comic Neue", cursive;
+  font-size: 16px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 3px;
+  background: var(--theme-surface);
+  color: #6b7280;
+  border-radius: 20px;
+  box-shadow: 5px 5px 0px #06b6d4;
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #1f2937;
+  border: 3px solid var(--theme-border);
+  border-radius: 20px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #1f2937;
+  border: 3px solid var(--theme-border);
+  border-radius: 20px;
+  box-shadow: 5px 5px 0px #06b6d4;
+}

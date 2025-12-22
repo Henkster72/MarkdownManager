@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Quicksand", sans-serif;
+}
+
+.editor-lines {
+  color: #7c3aed;
+}
+
+.editor-textarea {
+  caret-color: #7c3aed;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #7c3aed 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 16px;
+}

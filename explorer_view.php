@@ -11,6 +11,11 @@ function explorer_view_escape($s) {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
 
+function explorer_view_t($key, $fallback = '') {
+    if (function_exists('mdw_t')) return mdw_t($key, $fallback);
+    return is_string($fallback) ? $fallback : '';
+}
+
 function explorer_view_url_encode_path($path) {
     if (function_exists('url_encode_path')) return url_encode_path($path);
     $path = str_replace("\\", "/", (string)$path);
@@ -50,6 +55,8 @@ function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) 
             fclose($h);
             return trim($m[1]);
         }
+        $k = null; $v = null;
+        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) continue;
         if ($firstNonEmpty === null && trim($line) !== '') {
             $firstNonEmpty = $line;
         }
@@ -59,6 +66,100 @@ function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) 
     if ($firstNonEmpty !== null) return trim($firstNonEmpty);
     $fallbackBasename = (string)$fallbackBasename;
     return $fallbackBasename !== '' ? $fallbackBasename : 'Untitled';
+}
+
+function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackBasename, $wantMetaKeys = []) {
+    $want = [];
+    if (is_array($wantMetaKeys)) {
+        foreach ($wantMetaKeys as $k) {
+            if (!is_string($k) || $k === '') continue;
+            $want[strtolower($k)] = true;
+        }
+    }
+
+    if (!is_string($fullPath) || $fullPath === '' || !is_file($fullPath)) {
+        return ['title' => (string)$fallbackBasename, 'meta' => []];
+    }
+    $h = @fopen($fullPath, 'rb');
+    if (!$h) return ['title' => (string)$fallbackBasename, 'meta' => []];
+
+    $firstNonEmpty = null;
+    $title = null;
+    $meta = [];
+    $maxLines = 260;
+    while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
+        $line = rtrim($line, "\r\n");
+
+        $k = null; $v = null;
+        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+            if ($k !== null && isset($want[$k])) {
+                $meta[$k] = $v;
+            }
+            continue;
+        }
+        if (!empty($want)) {
+            if (preg_match('/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u', $line, $m)) {
+                $key = strtolower(trim((string)($m[1] ?? '')));
+                if ($key !== '' && isset($want[$key])) {
+                    $meta[$key] = trim((string)($m[2] ?? ''));
+                    continue;
+                }
+            }
+        }
+
+        if ($title === null && preg_match('/^#\\s+(.*)$/', $line, $m)) {
+            $title = trim((string)($m[1] ?? ''));
+        }
+
+        if ($firstNonEmpty === null && trim($line) !== '') {
+            $firstNonEmpty = $line;
+        }
+    }
+    fclose($h);
+
+    if ($title !== null && $title !== '') {
+        return ['title' => $title, 'meta' => $meta];
+    }
+    if ($firstNonEmpty !== null) {
+        return ['title' => trim($firstNonEmpty), 'meta' => $meta];
+    }
+    $fallbackBasename = (string)$fallbackBasename;
+    return ['title' => ($fallbackBasename !== '' ? $fallbackBasename : 'Untitled'), 'meta' => $meta];
+}
+
+function explorer_view_parse_date_value($value) {
+    $value = trim((string)$value);
+    if ($value === '') return [null, null, null];
+    if (preg_match('/(\d{4})[\\-\\/_\\.](\d{2})[\\-\\/_\\.](\d{2})/', $value, $m)) {
+        return [$m[1], $m[2], $m[3]];
+    }
+    if (preg_match('/(\d{2})[\\-\\/_\\.](\d{2})[\\-\\/_\\.](\d{2})/', $value, $m)) {
+        $year = 2000 + (int)$m[1];
+        return [$year, $m[2], $m[3]];
+    }
+    return [null, null, null];
+}
+
+function explorer_view_format_date_key_label($year, $month, $day) {
+    $y = (int)$year;
+    $m = (int)$month;
+    $d = (int)$day;
+    if ($y <= 0 || $m <= 0 || $d <= 0) return ['', ''];
+    $label = sprintf('%04d-%02d-%02d', $y, $m, $d);
+    $key = sprintf('%04d%02d%02d', $y, $m, $d);
+    return [$key, $label];
+}
+
+function explorer_view_entry_date_key_label($rawDate, $yy, $mm, $dd) {
+    [$year, $month, $day] = explorer_view_parse_date_value($rawDate);
+    if ($year !== null) {
+        return explorer_view_format_date_key_label($year, $month, $day);
+    }
+    if ($yy !== null && $mm !== null && $dd !== null) {
+        $year = strlen((string)$yy) === 2 ? (2000 + (int)$yy) : (int)$yy;
+        return explorer_view_format_date_key_label($year, $mm, $dd);
+    }
+    return ['', ''];
 }
 
 function explorer_view_plugins_dir($projectDir = null) {
@@ -171,6 +272,7 @@ function explorer_view_render_tree($opts) {
     $rootList = $opts['rootList'] ?? [];
     $dirMap = $opts['dirMap'] ?? [];
     $secretMap = $opts['secretMap'] ?? [];
+    $publisher_mode = !empty($opts['publisher_mode']);
     $folder_filter = $opts['folder_filter'] ?? null;
     $current_file = $opts['current_file'] ?? null;
     $csrf_token = $opts['csrf_token'] ?? null;
@@ -235,8 +337,20 @@ function explorer_view_render_tree($opts) {
         $pluginCtx['back_href'] = null;
     }
 
+    $backHrefAttr = '';
+    if (!empty($pluginCtx['back_href'])) {
+        $backHrefAttr = ' data-back-href="' . explorer_view_escape($pluginCtx['back_href']) . '"';
+    }
     ?>
-    <div id="contentList" class="content-list">
+    <div id="contentList" class="content-list"<?=$backHrefAttr?>>
+    <div class="nav-sort-row">
+        <span class="nav-sort-label"><?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?></span>
+        <select id="navSortSelect" class="input nav-sort-select" aria-label="<?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?>">
+            <option value="date"><?=explorer_view_escape(explorer_view_t('nav.sort_date','Date'))?></option>
+            <option value="title"><?=explorer_view_escape(explorer_view_t('nav.sort_title','Title'))?></option>
+            <option value="slug"><?=explorer_view_escape(explorer_view_t('nav.sort_slug','Filename'))?></option>
+        </select>
+    </div>
 
     <!-- Root files -->
     <?php if (!empty($rootList)): ?>
@@ -247,43 +361,84 @@ function explorer_view_render_tree($opts) {
 	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id('root'))?>" class="nav-section" data-folder-section="root" data-default-open="<?= $root_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
             <?php if ($folder_filter && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
-                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="Back">
+                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="<?=explorer_view_escape(explorer_view_t('common.back','Back'))?>">
                     <span class="pi pi-leftcaret"></span>
                 </a>
             <?php endif; ?>
-            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $root_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($root_children_id)?>" title="<?= $root_default_open ? 'Collapse folder' : 'Expand folder' ?>">
+            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $root_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($root_children_id)?>" title="<?= $root_default_open ? explorer_view_escape(explorer_view_t('nav.collapse_folder','Collapse folder')) : explorer_view_escape(explorer_view_t('nav.expand_folder','Expand folder')) ?>">
                 <span class="pi <?= $root_default_open ? 'pi-openfolder' : 'pi-folder' ?>"></span>
             </button>
-            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink('root'))?>">Root</a>
+            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink('root'))?>"><?=explorer_view_escape(explorer_view_t('common.root','Root'))?></a>
         </h2>
     <div id="<?=explorer_view_escape($root_children_id)?>" class="folder-children" <?= $root_default_open ? '' : 'hidden' ?>>
     <ul class="notes-list">
     <?php foreach($rootList as $entry):
         $p   = $entry['path'];
-        $t   = explorer_view_extract_md_title_from_file(__DIR__ . '/' . $p, $entry['basename']);
+        $info = explorer_view_extract_md_title_and_meta_from_file(
+            __DIR__ . '/' . $p,
+            $entry['basename'],
+            ['publishstate', 'page_title', 'post_date', 'published_date']
+        );
+        $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
+        $t   = $publisher_mode
+            ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
+            : (string)($info['title'] ?? $entry['basename']);
+        $publishState = null;
+        if ($publisher_mode) {
+            $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
+            $publishState = function_exists('mdw_publisher_normalize_publishstate')
+                ? mdw_publisher_normalize_publishstate($rawState)
+                : ($rawState !== '' ? $rawState : 'Concept');
+            if ($publishState === '') $publishState = 'Concept';
+        }
+        $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
+        if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+        [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
+            $rawDate,
+            $entry['yy'] ?? null,
+            $entry['mm'] ?? null,
+            $entry['dd'] ?? null
+        );
         $isSecret = isset($secretMap[$p]);
         $isCurrent = ($current_file !== null && $current_file === $p);
+        $publishClass = '';
+        if ($publisher_mode) {
+            $s = strtolower((string)$publishState);
+            if ($s === 'published') $publishClass = 'publish-published';
+            else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
+            else $publishClass = 'publish-concept';
+        }
     ?>
-    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>">
+    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
         <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>">
             <div class="note-title" style="justify-content: space-between;">
                 <span><?=explorer_view_escape($t)?></span>
-                <?php if ($isSecret): ?>
-                    <span class="badge-secret">secret</span>
+                <span class="note-badges" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                    <?php if ($publisher_mode): ?>
+                        <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
+                    <?php endif; ?>
+                    <?php if ($isSecret): ?>
+                        <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
+                    <?php endif; ?>
+                </span>
+            </div>
+            <div class="nav-item-path">
+                <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
+                <?php if ($dateLabel !== ''): ?>
+                    <span class="nav-item-date"><?=explorer_view_escape($dateLabel)?></span>
                 <?php endif; ?>
             </div>
-            <div class="nav-item-path"><?=explorer_view_escape($p)?></div>
         </a>
         <?php if ($show_actions && $csrf_token): ?>
         <div class="note-actions">
-            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="Edit">
+            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">
                 <span class="pi pi-edit"></span>
             </a>
             <form method="post" class="deleteForm" data-file="<?=explorer_view_escape($p)?>">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="file" value="<?=explorer_view_escape($p)?>">
                 <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                <button type="submit" class="btn btn-ghost icon-button" title="Delete">
+                <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
                     <span class="pi pi-bin"></span>
                 </button>
             </form>
@@ -310,11 +465,11 @@ function explorer_view_render_tree($opts) {
 	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id($dirname))?>" class="nav-section" data-folder-section="<?=explorer_view_escape($dirname)?>" data-default-open="<?= $dir_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
             <?php if ($folder_filter && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
-                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="Back">
+                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="<?=explorer_view_escape(explorer_view_t('common.back','Back'))?>">
                     <span class="pi pi-leftcaret"></span>
                 </a>
             <?php endif; ?>
-            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $dir_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($dir_children_id)?>" title="<?= $dir_default_open ? 'Collapse folder' : 'Expand folder' ?>">
+            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $dir_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($dir_children_id)?>" title="<?= $dir_default_open ? explorer_view_escape(explorer_view_t('nav.collapse_folder','Collapse folder')) : explorer_view_escape(explorer_view_t('nav.expand_folder','Expand folder')) ?>">
                 <span class="pi <?= $dir_default_open ? 'pi-openfolder' : 'pi-folder' ?>"></span>
             </button>
             <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink($dirname))?>"><?=explorer_view_escape($dirname)?></a>
@@ -324,30 +479,71 @@ function explorer_view_render_tree($opts) {
     <ul class="notes-list">
     <?php foreach($list as $entry):
         $p   = $entry['path'];
-        $t   = explorer_view_extract_md_title_from_file(__DIR__ . '/' . $p, $entry['basename']);
+        $info = explorer_view_extract_md_title_and_meta_from_file(
+            __DIR__ . '/' . $p,
+            $entry['basename'],
+            ['publishstate', 'page_title', 'post_date', 'published_date']
+        );
+        $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
+        $t   = $publisher_mode
+            ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
+            : (string)($info['title'] ?? $entry['basename']);
+        $publishState = null;
+        if ($publisher_mode) {
+            $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
+            $publishState = function_exists('mdw_publisher_normalize_publishstate')
+                ? mdw_publisher_normalize_publishstate($rawState)
+                : ($rawState !== '' ? $rawState : 'Concept');
+            if ($publishState === '') $publishState = 'Concept';
+        }
+        $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
+        if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+        [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
+            $rawDate,
+            $entry['yy'] ?? null,
+            $entry['mm'] ?? null,
+            $entry['dd'] ?? null
+        );
         $isSecret = isset($secretMap[$p]);
         $isCurrent = ($current_file !== null && $current_file === $p);
+        $publishClass = '';
+        if ($publisher_mode) {
+            $s = strtolower((string)$publishState);
+            if ($s === 'published') $publishClass = 'publish-published';
+            else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
+            else $publishClass = 'publish-concept';
+        }
     ?>
-    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>">
+    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
         <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>">
             <div class="note-title" style="justify-content: space-between;">
                 <span><?=explorer_view_escape($t)?></span>
-                <?php if ($isSecret): ?>
-                    <span class="badge-secret">secret</span>
+                <span class="note-badges" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                    <?php if ($publisher_mode): ?>
+                        <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
+                    <?php endif; ?>
+                    <?php if ($isSecret): ?>
+                        <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
+                    <?php endif; ?>
+                </span>
+            </div>
+            <div class="nav-item-path">
+                <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
+                <?php if ($dateLabel !== ''): ?>
+                    <span class="nav-item-date"><?=explorer_view_escape($dateLabel)?></span>
                 <?php endif; ?>
             </div>
-            <div class="nav-item-path"><?=explorer_view_escape($p)?></div>
         </a>
         <?php if ($show_actions && $csrf_token): ?>
         <div class="note-actions">
-            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="Edit">
+            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">
                 <span class="pi pi-edit"></span>
             </a>
             <form method="post" class="deleteForm" data-file="<?=explorer_view_escape($p)?>">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="file" value="<?=explorer_view_escape($p)?>">
                 <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                <button type="submit" class="btn btn-ghost icon-button" title="Delete">
+                <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
                     <span class="pi pi-bin"></span>
                 </button>
             </form>
@@ -356,7 +552,7 @@ function explorer_view_render_tree($opts) {
     </li>
     <?php endforeach; ?>
     <?php if (empty($list)): ?>
-        <li class="nav-empty">No notes yet.</li>
+        <li class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.no_notes_yet','No notes yet.'))?></li>
     <?php endif; ?>
     </ul>
     </div>
@@ -364,7 +560,7 @@ function explorer_view_render_tree($opts) {
     <?php endforeach; ?>
 
     <?php if (empty($rootList) && empty($dirMap) && empty($anyPluginFoldersRendered)): ?>
-    <div class="nav-empty">Nothing here yet.</div>
+    <div class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.nothing_here_yet','Nothing here yet.'))?></div>
     <?php endif; ?>
 
     </div><!-- /contentList -->

@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #2c2c2c;
+  --theme-primary: #f4a261;
+  --theme-secondary: #e76f51;
+  --theme-surface: #4a4a4a;
+  --theme-border: #e9c46a;
+  background: var(--theme-bg);
+  color: #e9c46a;
+  font-family: "Press Start 2P", cursive;
+  font-size: 12px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 4px;
+  background: var(--theme-surface);
+  color: #264653;
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #e9c46a;
+  border: 4px solid var(--theme-border);
+  border-radius: 0px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #e9c46a;
+  border: 4px solid var(--theme-border);
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px #000000;
+}

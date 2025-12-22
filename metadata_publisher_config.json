@@ -1,0 +1,89 @@
+{
+  "_meta": {
+    "version": 1
+  },
+  "fields": {
+    "author": {
+      "label": "Author",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "creationdate": {
+      "label": "Created",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "changedate": {
+      "label": "Updated",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "publishstate": {
+      "label": "Publish state",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "extends": {
+      "label": "Extends",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "page_title": {
+      "label": "Page title",
+      "markdown_visible": true,
+      "html_visible": true
+    },
+    "page_subtitle": {
+      "label": "Page subtitle",
+      "markdown_visible": true,
+      "html_visible": true
+    },
+    "post_date": {
+      "label": "Post date",
+      "markdown_visible": true,
+      "html_visible": true
+    },
+    "page_picture": {
+      "label": "Page picture",
+      "markdown_visible": true,
+      "html_visible": true
+    },
+    "active_page": {
+      "label": "Active page",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "cta": {
+      "label": "CTA",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "blurmenu": {
+      "label": "Blur menu",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "sociallinks": {
+      "label": "Social links",
+      "markdown_visible": true,
+      "html_visible": false
+    },
+    "blog": {
+      "label": "Blog",
+      "markdown_visible": true,
+      "html_visible": false
+    }
+  },
+  "html_map": {
+    "page_title": {
+      "prefix": "<h1>",
+      "postfix": "</h1>",
+      "omit_meta": true
+    },
+    "page_subtitle": {
+      "prefix": "<h2>",
+      "postfix": "</h2>",
+      "omit_meta": true
+    }
+  }
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Poppins", sans-serif;
+}
+
+.editor-lines {
+  color: #db2777;
+}
+
+.editor-textarea {
+  caret-color: #db2777;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #db2777 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

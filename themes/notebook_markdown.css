@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Patrick Hand", cursive;
+}
+
+.editor-lines {
+  color: #374151;
+}
+
+.editor-textarea {
+  caret-color: #374151;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #374151 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 16px;
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: Inter, sans-serif;
+}
+
+.editor-lines {
+  color: #f5bde6;
+}
+
+.editor-textarea {
+  caret-color: #f5bde6;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #f5bde6 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 14px;
+}

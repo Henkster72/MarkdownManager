@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Rajdhani", sans-serif;
+}
+
+.editor-lines {
+  color: #00ff41;
+}
+
+.editor-textarea {
+  caret-color: #00ff41;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #00ff41 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 16px;
+}

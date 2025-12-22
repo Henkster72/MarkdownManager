@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #e0e0e0;
+  --theme-primary: #0000ff;
+  --theme-secondary: #ff0000;
+  --theme-surface: #c0c0c0;
+  --theme-border: #000000;
+  background: var(--theme-bg);
+  color: #000000;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 2px;
+  background: var(--theme-surface);
+  color: #404040;
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #000000;
+  border: 2px solid var(--theme-border);
+  border-radius: 0px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #000000;
+  border: 2px solid var(--theme-border);
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px #000000;
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Google Sans", var(--font-sans);
+}
+
+.editor-lines {
+  color: #f4a261;
+}
+
+.editor-textarea {
+  caret-color: #f4a261;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #f4a261 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.editor-lines {
+  color: #8e9eab;
+}
+
+.editor-textarea {
+  caret-color: #8e9eab;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #8e9eab 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

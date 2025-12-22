@@ -8,7 +8,7 @@
     color: var(--line-number);
     border-right-color: var(--surface-code-border);
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     line-height: 1.35;
     text-align: right;
     white-space: pre;

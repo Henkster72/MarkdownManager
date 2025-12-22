@@ -1,0 +1,255 @@
+{
+  "_meta": { "label": "English", "native": "English" },
+  "common": {
+    "back": "Back",
+    "close": "Close",
+    "clear": "Clear",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "saved": "Saved",
+    "secret": "secret",
+    "folder": "Folder",
+    "root": "Root",
+    "notes": "Overview",
+    "markdown": "Markdown",
+    "items": "items",
+    "filter_placeholder": "Filter…",
+    "item_count_one": "{n} item",
+    "item_count_other": "{n} items",
+    "total_items": "{n} total items"
+  },
+  "index": {
+    "contents": "Overview",
+    "filter_desc": "Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).",
+    "filter_placeholder": "Type to filter...",
+    "filter_clear": "Clear filter",
+    "title_rule": {
+      "prefix": "First",
+      "middle": "in each .md becomes the title; HTML uses",
+      "or": "(or",
+      "suffix": ")."
+    },
+    "new_markdown": {
+      "title": "New markdown",
+      "close": "Close",
+      "create_edit": "Create & edit",
+      "relative_path": "Relative path, e.g.",
+      "date_prefix_title": "Adds a yy-mm-dd- prefix so notes sort nicely by date.",
+      "filename_placeholder": "title.md",
+      "content_placeholder": "# Title\n\nStart writing..."
+    },
+    "new_folder_title": "Create a new folder"
+  },
+  "edit": {
+    "unsaved_title": "Unsaved changes",
+    "toolbar": {
+      "link": "Link",
+      "image": "Image",
+      "save": "Save",
+      "publish": "Publish",
+      "publish_title": "Send to processing",
+      "revert": "Revert",
+      "delete": "Delete",
+      "wrap": "Wrap",
+      "wrap_title": "Word wrap",
+      "lines": "Lines",
+      "lines_title": "Line numbers"
+    },
+    "publish_state_label": "Publish state",
+    "publish_state": {
+      "concept": "Concept",
+      "processing": "Processing",
+      "published": "Published"
+    },
+    "preview_title": "HTML preview",
+    "preview": {
+      "export_title": "Download a plain HTML export",
+      "export_btn": "HTML download",
+      "copy_title": "Copy plain HTML to clipboard",
+      "copy_btn": "Copy HTML"
+    },
+    "nav": {
+      "open_files_aria": "Show files",
+      "close_files_aria": "Close files",
+      "collapse_overview": "Collapse overview",
+      "expand_overview": "Expand overview"
+    }
+  },
+  "theme": {
+    "settings_title": "Settings",
+    "title": "Settings",
+    "preset": "Preset",
+    "default": "Default",
+    "applies_hint": "Applies only to the Markdown editor + HTML preview.",
+    "default_preview": "Default theme (uses built-in styles)",
+    "preview_label": "preview",
+    "swatch": {
+      "primary": "Primary",
+      "secondary": "Secondary"
+    },
+    "kbd_modifier": {
+      "label": "Keyboard shortcuts modifier",
+      "option": "Ctrl + Option (⌃⌥)",
+      "command": "Ctrl + Command (⌃⌘)",
+      "tip": "Tip: macOS VoiceOver uses Ctrl+Option; choose Ctrl+Command to avoid conflicts."
+    },
+    "language": {
+      "label": "Language",
+      "hint": "Choose UI language (auto-detected from translations/*.json)."
+    },
+    "app_title": {
+      "label": "App title",
+      "placeholder": "Markdown Manager",
+      "save": "Save title",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed",
+      "hint": "Leave blank to use the default."
+    },
+    "editor_view": {
+      "title": "Editor view"
+    },
+    "overrides": {
+      "summary": "Overrides (optional)",
+      "saved_auto": "Overrides are saved in your browser (localStorage) automatically as you type.",
+      "preview_section": "HTML preview",
+      "editor_section": "Markdown editor",
+      "save_title": "Save overrides now",
+      "save_btn": "Save overrides",
+      "reset_title": "Clear overrides",
+      "reset_btn": "Reset overrides",
+      "saved": "Saved",
+      "cleared": "Cleared",
+      "placeholders": {
+        "preview_bg": "Background (e.g. #ffffff)",
+        "preview_text": "Text color (e.g. #111827)",
+        "preview_font": "Font family (e.g. Playfair Display)",
+        "preview_font_size": "Font size (e.g. 16px)",
+        "heading_font": "Heading font family (e.g. Montserrat)",
+        "heading_color": "Heading color (e.g. rgb(229,33,157))",
+        "list_color": "List color (optional)",
+        "blockquote_tint": "Blockquote tint (optional)",
+        "editor_font": "Font family (e.g. Playfair Display)",
+        "editor_font_size": "Font size (e.g. 15px)",
+        "editor_accent": "Accent color (e.g. rgb(229,33,157))"
+      }
+    }
+    ,
+    "metadata": {
+      "title": "Metadata",
+      "hint": "Control whether metadata is shown in the Markdown editor and/or HTML preview. If hidden in Markdown, it is also hidden in HTML preview.",
+      "field": "Field",
+      "show_markdown": "Markdown",
+      "show_html": "HTML",
+      "save": "Save metadata settings",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
+    "publisher": {
+      "title": "Website publisher mode",
+      "enable": "Enable website publisher mode",
+      "hint": "Adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.",
+      "author_label": "Author name",
+      "author_placeholder": "Your name",
+      "author_required": "Please enter an author name to enable publisher mode.",
+      "require_subtitle": "Require subtitle (##)"
+    }
+  },
+  "auth": {
+    "superuser_required": "Superuser login required.",
+    "login_title": "Login",
+    "setup_title": "Set passwords",
+    "login_submit": "Login",
+    "setup_submit": "Save passwords"
+  },
+  "link_modal": {
+    "title": "Add link",
+    "mode_internal": "Internal",
+    "mode_external": "External",
+    "mode_youtube": "YouTube",
+    "search_notes": "Search notes...",
+    "clear_search_aria": "Clear search",
+    "link_text_label": "Link text",
+    "link_text_placeholder": "e.g. Gold spot price",
+    "url_label": "URL",
+    "url_placeholder": "https://example.com/",
+    "youtube_label": "YouTube ID or URL",
+    "youtube_placeholder": "yob8SkcOKaYv or https://youtu.be/",
+    "insert": "Insert link"
+  },
+  "image_modal": {
+    "title": "Insert image",
+    "choose_file": "Choose file",
+    "no_file": "No file chosen",
+    "upload": "Upload",
+    "alt_placeholder": "Alt text (optional)",
+    "search_images": "Search images...",
+    "tip_insert": "Tip: click an image to insert",
+    "tip_at_cursor": "at the cursor."
+  },
+  "nav": {
+    "collapse_folder": "Collapse folder",
+    "expand_folder": "Expand folder",
+    "sort_label": "Sort",
+    "sort_date": "Date",
+    "sort_title": "Title",
+    "sort_slug": "Filename",
+    "no_notes_yet": "No notes yet.",
+    "nothing_here_yet": "Nothing here yet."
+  },
+  "js": {
+    "confirm_delete": "Delete \"{file}\"?",
+    "this_file": "this file",
+    "prompt_new_folder": "New folder name (no slashes):",
+    "invalid_folder_alert": "Invalid folder name.",
+    "unsaved_confirm": "You have unsaved changes. Discard them and continue?",
+    "export_failed": "Export failed. Check the console for details.",
+    "copy_failed": "Copy failed. Check the console for details.",
+    "copied": "Copied",
+    "new_md": {
+      "enter_title": "Please enter a title for the filename.",
+      "no_trailing_slash": "The filename cannot end with a slash.",
+      "no_empty_parts": "The filename cannot contain empty path parts.",
+      "adjust_title": "Please adjust the title so it contains letters/numbers (spaces become underscores).",
+      "no_dot_parts": "The filename cannot contain \".\" or \"..\" path parts.",
+      "invalid_filename": "Invalid filename.",
+      "adjusted_hint": "Adjusted filename: spaces → underscores; unsupported characters removed."
+    }
+  },
+  "flash": {
+    "csrf_invalid": "Invalid session (CSRF). Reload the page.",
+    "invalid_file_path": "Invalid file path.",
+    "secret_locked": "Secret note is locked. Unlock first via the viewer.",
+    "deleted_prefix": "Deleted:",
+    "delete_failed": "Could not delete file.",
+    "no_write_permissions": "no write permissions",
+    "invalid_folder_name": "Invalid folder name.",
+    "reserved_folder_name": "This folder name is reserved.",
+    "folder_exists_prefix": "Folder already exists:",
+    "path_exists_not_folder_prefix": "Path already exists (not a folder):",
+    "folder_create_failed": "Could not create folder.",
+    "folder_created_prefix": "Folder created:",
+    "invalid_filename_hint": "Invalid filename. Adjust the title (spaces become underscores) and try again.",
+    "secret_marked_locked": "This path is marked as secret. Unlock first via the viewer.",
+    "folder_not_exist_prefix": "Folder does not exist:",
+    "file_exists_prefix": "File already exists:",
+    "file_create_failed": "Could not create file.",
+    "publisher_requires_subtitle": "Website publisher mode requires a subtitle line starting with \"##\".",
+    "publisher_author_required": "Website publisher mode requires an author name.",
+    "publisher_requires_page_title": "Website publisher mode requires a page_title metadata line.",
+    "publisher_requires_page_picture": "Website publisher mode requires a page_picture metadata line."
+  },
+  "secret": {
+    "wrong_password": "Wrong password.",
+    "title": "Protected document",
+    "desc": "This note is protected. Enter the password to continue.",
+    "password_placeholder": "Password",
+    "unlock_btn": "Unlock",
+    "back_to_index": "Back to index"
+  },
+  "readme": {
+    "shortcut_modifier_note": "Shortcut modifier: by default shortcuts use Ctrl+Alt (Windows/Linux). On macOS you can switch to Ctrl+Command in the Settings modal; then replace Alt with ⌘ in the shortcuts below."
+  }
+}

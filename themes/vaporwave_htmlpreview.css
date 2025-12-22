@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #ff71ce;
+  --theme-primary: #05ffa1;
+  --theme-secondary: #b967ff;
+  --theme-surface: #01cdfe;
+  --theme-border: #fffb96;
+  background: var(--theme-bg);
+  color: #fffb96;
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 1px;
+  background: var(--theme-surface);
+  color: #01cdfe;
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #fffb96;
+  border: 1px solid var(--theme-border);
+  border-radius: 0px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #fffb96;
+  border: 1px solid var(--theme-border);
+  border-radius: 0px;
+  box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+}

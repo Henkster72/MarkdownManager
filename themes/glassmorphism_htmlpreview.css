@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #e0e5ec;
+  --theme-primary: #8e9eab;
+  --theme-secondary: #ffffff;
+  --theme-surface: rgba(255, 255, 255, 0.25);
+  --theme-border: rgba(255, 255, 255, 0.5);
+  background: var(--theme-bg);
+  color: #4a4a4a;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 1px;
+  background: var(--theme-surface);
+  color: #6c757d;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #4a4a4a;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #4a4a4a;
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}

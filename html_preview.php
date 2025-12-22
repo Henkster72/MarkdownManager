@@ -14,6 +14,19 @@ function is_external_url($url) {
     return (bool)preg_match('~^[a-z][a-z0-9+.-]*:~i', $url);
 }
 
+function normalize_md_link_url($url) {
+    $url = trim((string)$url);
+    if ($url === '') return $url;
+    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
+
+    // Treat bare domains as external links and add https://
+    if (preg_match('~^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9-]{1,63})+(?=$|[/?#])~', $url)) {
+        return 'https://' . $url;
+    }
+
+    return $url;
+}
+
 function html_preview_sanitize_dir_name($name, $fallback) {
     $name = is_string($name) ? trim($name) : '';
     if ($name === '') return $fallback;
@@ -31,6 +44,28 @@ function html_preview_images_dir() {
     $raw = function_exists('env_str') ? env_str('IMAGES_DIR', 'images') : 'images';
     $cache = html_preview_sanitize_dir_name($raw, 'images');
     return $cache;
+}
+
+function html_preview_expand_image_token($url) {
+    $url = trim((string)$url);
+    if ($url === '') return $url;
+    if (!preg_match('/^\\{\\{\\s*([^}]+?)\\s*\\}\\}$/', $url, $m)) return $url;
+
+    $rawName = trim((string)($m[1] ?? ''));
+    if ($rawName === '') return $url;
+
+    $rawName = str_replace("\\", "/", $rawName);
+    $parts = array_values(array_filter(explode('/', $rawName), fn($p) => $p !== '' && $p !== '.'));
+    $safe = [];
+    foreach ($parts as $p) {
+        if ($p === '..') continue;
+        $safe[] = $p;
+    }
+    $safePath = implode('/', $safe);
+    if ($safePath === '') return $url;
+
+    $imagesDir = html_preview_images_dir();
+    return $imagesDir !== '' ? ($imagesDir . '/' . $safePath) : $safePath;
 }
 
 function resolve_rel_url_from_md($url, $mdPath) {
@@ -76,7 +111,7 @@ function resolve_rel_url_from_md($url, $mdPath) {
 }
 
 function resolve_rel_href_from_md_link($url, $mdPath) {
-    $url = (string)$url;
+    $url = normalize_md_link_url($url);
     if ($url === '' || $mdPath === null || $mdPath === '') return $url;
     if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
 
@@ -125,6 +160,32 @@ function resolve_rel_href_from_md_link($url, $mdPath) {
     }
 
     return url_encode_path($resolved) . $suffix;
+}
+
+function mdw_page_picture_src($url) {
+    $url = trim((string)$url);
+    if ($url === '') return '';
+    $url = html_preview_expand_image_token($url);
+    if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
+
+    $suffixPos = null;
+    $qPos = strpos($url, '?');
+    $hPos = strpos($url, '#');
+    if ($qPos !== false && $hPos !== false) $suffixPos = min($qPos, $hPos);
+    else if ($qPos !== false) $suffixPos = $qPos;
+    else if ($hPos !== false) $suffixPos = $hPos;
+    $base = ($suffixPos === null) ? $url : substr($url, 0, $suffixPos);
+    $suffix = ($suffixPos === null) ? '' : substr($url, $suffixPos);
+
+    $base = str_replace("\\", "/", $base);
+    if ($base === '') return $url;
+
+    $imagesDir = html_preview_images_dir();
+    if ($imagesDir !== '' && !str_starts_with($base, $imagesDir . '/')) {
+        $base = rtrim($imagesDir, '/') . '/' . ltrim($base, '/');
+    }
+
+    return url_encode_path($base) . $suffix;
 }
 
 function md_join_classes(...$classes) {
@@ -283,13 +344,21 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
 
     // ![alt](url "title")
     $text = preg_replace_callback(
-        '/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/',
+        '/!\[([^\]]*)\]\(([^)]*)\)/',
         function($m) use ($mdPath){
             $alt = $m[1];
-            $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+            $innerRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
+            $urlRaw = $innerRaw;
+            $titleRaw = '';
+            if (preg_match('/^(.+?)\\s+"([^"]+)"\\s*$/s', $innerRaw, $tm)) {
+                $urlRaw = $tm[1];
+                $titleRaw = $tm[2];
+            }
+            $urlRaw = html_preview_expand_image_token($urlRaw);
             $urlResolved = resolve_rel_url_from_md($urlRaw, $mdPath);
             $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            $titleAttr = isset($m[3]) ? ' title="'.$m[3].'"' : '';
+            $titleRaw = trim((string)$titleRaw);
+            $titleAttr = $titleRaw !== '' ? ' title="'.htmlspecialchars($titleRaw, ENT_QUOTES, 'UTF-8').'"' : '';
             return '<img class="md-img" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
         },
         $text
@@ -300,16 +369,28 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
     // *italic*
     $text = preg_replace('/\*([^*]+)\*/', $p['italic_repl'], $text);
 
-    // [text](url)
+    // [text](url) {: class="foo bar"}
     $linkClass = $p['link_class'];
     $text = preg_replace_callback(
-        '/\[([^\]]+)\]\(([^)]+)\)/',
+        "/\\[([^\\]]+)\\]\\(([^)]+)\\)(?:\\s*\\{:\\s*class\\s*=\\s*(?:\"([^\"]+)\"|&quot;([^&]+)&quot;|&#039;([^']+)&#039;)\\s*\\})?/i",
         function($m) use ($mdPath, $linkClass){
             $label = $m[1];
             $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
             $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
             $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
-            return '<a class="'.$linkClass.'" href="'.
+
+            $rawClass = '';
+            if (isset($m[3]) && $m[3] !== '') $rawClass = $m[3];
+            else if (isset($m[4]) && $m[4] !== '') $rawClass = $m[4];
+            else if (isset($m[5]) && $m[5] !== '') $rawClass = $m[5];
+            $rawClass = html_entity_decode($rawClass, ENT_QUOTES, 'UTF-8');
+            $rawClass = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', (string)$rawClass);
+            $rawClass = trim(preg_replace('/\\s+/', ' ', $rawClass));
+
+            $classAttr = md_join_classes($linkClass, $rawClass);
+            $classAttr = $classAttr !== '' ? ' class="'.$classAttr.'"' : '';
+
+            return '<a'.$classAttr.' href="'.
                    $urlEsc.
                    '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
         },
@@ -382,16 +463,644 @@ function is_mathjax_display_close_line($line) {
     return (bool)preg_match('/^\s*\\\\\]\s*$/', (string)$line);
 }
 
+/* Hidden metadata lines at top of markdown (not rendered) */
+function mdw_hidden_meta_match($line, &$keyOut = null, &$valueOut = null) {
+    $line = (string)$line;
+
+    // Be robust to copy/paste whitespace oddities.
+    $line = str_replace("\xC2\xA0", ' ', $line); // NBSP
+    $line = preg_replace('/[\x{200B}\x{FEFF}]/u', '', $line); // ZWSP/BOM
+
+    // Match `_key: value_` but tolerate missing trailing underscores or extra underscores.
+    if (!preg_match('/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u', $line, $m)) return false;
+
+    $key = strtolower(trim((string)($m[1] ?? '')));
+    if ($key === '') return false;
+
+    $allowed = function_exists('mdw_metadata_allowed_keys') ? mdw_metadata_allowed_keys() : [];
+    if (empty($allowed)) $allowed = ['date' => true];
+    if (!isset($allowed[$key])) return false;
+
+    $keyOut = $key;
+    $valueOut = trim((string)($m[2] ?? ''));
+    return true;
+}
+
+function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null) {
+    $raw = str_replace(["\r\n", "\r"], "\n", (string)$raw);
+    $lines = explode("\n", $raw);
+    if (!$lines) {
+        $metaOut = [];
+        return '';
+    }
+
+    $meta = [];
+
+    // Strip BOM on the very first line if present.
+    if (isset($lines[0])) {
+        $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
+    }
+
+    $out = [];
+    foreach ($lines as $line) {
+        $k = null; $v = null;
+        if (mdw_hidden_meta_match($line, $k, $v)) {
+            $meta[$k] = $v;
+            continue;
+        }
+        $out[] = $line;
+    }
+
+    $metaOut = $meta;
+    return implode("\n", $out);
+}
+
+function mdw_hidden_meta_render_line($key, $value) {
+    $key = (string)$key;
+    $value = trim((string)$value);
+    if ($value === '') return null;
+    return '_' . $key . ': ' . $value . '_';
+}
+
+function mdw_metadata_config_path() {
+    $raw = function_exists('env_str') ? (string)env_str('METADATA_CONFIG_FILE', 'metadata_config.json') : 'metadata_config.json';
+    $raw = trim($raw);
+    if ($raw === '') $raw = 'metadata_config.json';
+    if (str_starts_with($raw, '/')) return $raw;
+    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $raw)) return $raw;
+    if (str_starts_with($raw, './')) $raw = substr($raw, 2);
+    return __DIR__ . '/' . ltrim($raw, "/\\");
+}
+
+function mdw_metadata_default_config() {
+    return [
+        '_meta' => ['version' => 1],
+        '_auth' => [
+            'user_hash' => '',
+            'superuser_hash' => '',
+        ],
+        '_settings' => [
+            'publisher_mode' => false,
+            'publisher_default_author' => '',
+            'publisher_require_h2' => true,
+            // Global (cross-device) UI defaults, used when publisher_mode is enabled.
+            'ui_theme' => '', // 'dark' | 'light' | ''
+            'theme_preset' => 'default',
+            'app_title' => '',
+        ],
+        'fields' => [
+            'date' => ['label' => 'Date', 'markdown_visible' => true, 'html_visible' => false],
+        ],
+    ];
+}
+
+function mdw_metadata_normalize_config($cfg) {
+    $def = mdw_metadata_default_config();
+    $out = $def;
+
+    if (!is_array($cfg)) return $out;
+    $inAuth = isset($cfg['_auth']) && is_array($cfg['_auth']) ? $cfg['_auth'] : [];
+    $userHash = isset($inAuth['user_hash']) ? trim((string)$inAuth['user_hash']) : '';
+    $superHash = isset($inAuth['superuser_hash']) ? trim((string)$inAuth['superuser_hash']) : '';
+    $out['_auth'] = [
+        'user_hash' => $userHash,
+        'superuser_hash' => $superHash,
+    ];
+    $inSettings = isset($cfg['_settings']) && is_array($cfg['_settings']) ? $cfg['_settings'] : [];
+    $publisherMode = !empty($inSettings['publisher_mode']);
+    $publisherDefaultAuthor = isset($inSettings['publisher_default_author']) ? trim((string)$inSettings['publisher_default_author']) : '';
+    $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
+    $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
+    if ($uiTheme !== 'dark' && $uiTheme !== 'light') $uiTheme = '';
+    $themePreset = isset($inSettings['theme_preset']) ? trim((string)$inSettings['theme_preset']) : 'default';
+    if ($themePreset === '') $themePreset = 'default';
+    $appTitle = isset($inSettings['app_title']) ? trim((string)$inSettings['app_title']) : '';
+    $out['_settings'] = [
+        'publisher_mode' => (bool)$publisherMode,
+        'publisher_default_author' => $publisherDefaultAuthor,
+        'publisher_require_h2' => (bool)$publisherRequireH2,
+        'ui_theme' => $uiTheme,
+        'theme_preset' => $themePreset,
+        'app_title' => $appTitle,
+    ];
+
+    $fields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+    foreach ($out['fields'] as $k => $v) {
+        $in = isset($fields[$k]) && is_array($fields[$k]) ? $fields[$k] : [];
+        $label = isset($in['label']) && is_string($in['label']) && trim($in['label']) !== ''
+            ? trim($in['label'])
+            : (string)($v['label'] ?? $k);
+        $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
+        $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+        if (!$mdVis) $htmlVis = false;
+        $out['fields'][$k] = [
+            'label' => $label,
+            'markdown_visible' => $mdVis,
+            'html_visible' => $htmlVis,
+        ];
+    }
+
+    return $out;
+}
+
+function mdw_metadata_publisher_config_path() {
+    $raw = function_exists('env_str') ? (string)env_str('METADATA_PUBLISHER_CONFIG_FILE', 'metadata_publisher_config.json') : 'metadata_publisher_config.json';
+    $raw = trim($raw);
+    if ($raw === '') $raw = 'metadata_publisher_config.json';
+    if (str_starts_with($raw, '/')) return $raw;
+    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $raw)) return $raw;
+    if (str_starts_with($raw, './')) $raw = substr($raw, 2);
+    return __DIR__ . '/' . ltrim($raw, "/\\");
+}
+
+function mdw_metadata_default_publisher_config() {
+    return [
+        '_meta' => ['version' => 1],
+        'fields' => [
+            'author' => ['label' => 'Author', 'markdown_visible' => true, 'html_visible' => false],
+            'creationdate' => ['label' => 'Created', 'markdown_visible' => true, 'html_visible' => false],
+            'changedate' => ['label' => 'Updated', 'markdown_visible' => true, 'html_visible' => false],
+            'publishstate' => ['label' => 'Publish state', 'markdown_visible' => true, 'html_visible' => false],
+
+            'extends' => ['label' => 'Extends', 'markdown_visible' => true, 'html_visible' => false],
+            'page_title' => ['label' => 'Page title', 'markdown_visible' => true, 'html_visible' => true],
+            'page_subtitle' => ['label' => 'Page subtitle', 'markdown_visible' => true, 'html_visible' => true],
+            'post_date' => ['label' => 'Post date', 'markdown_visible' => true, 'html_visible' => true],
+            'page_picture' => ['label' => 'Page picture', 'markdown_visible' => true, 'html_visible' => true],
+            'active_page' => ['label' => 'Active page', 'markdown_visible' => true, 'html_visible' => false],
+            'cta' => ['label' => 'CTA', 'markdown_visible' => true, 'html_visible' => false],
+            'blurmenu' => ['label' => 'Blur menu', 'markdown_visible' => true, 'html_visible' => false],
+            'sociallinks' => ['label' => 'Social links', 'markdown_visible' => true, 'html_visible' => false],
+            'blog' => ['label' => 'Blog', 'markdown_visible' => true, 'html_visible' => false],
+        ],
+        'html_map' => [
+            'page_title' => ['prefix' => '<h1>', 'postfix' => '</h1>', 'omit_meta' => true],
+            'page_subtitle' => ['prefix' => '<h2>', 'postfix' => '</h2>', 'omit_meta' => true],
+        ],
+    ];
+}
+
+function mdw_metadata_normalize_publisher_config($cfg) {
+    $def = mdw_metadata_default_publisher_config();
+    $out = $def;
+
+    if (!is_array($cfg)) return $out;
+    $fields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+    foreach ($out['fields'] as $k => $v) {
+        $in = isset($fields[$k]) && is_array($fields[$k]) ? $fields[$k] : [];
+        $label = isset($in['label']) && is_string($in['label']) && trim($in['label']) !== ''
+            ? trim($in['label'])
+            : (string)($v['label'] ?? $k);
+        $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
+        $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+        if (!$mdVis) $htmlVis = false;
+        $out['fields'][$k] = [
+            'label' => $label,
+            'markdown_visible' => $mdVis,
+            'html_visible' => $htmlVis,
+        ];
+    }
+
+    $defMap = (isset($def['html_map']) && is_array($def['html_map'])) ? $def['html_map'] : [];
+    $inMap = (isset($cfg['html_map']) && is_array($cfg['html_map'])) ? $cfg['html_map'] : [];
+    $mapOut = [];
+
+    $normalizeMapSpec = function($spec, $fallback = []) {
+        $spec = is_array($spec) ? $spec : [];
+        $fallback = is_array($fallback) ? $fallback : [];
+        $prefix = array_key_exists('prefix', $spec) ? (string)$spec['prefix'] : (string)($fallback['prefix'] ?? '');
+        $postfix = array_key_exists('postfix', $spec) ? (string)$spec['postfix'] : (string)($fallback['postfix'] ?? '');
+        $omitMeta = array_key_exists('omit_meta', $spec) ? (bool)$spec['omit_meta'] : (bool)($fallback['omit_meta'] ?? false);
+        $enabled = array_key_exists('enabled', $spec) ? (bool)$spec['enabled'] : (bool)($fallback['enabled'] ?? true);
+        return ['prefix' => $prefix, 'postfix' => $postfix, 'omit_meta' => $omitMeta, 'enabled' => $enabled];
+    };
+
+    foreach ($defMap as $k => $spec) {
+        if (!is_string($k) || $k === '') continue;
+        $kk = strtolower($k);
+        $mapOut[$kk] = $normalizeMapSpec($spec, []);
+    }
+    foreach ($inMap as $k => $spec) {
+        if (!is_string($k) || $k === '') continue;
+        $kk = strtolower($k);
+        $mapOut[$kk] = $normalizeMapSpec($spec, $mapOut[$kk] ?? []);
+    }
+
+    $out['html_map'] = $mapOut;
+    return $out;
+}
+
+function mdw_metadata_load_publisher_config() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+
+    $path = mdw_metadata_publisher_config_path();
+    $def = mdw_metadata_default_publisher_config();
+    if (!is_file($path)) {
+        $cache = $def;
+        return $cache;
+    }
+    $raw = @file_get_contents($path);
+    $j = json_decode((string)$raw, true);
+    $cache = mdw_metadata_normalize_publisher_config($j);
+    return $cache;
+}
+
+function mdw_metadata_save_publisher_config($cfg) {
+    $norm = mdw_metadata_normalize_publisher_config($cfg);
+    $path = mdw_metadata_publisher_config_path();
+    $pathNorm = str_replace("\\", "/", (string)$path);
+    $rootNorm = str_replace("\\", "/", (string)__DIR__);
+    $shortPath = (str_starts_with($pathNorm, rtrim($rootNorm, '/') . '/'))
+        ? substr($pathNorm, strlen(rtrim($rootNorm, '/')) + 1)
+        : basename($pathNorm);
+    $dir = dirname($path);
+    if (!is_dir($dir)) return [false, 'Config directory does not exist.'];
+    if (!is_writable($dir)) return [false, 'Config directory not writable: ' . basename($dir)];
+    if (is_file($path) && !is_writable($path)) return [false, 'Config file not writable: ' . $shortPath];
+    $json = json_encode($norm, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($json) || $json === '') return [false, 'Could not encode config JSON.'];
+    if (@file_put_contents($path, $json . "\n", LOCK_EX) === false) {
+        $err = error_get_last();
+        $msg = 'Could not write config file: ' . $shortPath;
+        if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
+        return [false, $msg];
+    }
+    @chmod($path, 0664);
+    $GLOBALS['__mdw_metadata_publisher_cache_bust'] = microtime(true);
+    return [true, 'ok'];
+}
+
+function mdw_metadata_all_field_configs($publisherMode = null) {
+    $cfg = mdw_metadata_load_config();
+    $baseFields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+
+    if ($publisherMode === null) {
+        $s = mdw_metadata_settings();
+        $publisherMode = !empty($s['publisher_mode']);
+    }
+
+    if (!$publisherMode) return $baseFields;
+    $pcfg = mdw_metadata_load_publisher_config();
+    $pubFields = isset($pcfg['fields']) && is_array($pcfg['fields']) ? $pcfg['fields'] : [];
+    // Publisher fields can override base fields if needed.
+    return array_merge($baseFields, $pubFields);
+}
+
+function mdw_metadata_allowed_keys() {
+    static $allowed = null;
+    if (is_array($allowed)) return $allowed;
+
+    $a = [];
+    $cfg = mdw_metadata_load_config();
+    $fields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+    foreach ($fields as $k => $_v) {
+        if (!is_string($k) || $k === '') continue;
+        $a[strtolower($k)] = true;
+    }
+
+    $pcfg = mdw_metadata_load_publisher_config();
+    $pfields = isset($pcfg['fields']) && is_array($pcfg['fields']) ? $pcfg['fields'] : [];
+    foreach ($pfields as $k => $_v) {
+        if (!is_string($k) || $k === '') continue;
+        $a[strtolower($k)] = true;
+    }
+
+    $allowed = $a;
+    return $allowed;
+}
+
+function mdw_metadata_settings() {
+    $cfg = mdw_metadata_load_config();
+    $s = isset($cfg['_settings']) && is_array($cfg['_settings']) ? $cfg['_settings'] : [];
+    $out = [
+        'publisher_mode' => !empty($s['publisher_mode']),
+        'publisher_default_author' => isset($s['publisher_default_author']) ? trim((string)$s['publisher_default_author']) : '',
+        'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
+        'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
+        'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
+        'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
+    ];
+    if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
+    if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
+    return $out;
+}
+
+function mdw_auth_hash_password($password) {
+    $password = (string)$password;
+    if ($password === '') return '';
+    return hash('sha256', $password);
+}
+
+function mdw_auth_config() {
+    $cfg = mdw_metadata_load_config();
+    $auth = isset($cfg['_auth']) && is_array($cfg['_auth']) ? $cfg['_auth'] : [];
+    return [
+        'user_hash' => isset($auth['user_hash']) ? trim((string)$auth['user_hash']) : '',
+        'superuser_hash' => isset($auth['superuser_hash']) ? trim((string)$auth['superuser_hash']) : '',
+    ];
+}
+
+function mdw_auth_has_role($role) {
+    $auth = mdw_auth_config();
+    if ($role === 'superuser') return $auth['superuser_hash'] !== '';
+    if ($role === 'user') return $auth['user_hash'] !== '';
+    return false;
+}
+
+function mdw_auth_verify_token($role, $token) {
+    $token = (string)$token;
+    if ($token === '') return false;
+    $auth = mdw_auth_config();
+    if ($role === 'superuser' && $auth['superuser_hash'] !== '') {
+        return hash_equals($auth['superuser_hash'], $token);
+    }
+    if ($role === 'user' && $auth['user_hash'] !== '') {
+        return hash_equals($auth['user_hash'], $token);
+    }
+    return false;
+}
+
+function mdw_publisher_mode_enabled() {
+    $s = mdw_metadata_settings();
+    return !empty($s['publisher_mode']);
+}
+
+function mdw_md_has_h2($raw) {
+    $raw = str_replace(["\r\n", "\r"], "\n", (string)$raw);
+    $lines = explode("\n", $raw);
+    $inFence = false;
+    foreach ($lines as $line) {
+        // Ignore metadata lines.
+        $k = null; $v = null;
+        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) continue;
+
+        if (preg_match('/^\s*```/', $line)) {
+            $inFence = !$inFence;
+            continue;
+        }
+        if ($inFence) continue;
+        if (preg_match('/^\s*##\s+\S/', $line)) return true;
+    }
+    return false;
+}
+
+function mdw_publisher_normalize_publishstate($raw) {
+    $v = trim((string)$raw);
+    if ($v === '') return 'Concept';
+    $l = strtolower($v);
+    $l = preg_replace('/\s+/', ' ', $l);
+    if ($l === 'concept') return 'Concept';
+    if ($l === 'processing' || $l === 'in progress' || $l === 'in-progress') return 'Processing';
+    if ($l === 'to publish' || $l === 'topublish' || $l === 'to-publish') return 'Processing';
+    if ($l === 'published') return 'Published';
+    return $v;
+}
+
+function mdw_metadata_load_config() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+
+    $path = mdw_metadata_config_path();
+    $def = mdw_metadata_default_config();
+    if (!is_file($path)) {
+        $cache = $def;
+        return $cache;
+    }
+    $raw = @file_get_contents($path);
+    $j = json_decode((string)$raw, true);
+    $cache = mdw_metadata_normalize_config($j);
+    return $cache;
+}
+
+function mdw_metadata_save_config($cfg) {
+    $norm = mdw_metadata_normalize_config($cfg);
+    $path = mdw_metadata_config_path();
+    $pathNorm = str_replace("\\", "/", (string)$path);
+    $rootNorm = str_replace("\\", "/", (string)__DIR__);
+    $shortPath = (str_starts_with($pathNorm, rtrim($rootNorm, '/') . '/'))
+        ? substr($pathNorm, strlen(rtrim($rootNorm, '/')) + 1)
+        : basename($pathNorm);
+    $dir = dirname($path);
+    if (!is_dir($dir)) return [false, 'Config directory does not exist.'];
+    if (!is_writable($dir)) return [false, 'Config directory not writable: ' . basename($dir)];
+    if (is_file($path) && !is_writable($path)) return [false, 'Config file not writable: ' . $shortPath];
+    $json = json_encode($norm, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($json) || $json === '') return [false, 'Could not encode config JSON.'];
+    if (@file_put_contents($path, $json . "\n", LOCK_EX) === false) {
+        $err = error_get_last();
+        $msg = 'Could not write config file: ' . $shortPath;
+        if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
+        return [false, $msg];
+    }
+    @chmod($path, 0664);
+    // Reset cache so the new settings apply immediately.
+    $GLOBALS['__mdw_metadata_cache_bust'] = microtime(true);
+    return [true, 'ok'];
+}
+
+function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
+    $meta = [];
+    $body = mdw_hidden_meta_extract_and_remove_all($raw, $meta);
+
+    $now = date('Y-m-d H:i');
+    $today = date('y-m-d');
+
+    $settings = (isset($opts['settings']) && is_array($opts['settings'])) ? $opts['settings'] : mdw_metadata_settings();
+    $publisherMode = !empty($settings['publisher_mode']);
+    $publisherDefaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
+
+    if (!empty($opts['set'])) {
+        foreach ((array)$opts['set'] as $k => $v) {
+            $kk = strtolower((string)$k);
+            if ($kk === 'publishstate') $kk = 'publishstate';
+            $meta[$kk] = (string)$v;
+        }
+    }
+
+    if (!isset($meta['date']) || trim((string)$meta['date']) === '') {
+        $fileDate = null;
+        if (is_string($mdPath) && $mdPath !== '') {
+            $base = basename(str_replace("\\", "/", $mdPath));
+            if (preg_match('/^(\d{2}-\d{2}-\d{2})-/', $base, $m)) {
+                $fileDate = $m[1];
+            }
+        }
+        $meta['date'] = $fileDate ?: $today;
+    }
+
+    if ($publisherMode) {
+        if (!isset($meta['creationdate']) || trim((string)$meta['creationdate']) === '') {
+            $meta['creationdate'] = $now;
+        }
+        $meta['changedate'] = $now;
+
+        if (!isset($meta['publishstate']) || trim((string)$meta['publishstate']) === '') {
+            $meta['publishstate'] = 'Concept';
+        }
+        $meta['publishstate'] = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
+        if (!isset($meta['author']) || trim((string)$meta['author']) === '') {
+            if ($publisherDefaultAuthor !== '') {
+                $meta['author'] = $publisherDefaultAuthor;
+            }
+        }
+    } else {
+        // If these fields already exist, keep them but do not inject new ones.
+        if (isset($meta['changedate']) && trim((string)$meta['changedate']) !== '') {
+            // Do not auto-update changedate outside publisher mode.
+        }
+    }
+
+    $baseCfg = mdw_metadata_load_config();
+    $baseFields = isset($baseCfg['fields']) && is_array($baseCfg['fields']) ? $baseCfg['fields'] : [];
+    $pubCfg = mdw_metadata_load_publisher_config();
+    $pubFields = isset($pubCfg['fields']) && is_array($pubCfg['fields']) ? $pubCfg['fields'] : [];
+
+    $order = [];
+    foreach (array_keys($baseFields) as $k) {
+        $k = strtolower((string)$k);
+        if ($k !== '' && !in_array($k, $order, true)) $order[] = $k;
+    }
+    // Stable publisher order.
+    $publisherOrder = ['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','publishstate'];
+    foreach ($publisherOrder as $k) {
+        if (!isset($pubFields[$k])) continue;
+        if (!$publisherMode && !array_key_exists($k, $meta)) continue;
+        if (!in_array($k, $order, true)) $order[] = $k;
+    }
+    // Preserve any extra known keys present in file.
+    foreach (array_keys($meta) as $k) {
+        $k = strtolower((string)$k);
+        if ($k === '') continue;
+        if (!isset($baseFields[$k]) && !isset($pubFields[$k])) continue;
+        if (!in_array($k, $order, true)) $order[] = $k;
+    }
+
+    $outLines = [];
+    foreach ($order as $k) {
+        if (!isset($meta[$k])) continue;
+        $line = mdw_hidden_meta_render_line($k, $meta[$k]);
+        if ($line !== null) $outLines[] = $line;
+    }
+
+    $body = ltrim((string)$body, "\n");
+    if ($body !== '') {
+        $outLines[] = '';
+        $outLines[] = $body;
+    }
+
+    return implode("\n", $outLines);
+}
+
 /* BLOCK MARKDOWN -> HTML */
 function md_to_html($text, $mdPath = null, $profile = 'edit') {
     $p = md_render_profile($profile);
 
-    $text = str_replace(["\r\n","\r"], "\n", $text);
+    $meta = [];
+    $body = mdw_hidden_meta_extract_and_remove_all($text, $meta);
+    $settings = mdw_metadata_settings();
+    $publisherMode = !empty($settings['publisher_mode']);
+    $cfg = mdw_metadata_load_config();
+    $pcfg = mdw_metadata_load_publisher_config();
+
+    $text = str_replace(["\r\n","\r"], "\n", $body);
     $lines = explode("\n",$text);
 
     $html = [];
     $in_codeblock = false;
     $listStack = [];
+
+    // Render metadata block (optional, based on config).
+    $baseFields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+    $pubFields = ($publisherMode && isset($pcfg['fields']) && is_array($pcfg['fields'])) ? $pcfg['fields'] : [];
+    $metaFields = array_merge($baseFields, $pubFields);
+    $metaShown = [];
+    $order = [];
+    foreach (array_keys($baseFields) as $k) $order[] = $k;
+    foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','publishstate'] as $k) {
+        if (!isset($pubFields[$k])) continue;
+        $order[] = $k;
+    }
+    $order = array_values(array_unique(array_map(fn($x) => strtolower((string)$x), $order)));
+
+    $pagePictureHtml = '';
+    $pictureInserted = false;
+    if ($publisherMode) {
+        $pictureValue = isset($meta['page_picture']) ? trim((string)$meta['page_picture']) : '';
+        if ($pictureValue !== '') {
+            $f = isset($metaFields['page_picture']) && is_array($metaFields['page_picture']) ? $metaFields['page_picture'] : null;
+            $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
+            $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
+            if (!$mdVis) $htmlVis = false;
+            if ($htmlVis) {
+                $titleText = isset($meta['page_title']) ? trim((string)$meta['page_title']) : '';
+                $src = mdw_page_picture_src($pictureValue);
+                if ($src !== '') {
+                    $pagePictureHtml = '<img class="md-img" src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($titleText, ENT_QUOTES, 'UTF-8') . '" loading="lazy" decoding="async">';
+                }
+            }
+        }
+    }
+
+    $mappedMetaKeys = [];
+    if ($publisherMode) {
+        $htmlMap = (isset($pcfg['html_map']) && is_array($pcfg['html_map'])) ? $pcfg['html_map'] : [];
+        if (!empty($htmlMap)) {
+            foreach ($order as $k) {
+                if (!isset($meta[$k])) continue;
+                $spec = (isset($htmlMap[$k]) && is_array($htmlMap[$k])) ? $htmlMap[$k] : null;
+                if (!$spec) continue;
+                if (array_key_exists('enabled', $spec) && !$spec['enabled']) continue;
+                $v = trim((string)$meta[$k]);
+                if ($v === '') continue;
+                $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
+                $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
+                $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
+                if (!$mdVis) $htmlVis = false;
+                if (!$htmlVis) continue;
+                $prefix = isset($spec['prefix']) ? (string)$spec['prefix'] : '';
+                $postfix = isset($spec['postfix']) ? (string)$spec['postfix'] : '';
+                $html[] = $prefix . htmlspecialchars($v, ENT_QUOTES, 'UTF-8') . $postfix;
+                if (!empty($spec['omit_meta'])) {
+                    $mappedMetaKeys[$k] = true;
+                }
+                if ($k === 'page_title' && $pagePictureHtml !== '') {
+                    $html[] = $pagePictureHtml;
+                    $mappedMetaKeys['page_picture'] = true;
+                    $pictureInserted = true;
+                }
+            }
+        }
+    }
+
+    if ($pagePictureHtml !== '' && !$pictureInserted) {
+        $html[] = $pagePictureHtml;
+        $mappedMetaKeys['page_picture'] = true;
+    }
+
+    foreach ($order as $k) {
+        if (!isset($meta[$k])) continue;
+        $v = trim((string)$meta[$k]);
+        if ($v === '') continue;
+        if (isset($mappedMetaKeys[$k])) continue;
+        $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
+        $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
+        $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
+        if (!$mdVis) $htmlVis = false;
+        if (!$htmlVis) continue;
+        $label = $f && isset($f['label']) ? (string)$f['label'] : $k;
+        $metaShown[] = ['k' => $k, 'label' => $label, 'value' => $v];
+    }
+
+    if (!empty($metaShown)) {
+        $html[] = '<dl class="md-meta">';
+        foreach ($metaShown as $it) {
+            $labelEsc = htmlspecialchars((string)$it['label'], ENT_QUOTES, 'UTF-8');
+            $valEsc = htmlspecialchars((string)$it['value'], ENT_QUOTES, 'UTF-8');
+            $html[] = '<div class="md-meta-row"><dt>' . $labelEsc . '</dt><dd>' . $valEsc . '</dd></div>';
+        }
+        $html[] = '</dl>';
+    }
 
     $openList = function($tag, $indent) use (&$html, &$listStack, $p) {
         $listClass = $tag === 'ol' ? ($p['ol_class'] ?? '') : ($p['ul_class'] ?? '');
@@ -424,25 +1133,69 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
         $line = $lines[$i];
 
         // ``` fenced code blocks (allow indentation, e.g. inside lists)
-        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
-            $closeAllLists();
-            if ($in_codeblock) {
-                $html[] = "</code></pre>";
-                $in_codeblock = false;
-            } else {
-                $in_codeblock = true;
-                $lang = trim((string)($m[1] ?? ''));
-                $langAttr = $lang ? ' class="language-'.htmlspecialchars($lang, ENT_QUOTES, 'UTF-8').'"' : '';
-                $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
-                $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
-                $html[] = '<pre'.$preAttr.'><code'.$langAttr.'>';
-            }
-            continue;
-        }
+	        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
+	            $closeAllLists();
+	            if ($in_codeblock) {
+	                $html[] = "</code></pre>";
+	                $in_codeblock = false;
+	            } else {
+	                $in_codeblock = true;
+	                $lang = trim((string)($m[1] ?? ''));
+	                $langEsc = $lang ? htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') : '';
+	                $langAttr = $lang ? ' class="language-'.$langEsc.'"' : '';
+	                $langDataAttr = $lang ? ' data-lang="'.$langEsc.'"' : '';
+	                $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
+	                $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
+	                $html[] = '<pre'.$preAttr.$langDataAttr.'><code'.$langAttr.'>';
+	            }
+	            continue;
+	        }
 
         if ($in_codeblock) {
             $html[] = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
             continue;
+        }
+
+        $trim = trim($line);
+        if ($trim !== '' && preg_match('/^<iframe\\b[^>]*><\\/iframe>$/i', $trim)) {
+            $src = '';
+            if (preg_match('/\\ssrc="([^"]+)"/i', $trim, $sm)) {
+                $src = $sm[1];
+            }
+            if ($src !== '' && preg_match('~^https?://(?:www\\.)?youtube\\.com/embed/|^https?://(?:www\\.)?youtu\\.be/~i', $src)) {
+                $classes = [];
+                $consume = 0;
+                for ($j = $i + 1; $j < $count && $consume < 2; $j++) {
+                    if (preg_match('/^\\s*\\{:\\s*class\\s*=\\s*"([^"]+)"\\s*\\}\\s*$/', $lines[$j], $cm)) {
+                        $classes[] = trim((string)$cm[1]);
+                        $consume++;
+                        continue;
+                    }
+                    break;
+                }
+
+                $iframeClass = '';
+                $wrapperClass = '';
+                foreach ($classes as $cls) {
+                    if (stripos($cls, 'ytframe-wrapper') !== false) {
+                        $wrapperClass = $cls;
+                    } else if ($iframeClass === '') {
+                        $iframeClass = $cls;
+                    } else if ($wrapperClass === '') {
+                        $wrapperClass = $cls;
+                    }
+                }
+                if ($iframeClass === '') $iframeClass = 'lazyload ytframe';
+                if ($wrapperClass === '') $wrapperClass = 'ytframe-wrapper';
+
+                $closeAllLists();
+                $srcEsc = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
+                $iframeClassEsc = htmlspecialchars(trim($iframeClass), ENT_QUOTES, 'UTF-8');
+                $wrapperClassEsc = htmlspecialchars(trim($wrapperClass), ENT_QUOTES, 'UTF-8');
+                $html[] = '<div class="'.$wrapperClassEsc.'"><iframe class="'.$iframeClassEsc.'" src="'.$srcEsc.'" frameborder="0" allowfullscreen></iframe></div>';
+                $i += $consume;
+                continue;
+            }
         }
 
         // MathJax display blocks: \[ ... \] on their own lines (allow indentation, incl. inside list items)
@@ -640,6 +1393,8 @@ function extract_title($raw){
         if (preg_match('/^#\s+(.*)$/',$l,$m)) return trim($m[1]);
     }
     foreach (explode("\n",$raw) as $l){
+        $k = null; $v = null;
+        if (mdw_hidden_meta_match($l, $k, $v)) continue;
         if (trim($l)!=='') return trim($l);
     }
     return "Untitled";

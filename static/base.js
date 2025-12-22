@@ -1,9 +1,373 @@
 (function(){
+    // i18n helper (populated by PHP via window.MDW_I18N)
+    const data = (window.MDW_I18N && typeof window.MDW_I18N === 'object') ? window.MDW_I18N : null;
+    const get = (key) => {
+        if (!data || !key || typeof key !== 'string') return null;
+        let cur = data;
+        for (const part of key.split('.')) {
+            if (!cur || typeof cur !== 'object' || !(part in cur)) return null;
+            cur = cur[part];
+        }
+        return (typeof cur === 'string') ? cur : null;
+    };
+    const format = (str, vars) => {
+        let out = String(str ?? '');
+        if (!vars || typeof vars !== 'object') return out;
+        for (const [k, v] of Object.entries(vars)) {
+            out = out.replaceAll(`{${k}}`, String(v ?? ''));
+        }
+        return out;
+    };
+    window.MDW_T = (key, fallback = '', vars = null) => {
+        const v = get(key);
+        if (typeof v === 'string' && v !== '') return format(v, vars);
+        return format(typeof fallback === 'string' ? fallback : '', vars);
+    };
+})();
+
+// Auth (user/superuser)
+(function(){
+    const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object') ? window.MDW_AUTH_META : { has_user: false, has_superuser: false };
+    const overlay = document.getElementById('authOverlay');
+    const modal = document.getElementById('authModal');
+    const titleEl = document.getElementById('authModalTitle');
+    const setupFields = document.getElementById('authSetupFields');
+    const loginFields = document.getElementById('authLoginFields');
+    const setupUser = document.getElementById('authSetupUserPassword');
+    const setupSuper = document.getElementById('authSetupSuperPassword');
+    const loginPassword = document.getElementById('authLoginPassword');
+    const submitBtn = document.getElementById('authSubmitBtn');
+    const statusEl = document.getElementById('authStatus');
+    const authBtn = document.getElementById('authToggleBtn');
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+
+    const getStoredAuth = () => {
+        let role = '';
+        let token = '';
+        try {
+            role = String(localStorage.getItem('mdw_auth_role') || '').trim();
+            token = String(localStorage.getItem('mdw_auth_token') || '').trim();
+        } catch {}
+        return { role, token };
+    };
+
+    const isSuperuser = () => {
+        const { role } = getStoredAuth();
+        return role === 'superuser';
+    };
+
+    window.__mdwAuthState = getStoredAuth;
+    window.__mdwIsSuperuser = isSuperuser;
+
+    const setStatus = (msg, kind = 'info') => {
+        if (!(statusEl instanceof HTMLElement)) return;
+        statusEl.textContent = String(msg || '');
+        statusEl.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const setLocked = (locked) => {
+        document.documentElement.classList.toggle('auth-locked', !!locked);
+        if (overlay) overlay.hidden = !locked;
+    };
+
+    const updateSuperuserUi = () => {
+        const allow = isSuperuser();
+        document.querySelectorAll('[data-auth-superuser="1"]').forEach((el) => {
+            if (!(el instanceof HTMLElement)) return;
+            el.style.display = allow ? '' : 'none';
+        });
+        document.querySelectorAll('[data-auth-regular="1"]').forEach((el) => {
+            if (!(el instanceof HTMLElement)) return;
+            el.style.display = allow ? 'none' : '';
+        });
+        document.querySelectorAll('[data-auth-superuser-enable="1"]').forEach((el) => {
+            if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLButtonElement || el instanceof HTMLTextAreaElement) {
+                el.disabled = !allow;
+            }
+        });
+    };
+
+    window.__mdwShowAuthModal = () => {
+        const needsSetup = !meta.has_user && !meta.has_superuser;
+        setMode(needsSetup ? 'setup' : 'login');
+        setLocked(true);
+        updateSuperuserUi();
+        updateAuthButton();
+        if (loginPassword instanceof HTMLInputElement) {
+            try { loginPassword.focus(); } catch {}
+        }
+    };
+
+    const updateAuthButton = () => {
+        if (!(authBtn instanceof HTMLElement)) return;
+        const { role, token } = getStoredAuth();
+        const loggedIn = !!(role && token);
+        const icon = authBtn.querySelector('.pi');
+        if (icon) {
+            icon.classList.toggle('pi-upload', loggedIn);
+            icon.classList.toggle('auth-logout-icon', loggedIn);
+            icon.classList.toggle('pi-login', !loggedIn);
+        }
+        authBtn.title = loggedIn ? 'Logout' : 'Login';
+        authBtn.setAttribute('aria-label', loggedIn ? 'Logout' : 'Login');
+        authBtn.style.display = (meta.has_user || meta.has_superuser) ? '' : (loggedIn ? '' : 'none');
+    };
+
+    const DEFAULT_APP_TITLE = 'Markdown Manager';
+    let authMode = 'login';
+
+    const getAppTitle = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
+        return raw || DEFAULT_APP_TITLE;
+    };
+
+    const applyAuthTitle = () => {
+        if (!titleEl) return;
+        const modeLabel = authMode === 'setup'
+            ? t('auth.setup_title', 'Set passwords')
+            : t('auth.login_title', 'Login');
+        const appTitle = getAppTitle();
+        titleEl.textContent = appTitle ? `${appTitle} • ${modeLabel}` : modeLabel;
+    };
+
+    const setMode = (mode) => {
+        authMode = mode === 'setup' ? 'setup' : 'login';
+        applyAuthTitle();
+        if (setupFields) setupFields.hidden = mode !== 'setup';
+        if (loginFields) loginFields.hidden = mode !== 'login';
+        if (submitBtn instanceof HTMLButtonElement) {
+            const label = submitBtn.querySelector('.btn-label');
+            if (label instanceof HTMLElement) {
+                label.textContent = mode === 'setup'
+                    ? t('auth.setup_submit', 'Save passwords')
+                    : t('auth.login_submit', 'Login');
+            }
+        }
+    };
+
+    window.__mdwUpdateAuthTitle = applyAuthTitle;
+
+    const FAIL_KEY = 'mdw_auth_fail_count';
+    const LOCK_KEY = 'mdw_auth_lock_until';
+    const LOCK_MS = 5 * 60 * 1000;
+    let lockTimer = null;
+
+    const readLockUntil = () => {
+        let until = 0;
+        try { until = parseInt(localStorage.getItem(LOCK_KEY) || '0', 10) || 0; } catch {}
+        return until;
+    };
+
+    const isLocked = () => readLockUntil() > Date.now();
+
+    const formatMs = (ms) => {
+        const total = Math.max(0, Math.ceil(ms / 1000));
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    };
+
+    const updateLockUi = () => {
+        const until = readLockUntil();
+        if (until <= Date.now()) {
+            if (lockTimer) {
+                clearInterval(lockTimer);
+                lockTimer = null;
+            }
+            if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
+            if (loginPassword instanceof HTMLInputElement) loginPassword.disabled = false;
+            return false;
+        }
+        const remaining = until - Date.now();
+        setStatus(`Too many attempts. Try again in ${formatMs(remaining)}.`, 'error');
+        if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
+        if (loginPassword instanceof HTMLInputElement) loginPassword.disabled = true;
+        if (!lockTimer) {
+            lockTimer = setInterval(updateLockUi, 1000);
+        }
+        return true;
+    };
+
+    const authRequest = async (payload) => {
+        const res = await fetch('auth.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {}),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.ok !== true) {
+            const err = (data && data.error) ? String(data.error) : 'auth_failed';
+            throw new Error(err);
+        }
+        return data;
+    };
+
+    const storeAuth = (role, token) => {
+        try {
+            localStorage.setItem('mdw_auth_role', String(role || ''));
+            localStorage.setItem('mdw_auth_token', String(token || ''));
+        } catch {}
+    };
+
+    const login = async () => {
+        if (!(loginPassword instanceof HTMLInputElement)) return;
+        const password = String(loginPassword.value || '');
+        if (isLocked()) {
+            updateLockUi();
+            return;
+        }
+        if (!password.trim()) {
+            setStatus('Enter a password.', 'error');
+            return;
+        }
+        setStatus('Signing in…', 'info');
+        const data = await authRequest({ action: 'login', password });
+        storeAuth(data.role, data.token);
+        try { localStorage.setItem('mdw_auth_role_hint', data.role); } catch {}
+        try { localStorage.removeItem(FAIL_KEY); localStorage.removeItem(LOCK_KEY); } catch {}
+        loginPassword.value = '';
+        setStatus('', 'info');
+        setLocked(false);
+        updateSuperuserUi();
+        updateAuthButton();
+    };
+
+    const setup = async () => {
+        if (!(setupUser instanceof HTMLInputElement) || !(setupSuper instanceof HTMLInputElement)) return;
+        const userPw = String(setupUser.value || '').trim();
+        const superPw = String(setupSuper.value || '').trim();
+        if (!userPw || !superPw) {
+            setStatus('Set both passwords.', 'error');
+            return;
+        }
+        setStatus('Saving…', 'info');
+        const data = await authRequest({ action: 'setup', user_password: userPw, superuser_password: superPw });
+        meta.has_user = !!data.has_user;
+        meta.has_superuser = !!data.has_superuser;
+        storeAuth(data.role, data.token);
+        setupUser.value = '';
+        setupSuper.value = '';
+        setStatus('', 'info');
+        setMode('login');
+        setLocked(false);
+        updateSuperuserUi();
+        updateAuthButton();
+    };
+
+    const onSubmit = async () => {
+        try {
+            const needsSetup = !meta.has_user && !meta.has_superuser;
+            if (needsSetup) {
+                await setup();
+            } else {
+                await login();
+            }
+        } catch (e) {
+            const msg = (e && typeof e.message === 'string' && e.message.trim()) ? e.message.trim() : 'Auth failed';
+            const friendly = msg === 'invalid_password'
+                ? 'Invalid password.'
+                : (msg === 'missing_password' ? 'Enter a password.' : msg);
+            setStatus(friendly, 'error');
+            if (msg === 'invalid_password') {
+                let count = 0;
+                try { count = parseInt(localStorage.getItem(FAIL_KEY) || '0', 10) || 0; } catch {}
+                count += 1;
+                if (count >= 3) {
+                    const until = Date.now() + LOCK_MS;
+                    try {
+                        localStorage.setItem(LOCK_KEY, String(until));
+                        localStorage.removeItem(FAIL_KEY);
+                    } catch {}
+                    updateLockUi();
+                } else {
+                    try { localStorage.setItem(FAIL_KEY, String(count)); } catch {}
+                }
+            }
+        }
+    };
+
+    submitBtn?.addEventListener('click', () => {
+        onSubmit();
+    });
+
+    authBtn?.addEventListener('click', () => {
+        const { role, token } = getStoredAuth();
+        if (role && token) {
+            try {
+                localStorage.removeItem('mdw_auth_role');
+                localStorage.removeItem('mdw_auth_token');
+            } catch {}
+            setLocked(true);
+            updateSuperuserUi();
+            updateAuthButton();
+            window.location.href = 'index.php';
+        } else {
+            setLocked(true);
+            updateSuperuserUi();
+            updateAuthButton();
+        }
+    });
+
+    const { role, token } = getStoredAuth();
+    const loggedIn = !!(role && token);
+    const needsSetup = !meta.has_user && !meta.has_superuser;
+    setMode(needsSetup ? 'setup' : 'login');
+    setLocked(!loggedIn || needsSetup);
+    updateSuperuserUi();
+    updateAuthButton();
+    updateLockUi();
+
+    // Attach auth fields to all form submissions.
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const { role, token } = getStoredAuth();
+        if (!role || !token) return;
+        const ensureInput = (name, value) => {
+            let input = form.querySelector(`input[name="${name}"]`);
+            if (!(input instanceof HTMLInputElement)) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                form.appendChild(input);
+            }
+            input.value = String(value || '');
+        };
+        ensureInput('auth_role', role);
+        ensureInput('auth_token', token);
+    }, true);
+})();
+
+(function(){
     const btn = document.getElementById('themeToggle');
     const icon = document.getElementById('themeIcon');
     const root = document.documentElement;
 
     if (!btn || !icon) return;
+
+    const getSettings = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return s && typeof s === 'object' ? s : null;
+    };
+    const isPublisherMode = () => {
+        const s = getSettings();
+        return !!(s && s.publisher_mode);
+    };
+    const readPreferredUiTheme = () => {
+        const s = getSettings();
+        const fromServer = s && typeof s.ui_theme === 'string' ? s.ui_theme.trim().toLowerCase() : '';
+        if (isPublisherMode() && (fromServer === 'dark' || fromServer === 'light')) return fromServer;
+        try {
+            const v = String(localStorage.getItem('mdsite-theme') || '').trim().toLowerCase();
+            if (v === 'dark' || v === 'light') return v;
+        } catch {}
+        return root.classList.contains('dark') ? 'dark' : 'light';
+    };
 
     function updateIcon() {
         const isDark = root.classList.contains('dark');
@@ -22,8 +386,15 @@
     btn.addEventListener('click', function(){
         const next = root.classList.contains('dark') ? 'light' : 'dark';
         setTheme(next);
+        // Persist across devices only when publisher mode is enabled.
+        if (isPublisherMode() && typeof window.__mdwSaveSettingsToServer === 'function' && (!window.__mdwIsSuperuser || window.__mdwIsSuperuser())) {
+            window.__mdwSaveSettingsToServer({ ui_theme: next }).catch(() => {});
+        }
     });
 
+    // Apply initial theme (server-driven when publisher mode is enabled).
+    const initial = readPreferredUiTheme();
+    setTheme(initial);
     updateIcon();
 })();
 
@@ -32,6 +403,71 @@
     const STORAGE_PRESET = 'mdw-theme-preset';
     const STORAGE_OVERRIDES = 'mdw-theme-overrides';
     const STYLE_ID = 'mdwThemeStyle';
+    const SHORTCUT_MOD_KEY = 'mdw_shortcut_mod';
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+
+    const getSettings = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return s && typeof s === 'object' ? s : null;
+    };
+    const isPublisherMode = () => {
+        const s = getSettings();
+        return !!(s && s.publisher_mode);
+    };
+
+    const saveSettingsToServer = async (partial) => {
+        const csrf = String(window.MDW_CSRF || '');
+        if (!csrf) return false;
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const cur = (cfg && cfg._settings && typeof cfg._settings === 'object') ? cfg._settings : {};
+        const settings = { ...(cur || {}), ...(partial || {}) };
+        const authMeta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object') ? window.MDW_AUTH_META : { has_user: false, has_superuser: false };
+        const authRequired = !!(authMeta.has_user || authMeta.has_superuser);
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (authRequired && (!auth || auth.role !== 'superuser' || !auth.token)) return false;
+
+        const res = await fetch('metadata_config_save.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf, settings, auth: authRequired ? { role: auth.role, token: auth.token } : null }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.ok !== true) return false;
+        if (data.config) window.MDW_META_CONFIG = data.config;
+        if (data.publisher_config) window.MDW_META_PUBLISHER_CONFIG = data.publisher_config;
+        return true;
+    };
+    window.__mdwSaveSettingsToServer = saveSettingsToServer;
+
+    const isApple = (() => {
+        try {
+            const p = String(navigator.platform || '');
+            const ua = String(navigator.userAgent || '');
+            return /Mac|iPhone|iPad|iPod/i.test(p) || /Macintosh|iPhone|iPad|iPod/i.test(ua);
+        } catch {
+            return false;
+        }
+    })();
+
+    const readShortcutMod = () => {
+        try {
+            const v = localStorage.getItem(SHORTCUT_MOD_KEY);
+            if (v === 'command' || v === 'option') return v;
+        } catch {}
+        return isApple ? 'command' : 'option';
+    };
+
+    const writeShortcutMod = (v) => {
+        const next = (v === 'command' || v === 'option') ? v : (isApple ? 'command' : 'option');
+        try { localStorage.setItem(SHORTCUT_MOD_KEY, next); } catch {}
+        window.__mdwShortcutMod = next;
+        return next;
+    };
+
+    window.__mdwReadShortcutMod = readShortcutMod;
+    window.__mdwWriteShortcutMod = writeShortcutMod;
+    window.__mdwShortcutMod = readShortcutMod();
 
     const listThemes = () => Array.isArray(window.MDW_THEMES) ? window.MDW_THEMES : [];
     const findTheme = (name) => {
@@ -45,6 +481,14 @@
     };
 
     const readPreset = () => {
+        // In publisher mode, prefer server-saved preset for cross-device consistency.
+        const s = getSettings();
+        const serverPreset = s && typeof s.theme_preset === 'string' ? s.theme_preset.trim() : '';
+        if (isPublisherMode() && serverPreset) {
+            const normalized = serverPreset.toLowerCase() === 'candy' && findTheme('Candy') ? 'Candy' : (findTheme(serverPreset)?.name || 'default');
+            try { localStorage.setItem(STORAGE_PRESET, normalized); } catch {}
+            return normalized;
+        }
         const raw = String(localStorage.getItem(STORAGE_PRESET) || '').trim();
         if (!raw) return 'default';
         if (raw.toLowerCase() === 'candy' && findTheme('Candy')) return 'Candy';
@@ -242,6 +686,21 @@
     const resetBtn = document.getElementById('themeResetBtn');
     const saveBtn = document.getElementById('themeSaveOverridesBtn');
     const overridesStatus = document.getElementById('themeOverridesStatus');
+    const kbdModOption = document.getElementById('kbdShortcutModOption');
+    const kbdModCommand = document.getElementById('kbdShortcutModCommand');
+    const langSelect = document.getElementById('langSelect');
+    const metaSaveBtn = document.getElementById('metaSettingsSaveBtn');
+    const metaStatus = document.getElementById('metaSettingsStatus');
+    const metaInputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-meta-key][data-meta-field][data-meta-scope]'))
+        .filter(el => el instanceof HTMLInputElement);
+    const baseMetaInputs = metaInputs.filter(el => String(el.dataset.metaScope || '') === 'base');
+    const publisherMetaInputs = metaInputs.filter(el => String(el.dataset.metaScope || '') === 'publisher');
+    const publisherModeToggle = document.getElementById('publisherModeToggle');
+    const publisherAuthorInput = document.getElementById('publisherAuthorInput');
+    const publisherRequireH2Toggle = document.getElementById('publisherRequireH2Toggle');
+    const appTitleInput = document.getElementById('appTitleInput');
+    const appTitleSaveBtn = document.getElementById('appTitleSaveBtn');
+    const appTitleStatus = document.getElementById('appTitleStatus');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -265,14 +724,35 @@
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
 
+    const setAppTitleStatus = (msg, kind = 'info') => {
+        if (!(appTitleStatus instanceof HTMLElement)) return;
+        appTitleStatus.textContent = String(msg || '');
+        appTitleStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const readAppTitleSetting = () => {
+        const s = getSettings();
+        return s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
+    };
+
+    const applyAppTitleUi = (title) => {
+        if (!document.body?.classList.contains('index-page')) return;
+        const textEl = document.querySelector('.app-title-text');
+        if (!(textEl instanceof HTMLElement)) return;
+        const next = title && title.trim() ? title.trim() : 'Markdown Manager';
+        textEl.textContent = next;
+    };
+
     const updateThemeUi = () => {
         const selected = presetSelect ? presetSelect.value : '';
-        const t = selected && selected !== 'default' ? findTheme(selected) : null;
+        const theme = selected && selected !== 'default' ? findTheme(selected) : null;
 
-        const name = t?.label || t?.name || 'Default';
-        const color = String(t?.color || '').trim();
-        const bg = String(t?.bg || '').trim();
-        const secondary = String(t?.secondary || '').trim();
+        const name = theme?.label || theme?.name || t('theme.default', 'Default');
+        const color = String(theme?.color || '').trim();
+        const bg = String(theme?.bg || '').trim();
+        const secondary = String(theme?.secondary || '').trim();
 
         if (presetSelect instanceof HTMLSelectElement) {
             presetSelect.style.color = color || '';
@@ -282,21 +762,23 @@
 
         if (swatchPrimary instanceof HTMLElement) {
             swatchPrimary.style.backgroundColor = color || 'transparent';
-            swatchPrimary.title = color ? `Primary: ${color}` : 'Primary';
+            const primaryLabel = t('theme.swatch.primary', 'Primary');
+            swatchPrimary.title = color ? `${primaryLabel}: ${color}` : primaryLabel;
         }
         if (swatchSecondary instanceof HTMLElement) {
             swatchSecondary.style.backgroundColor = secondary || 'transparent';
-            swatchSecondary.title = secondary ? `Secondary: ${secondary}` : 'Secondary';
+            const secondaryLabel = t('theme.swatch.secondary', 'Secondary');
+            swatchSecondary.title = secondary ? `${secondaryLabel}: ${secondary}` : secondaryLabel;
         }
 
         if (presetPreview instanceof HTMLElement) {
-            if (!t) {
-                presetPreview.textContent = 'Default theme (uses built-in styles)';
+            if (!theme) {
+                presetPreview.textContent = t('theme.default_preview', 'Default theme (uses built-in styles)');
                 presetPreview.style.color = '';
                 presetPreview.style.backgroundColor = '';
                 presetPreview.style.borderColor = '';
             } else {
-                presetPreview.textContent = `${name} • preview`;
+                presetPreview.textContent = `${name} • ${t('theme.preview_label', 'preview')}`;
                 presetPreview.style.backgroundColor = bg || '';
                 presetPreview.style.color = color || '';
                 presetPreview.style.borderColor = color ? 'rgba(148, 163, 184, 0.55)' : '';
@@ -305,12 +787,17 @@
     };
 
     const open = () => {
+        if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) return;
         if (typeof window.__mdwCloseLinkModal === 'function') window.__mdwCloseLinkModal();
         if (typeof window.__mdwCloseImageModal === 'function') window.__mdwCloseImageModal();
 
         const preset = readPreset();
         if (presetSelect instanceof HTMLSelectElement) presetSelect.value = preset;
         updateThemeUi();
+
+        const mod = readShortcutMod();
+        if (kbdModOption instanceof HTMLInputElement) kbdModOption.checked = mod === 'option';
+        if (kbdModCommand instanceof HTMLInputElement) kbdModCommand.checked = mod === 'command';
 
         const ov = readOverrides();
         if (inputs.previewBg instanceof HTMLInputElement) inputs.previewBg.value = String(ov.preview?.bg || '');
@@ -324,6 +811,10 @@
         if (inputs.editorFont instanceof HTMLInputElement) inputs.editorFont.value = String(ov.editor?.font || '');
         if (inputs.editorFontSize instanceof HTMLInputElement) inputs.editorFontSize.value = String(ov.editor?.fontSize || '');
         if (inputs.editorAccent instanceof HTMLInputElement) inputs.editorAccent.value = String(ov.editor?.accent || '');
+        if (appTitleInput instanceof HTMLInputElement) {
+            appTitleInput.value = readAppTitleSetting();
+        }
+        setAppTitleStatus(t('theme.app_title.hint', 'Leave blank to use the default.'), 'info');
 
         overlay.hidden = false;
         modal.hidden = false;
@@ -366,7 +857,7 @@
 
         writeOverrides(ov);
         applyTheme();
-        setOverridesStatus('Saved', 'ok');
+        setOverridesStatus(t('theme.overrides.saved', 'Saved'), 'ok');
     };
 
     const resetOverrides = () => {
@@ -375,7 +866,7 @@
             if (el instanceof HTMLInputElement) el.value = '';
         });
         applyTheme();
-        setOverridesStatus('Cleared', 'ok');
+        setOverridesStatus(t('theme.overrides.cleared', 'Cleared'), 'ok');
     };
 
     if (btn && modal && overlay) {
@@ -385,11 +876,266 @@
         cancelBtn?.addEventListener('click', close);
         resetBtn?.addEventListener('click', resetOverrides);
         saveBtn?.addEventListener('click', persistFromInputs);
+        appTitleSaveBtn?.addEventListener('click', async () => {
+            if (!(appTitleInput instanceof HTMLInputElement)) return;
+            setAppTitleStatus(t('theme.app_title.saving', 'Saving…'), 'info');
+            try {
+                if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                    setAppTitleStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                    if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                    return;
+                }
+                const nextTitle = String(appTitleInput.value || '').trim();
+                const ok = await saveSettingsToServer({ app_title: nextTitle });
+                if (!ok) throw new Error(t('theme.app_title.save_failed', 'Save failed'));
+                if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                    window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                    window.MDW_META_CONFIG._settings.app_title = nextTitle;
+                }
+                applyAppTitleUi(nextTitle);
+                if (typeof window.__mdwUpdateAuthTitle === 'function') {
+                    window.__mdwUpdateAuthTitle();
+                }
+                setAppTitleStatus(t('theme.app_title.saved', 'Saved'), 'ok');
+            } catch (e) {
+                console.error('app title save failed', e);
+                const msg = (e && typeof e.message === 'string' && e.message.trim())
+                    ? e.message.trim()
+                    : t('theme.app_title.save_failed', 'Save failed');
+                setAppTitleStatus(msg, 'error');
+            }
+        });
+
+        const onKbdModChange = (e) => {
+            const t = e.target;
+            if (!(t instanceof HTMLInputElement)) return;
+            if (t.name !== 'kbdShortcutMod') return;
+            writeShortcutMod(t.value);
+        };
+        kbdModOption?.addEventListener('change', onKbdModChange);
+        kbdModCommand?.addEventListener('change', onKbdModChange);
+
+        if (langSelect instanceof HTMLSelectElement) {
+            langSelect.addEventListener('change', () => {
+                const v = String(langSelect.value || '').trim();
+                if (!v) return;
+                const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
+                const allowed = new Set(list.map(x => String(x?.code || '')).filter(Boolean));
+                if (!allowed.has(v)) return;
+                if (String(window.MDW_LANG || '') === v) return;
+                const parts = [
+                    `mdw_lang=${encodeURIComponent(v)}`,
+                    'Path=/',
+                    `Max-Age=${60 * 60 * 24 * 365}`,
+                    'SameSite=Lax',
+                ];
+                if (window.location && window.location.protocol === 'https:') parts.push('Secure');
+                document.cookie = parts.join('; ');
+                window.location.reload();
+            });
+        }
+
+        // Metadata settings: enforce rules + save to disk
+        const setMetaStatus = (msg, kind = 'info') => {
+            if (!(metaStatus instanceof HTMLElement)) return;
+            metaStatus.textContent = String(msg || '');
+            metaStatus.style.color = kind === 'error'
+                ? 'var(--danger)'
+                : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+        };
+
+        const syncMetaUiRules = (inputs) => {
+            const byKey = new Map();
+            inputs.forEach((input) => {
+                const key = String(input.dataset.metaKey || '').trim();
+                const field = String(input.dataset.metaField || '').trim();
+                if (!key || !field) return;
+                const row = byKey.get(key) || {};
+                row[field] = input;
+                byKey.set(key, row);
+            });
+            byKey.forEach((row) => {
+                const md = row.markdown;
+                const html = row.html;
+                if (!(md instanceof HTMLInputElement) || !(html instanceof HTMLInputElement)) return;
+                if (!md.checked) {
+                    html.checked = false;
+                    html.disabled = true;
+                } else {
+                    html.disabled = false;
+                }
+            });
+        };
+
+        const readMetaUi = (inputs) => {
+            const cfg = {};
+            inputs.forEach((input) => {
+                const key = String(input.dataset.metaKey || '').trim();
+                const field = String(input.dataset.metaField || '').trim();
+                if (!key || !field) return;
+                cfg[key] = cfg[key] || {};
+                if (field === 'markdown') cfg[key].markdown_visible = input.checked;
+                if (field === 'html') cfg[key].html_visible = input.checked;
+            });
+            Object.entries(cfg).forEach(([_, v]) => {
+                if (!v.markdown_visible) v.html_visible = false;
+            });
+            return cfg;
+        };
+
+        const readPublisherSettings = () => {
+        const author = (publisherAuthorInput instanceof HTMLInputElement) ? String(publisherAuthorInput.value || '').trim() : '';
+        const mode = (publisherModeToggle instanceof HTMLInputElement) ? !!publisherModeToggle.checked : false;
+        const requireH2 = (publisherRequireH2Toggle instanceof HTMLInputElement)
+            ? !!publisherRequireH2Toggle.checked
+            : true;
+        return {
+            publisher_mode: mode,
+            publisher_default_author: author,
+            publisher_require_h2: requireH2,
+        };
+        };
+
+        const syncPublisherUi = () => {
+            if (!(publisherModeToggle instanceof HTMLInputElement)) return;
+            if (!(publisherAuthorInput instanceof HTMLInputElement)) return;
+        const on = !!publisherModeToggle.checked;
+        publisherAuthorInput.disabled = false;
+        publisherAuthorInput.placeholder = on
+            ? t('theme.publisher.author_placeholder', 'Your name')
+            : t('theme.publisher.author_placeholder', 'Your name');
+        if (publisherRequireH2Toggle instanceof HTMLInputElement) {
+            publisherRequireH2Toggle.disabled = !on;
+        }
+    };
+
+        const publisherMetaWrap = document.getElementById('publisherMetaFields');
+        publisherModeToggle?.addEventListener('change', () => {
+            syncPublisherUi();
+            setMetaStatus('', 'info');
+            if (publisherMetaWrap instanceof HTMLElement) {
+                publisherMetaWrap.style.display = (publisherModeToggle instanceof HTMLInputElement && publisherModeToggle.checked) ? '' : 'none';
+            }
+            if (publisherModeToggle instanceof HTMLInputElement && publisherModeToggle.checked) {
+                if (publisherAuthorInput instanceof HTMLInputElement) {
+                    const v = String(publisherAuthorInput.value || '').trim();
+                    if (!v) {
+                        try { publisherAuthorInput.focus(); } catch {}
+                    }
+                }
+            }
+        });
+        publisherAuthorInput?.addEventListener('input', () => setMetaStatus('', 'info'));
+        syncPublisherUi();
+
+        if (baseMetaInputs.length) {
+            baseMetaInputs.forEach((input) => {
+                input.addEventListener('change', () => {
+                    syncMetaUiRules(baseMetaInputs);
+                    setMetaStatus('', 'info');
+                });
+            });
+            syncMetaUiRules(baseMetaInputs);
+        }
+        if (publisherMetaInputs.length) {
+            publisherMetaInputs.forEach((input) => {
+                input.addEventListener('change', () => {
+                    syncMetaUiRules(publisherMetaInputs);
+                    setMetaStatus('', 'info');
+                });
+            });
+            syncMetaUiRules(publisherMetaInputs);
+        }
+
+        metaSaveBtn?.addEventListener('click', async () => {
+            setMetaStatus(t('theme.metadata.saving', 'Saving…'), 'info');
+            try {
+                if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                    setMetaStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                    if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                    return;
+                }
+                const publisherSettings = readPublisherSettings();
+                if (publisherSettings.publisher_mode && !publisherSettings.publisher_default_author) {
+                    setMetaStatus(t('theme.publisher.author_required', 'Please enter an author name to enable publisher mode.'), 'error');
+                    try { publisherAuthorInput?.focus?.(); } catch {}
+                    return;
+                }
+                // Also persist UI theme + theme preset to disk so publisher mode is consistent across devices.
+                try {
+                    const uiTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                    publisherSettings.ui_theme = uiTheme;
+                } catch {}
+                try {
+                    const preset = String(localStorage.getItem(STORAGE_PRESET) || '').trim();
+                    publisherSettings.theme_preset = preset || 'default';
+                } catch {
+                    publisherSettings.theme_preset = 'default';
+                }
+                const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+                const payload = {
+                    csrf: String(window.MDW_CSRF || ''),
+                    config: readMetaUi(baseMetaInputs),
+                    publisher_config: readMetaUi(publisherMetaInputs),
+                    settings: publisherSettings,
+                    auth: (auth && auth.role && auth.token) ? { role: auth.role, token: auth.token } : null,
+                };
+                const res = await fetch('metadata_config_save.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data || data.ok !== true) {
+                    const errCode = (data && data.error) ? String(data.error) : '';
+                    const serverMsg = (data && data.message) ? String(data.message) : '';
+                    if (errCode === 'publisher_author_required') {
+                        throw new Error(t('theme.publisher.author_required', 'Please enter an author name to enable publisher mode.'));
+                    }
+                    if (errCode === 'auth_required') {
+                        if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                        throw new Error(t('auth.superuser_required', 'Superuser login required.'));
+                    }
+                    if (errCode === 'csrf' || errCode === 'no_session') {
+                        throw new Error(t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.'));
+                    }
+                    if (serverMsg) throw new Error(serverMsg);
+                    if (errCode) throw new Error(errCode);
+                    throw new Error(t('theme.metadata.save_failed', 'Save failed'));
+                }
+                window.MDW_META_CONFIG = data.config;
+                if (data.publisher_config) window.MDW_META_PUBLISHER_CONFIG = data.publisher_config;
+                setMetaStatus(t('theme.metadata.saved', 'Saved'), 'ok');
+                if (typeof window.__mdwApplyMetaVisibility === 'function') {
+                    window.__mdwApplyMetaVisibility();
+                }
+                // HTML preview uses server-side config; force a refresh even if the textarea content didn't change.
+                const ta = document.getElementById('editor');
+                if (ta instanceof HTMLTextAreaElement) {
+                    ta.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            } catch (e) {
+                console.error('metadata settings save failed', e);
+                const msg = (e && typeof e.message === 'string' && e.message.trim()) ? e.message.trim() : t('theme.metadata.save_failed', 'Save failed');
+                setMetaStatus(msg, 'error');
+            }
+        });
 
         presetSelect?.addEventListener('change', () => {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) return;
             const v = String(presetSelect.value || '').trim();
             const t = findTheme(v);
-            localStorage.setItem(STORAGE_PRESET, t ? t.name : 'default');
+            const nextPreset = t ? t.name : 'default';
+            localStorage.setItem(STORAGE_PRESET, nextPreset);
+            if (isPublisherMode()) {
+                try {
+                    const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+                    if (cfg && cfg._settings && typeof cfg._settings === 'object') {
+                        cfg._settings.theme_preset = nextPreset;
+                    }
+                } catch {}
+                saveSettingsToServer({ theme_preset: nextPreset }).catch(() => {});
+            }
             updateThemeUi();
             applyTheme();
         });
@@ -410,6 +1156,258 @@
     applyTheme();
 })();
 
+// Editor: metadata visibility (hide/show in markdown textarea; always saved in file)
+(function(){
+    const editor = document.getElementById('editor');
+    const form = document.getElementById('editor-form');
+    if (!(editor instanceof HTMLTextAreaElement) || !(form instanceof HTMLFormElement)) return;
+
+    const t = (k, f) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f) : (typeof f === 'string' ? f : ''));
+
+    const metaLineRe = /^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u;
+
+    const getBaseCfg = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const fields = cfg && cfg.fields && typeof cfg.fields === 'object' ? cfg.fields : {};
+        return fields || {};
+    };
+    const getPublisherCfg = () => {
+        const cfg = (window.MDW_META_PUBLISHER_CONFIG && typeof window.MDW_META_PUBLISHER_CONFIG === 'object') ? window.MDW_META_PUBLISHER_CONFIG : null;
+        const fields = cfg && cfg.fields && typeof cfg.fields === 'object' ? cfg.fields : {};
+        return fields || {};
+    };
+    const isPublisherMode = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(settings && settings.publisher_mode);
+    };
+
+    const publisherOrder = [
+        'extends',
+        'page_title',
+        'page_subtitle',
+        'post_date',
+        'page_picture',
+        'active_page',
+        'cta',
+        'blurmenu',
+        'sociallinks',
+        'blog',
+        'author',
+        'creationdate',
+        'changedate',
+        'publishstate',
+    ];
+
+    const isMarkdownVisible = (f) => {
+        if (!f || typeof f !== 'object') return true;
+        if (!Object.prototype.hasOwnProperty.call(f, 'markdown_visible')) return true;
+        const v = f.markdown_visible;
+        if (typeof v === 'string') {
+            const s = v.trim().toLowerCase();
+            if (s === 'false' || s === '0' || s === 'no') return false;
+            if (s === 'true' || s === '1' || s === 'yes') return true;
+        }
+        return !!v;
+    };
+
+    const stripHiddenMeta = (raw) => {
+        const baseCfg = getBaseCfg();
+        const pubCfg = getPublisherCfg();
+        const publisherMode = isPublisherMode();
+        const { meta, body } = extractMetaAndBody(raw);
+        const { order } = getKnownKeysAndOrder();
+        const includeKeys = order.filter((k) => {
+            const fBase = baseCfg[k];
+            const fPub = pubCfg[k];
+            const f = fBase || fPub || {};
+            const inPublisherCfg = !!fPub && !fBase;
+            if (inPublisherCfg && !publisherMode) return false;
+            return isMarkdownVisible(f);
+        });
+        const block = buildMetaBlock(meta, includeKeys);
+        const cleanedBody = String(body).replace(/^\n+/, '');
+        return block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+    };
+
+    const getKnownKeysAndOrder = () => {
+        const base = getBaseCfg();
+        const pub = getPublisherCfg();
+        const known = new Set([
+            ...Object.keys(base || {}).map(k => String(k).toLowerCase()),
+            ...Object.keys(pub || {}).map(k => String(k).toLowerCase()),
+        ]);
+        const order = [];
+        const add = (k) => {
+            const kk = String(k || '').trim().toLowerCase();
+            if (!kk || !known.has(kk)) return;
+            if (!order.includes(kk)) order.push(kk);
+        };
+        // Base keys first (keeps date at top).
+        Object.keys(base || {}).forEach(add);
+        // Publisher keys in stable order.
+        publisherOrder.forEach(add);
+        // Any remaining known keys.
+        known.forEach(add);
+        return { known, order };
+    };
+
+    const extractMetaAndBody = (raw) => {
+        const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
+        const meta = {};
+        const bodyLines = [];
+        const { known } = getKnownKeysAndOrder();
+        for (const line of lines) {
+            const normalized = String(line).replace(/\u00a0/g, ' ').replace(/[\u200B\uFEFF]/g, '');
+            const m = normalized.match(metaLineRe);
+            if (m) {
+                const key = String(m[1] || '').trim().toLowerCase();
+                const val = String(m[2] || '').trim();
+                if (known.has(key)) {
+                    meta[key] = val;
+                    continue;
+                }
+            }
+            bodyLines.push(line);
+        }
+        return { meta, body: bodyLines.join('\n') };
+    };
+
+    const buildMetaBlock = (meta, includeKeys) => {
+        const { order } = getKnownKeysAndOrder();
+        const out = [];
+        for (const k of order) {
+            if (!includeKeys.includes(k)) continue;
+            const v = String(meta?.[k] ?? '').trim();
+            if (!v) continue;
+            out.push(`_${k}: ${v}_`);
+        }
+        return out.join('\n');
+    };
+
+    let metaStore = extractMetaAndBody(editor.value).meta;
+    const liveStatus = document.getElementById('liveStatus');
+    let metaWarnTimer = null;
+    let applyTimer = null;
+    let isApplying = false;
+    let hasAppliedOnce = false;
+    const warnHiddenMeta = (keys) => {
+        if (!keys.length || !(liveStatus instanceof HTMLElement)) return;
+        liveStatus.textContent = `Hidden metadata removed: ${keys.join(', ')}.`;
+        liveStatus.style.color = 'var(--danger)';
+        if (metaWarnTimer) clearTimeout(metaWarnTimer);
+        metaWarnTimer = setTimeout(() => {
+            liveStatus.textContent = '';
+            liveStatus.style.color = '';
+        }, 4000);
+    };
+
+    const applyMetaVisibility = () => {
+        const baseCfg = getBaseCfg();
+        const pubCfg = getPublisherCfg();
+        const publisherMode = isPublisherMode();
+        const { meta, body } = extractMetaAndBody(editor.value);
+        const hiddenKeys = new Set();
+        Object.entries(baseCfg || {}).forEach(([k, f]) => {
+            if (!f || typeof f !== 'object') return;
+            if (!isMarkdownVisible(f)) hiddenKeys.add(String(k).toLowerCase());
+        });
+        if (publisherMode) {
+            Object.entries(pubCfg || {}).forEach(([k, f]) => {
+                if (!f || typeof f !== 'object') return;
+                if (!isMarkdownVisible(f)) hiddenKeys.add(String(k).toLowerCase());
+            });
+        }
+
+        const filteredMeta = {};
+        const blockedKeys = [];
+        Object.entries(meta || {}).forEach(([k, v]) => {
+            const key = String(k).toLowerCase();
+            const isHidden = hiddenKeys.has(key);
+            if (isHidden) {
+                if (hasAppliedOnce) blockedKeys.push(key);
+                return;
+            }
+            filteredMeta[key] = v;
+        });
+        if (blockedKeys.length) warnHiddenMeta(blockedKeys);
+        metaStore = { ...metaStore, ...filteredMeta };
+
+        const { order } = getKnownKeysAndOrder();
+        const includeKeys = order.filter((k) => {
+            const fBase = baseCfg[k];
+            const fPub = pubCfg[k];
+            const f = fBase || fPub || {};
+            const inPublisherCfg = !!fPub && !fBase;
+            if (inPublisherCfg && !publisherMode) return false;
+            return isMarkdownVisible(f);
+        });
+
+        const block = buildMetaBlock(metaStore, includeKeys);
+        const cleanedBody = String(body).replace(/^\n+/, '');
+        const next = block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+
+        if (editor.value !== next) {
+            const pos = editor.selectionStart;
+            isApplying = true;
+            editor.value = next;
+            try { editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length); } catch {}
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            isApplying = false;
+        }
+        hasAppliedOnce = true;
+    };
+
+    window.__mdwApplyMetaVisibility = applyMetaVisibility;
+    window.__mdwStripHiddenMetaForDirty = stripHiddenMeta;
+    window.__mdwResetMetaStore = () => {
+        metaStore = extractMetaAndBody(editor.value).meta;
+        hasAppliedOnce = false;
+        applyMetaVisibility();
+    };
+    applyMetaVisibility();
+
+    const scheduleApply = () => {
+        if (isApplying) return;
+        if (applyTimer) clearTimeout(applyTimer);
+        applyTimer = setTimeout(() => {
+            applyTimer = null;
+            applyMetaVisibility();
+        }, 120);
+    };
+
+    editor.addEventListener('input', () => {
+        if (isApplying) return;
+        scheduleApply();
+    });
+
+    form.addEventListener('submit', (event) => {
+        const { meta, body } = extractMetaAndBody(editor.value);
+        const mergedMeta = { ...metaStore, ...meta };
+        if (isPublisherMode()) {
+            const pageTitle = String(mergedMeta.page_title || '').trim();
+            if (!pageTitle) {
+                alert(t('flash.publisher_requires_page_title', 'Website publisher mode requires a page_title metadata line.'));
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            const pagePicture = String(mergedMeta.page_picture || '').trim();
+            if (!pagePicture) {
+                alert(t('flash.publisher_requires_page_picture', 'Website publisher mode requires a page_picture metadata line.'));
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+        }
+        metaStore = mergedMeta;
+        const { order } = getKnownKeysAndOrder();
+        const block = buildMetaBlock(metaStore, order.slice());
+        const cleanedBody = String(body).replace(/^\n+/, '');
+        editor.value = block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+    }, true);
+})();
+
 // Header show on scroll up, hide on scroll down (index.php + edit.php)
 (function(){
     const root = document.documentElement;
@@ -427,6 +1425,18 @@
 
     measure();
     window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener('load', measure);
+
+    if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+        document.fonts.ready.then(() => measure()).catch(() => {});
+    }
+
+    if (typeof ResizeObserver === 'function') {
+        const ro = new ResizeObserver(() => {
+            measure();
+        });
+        ro.observe(header);
+    }
 
     let hidden = false;
 
@@ -499,12 +1509,14 @@
 
 // Delete confirm (shared: index.php + edit.php)
 (function(){
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
     document.addEventListener('submit', (e) => {
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
         if (!form.classList.contains('deleteForm')) return;
-        const file = form.dataset.file || form.querySelector('input[name="file"]')?.value || 'this file';
-        if (!confirm(`Delete "${file}"?`)) {
+        const file = form.dataset.file || form.querySelector('input[name="file"]')?.value || t('js.this_file', 'this file');
+        const msg = t('js.confirm_delete', `Delete \"${file}\"?`, { file });
+        if (!confirm(msg)) {
             e.preventDefault();
         }
     }, true);
@@ -517,12 +1529,15 @@
     const newMdClose = document.getElementById('newMdClose');
     const newMdPrefixDate = document.getElementById('newMdPrefixDate');
     const newMdFile = document.getElementById('newMdFile');
+    const newMdFileHint = document.getElementById('newMdFileHint');
     const newMdForm = newMdFile?.closest?.('form');
+    const newMdContent = newMdForm?.querySelector?.('textarea[name="new_content"]') || null;
     const newFolderBtn = document.getElementById('newFolderBtn');
     const newFolderForm = document.getElementById('newFolderForm');
     const newFolderName = document.getElementById('newFolderName');
 
     if (!newMdToggle || !newMdPanel) return;
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const open = () => {
         newMdPanel.style.display = 'block';
@@ -541,12 +1556,88 @@
     newMdToggle.addEventListener('click', toggle);
     newMdClose?.addEventListener('click', close);
 
+    const supportsUnicodeProps = (() => {
+        try { new RegExp('\\p{L}', 'u'); return true; } catch { return false; }
+    })();
+    const invalidCharsRe = supportsUnicodeProps
+        ? /[^\p{L}\p{N}._-]+/gu
+        : /[^A-Za-z0-9._-]+/g;
+    const whitespaceRe = /\s+/g;
+
+    const setNewMdHint = (msg, variant) => {
+        if (!(newMdFileHint instanceof HTMLElement)) return;
+        if (!msg) {
+            newMdFileHint.textContent = '';
+            newMdFileHint.style.color = '';
+            newMdFileHint.style.display = 'none';
+            return;
+        }
+        newMdFileHint.textContent = msg;
+        newMdFileHint.style.display = 'block';
+        newMdFileHint.style.color = variant === 'danger' ? 'var(--danger)' : 'var(--text-muted)';
+    };
+
+    const sanitizeNewMdPath = (raw) => {
+        const original = (raw || '').toString();
+        let v = original.replace(/\\/g, '/').trim();
+        v = v.replace(/\/{2,}/g, '/');
+        v = v.replace(/^\/+/, '');
+        if (!v) return { ok: false, value: '', changed: false, reason: t('js.new_md.enter_title', 'Please enter a title for the filename.') };
+        if (v.endsWith('/')) return { ok: false, value: '', changed: false, reason: t('js.new_md.no_trailing_slash', 'The filename cannot end with a slash.') };
+
+        const parts = v.split('/');
+        const outParts = [];
+        let changed = v !== original;
+
+        for (const part0 of parts) {
+            if (part0 === '') return { ok: false, value: '', changed, reason: t('js.new_md.no_empty_parts', 'The filename cannot contain empty path parts.') };
+
+            let part = part0.replace(whitespaceRe, '_');
+            if (part !== part0) changed = true;
+
+            const cleaned = part.replace(invalidCharsRe, '');
+            if (cleaned !== part) changed = true;
+            part = cleaned;
+
+            const collapsed = part.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+            if (collapsed !== part) changed = true;
+            part = collapsed;
+
+            if (!part) return { ok: false, value: '', changed, reason: t('js.new_md.adjust_title', 'Please adjust the title so it contains letters/numbers (spaces become underscores).') };
+            if (part === '.' || part === '..') return { ok: false, value: '', changed, reason: t('js.new_md.no_dot_parts', 'The filename cannot contain \".\" or \"..\" path parts.') };
+            outParts.push(part);
+        }
+
+        return { ok: true, value: outParts.join('/'), changed, reason: '' };
+    };
+
     const ensureMdExtension = () => {
         if (!(newMdFile instanceof HTMLInputElement)) return;
         const v = (newMdFile.value || '').trim();
         if (!v) return;
         if (/\.md$/i.test(v)) return;
         newMdFile.value = v + '.md';
+    };
+
+    const sanitizeNewMdFileInput = ({ showHint } = { showHint: false }) => {
+        if (!(newMdFile instanceof HTMLInputElement)) return true;
+
+        const raw = newMdFile.value || '';
+        const res = sanitizeNewMdPath(raw);
+        if (!res.ok) {
+            newMdFile.setCustomValidity(res.reason || t('js.new_md.invalid_filename', 'Invalid filename.'));
+            if (showHint) setNewMdHint(res.reason, 'danger');
+            return false;
+        }
+
+        newMdFile.setCustomValidity('');
+        if (res.changed && res.value && res.value !== raw) {
+            newMdFile.value = res.value;
+            if (showHint) setNewMdHint(t('js.new_md.adjusted_hint', 'Adjusted filename: spaces → underscores; unsupported characters removed.'), 'info');
+        } else if (showHint) {
+            setNewMdHint('', 'info');
+        }
+        return true;
     };
 
     const applyPrefixToggle = () => {
@@ -570,11 +1661,80 @@
         newMdFile.value = v.replace(/^\d{2}-\d{2}-\d{2}-/, '');
     };
 
-    newMdPrefixDate?.addEventListener('change', applyPrefixToggle);
-    newMdFile?.addEventListener('blur', ensureMdExtension);
-    if (newMdForm instanceof HTMLFormElement) {
-        newMdForm.addEventListener('submit', () => {
+    const isPrefixOnly = (v) => {
+        if (!(newMdPrefixDate instanceof HTMLInputElement)) return false;
+        const prefix = String(newMdPrefixDate.dataset.datePrefix || '');
+        return !!prefix && String(v || '').trim() === prefix;
+    };
+
+    let autoFilename = (() => {
+        if (!(newMdFile instanceof HTMLInputElement)) return false;
+        const v = (newMdFile.value || '').trim();
+        return v === '' || isPrefixOnly(v);
+    })();
+
+    const findFirstH1 = (raw) => {
+        const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
+        let inFence = false;
+        for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+                inFence = !inFence;
+                continue;
+            }
+            if (inFence) continue;
+            const m = line.match(/^\s*#\s+(.+?)\s*$/);
+            if (m && m[1]) return String(m[1]).trim();
+        }
+        return '';
+    };
+
+    const maybeAutofillFileFromContent = () => {
+        if (!autoFilename) return;
+        if (!(newMdFile instanceof HTMLInputElement)) return;
+        if (!(newMdContent instanceof HTMLTextAreaElement)) return;
+
+        const h1 = findFirstH1(newMdContent.value);
+        if (!h1) return;
+
+        const safeTitle = h1.replace(/[\\/]+/g, ' ').trim();
+        if (!safeTitle) return;
+
+        const sanitized = sanitizeNewMdPath(safeTitle);
+        if (!sanitized.ok || !sanitized.value) return;
+
+        const prefix = (newMdPrefixDate instanceof HTMLInputElement) ? String(newMdPrefixDate.dataset.datePrefix || '') : '';
+        const current = (newMdFile.value || '').trim();
+        const keepPrefix = prefix && (isPrefixOnly(current) || current.startsWith(prefix));
+        const base = sanitized.value;
+        const next = keepPrefix ? (prefix + base) : base;
+
+        if (newMdFile.value !== next) {
+            newMdFile.value = next;
+            ensureMdExtension();
             applyPrefixToggle();
+            sanitizeNewMdFileInput({ showHint: true });
+        }
+    };
+
+    newMdPrefixDate?.addEventListener('change', applyPrefixToggle);
+    newMdFile?.addEventListener('input', () => {
+        autoFilename = false;
+        sanitizeNewMdFileInput({ showHint: true });
+    });
+    newMdFile?.addEventListener('blur', () => {
+        sanitizeNewMdFileInput({ showHint: true });
+        ensureMdExtension();
+    });
+    newMdContent?.addEventListener('input', maybeAutofillFileFromContent);
+    if (newMdForm instanceof HTMLFormElement) {
+        newMdForm.addEventListener('submit', (e) => {
+            applyPrefixToggle();
+            if (!sanitizeNewMdFileInput({ showHint: true })) {
+                e.preventDefault();
+                try { newMdFile?.focus(); } catch {}
+                try { newMdFile?.reportValidity?.(); } catch {}
+                return;
+            }
             ensureMdExtension();
         });
     }
@@ -583,17 +1743,39 @@
         open();
     }
     applyPrefixToggle();
+    maybeAutofillFileFromContent();
+    sanitizeNewMdFileInput({ showHint: false });
+    setNewMdHint('', 'info');
 
     newFolderBtn?.addEventListener('click', () => {
+        if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+            alert(t('auth.superuser_required', 'Superuser login required.'));
+            return;
+        }
         if (!(newFolderForm instanceof HTMLFormElement)) return;
         if (!(newFolderName instanceof HTMLInputElement)) return;
-        const name = window.prompt('New folder name (no slashes):', '');
+        const name = window.prompt(t('js.prompt_new_folder', 'New folder name (no slashes):'), '');
         if (name === null) return;
         const folder = name.trim();
         if (!folder) return;
         if (folder.includes('/') || folder.includes('\\') || folder.includes('..')) {
-            alert('Invalid folder name.');
+            alert(t('js.invalid_folder_alert', 'Invalid folder name.'));
             return;
+        }
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (auth && auth.role && auth.token) {
+            const ensureInput = (name, value) => {
+                let input = newFolderForm.querySelector(`input[name="${name}"]`);
+                if (!(input instanceof HTMLInputElement)) {
+                    input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    newFolderForm.appendChild(input);
+                }
+                input.value = String(value || '');
+            };
+            ensureInput('auth_role', auth.role);
+            ensureInput('auth_token', auth.token);
         }
         newFolderName.value = folder;
         newFolderForm.submit();
@@ -819,6 +2001,7 @@
     const inferredFolder = file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : 'root';
     const folder = folderParam || inferredFolder;
     const focus = params.get('focus') || file;
+    const nav = (window.MDW_VIEW_NAV && typeof window.MDW_VIEW_NAV === 'object') ? window.MDW_VIEW_NAV : null;
 
     document.addEventListener('keydown', (e) => {
         const t = e.target;
@@ -848,9 +2031,17 @@
             return;
         }
 
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+	        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+	            e.preventDefault();
+	            const url = `edit.php?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder)}`;
+	            window.location.href = url;
+	        }
+
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+            const targetFile = (e.key === 'ArrowLeft') ? (nav?.prev || null) : (nav?.next || null);
+            if (!targetFile) return;
             e.preventDefault();
-            const url = `edit.php?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder)}`;
+            const url = `index.php?file=${encodeURIComponent(targetFile)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(targetFile)}`;
             window.location.href = url;
         }
     });
@@ -859,6 +2050,7 @@
 // NAVIGATIE, FILTER & DOCUMENT LADEN
 (function(){
     const normalizeNewlines = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const overview = document.getElementById('links_md_overview');
     if (!overview) return;
@@ -870,10 +2062,64 @@
     const navOverlay = document.getElementById('navOverlay');
     const mobileNavToggle = document.getElementById('mobileNavToggle');
     const mobileNavClose  = document.getElementById('mobileNavClose');
+    const navSortSelect = document.getElementById('navSortSelect');
+    const navSortRow = overview.querySelector('.nav-sort-row');
+    const navFilterRow = overview.querySelector('.nav-filter-row');
+    const contentList = overview.querySelector('#contentList');
+    const navBackHref = contentList?.dataset.backHref || '';
     const filterReset = document.getElementById('filterReset');
     const filterClear = document.getElementById('filterClear');
+    const explorerCollapseToggle = document.getElementById('explorerCollapseToggle');
 
     if (!filterInput) return;
+
+    const navSortPlaceholder = (isEditorPage && navSortRow) ? document.createElement('div') : null;
+    if (navSortRow && navSortPlaceholder && navSortRow.parentNode) {
+        navSortPlaceholder.dataset.navSortPlaceholder = '1';
+        navSortRow.parentNode.insertBefore(navSortPlaceholder, navSortRow);
+    }
+
+    // Explorer collapse/expand (edit.php, desktop)
+    (function(){
+        if (!isEditorPage) return;
+        if (!(explorerCollapseToggle instanceof HTMLButtonElement)) return;
+
+        const KEY = 'mdw_editor_explorer_collapsed';
+        const root = document.documentElement;
+        const mql = window.matchMedia('(max-width: 960px)');
+
+        const isCollapsed = () => root.classList.contains('mdw-explorer-collapsed');
+        const apply = (collapsed, save) => {
+            const allow = !mql.matches;
+            const next = allow && !!collapsed;
+            root.classList.toggle('mdw-explorer-collapsed', next);
+            const icon = explorerCollapseToggle.querySelector('.pi');
+            if (icon) {
+                icon.classList.toggle('pi-leftcaret', !next);
+                icon.classList.toggle('pi-rightcaret', next);
+            }
+            const label = next
+                ? t('edit.nav.expand_overview', 'Expand overview')
+                : t('edit.nav.collapse_overview', 'Collapse overview');
+            explorerCollapseToggle.title = label;
+            explorerCollapseToggle.setAttribute('aria-label', label);
+            if (save) {
+                try { localStorage.setItem(KEY, next ? '1' : '0'); } catch {}
+            }
+        };
+
+        const initial = (() => {
+            try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
+        })();
+        apply(initial, false);
+
+        explorerCollapseToggle.addEventListener('click', () => apply(!isCollapsed(), true));
+        if (typeof mql.addEventListener === 'function') {
+            mql.addEventListener('change', () => apply(isCollapsed(), false));
+        } else if (typeof mql.addListener === 'function') {
+            mql.addListener(() => apply(isCollapsed(), false));
+        }
+    })();
 
     const navCount = document.getElementById('navCount') || (() => {
         const counter = document.createElement('div');
@@ -913,7 +2159,9 @@
 
         children.hidden = !open;
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        btn.title = open ? 'Collapse folder' : 'Expand folder';
+        btn.title = open
+            ? t('nav.collapse_folder', 'Collapse folder')
+            : t('nav.expand_folder', 'Expand folder');
 
         const icon = btn.querySelector('.pi');
         if (icon) {
@@ -933,6 +2181,7 @@
         setFolderOpen(section, getFolderOpen(section));
     });
 
+    const navMql = window.matchMedia('(max-width: 960px)');
     const closeNav = () => {
         document.documentElement.classList.remove('nav-open');
     };
@@ -940,41 +2189,161 @@
         document.documentElement.classList.add('nav-open');
     };
 
+    const updateMobileNavClose = () => {
+        if (!(mobileNavClose instanceof HTMLButtonElement)) return;
+        const useBack = !!(navBackHref && isEditorPage && navMql.matches);
+        const icon = mobileNavClose.querySelector('.pi');
+        if (icon) {
+            icon.classList.toggle('pi-leftcaret', useBack);
+            icon.classList.toggle('pi-cross', !useBack);
+        }
+        const label = useBack
+            ? t('common.back', 'Back')
+            : t('common.close', 'Close');
+        mobileNavClose.title = label;
+        mobileNavClose.setAttribute('aria-label', label);
+        if (useBack) {
+            mobileNavClose.dataset.backHref = navBackHref;
+        } else {
+            delete mobileNavClose.dataset.backHref;
+        }
+    };
+
     mobileNavToggle?.addEventListener('click', openNav);
-    mobileNavClose?.addEventListener('click', closeNav);
+    mobileNavClose?.addEventListener('click', () => {
+        if (navBackHref && isEditorPage && navMql.matches) {
+            window.location.href = navBackHref;
+            return;
+        }
+        closeNav();
+    });
     navOverlay?.addEventListener('click', closeNav);
+    updateMobileNavClose();
+    if (typeof navMql.addEventListener === 'function') {
+        navMql.addEventListener('change', updateMobileNavClose);
+    } else if (typeof navMql.addListener === 'function') {
+        navMql.addListener(updateMobileNavClose);
+    }
+
+    const folderSections = Array.from(document.querySelectorAll('[data-folder-section]'))
+        .filter(el => el instanceof HTMLElement);
+    const docEntries = Array.from(overview.querySelectorAll('.doclink'))
+        .filter(el => el instanceof HTMLElement)
+        .map(el => {
+            const text = String(el.textContent || '').toLowerCase();
+            const section = el.closest?.('[data-folder-section]') || null;
+            return { el, text, section };
+        });
+
+    const normalizeSort = (value) => String(value || '').trim().toLowerCase();
+    const sortNoteItems = (mode) => {
+        const lists = Array.from(overview.querySelectorAll('.notes-list'));
+        if (!lists.length) return;
+
+        const compare = (a, b) => {
+            const dateA = String(a.dataset.date || '');
+            const dateB = String(b.dataset.date || '');
+            const titleA = normalizeSort(a.dataset.title || '');
+            const titleB = normalizeSort(b.dataset.title || '');
+            const slugA = normalizeSort(a.dataset.slug || '');
+            const slugB = normalizeSort(b.dataset.slug || '');
+
+            if (mode === 'title') {
+                if (titleA !== titleB) return titleA.localeCompare(titleB);
+                return slugA.localeCompare(slugB);
+            }
+            if (mode === 'slug') {
+                if (slugA !== slugB) return slugA.localeCompare(slugB);
+                return titleA.localeCompare(titleB);
+            }
+
+            if (dateA && dateB && dateA !== dateB) return dateB.localeCompare(dateA);
+            if (dateA && !dateB) return -1;
+            if (!dateA && dateB) return 1;
+            if (titleA !== titleB) return titleA.localeCompare(titleB);
+            return slugA.localeCompare(slugB);
+        };
+
+        for (const list of lists) {
+            const items = Array.from(list.querySelectorAll('li.note-item'));
+            if (items.length < 2) continue;
+            const empty = list.querySelector('.nav-empty');
+            items.sort(compare);
+            for (const item of items) list.appendChild(item);
+            if (empty) list.appendChild(empty);
+        }
+    };
+
+    (function(){
+        if (!(navSortSelect instanceof HTMLSelectElement)) return;
+        const SORT_KEY = 'mdw_nav_sort';
+        const options = Array.from(navSortSelect.options).map(o => o.value);
+        const stored = (() => {
+            try { return localStorage.getItem(SORT_KEY) || ''; } catch { return ''; }
+        })();
+        const initial = options.includes(stored) ? stored : (navSortSelect.value || 'date');
+        navSortSelect.value = initial;
+        sortNoteItems(initial);
+        navSortSelect.addEventListener('change', () => {
+            const next = options.includes(navSortSelect.value) ? navSortSelect.value : 'date';
+            try { localStorage.setItem(SORT_KEY, next); } catch {}
+            sortNoteItems(next);
+        });
+    })();
+
+    const updateNavSortPlacement = () => {
+        if (!isEditorPage || !navSortRow || !navFilterRow || !navSortPlaceholder) return;
+        if (navMql.matches) {
+            navSortRow.classList.add('nav-sort-inline');
+            navFilterRow.appendChild(navSortRow);
+        } else {
+            navSortRow.classList.remove('nav-sort-inline');
+            if (navSortPlaceholder.parentNode) {
+                navSortPlaceholder.parentNode.insertBefore(navSortRow, navSortPlaceholder);
+            }
+        }
+    };
+    updateNavSortPlacement();
+    if (typeof navMql.addEventListener === 'function') {
+        navMql.addEventListener('change', updateNavSortPlacement);
+    } else if (typeof navMql.addListener === 'function') {
+        navMql.addListener(updateNavSortPlacement);
+    }
 
     function update() {
-        const q = filterInput.value.toLowerCase();
-        const docs = Array.from(overview.querySelectorAll('.doclink'))
-            .filter(el => el instanceof HTMLElement);
+        const q = String(filterInput.value || '').trim().toLowerCase();
+        const filtering = q.length > 0;
+
         let visible = 0;
-        docs.forEach(el => {
-            const text = (el.innerText || el.textContent || '').toLowerCase();
-            const match = text.includes(q);
-            el.style.display = match ? '' : 'none'; // Gebruik class voor betere controle
-            if (match) visible++;
-        });
-        navCount.textContent = q
-            ? `${visible} item${visible === 1 ? '' : 's'}`
-            : `${docs.length} total items`;
-        if (filterReset) {
-            filterReset.disabled = q.length === 0;
-        }
-        if (filterClear) {
-            filterClear.style.display = q.length === 0 ? 'none' : '';
+        const visibleBySection = new Map();
+
+        for (const { el, text, section } of docEntries) {
+            const match = !filtering || text.includes(q);
+            const nextDisplay = match ? '' : 'none';
+            if (el.style.display !== nextDisplay) el.style.display = nextDisplay;
+            if (!match) continue;
+            visible++;
+            if (section instanceof HTMLElement) {
+                visibleBySection.set(section, (visibleBySection.get(section) || 0) + 1);
+            }
         }
 
-        document.querySelectorAll('[data-folder-section]').forEach(section => {
-            if (!(section instanceof HTMLElement)) return;
-            if (!q) {
+        navCount.textContent = filtering
+            ? (visible === 1
+                ? t('common.item_count_one', '{n} item', { n: visible })
+                : t('common.item_count_other', '{n} items', { n: visible }))
+            : t('common.total_items', '{n} total items', { n: docEntries.length });
+
+        if (filterReset) filterReset.disabled = !filtering;
+        if (filterClear) filterClear.style.display = filtering ? '' : 'none';
+
+        for (const section of folderSections) {
+            if (!filtering) {
                 setFolderOpen(section, getFolderOpen(section));
-                return;
+                continue;
             }
-            const anyVisible = Array.from(section.querySelectorAll('.doclink'))
-                .some(el => el instanceof HTMLElement && el.style.display !== 'none');
-            setFolderOpen(section, anyVisible);
-        });
+            setFolderOpen(section, (visibleBySection.get(section) || 0) > 0);
+        }
     }
 
     // q parameter uit URL
@@ -984,7 +2353,15 @@
         filterInput.value = qParam;
     }
 
-    filterInput.addEventListener('input', update);
+    let filterTimer = null;
+    const scheduleUpdate = () => {
+        if (filterTimer) window.clearTimeout(filterTimer);
+        filterTimer = window.setTimeout(() => {
+            filterTimer = null;
+            update();
+        }, 60);
+    };
+    filterInput.addEventListener('input', scheduleUpdate);
     const clearFilter = () => {
         filterInput.value = '';
         update();
@@ -1040,7 +2417,7 @@
                 }
 
                 if (window.__mdDirty) {
-                    if (!confirm('You have unsaved changes. Discard them and continue?')) {
+                    if (!confirm(t('js.unsaved_confirm', 'You have unsaved changes. Discard them and continue?'))) {
                         return;
                     }
                 }
@@ -1113,7 +2490,13 @@
             history.pushState({file: data.file}, '', `?file=${encodeURIComponent(data.file)}`);
             
             // Trigger line number update en andere afhankelijke functies
+            if (typeof window.__mdwResetMetaStore === 'function') {
+                window.__mdwResetMetaStore();
+            }
             editorTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+            if (typeof window.__mdwResetDirty === 'function') {
+                window.__mdwResetDirty();
+            }
 
         } catch (error) {
             console.error('Failed to load document:', error);
@@ -1137,11 +2520,13 @@
 
     const internalSection = document.getElementById('linkModalInternal');
     const externalSection = document.getElementById('linkModalExternal');
+    const youtubeSection = document.getElementById('linkModalYoutube');
     const picker = document.getElementById('linkPicker');
     const pickerFilter = document.getElementById('linkPickerFilter');
     const pickerFilterClear = document.getElementById('linkPickerFilterClear');
     const externalText = document.getElementById('externalLinkText');
     const externalUrl = document.getElementById('externalLinkUrl');
+    const youtubeInput = document.getElementById('youtubeLinkInput');
 
     const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
     const dirname = (p) => {
@@ -1175,12 +2560,15 @@
     let selectedTitle = null;
 
     const setMode = (next) => {
-        mode = next === 'external' ? 'external' : 'internal';
+        mode = next === 'external' || next === 'youtube' ? next : 'internal';
         if (internalSection) internalSection.hidden = mode !== 'internal';
         if (externalSection) externalSection.hidden = mode !== 'external';
+        if (youtubeSection) youtubeSection.hidden = mode !== 'youtube';
         validate();
         if (mode === 'external') {
             externalUrl?.focus();
+        } else if (mode === 'youtube') {
+            youtubeInput?.focus();
         } else {
             pickerFilter?.focus();
         }
@@ -1217,6 +2605,7 @@
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
         if (externalText) externalText.value = '';
         if (externalUrl) externalUrl.value = '';
+        if (youtubeInput) youtubeInput.value = '';
         validate();
         btn.focus();
 	    };
@@ -1242,10 +2631,26 @@
         editor.focus();
     };
 
+    const insertBlockAtSelection = (block) => {
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        const before = editor.value.slice(0, start);
+        const after = editor.value.slice(end);
+        const needsLeading = before !== '' && !before.endsWith('\n');
+        const needsTrailing = after !== '' && !after.startsWith('\n');
+        const text = `${needsLeading ? '\n' : ''}${block}${needsTrailing ? '\n' : ''}`;
+        insertAtSelection(text);
+    };
+
     const validate = () => {
         if (mode === 'external') {
             const url = String(externalUrl?.value || '').trim();
             insertBtn.disabled = url === '';
+            return;
+        }
+        if (mode === 'youtube') {
+            const id = extractYoutubeId(youtubeInput?.value || '');
+            insertBtn.disabled = !id;
             return;
         }
         insertBtn.disabled = !selectedPath;
@@ -1271,6 +2676,7 @@
     });
 
     externalUrl?.addEventListener('input', validate);
+    youtubeInput?.addEventListener('input', validate);
 
     picker?.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target.closest('.link-pick-item') : null;
@@ -1326,13 +2732,70 @@
         pickerFilter.focus();
     });
 
+    const isPdfUrl = (url) => {
+        const raw = String(url || '').trim();
+        if (!raw) return false;
+        const base = raw.split('#')[0].split('?')[0].toLowerCase();
+        return base.endsWith('.pdf');
+    };
+
+    const extractYoutubeId = (value) => {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+
+        let input = raw;
+        if (!/^[a-z][a-z0-9+.-]*:/i.test(input)) {
+            input = input.startsWith('//') ? ('https:' + input) : ('https://' + input);
+        }
+
+        let url;
+        try {
+            url = new URL(input);
+        } catch {
+            return '';
+        }
+
+        const host = String(url.hostname || '').toLowerCase();
+        let id = '';
+        if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
+            id = url.pathname.split('/').filter(Boolean)[0] || '';
+        } else if (host.includes('youtube.com')) {
+            if (url.pathname.startsWith('/embed/')) {
+                id = url.pathname.split('/')[2] || '';
+            } else if (url.pathname.startsWith('/shorts/')) {
+                id = url.pathname.split('/')[2] || '';
+            } else {
+                id = url.searchParams.get('v') || '';
+            }
+        }
+
+        id = String(id || '').split('?')[0].split('&')[0].split('#')[0];
+        id = id.replace(/[^A-Za-z0-9_-]/g, '');
+        return id;
+    };
+
     const insertLink = () => {
         if (mode === 'external') {
             const url = String(externalUrl?.value || '').trim();
             if (!url) return;
             const selection = getEditorSelectionText();
             const text = selection || String(externalText?.value || '').trim() || url;
-            insertAtSelection(`[${text}](${url})`);
+            const cls = isPdfUrl(url) ? 'pdflink externlink' : 'externlink';
+            insertAtSelection(`[${text}](${url}) {: class="${cls}"}`);
+            close();
+            return;
+        }
+        if (mode === 'youtube') {
+            const id = extractYoutubeId(youtubeInput?.value || '');
+            if (!id) return;
+            const embedUrl = `https://www.youtube.com/embed/${id}`;
+            const block = [
+                `<iframe src="${embedUrl}" frameborder="0"></iframe>`,
+                '{: class="lazyload ytframe"}',
+                '{: class="ytframe-wrapper"}',
+            ].join('\n');
+            insertBlockAtSelection(block);
             close();
             return;
         }
@@ -1341,7 +2804,7 @@
         const selection = getEditorSelectionText();
         const text = selection || selectedTitle || selectedPath;
         const href = relativePath(window.CURRENT_FILE || '', selectedPath);
-        insertAtSelection(`[${text}](${href})`);
+        insertAtSelection(`[${text}](${href}) {: class="link"}`);
         close();
     };
 
@@ -1371,6 +2834,8 @@
     const cancelBtn = document.getElementById('imageModalCancel');
     const uploadInput = document.getElementById('imageUploadInput');
     const uploadBtn = document.getElementById('imageUploadBtn');
+    const pickBtn = document.getElementById('imagePickBtn');
+    const pickLabel = document.getElementById('imagePickLabel');
     const altInput = document.getElementById('imageAltInput');
     const csrfInput = document.getElementById('imageCsrf');
     const listEl = document.getElementById('imageList');
@@ -1382,6 +2847,9 @@
 
     const apiUrl = 'image_manager.php';
     let items = [];
+    const CACHE_KEY = 'mdw_image_cache_v1';
+    const CACHE_TTL_MS = 10 * 60 * 1000;
+    const pickLabelDefault = pickLabel ? String(pickLabel.textContent || '') : '';
 
     const setStatus = (msg, kind = 'info') => {
         if (!statusEl) return;
@@ -1391,12 +2859,52 @@
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
 
+    const setPickLabel = (value) => {
+        if (!pickLabel) return;
+        const next = String(value || '').trim();
+        pickLabel.textContent = next || pickLabelDefault;
+    };
+
+    const loadCache = () => {
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !Array.isArray(parsed.items)) return false;
+            const ts = Number(parsed.ts || 0);
+            if (ts && (Date.now() - ts) > CACHE_TTL_MS) return false;
+            items = parsed.items;
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const saveCache = () => {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
+        } catch {}
+    };
+
     const insertAtSelection = (text) => {
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
         editor.setRangeText(text, start, end, 'end');
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         editor.focus();
+    };
+
+    const imageTokenForFile = (file, path) => {
+        let name = String(file || '').trim();
+        if (!name) {
+            const p = String(path || '').trim();
+            if (p) {
+                const parts = p.replace(/\\/g, '/').split('/');
+                name = parts[parts.length - 1] || '';
+            }
+        }
+        if (!name) return '';
+        return `{{ ${name} }}`;
     };
 
     const guessAlt = (file) => {
@@ -1452,7 +2960,9 @@
 
     const loadList = async () => {
         setStatus('');
-        listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">Loading…</div>';
+        if (!items.length) {
+            listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">Loading…</div>';
+        }
         try {
             const res = await fetch(`${apiUrl}?action=list`, { headers: { 'Accept': 'application/json' } });
             const data = await res.json().catch(() => null);
@@ -1460,8 +2970,13 @@
                 throw new Error((data && data.error) ? data.error : 'Failed to load images.');
             }
             items = Array.isArray(data.images) ? data.images : [];
+            saveCache();
             render();
         } catch (err) {
+            if (items.length) {
+                setStatus(err?.message || 'Failed to load images.', 'error');
+                return;
+            }
             items = [];
             listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">Failed to load images.</div>';
             setStatus(err?.message || 'Failed to load images.', 'error');
@@ -1475,12 +2990,16 @@
 	        if (typeof window.__mdwCloseThemeModal === 'function') {
 	            window.__mdwCloseThemeModal();
 	        }
-	        overlay.hidden = false;
-	        modal.hidden = false;
-	        document.documentElement.classList.add('modal-open');
-	        setStatus('');
+        overlay.hidden = false;
+        modal.hidden = false;
+        document.documentElement.classList.add('modal-open');
+        setStatus('');
         if (filterEl) filterEl.value = '';
         if (altInput) altInput.value = '';
+        setPickLabel('');
+        if (loadCache()) {
+            render();
+        }
         loadList();
         setTimeout(() => filterEl?.focus(), 0);
     };
@@ -1513,6 +3032,18 @@
         filterEl.focus();
     });
 
+    pickBtn?.addEventListener('click', () => {
+        if (uploadInput instanceof HTMLInputElement) {
+            uploadInput.click();
+        }
+    });
+
+    uploadInput?.addEventListener('change', () => {
+        if (!(uploadInput instanceof HTMLInputElement)) return;
+        const file = uploadInput.files && uploadInput.files[0];
+        setPickLabel(file ? file.name : '');
+    });
+
     uploadBtn.addEventListener('click', async () => {
         if (!(uploadInput instanceof HTMLInputElement)) return;
         const file = uploadInput.files && uploadInput.files[0];
@@ -1542,12 +3073,15 @@
             }
 
             const path = String(data.path || '');
+            const file = String(data.file || '');
             const alt = String(altInput?.value || '').trim() || String(data.alt || '') || guessAlt(path);
-            if (path) {
-                insertAtSelection(`![${alt}](${path})`);
+            const token = imageTokenForFile(file, path);
+            if (token) {
+                insertAtSelection(`![${alt}](${token})`);
             }
 
             uploadInput.value = '';
+            setPickLabel('');
             if (altInput instanceof HTMLInputElement) altInput.value = '';
             setStatus('Uploaded.', 'ok');
             await loadList();
@@ -1564,10 +3098,11 @@
         const path = target.getAttribute('data-path') || '';
         const file = target.getAttribute('data-file') || '';
         const suggestedAlt = target.getAttribute('data-alt') || '';
-        if (!path) return;
+        const token = imageTokenForFile(file, path);
+        if (!token) return;
 
         const alt = String(altInput?.value || '').trim() || suggestedAlt || guessAlt(file || path);
-        insertAtSelection(`![${alt}](${path})`);
+        insertAtSelection(`![${alt}](${token})`);
         close();
     });
 })();
@@ -1587,6 +3122,75 @@
 
     if (!ta || !ln || !prev) return;
 
+    const WRAP_MARK = '↩';
+    const getTabSize = () => {
+        try {
+            const v = getComputedStyle(ta).tabSize;
+            const n = parseInt(String(v || ''), 10);
+            return Number.isFinite(n) && n > 0 ? n : 2;
+        } catch {
+            return 2;
+        }
+    };
+    const expandTabsLen = (line, tabSize) => {
+        if (!line.includes('\t')) return line.length;
+        let col = 0;
+        for (const ch of line) {
+            if (ch === '\t') {
+                const next = tabSize - (col % tabSize);
+                col += next;
+            } else {
+                col += 1;
+            }
+        }
+        return col;
+    };
+
+    let measureEl = null;
+    let measuredFontKey = '';
+    let measuredCharWidth = 8;
+    const measureCharWidth = () => {
+        const cs = getComputedStyle(ta);
+        const fontKey = `${cs.fontStyle}|${cs.fontVariant}|${cs.fontWeight}|${cs.fontSize}|${cs.fontFamily}|${cs.letterSpacing}`;
+        if (fontKey === measuredFontKey && measuredCharWidth > 0) return measuredCharWidth;
+
+        if (!measureEl) {
+            measureEl = document.createElement('span');
+            measureEl.style.position = 'absolute';
+            measureEl.style.left = '-99999px';
+            measureEl.style.top = '-99999px';
+            measureEl.style.whiteSpace = 'pre';
+            document.body.appendChild(measureEl);
+        }
+        measureEl.style.fontFamily = cs.fontFamily;
+        measureEl.style.fontSize = cs.fontSize;
+        measureEl.style.fontWeight = cs.fontWeight;
+        measureEl.style.fontStyle = cs.fontStyle;
+        measureEl.style.letterSpacing = cs.letterSpacing;
+        measureEl.textContent = '00000000000000000000';
+
+        const rect = measureEl.getBoundingClientRect();
+        const w = rect.width / 20;
+        if (Number.isFinite(w) && w > 0) {
+            measuredFontKey = fontKey;
+            measuredCharWidth = w;
+        }
+        return measuredCharWidth;
+    };
+
+    const getCols = () => {
+        const cs = getComputedStyle(ta);
+        const padL = parseFloat(cs.paddingLeft || '0') || 0;
+        const padR = parseFloat(cs.paddingRight || '0') || 0;
+        const contentW = Math.max(0, ta.clientWidth - padL - padR);
+        const cw = measureCharWidth();
+        const cols = cw > 0 ? Math.floor(contentW / cw) : 0;
+        return Math.max(1, cols);
+    };
+
+    const isWrapOn = () => document.documentElement.classList.contains('mdw-wrap-on');
+    const isLinesOn = () => !document.documentElement.classList.contains('mdw-lines-off');
+
     let ignoreBeforeUnload = false;
     const setIgnoreBeforeUnload = () => { ignoreBeforeUnload = true; };
 
@@ -1603,12 +3207,25 @@
             : document.title.replace(/\s*\*$/, '');
     }
 
+    function normalizeForDirty(value) {
+        let next = normalizeNewlines(value);
+        if (typeof window.__mdwStripHiddenMetaForDirty === 'function') {
+            try { next = window.__mdwStripHiddenMetaForDirty(next); } catch {}
+        }
+        return normalizeNewlines(next);
+    }
+
     function recomputeDirty() {
         if (!window.CURRENT_FILE) return;
         setDirty(
-            normalizeNewlines(ta.value) !== normalizeNewlines(window.initialContent || '')
+            normalizeForDirty(ta.value) !== normalizeForDirty(window.initialContent || '')
         );
     }
+
+    window.__mdwResetDirty = () => {
+        window.initialContent = normalizeNewlines(ta.value);
+        setDirty(false);
+    };
 
     window.addEventListener('beforeunload', (e) => {
         if (ignoreBeforeUnload) return;
@@ -1618,10 +3235,26 @@
     });
 
     function updateLineNumbers() {
-        const lines = ta.value.split('\n').length;
+        if (!isLinesOn()) {
+            ln.textContent = '';
+            return;
+        }
+
+        const rawLines = ta.value.split('\n');
+        const wrap = isWrapOn();
+        const tabSize = getTabSize();
+        const cols = wrap ? getCols() : 0;
+
         let out = '';
-        for (let i = 1; i <= lines; i++) {
-            out += i + '\n';
+        for (let i = 0; i < rawLines.length; i++) {
+            out += (i + 1) + '\n';
+            if (!wrap) continue;
+
+            const len = expandTabsLen(rawLines[i], tabSize);
+            const rows = Math.max(1, Math.ceil(Math.max(0, len) / cols));
+            for (let r = 1; r < rows; r++) {
+                out += WRAP_MARK + '\n';
+            }
         }
         ln.textContent = out;
     }
@@ -1665,6 +3298,27 @@
         ln.scrollTop = ta.scrollTop;
     });
 
+    // Recompute wraps when panes are resized (affects visual line wrapping).
+    let resizeTicking = false;
+    const onResize = () => {
+        if (resizeTicking) return;
+        resizeTicking = true;
+        requestAnimationFrame(() => {
+            resizeTicking = false;
+            updateLineNumbers();
+            ln.scrollTop = ta.scrollTop;
+        });
+    };
+    try {
+        const ro = new ResizeObserver(onResize);
+        ro.observe(ta);
+    } catch {
+        window.addEventListener('resize', onResize, { passive: true });
+    }
+
+    document.getElementById('wrapToggle')?.addEventListener('click', () => setTimeout(onResize, 0));
+    document.getElementById('lineNumbersToggle')?.addEventListener('click', () => setTimeout(onResize, 0));
+
     // Revert naar initialContent
     if (btnRevert) {
         btnRevert.addEventListener('click', function(){
@@ -1678,6 +3332,539 @@
     updateLineNumbers();
     window.initialContent = normalizeNewlines(window.initialContent || '');
     recomputeDirty();
+})();
+
+// Editor: Markdown keyboard shortcuts (edit.php)
+(function(){
+    const ta = document.getElementById('editor');
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+
+    const wrapToggle = document.getElementById('wrapToggle');
+    const lineNumbersToggle = document.getElementById('lineNumbersToggle');
+    const WRAP_KEY = 'mdw_editor_wrap';
+    const LINES_KEY = 'mdw_editor_lines';
+
+    const MAX_UNDO_STEPS = 25;
+    const MAX_SNAPSHOTS = MAX_UNDO_STEPS + 1;
+    const undoStack = [];
+    const redoStack = [];
+    let isRestoring = false;
+    let lastRecordAt = 0;
+
+    const getShortcutMod = () => {
+        try {
+            const fn = window.__mdwReadShortcutMod;
+            const v = (typeof fn === 'function') ? fn() : null;
+            return (v === 'command' || v === 'option') ? v : 'option';
+        } catch {
+            return 'option';
+        }
+    };
+    const isModKey = (e) => {
+        if (!e.ctrlKey) return false;
+        const mod = getShortcutMod();
+        if (mod === 'command') return e.metaKey && !e.altKey;
+        return e.altKey && !e.metaKey;
+    };
+
+    const supportsUnicodeProps = (() => {
+        try { new RegExp('\\p{L}', 'u'); return true; } catch { return false; }
+    })();
+    const wordCharRe = supportsUnicodeProps ? /[\p{L}\p{N}_]/u : /[A-Za-z0-9_]/;
+    const isWordChar = (ch) => !!ch && wordCharRe.test(ch);
+
+    const dispatchInput = () => {
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const isWrapOn = () => document.documentElement.classList.contains('mdw-wrap-on');
+    const isLinesOn = () => !document.documentElement.classList.contains('mdw-lines-off');
+    const applyWrapUi = () => {
+        if (!(wrapToggle instanceof HTMLButtonElement)) return;
+        const on = isWrapOn();
+        wrapToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    };
+    const applyLinesUi = () => {
+        if (!(lineNumbersToggle instanceof HTMLButtonElement)) return;
+        const on = isLinesOn();
+        lineNumbersToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+    };
+
+    applyWrapUi();
+    applyLinesUi();
+    wrapToggle?.addEventListener('click', () => {
+        const on = !isWrapOn();
+        document.documentElement.classList.toggle('mdw-wrap-on', on);
+        try { localStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch {}
+        applyWrapUi();
+        ta.focus();
+    });
+    lineNumbersToggle?.addEventListener('click', () => {
+        const on = !isLinesOn();
+        document.documentElement.classList.toggle('mdw-lines-off', !on);
+        try { localStorage.setItem(LINES_KEY, on ? '1' : '0'); } catch {}
+        applyLinesUi();
+        ta.focus();
+    });
+
+    const snapshot = () => ({
+        value: ta.value,
+        start: ta.selectionStart ?? 0,
+        end: ta.selectionEnd ?? 0,
+        scrollTop: ta.scrollTop ?? 0,
+    });
+
+    const sameSnapshot = (a, b) =>
+        !!a && !!b && a.value === b.value && a.start === b.start && a.end === b.end;
+
+    const pushUndoSnapshot = (snap, { merge } = {}) => {
+        const prev = undoStack[undoStack.length - 1];
+        if (sameSnapshot(prev, snap)) return;
+
+        if (merge && prev) {
+            undoStack[undoStack.length - 1] = snap;
+        } else {
+            undoStack.push(snap);
+            if (undoStack.length > MAX_SNAPSHOTS) undoStack.shift();
+        }
+    };
+
+    const applySnapshot = (snap) => {
+        if (!snap) return;
+        isRestoring = true;
+        try {
+            ta.value = snap.value;
+            ta.scrollTop = snap.scrollTop ?? ta.scrollTop;
+            setSelection(snap.start ?? 0, snap.end ?? 0);
+            dispatchInput();
+        } finally {
+            isRestoring = false;
+        }
+    };
+
+    // Seed initial state so shortcuts + programmatic edits are undoable.
+    pushUndoSnapshot(snapshot(), { merge: false });
+
+    ta.addEventListener('input', (e) => {
+        if (isRestoring) return;
+
+        const now = Date.now();
+        const inputType = (e instanceof InputEvent) ? String(e.inputType || '') : '';
+        const mergeTyping = (now - lastRecordAt) < 1000 && (
+            inputType === 'insertText' ||
+            inputType === 'insertCompositionText' ||
+            inputType === 'deleteContentBackward' ||
+            inputType === 'deleteContentForward'
+        );
+
+        pushUndoSnapshot(snapshot(), { merge: mergeTyping });
+        lastRecordAt = now;
+        redoStack.length = 0;
+    });
+
+    ta.addEventListener('keydown', (e) => {
+        // Custom undo/redo so our formatting shortcuts are always undoable.
+        const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+        if (!mod) return;
+
+        if (e.key === 'z' || e.key === 'Z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                const next = redoStack.pop();
+                if (!next) return;
+                pushUndoSnapshot(next, { merge: false });
+                applySnapshot(next);
+                return;
+            }
+
+            if (undoStack.length <= 1) return;
+            const current = undoStack.pop();
+            if (current) redoStack.push(current);
+            const prev = undoStack[undoStack.length - 1];
+            applySnapshot(prev);
+            return;
+        }
+
+        // Also support Ctrl+Y as redo (common on Windows/Linux).
+        if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+            e.preventDefault();
+            const next = redoStack.pop();
+            if (!next) return;
+            pushUndoSnapshot(next, { merge: false });
+            applySnapshot(next);
+        }
+    });
+
+    const getSelection = () => {
+        const start = ta.selectionStart ?? 0;
+        const end = ta.selectionEnd ?? 0;
+        return { start, end, text: ta.value.slice(start, end) };
+    };
+
+    const setSelection = (start, end) => {
+        ta.setSelectionRange(Math.max(0, start), Math.max(0, end));
+    };
+
+    const replaceRange = (start, end, replacement) => {
+        const scrollTop = ta.scrollTop;
+        ta.setRangeText(replacement, start, end, 'preserve');
+        ta.scrollTop = scrollTop;
+        dispatchInput();
+    };
+
+    const wrapOrUnwrap = (left, right, { singleCharSafe } = {}) => {
+        const { start, end, text } = getSelection();
+        const v = ta.value;
+
+        const leftLen = left.length;
+        const rightLen = right.length;
+
+        const selectionStartsWith = text.startsWith(left) && text.endsWith(right) && text.length >= leftLen + rightLen;
+        if (selectionStartsWith) {
+            const inner = text.slice(leftLen, text.length - rightLen);
+            replaceRange(start, end, inner);
+            setSelection(start, start + inner.length);
+            return;
+        }
+
+        const before = v.slice(Math.max(0, start - leftLen), start);
+        const after = v.slice(end, Math.min(v.length, end + rightLen));
+
+        let hasAround = before === left && after === right;
+        if (hasAround && singleCharSafe) {
+            hasAround = singleCharSafe({ value: v, start, end, left, right });
+        }
+
+        if (hasAround) {
+            const beforeStart = start - leftLen;
+            const afterEnd = end + rightLen;
+            replaceRange(beforeStart, afterEnd, text);
+            setSelection(beforeStart, beforeStart + text.length);
+            return;
+        }
+
+        const wrapped = left + text + right;
+        replaceRange(start, end, wrapped);
+        if (start === end) {
+            const caret = start + leftLen;
+            setSelection(caret, caret);
+        } else {
+            setSelection(start + leftLen, end + leftLen);
+        }
+    };
+
+    const selectWordAtCaret = () => {
+        const pos = ta.selectionStart ?? 0;
+        const v = ta.value;
+        let start = pos;
+        let end = pos;
+        while (start > 0 && isWordChar(v[start - 1])) start--;
+        while (end < v.length && isWordChar(v[end])) end++;
+        if (start === end) return null;
+        return { start, end, text: v.slice(start, end) };
+    };
+
+    const transformSelectionOrWord = (fn) => {
+        const { start, end, text } = getSelection();
+        if (end > start) {
+            const next = fn(text);
+            replaceRange(start, end, next);
+            setSelection(start, start + next.length);
+            return;
+        }
+        const w = selectWordAtCaret();
+        if (!w) return;
+        const next = fn(w.text);
+        replaceRange(w.start, w.end, next);
+        setSelection(w.start, w.start + next.length);
+    };
+
+    const adjustHeadingLevel = (delta) => {
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? 0;
+
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', selEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+
+        const block = value.slice(blockStart, blockEnd);
+        const lines = block.split('\n');
+
+        let offset = 0;
+        const deltas = [];
+        const newLines = lines.map((line) => {
+            const absStart = blockStart + offset;
+            offset += line.length + 1;
+
+            const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
+            if (!m) {
+                if (delta > 0) {
+                    const out = '# ' + line;
+                    deltas.push({ absStart, delta: out.length - line.length });
+                    return out;
+                }
+                deltas.push({ absStart, delta: 0 });
+                return line;
+            }
+
+            const indent = m[1] || '';
+            const hashes = m[2] || '';
+            const rest = m[3] || '';
+            const level = hashes.length;
+            const nextLevel = Math.max(0, Math.min(6, level + delta));
+
+            if (nextLevel <= 0) {
+                const out = indent + rest.replace(/^\s+/, '');
+                deltas.push({ absStart, delta: out.length - line.length });
+                return out;
+            }
+
+            const out = indent + '#'.repeat(nextLevel) + (rest !== '' ? ' ' : '') + rest.replace(/^\s+/, '');
+            deltas.push({ absStart, delta: out.length - line.length });
+            return out;
+        });
+
+        const replacement = newLines.join('\n');
+        replaceRange(blockStart, blockEnd, replacement);
+
+        const shiftPos = (pos) => {
+            let out = pos;
+            for (const d of deltas) {
+                if (pos > d.absStart) out += d.delta;
+            }
+            return out;
+        };
+
+        setSelection(shiftPos(selStart), shiftPos(selEnd));
+    };
+
+    const setHeadingLevel = (targetLevel) => {
+        const level = Math.max(1, Math.min(6, Number(targetLevel) || 1));
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? 0;
+
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', selEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+
+        const block = value.slice(blockStart, blockEnd);
+        const lines = block.split('\n');
+
+        let offset = 0;
+        const deltas = [];
+        const newLines = lines.map((line) => {
+            const absStart = blockStart + offset;
+            offset += line.length + 1;
+
+            const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
+            const indent = m ? (m[1] || '') : (line.match(/^(\s*)/)?.[1] || '');
+            const restRaw = m ? (m[3] || '') : line.slice(indent.length);
+            const rest = restRaw.replace(/^\s+/, '');
+            const out = indent + '#'.repeat(level) + ' ' + rest;
+            deltas.push({ absStart, delta: out.length - line.length });
+            return out;
+        });
+
+        const replacement = newLines.join('\n');
+        replaceRange(blockStart, blockEnd, replacement);
+
+        const shiftPos = (pos) => {
+            let out = pos;
+            for (const d of deltas) {
+                if (pos > d.absStart) out += d.delta;
+            }
+            return out;
+        };
+
+        setSelection(shiftPos(selStart), shiftPos(selEnd));
+    };
+
+    const toggleLinePrefix = (kind) => {
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? 0;
+
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', selEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+
+        const block = value.slice(blockStart, blockEnd);
+        const lines = block.split('\n');
+
+        const getIndent = (line) => line.match(/^(\s*)/)?.[1] || '';
+        const hasPrefix = (line) => {
+            const indent = getIndent(line);
+            const rest = line.slice(indent.length);
+            if (kind === 'quote') return rest.startsWith('>') && (rest.length === 1 || rest[1] === ' ' || rest[1] === '\t');
+            return rest.startsWith('-') && (rest.length === 1 || rest[1] === ' ' || rest[1] === '\t');
+        };
+
+        const shouldRemove = lines.every((line) => line.trim() === '' || hasPrefix(line));
+
+        let offset = 0;
+        const deltas = [];
+        const newLines = lines.map((line) => {
+            const absStart = blockStart + offset;
+            offset += line.length + 1;
+
+            if (line.trim() === '') {
+                deltas.push({ absStart, delta: 0 });
+                return line;
+            }
+
+            const indent = getIndent(line);
+            const rest = line.slice(indent.length);
+            if (shouldRemove) {
+                if (kind === 'quote') {
+                    const out = indent + rest.replace(/^>\s?/, '');
+                    deltas.push({ absStart, delta: out.length - line.length });
+                    return out;
+                }
+                const out = indent + rest.replace(/^-+\s?/, '').replace(/^\s+/, '');
+                deltas.push({ absStart, delta: out.length - line.length });
+                return out;
+            }
+
+            const prefix = kind === 'quote' ? '> ' : '- ';
+            const out = indent + prefix + rest;
+            deltas.push({ absStart, delta: out.length - line.length });
+            return out;
+        });
+
+        const replacement = newLines.join('\n');
+        replaceRange(blockStart, blockEnd, replacement);
+
+        const shiftPos = (pos) => {
+            let out = pos;
+            for (const d of deltas) {
+                if (pos > d.absStart) out += d.delta;
+            }
+            return out;
+        };
+
+        setSelection(shiftPos(selStart), shiftPos(selEnd));
+    };
+
+    const clickById = (id) => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLElement) el.click();
+    };
+
+    ta.addEventListener('keydown', (e) => {
+        if (!isModKey(e)) return;
+
+        // Bold: Ctrl+Alt+B
+        if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+            e.preventDefault();
+            wrapOrUnwrap('**', '**');
+            return;
+        }
+
+        // Italic: Ctrl+Alt+I
+        if (!e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+            e.preventDefault();
+            wrapOrUnwrap('*', '*', {
+                singleCharSafe: ({ value, start, end }) => {
+                    const prev = value[start - 2] || '';
+                    const next = value[end + 1] || '';
+                    return prev !== '*' && next !== '*';
+                }
+            });
+            return;
+        }
+
+        // Strikethrough: Ctrl+Alt+X
+        if (!e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+            e.preventDefault();
+            wrapOrUnwrap('~~', '~~');
+            return;
+        }
+
+        // Inline code: Ctrl+Alt+` (backquote key)
+        if (!e.shiftKey && (e.code === 'Backquote' || e.key === '`')) {
+            e.preventDefault();
+            wrapOrUnwrap('`', '`');
+            return;
+        }
+
+        // Link modal: Ctrl+Alt+L
+        if (!e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+            e.preventDefault();
+            clickById('addLinkBtn');
+            return;
+        }
+
+        // Link modal (common in editors): Ctrl+Alt+K
+        if (!e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            clickById('addLinkBtn');
+            return;
+        }
+
+        // Image modal: Ctrl+Alt+M
+        if (!e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+            e.preventDefault();
+            clickById('addImageBtn');
+            return;
+        }
+
+        // Blockquote toggle: Ctrl+Alt+Q
+        if (!e.shiftKey && (e.key === 'q' || e.key === 'Q')) {
+            e.preventDefault();
+            toggleLinePrefix('quote');
+            return;
+        }
+
+        // Bullet list toggle: Ctrl+Alt+U
+        if (!e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+            e.preventDefault();
+            toggleLinePrefix('bullet');
+            return;
+        }
+
+        // Fenced code block: Ctrl+Alt+O
+        if (!e.shiftKey && (e.key === 'o' || e.key === 'O')) {
+            e.preventDefault();
+            wrapOrUnwrap('```\n', '\n```');
+            return;
+        }
+
+        // Uppercase: Ctrl+Alt+ArrowUp
+        if (!e.shiftKey && e.key === 'ArrowUp') {
+            e.preventDefault();
+            transformSelectionOrWord((s) => s.toUpperCase());
+            return;
+        }
+
+        // Lowercase: Ctrl+Alt+ArrowDown
+        if (!e.shiftKey && e.key === 'ArrowDown') {
+            e.preventDefault();
+            transformSelectionOrWord((s) => s.toLowerCase());
+            return;
+        }
+
+        // Increase/decrease heading level: Ctrl+Alt+ + / -
+        const isPlus = e.code === 'NumpadAdd' || e.key === '+' || (e.key === '=' && e.shiftKey);
+        const isMinus = e.code === 'NumpadSubtract' || e.key === '-';
+        if (isPlus) {
+            e.preventDefault();
+            adjustHeadingLevel(1);
+            return;
+        }
+        if (isMinus) {
+            e.preventDefault();
+            adjustHeadingLevel(-1);
+            return;
+        }
+
+        // Set heading level directly: Ctrl+Alt+1..6
+        if (!e.shiftKey && /^[1-6]$/.test(String(e.key || ''))) {
+            e.preventDefault();
+            setHeadingLevel(Number(e.key));
+        }
+    });
 })();
 
 // RESIZABLE COLUMNS
@@ -1783,6 +3970,7 @@
     const copyBtn = document.getElementById('copyHtmlBtn');
     const preview = document.getElementById('preview');
     if ((!btn && !copyBtn) || !preview) return;
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const editor = document.getElementById('editor');
 
@@ -1959,7 +4147,7 @@ ${wrapper.innerHTML}
                 downloadTextFile(filename, html, 'text/html;charset=utf-8');
             } catch (e) {
                 console.error('Export failed', e);
-                alert('Export failed. Check the console for details.');
+                alert(t('js.export_failed', 'Export failed. Check the console for details.'));
             } finally {
                 btn.disabled = false;
             }
@@ -1974,10 +4162,10 @@ ${wrapper.innerHTML}
                 const { html } = await buildExportHtml();
                 const ok = await copyTextToClipboard(html);
                 if (!ok) throw new Error('Copy failed');
-                flashBtnLabel(copyBtn, 'Copied', 1200);
+                flashBtnLabel(copyBtn, t('js.copied', 'Copied'), 1200);
             } catch (e) {
                 console.error('Copy failed', e);
-                alert('Copy failed. Check the console for details.');
+                alert(t('js.copy_failed', 'Copy failed. Check the console for details.'));
             } finally {
                 copyBtn.disabled = false;
             }

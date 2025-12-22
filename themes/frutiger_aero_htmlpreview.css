@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #cbf3f0;
+  --theme-primary: #2ec4b6;
+  --theme-secondary: #ff9f1c;
+  --theme-surface: linear-gradient(180deg, #ffffff 0%, #e0f7fa 100%);
+  --theme-border: #a5d8ff;
+  background: var(--theme-bg);
+  color: #003049;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 15px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 1px;
+  background: var(--theme-surface);
+  color: #5c8091;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(46, 196, 182, 0.3), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #003049;
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #003049;
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(46, 196, 182, 0.3), inset 0 1px 0 rgba(255,255,255,0.8);
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Exo 2", sans-serif;
+}
+
+.editor-lines {
+  color: #4ade80;
+}
+
+.editor-textarea {
+  caret-color: #4ade80;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #4ade80 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

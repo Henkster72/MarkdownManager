@@ -1,0 +1,47 @@
+.preview-content {
+  --theme-bg: #fdf0f3;
+  --theme-primary: #ff7b9c;
+  --theme-secondary: #ffc2d1;
+  --theme-surface: #ffffff;
+  --theme-border: transparent;
+  background: var(--theme-bg);
+  color: #6d6d6d;
+  font-family: "Nunito", sans-serif;
+  font-size: 16px;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3 {
+  color: var(--theme-primary);
+}
+
+.preview-content a {
+  color: var(--theme-primary);
+  text-decoration-color: color-mix(in srgb, var(--theme-primary) 55%, transparent);
+}
+
+.preview-content blockquote {
+  border-left-color: color-mix(in srgb, var(--theme-primary) 60%, transparent);
+  border-left-width: 0px;
+  background: var(--theme-surface);
+  color: #a8a8a8;
+  border-radius: 32px;
+  box-shadow: 16px 16px 32px #d1d9e6, -16px -16px 32px #ffffff, inset 8px 8px 16px rgba(255, 123, 156, 0.2);
+}
+
+.preview-content code,
+.preview-content .md-code-inline {
+  background: var(--theme-surface);
+  color: #6d6d6d;
+  border: 0px solid var(--theme-border);
+  border-radius: 32px;
+}
+
+.preview-content pre {
+  background: var(--theme-surface);
+  color: #6d6d6d;
+  border: 0px solid var(--theme-border);
+  border-radius: 32px;
+  box-shadow: 16px 16px 32px #d1d9e6, -16px -16px 32px #ffffff, inset 8px 8px 16px rgba(255, 123, 156, 0.2);
+}

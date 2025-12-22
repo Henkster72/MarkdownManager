@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Segoe UI", sans-serif;
+}
+
+.editor-lines {
+  color: #2ec4b6;
+}
+
+.editor-textarea {
+  caret-color: #2ec4b6;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #2ec4b6 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 15px;
+}

@@ -27,7 +27,10 @@ function image_manager_guess_alt($filename) {
     $name = str_replace(['_', '-'], ' ', $name);
     $name = trim(preg_replace('/\\s+/u', ' ', $name));
     if ($name === '') return 'Image';
-    return mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');
+    if (function_exists('mb_convert_case')) {
+        return mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');
+    }
+    return ucwords(strtolower($name));
 }
 
 function image_manager_unique_name($dir, $base, $ext) {
@@ -221,4 +224,3 @@ image_manager_json([
     'file' => $filename,
     'alt' => image_manager_guess_alt($filename),
 ]);
-

@@ -1,0 +1,9 @@
+{
+  "preconnect": [
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com"
+  ],
+  "stylesheets": [
+    "https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap"
+  ]
+}

@@ -1,0 +1,20 @@
+.editor-textarea {
+  font-family: "Courier New", monospace;
+}
+
+.editor-lines {
+  color: #0000ff;
+}
+
+.editor-textarea {
+  caret-color: #0000ff;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #0000ff 22%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 14px;
+}
