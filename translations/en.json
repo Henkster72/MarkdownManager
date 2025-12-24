@@ -89,10 +89,10 @@
       "secondary": "Secondary"
     },
     "kbd_modifier": {
-      "label": "Keyboard shortcuts modifier",
-      "option": "Ctrl + Option (⌃⌥)",
-      "command": "Ctrl + Command (⌃⌘)",
-      "tip": "Tip: macOS VoiceOver uses Ctrl+Option; choose Ctrl+Command to avoid conflicts."
+      "label": "Keyboard shortcuts system",
+      "option": "Windows / Linux (Ctrl + Alt)",
+      "command": "Mac (Ctrl + Command)",
+      "tip": "Choose the system your shortcuts should follow (saved in this browser)."
     },
     "language": {
       "label": "Language",
@@ -109,6 +109,20 @@
     },
     "editor_view": {
       "title": "Editor view"
+    },
+    "delete_after": {
+      "label": "After deleting a note",
+      "overview": "Back to overview",
+      "next": "Open next note",
+      "hint": "Saved in this browser."
+    },
+    "permissions": {
+      "title": "Permissions",
+      "allow_user_delete": "Allow users to delete notes",
+      "hint": "Saved for all users.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
     },
     "overrides": {
       "summary": "Overrides (optional)",
@@ -148,12 +162,12 @@
       "save_failed": "Save failed"
     },
     "publisher": {
-      "title": "Website publisher mode",
-      "enable": "Enable website publisher mode",
-      "hint": "Adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.",
+      "title": "WPM (Website publication mode)",
+      "enable": "Enable WPM",
+      "hint": "WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.",
       "author_label": "Author name",
       "author_placeholder": "Your name",
-      "author_required": "Please enter an author name to enable publisher mode.",
+      "author_required": "Please enter an author name to enable WPM.",
       "require_subtitle": "Require subtitle (##)"
     }
   },
@@ -162,7 +176,14 @@
     "login_title": "Login",
     "setup_title": "Set passwords",
     "login_submit": "Login",
-    "setup_submit": "Save passwords"
+    "setup_submit": "Save passwords",
+    "wrong_password": "Wrong password.",
+    "missing_password": "Enter a password.",
+    "signing_in": "Signing in...",
+    "saving": "Saving...",
+    "set_passwords": "Set both passwords.",
+    "failed": "Auth failed.",
+    "locked": "Too many attempts. Try again in {time}."
   },
   "link_modal": {
     "title": "Add link",
@@ -236,10 +257,10 @@
     "folder_not_exist_prefix": "Folder does not exist:",
     "file_exists_prefix": "File already exists:",
     "file_create_failed": "Could not create file.",
-    "publisher_requires_subtitle": "Website publisher mode requires a subtitle line starting with \"##\".",
-    "publisher_author_required": "Website publisher mode requires an author name.",
-    "publisher_requires_page_title": "Website publisher mode requires a page_title metadata line.",
-    "publisher_requires_page_picture": "Website publisher mode requires a page_picture metadata line."
+    "publisher_requires_subtitle": "WPM requires a subtitle line starting with \"##\".",
+    "publisher_author_required": "WPM requires an author name.",
+    "publisher_requires_page_title": "WPM requires a page_title metadata line.",
+    "publisher_requires_page_picture": "WPM requires a page_picture metadata line."
   },
   "secret": {
     "wrong_password": "Wrong password.",
@@ -250,6 +271,15 @@
     "back_to_index": "Back to index"
   },
   "readme": {
-    "shortcut_modifier_note": "Shortcut modifier: by default shortcuts use Ctrl+Alt (Windows/Linux). On macOS you can switch to Ctrl+Command in the Settings modal; then replace Alt with ⌘ in the shortcuts below."
+    "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal."
+  },
+  "wpm": {
+    "setup_title": "WPM setup",
+    "setup_hint": "Set your author name and UI language.",
+    "author_label": "Author name",
+    "author_placeholder": "Your name",
+    "language_label": "UI language",
+    "author_required": "Please enter your author name.",
+    "save": "Save"
   }
 }

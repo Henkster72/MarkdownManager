@@ -83,6 +83,15 @@ if (is_array($settingsIn)) {
     $publisherMode = array_key_exists('publisher_mode', $settingsIn) ? !empty($settingsIn['publisher_mode']) : !empty($curSettings['publisher_mode']);
     $defaultAuthor = array_key_exists('publisher_default_author', $settingsIn) ? trim((string)($settingsIn['publisher_default_author'] ?? '')) : trim((string)($curSettings['publisher_default_author'] ?? ''));
     $requireH2 = array_key_exists('publisher_require_h2', $settingsIn) ? (bool)$settingsIn['publisher_require_h2'] : (!array_key_exists('publisher_require_h2', $curSettings) ? true : (bool)$curSettings['publisher_require_h2']);
+    $allowUserDelete = array_key_exists('allow_user_delete', $settingsIn)
+        ? (bool)$settingsIn['allow_user_delete']
+        : (!array_key_exists('allow_user_delete', $curSettings) ? true : (bool)$curSettings['allow_user_delete']);
+    $uiLanguage = array_key_exists('ui_language', $settingsIn)
+        ? trim((string)($settingsIn['ui_language'] ?? ''))
+        : trim((string)($curSettings['ui_language'] ?? ''));
+    if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) {
+        $uiLanguage = '';
+    }
 
     $uiTheme = array_key_exists('ui_theme', $settingsIn) ? strtolower(trim((string)($settingsIn['ui_theme'] ?? ''))) : strtolower(trim((string)($curSettings['ui_theme'] ?? '')));
     if ($uiTheme !== 'dark' && $uiTheme !== 'light') $uiTheme = '';
@@ -108,6 +117,8 @@ if (is_array($settingsIn)) {
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $defaultAuthor,
         'publisher_require_h2' => (bool)$requireH2,
+        'allow_user_delete' => (bool)$allowUserDelete,
+        'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
         'app_title' => $appTitle,

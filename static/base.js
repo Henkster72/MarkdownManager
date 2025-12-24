@@ -25,6 +25,107 @@
     };
 })();
 
+// localStorage helpers (namespace keys per app base URL)
+(function(){
+    const existingKey = (typeof window.__mdwStorageKey === 'function') ? window.__mdwStorageKey : null;
+    const buildKey = () => {
+        const loc = window.location || {};
+        const origin = String(loc.origin || '');
+        const path = String(loc.pathname || '/');
+        const dir = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+        const prefix = `mdw:${origin}${dir}`;
+        return (key) => `${prefix}:${key}`;
+    };
+    const storageKey = existingKey || buildKey();
+    const get = (key) => {
+        try { return localStorage.getItem(storageKey(key)); } catch { return null; }
+    };
+    const set = (key, value) => {
+        try { localStorage.setItem(storageKey(key), value); } catch {}
+    };
+    const remove = (key) => {
+        try { localStorage.removeItem(storageKey(key)); } catch {}
+    };
+    if (!existingKey) window.__mdwStorageKey = storageKey;
+    if (typeof window.__mdwStorageGet !== 'function') window.__mdwStorageGet = get;
+    if (typeof window.__mdwStorageSet !== 'function') window.__mdwStorageSet = set;
+    if (typeof window.__mdwStorageRemove !== 'function') window.__mdwStorageRemove = remove;
+})();
+
+const mdwStorageGet = (key) => {
+    const fn = window.__mdwStorageGet;
+    if (typeof fn === 'function') return fn(key);
+    try { return localStorage.getItem(key); } catch { return null; }
+};
+const mdwStorageSet = (key, value) => {
+    const fn = window.__mdwStorageSet;
+    if (typeof fn === 'function') { fn(key, value); return; }
+    try { localStorage.setItem(key, value); } catch {}
+};
+const mdwStorageRemove = (key) => {
+    const fn = window.__mdwStorageRemove;
+    if (typeof fn === 'function') { fn(key); return; }
+    try { localStorage.removeItem(key); } catch {}
+};
+
+const MDW_DELETE_AFTER_KEY = 'mdw_delete_after';
+const mdwReadDeleteAfter = () => {
+    try {
+        const v = String(mdwStorageGet(MDW_DELETE_AFTER_KEY) || '').trim();
+        return v === 'next' ? 'next' : 'overview';
+    } catch {}
+    return 'overview';
+};
+const mdwWriteDeleteAfter = (value) => {
+    const next = value === 'next' ? 'next' : 'overview';
+    try { mdwStorageSet(MDW_DELETE_AFTER_KEY, next); } catch {}
+    return next;
+};
+window.__mdwReadDeleteAfter = mdwReadDeleteAfter;
+window.__mdwWriteDeleteAfter = mdwWriteDeleteAfter;
+
+const mdwRenderMermaid = async (root) => {
+    const mermaid = window.mermaid;
+    if (!mermaid || typeof mermaid.run !== 'function') return;
+    const scope = root instanceof HTMLElement ? root : document;
+    const nodes = scope.querySelectorAll('.mermaid');
+    if (!nodes.length) return;
+    try {
+        await mermaid.run({ nodes });
+    } catch (err) {
+        console.warn('Mermaid render failed', err);
+    }
+};
+window.__mdwRenderMermaid = mdwRenderMermaid;
+
+const mdwSetLangCookie = (lang) => {
+    const v = String(lang || '').trim();
+    if (!v) return false;
+    const parts = [
+        `mdw_lang=${encodeURIComponent(v)}`,
+        'Path=/',
+        `Max-Age=${60 * 60 * 24 * 365}`,
+        'SameSite=Lax',
+    ];
+    if (window.location && window.location.protocol === 'https:') parts.push('Secure');
+    document.cookie = parts.join('; ');
+    return true;
+};
+window.__mdwSetLangCookie = mdwSetLangCookie;
+
+(function(){
+    const saved = String(mdwStorageGet('mdw_ui_lang') || '').trim();
+    if (!saved) return;
+    const current = String(window.MDW_LANG || '').trim();
+    if (saved === '' || saved === current) return;
+    const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
+    const allowed = new Set(list.map((l) => String(l?.code || '')).filter(Boolean));
+    if (allowed.size && !allowed.has(saved)) return;
+    if (mdwSetLangCookie(saved)) {
+        window.location.reload();
+    }
+})();
+
 // Auth (user/superuser)
 (function(){
     const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object') ? window.MDW_AUTH_META : { has_user: false, has_superuser: false };
@@ -37,6 +138,7 @@
     const setupSuper = document.getElementById('authSetupSuperPassword');
     const loginPassword = document.getElementById('authLoginPassword');
     const submitBtn = document.getElementById('authSubmitBtn');
+    const authForm = document.getElementById('authForm');
     const statusEl = document.getElementById('authStatus');
     const authBtn = document.getElementById('authToggleBtn');
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
@@ -45,8 +147,8 @@
         let role = '';
         let token = '';
         try {
-            role = String(localStorage.getItem('mdw_auth_role') || '').trim();
-            token = String(localStorage.getItem('mdw_auth_token') || '').trim();
+            role = String(mdwStorageGet('mdw_auth_role') || '').trim();
+            token = String(mdwStorageGet('mdw_auth_token') || '').trim();
         } catch {}
         return { role, token };
     };
@@ -87,6 +189,9 @@
                 el.disabled = !allow;
             }
         });
+        if (typeof window.__mdwApplyDeletePermissions === 'function') {
+            window.__mdwApplyDeletePermissions();
+        }
     };
 
     window.__mdwShowAuthModal = () => {
@@ -158,7 +263,7 @@
 
     const readLockUntil = () => {
         let until = 0;
-        try { until = parseInt(localStorage.getItem(LOCK_KEY) || '0', 10) || 0; } catch {}
+        try { until = parseInt(mdwStorageGet(LOCK_KEY) || '0', 10) || 0; } catch {}
         return until;
     };
 
@@ -183,7 +288,10 @@
             return false;
         }
         const remaining = until - Date.now();
-        setStatus(`Too many attempts. Try again in ${formatMs(remaining)}.`, 'error');
+        setStatus(
+            t('auth.locked', 'Too many attempts. Try again in {time}.', { time: formatMs(remaining) }),
+            'error'
+        );
         if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
         if (loginPassword instanceof HTMLInputElement) loginPassword.disabled = true;
         if (!lockTimer) {
@@ -208,8 +316,8 @@
 
     const storeAuth = (role, token) => {
         try {
-            localStorage.setItem('mdw_auth_role', String(role || ''));
-            localStorage.setItem('mdw_auth_token', String(token || ''));
+            mdwStorageSet('mdw_auth_role', String(role || ''));
+            mdwStorageSet('mdw_auth_token', String(token || ''));
         } catch {}
     };
 
@@ -221,19 +329,22 @@
             return;
         }
         if (!password.trim()) {
-            setStatus('Enter a password.', 'error');
+            setStatus(t('auth.missing_password', 'Enter a password.'), 'error');
             return;
         }
-        setStatus('Signing in…', 'info');
+        setStatus(t('auth.signing_in', 'Signing in...'), 'info');
         const data = await authRequest({ action: 'login', password });
         storeAuth(data.role, data.token);
-        try { localStorage.setItem('mdw_auth_role_hint', data.role); } catch {}
-        try { localStorage.removeItem(FAIL_KEY); localStorage.removeItem(LOCK_KEY); } catch {}
+        try { mdwStorageSet('mdw_auth_role_hint', data.role); } catch {}
+        try { mdwStorageRemove(FAIL_KEY); mdwStorageRemove(LOCK_KEY); } catch {}
         loginPassword.value = '';
         setStatus('', 'info');
         setLocked(false);
         updateSuperuserUi();
         updateAuthButton();
+        if (typeof window.__mdwMaybeShowWpmSetup === 'function') {
+            window.__mdwMaybeShowWpmSetup();
+        }
     };
 
     const setup = async () => {
@@ -241,10 +352,10 @@
         const userPw = String(setupUser.value || '').trim();
         const superPw = String(setupSuper.value || '').trim();
         if (!userPw || !superPw) {
-            setStatus('Set both passwords.', 'error');
+            setStatus(t('auth.set_passwords', 'Set both passwords.'), 'error');
             return;
         }
-        setStatus('Saving…', 'info');
+        setStatus(t('auth.saving', 'Saving...'), 'info');
         const data = await authRequest({ action: 'setup', user_password: userPw, superuser_password: superPw });
         meta.has_user = !!data.has_user;
         meta.has_superuser = !!data.has_superuser;
@@ -269,37 +380,55 @@
         } catch (e) {
             const msg = (e && typeof e.message === 'string' && e.message.trim()) ? e.message.trim() : 'Auth failed';
             const friendly = msg === 'invalid_password'
-                ? 'Invalid password.'
-                : (msg === 'missing_password' ? 'Enter a password.' : msg);
+                ? t('auth.wrong_password', 'Wrong password.')
+                : (msg === 'missing_password'
+                    ? t('auth.missing_password', 'Enter a password.')
+                    : (msg === 'auth_failed'
+                        ? t('auth.failed', 'Auth failed.')
+                        : msg));
             setStatus(friendly, 'error');
             if (msg === 'invalid_password') {
                 let count = 0;
-                try { count = parseInt(localStorage.getItem(FAIL_KEY) || '0', 10) || 0; } catch {}
+                try { count = parseInt(mdwStorageGet(FAIL_KEY) || '0', 10) || 0; } catch {}
                 count += 1;
                 if (count >= 3) {
                     const until = Date.now() + LOCK_MS;
                     try {
-                        localStorage.setItem(LOCK_KEY, String(until));
-                        localStorage.removeItem(FAIL_KEY);
+                        mdwStorageSet(LOCK_KEY, String(until));
+                        mdwStorageRemove(FAIL_KEY);
                     } catch {}
                     updateLockUi();
                 } else {
-                    try { localStorage.setItem(FAIL_KEY, String(count)); } catch {}
+                    try { mdwStorageSet(FAIL_KEY, String(count)); } catch {}
                 }
             }
         }
     };
 
-    submitBtn?.addEventListener('click', () => {
+    authForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
         onSubmit();
     });
+
+    const authEnterHandler = (e) => {
+        if ((e.key !== 'Enter' && e.code !== 'NumpadEnter') || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target !== loginPassword && target !== setupUser && target !== setupSuper) return;
+        console.debug('[auth] enter key detected on', target.id);
+        e.preventDefault();
+        onSubmit();
+    };
+    loginPassword?.addEventListener('keydown', authEnterHandler);
+    setupUser?.addEventListener('keydown', authEnterHandler);
+    setupSuper?.addEventListener('keydown', authEnterHandler);
 
     authBtn?.addEventListener('click', () => {
         const { role, token } = getStoredAuth();
         if (role && token) {
             try {
-                localStorage.removeItem('mdw_auth_role');
-                localStorage.removeItem('mdw_auth_token');
+                mdwStorageRemove('mdw_auth_role');
+                mdwStorageRemove('mdw_auth_token');
             } catch {}
             setLocked(true);
             updateSuperuserUi();
@@ -343,6 +472,275 @@
 })();
 
 (function(){
+    const readAllowUserDelete = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'allow_user_delete') ? true : !!s.allow_user_delete;
+    };
+
+    const canDelete = () => {
+        const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object')
+            ? window.MDW_AUTH_META
+            : { has_user: false, has_superuser: false };
+        const hasAuth = !!(meta.has_user || meta.has_superuser);
+        if (!hasAuth) return true;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (!auth || !auth.role) return false;
+        if (auth.role === 'superuser') return true;
+        if (auth.role === 'user') return readAllowUserDelete();
+        return false;
+    };
+
+    const applyDeletePermissions = () => {
+        const allow = canDelete();
+        document.querySelectorAll('form.deleteForm').forEach((form) => {
+            if (!(form instanceof HTMLFormElement)) return;
+            const btn = form.querySelector('button[type="submit"], input[type="submit"]');
+            if (btn instanceof HTMLButtonElement || btn instanceof HTMLInputElement) {
+                btn.disabled = !allow;
+            }
+        });
+    };
+
+    const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    const folderFromFile = (p) => {
+        const path = normalizePath(p);
+        const idx = path.lastIndexOf('/');
+        return idx === -1 ? 'root' : path.slice(0, idx);
+    };
+    const getNeighborFile = (row) => {
+        if (!(row instanceof HTMLElement)) return null;
+        const list = row.closest('.notes-list');
+        if (!list) return null;
+        const items = Array.from(list.querySelectorAll('.note-item.doclink[data-file]'))
+            .filter(el => el instanceof HTMLElement && el.offsetParent !== null);
+        const idx = items.indexOf(row);
+        if (idx === -1) return null;
+        const next = items[idx + 1] || items[idx - 1];
+        if (!(next instanceof HTMLElement)) return null;
+        return String(next.dataset.file || '') || null;
+    };
+
+    const ensureInput = (form, name, value) => {
+        let input = form.querySelector(`input[name="${name}"]`);
+        if (!(input instanceof HTMLInputElement)) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            form.appendChild(input);
+        }
+        input.value = String(value || '');
+    };
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (!form.classList.contains('deleteForm')) return;
+        if (!canDelete()) {
+            e.preventDefault();
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+
+        const fileInput = form.querySelector('input[name="file"]');
+        const file = String((fileInput instanceof HTMLInputElement ? fileInput.value : form.dataset.file) || '').trim();
+        if (!file) return;
+
+        const deleteAfter = mdwReadDeleteAfter();
+        ensureInput(form, 'delete_after', deleteAfter);
+        ensureInput(form, 'return_open', folderFromFile(file));
+
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const inView = !!params.get('file');
+            const folderFilter = !inView ? String(params.get('folder') || '') : '';
+            if (folderFilter) ensureInput(form, 'return_filter', folderFilter);
+        } catch {}
+
+        const row = form.closest('[data-file]');
+        let focus = getNeighborFile(row);
+        if (!focus && window.MDW_VIEW_NAV && typeof window.MDW_VIEW_NAV === 'object') {
+            focus = window.MDW_VIEW_NAV.next || window.MDW_VIEW_NAV.prev || '';
+        }
+        if (!focus) focus = file;
+        ensureInput(form, 'return_focus', focus);
+    }, true);
+
+    window.__mdwCanDelete = canDelete;
+    window.__mdwApplyDeletePermissions = applyDeletePermissions;
+    applyDeletePermissions();
+})();
+
+(function(){
+    const overlay = document.getElementById('wpmUserOverlay');
+    const modal = document.getElementById('wpmUserModal');
+    if (!overlay || !modal) return;
+
+    const authorInput = document.getElementById('wpmAuthorInput');
+    const langSelect = document.getElementById('wpmLangSelect');
+    const saveBtn = document.getElementById('wpmUserSaveBtn');
+    const statusEl = document.getElementById('wpmUserStatus');
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+
+    const AUTHOR_KEY = 'mdw_wpm_author';
+    const LANG_KEY = 'mdw_ui_lang';
+
+    const isWpm = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(s && s.publisher_mode);
+    };
+
+    const getAuthor = () => String(mdwStorageGet(AUTHOR_KEY) || '').trim();
+    const setAuthor = (value) => {
+        const next = String(value || '').trim();
+        if (next) mdwStorageSet(AUTHOR_KEY, next);
+        return next;
+    };
+
+    const setStatus = (msg, kind = 'info') => {
+        if (!(statusEl instanceof HTMLElement)) return;
+        statusEl.textContent = String(msg || '');
+        statusEl.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const applyAuthorToForms = (value) => {
+        const author = String(value || '').trim() || getAuthor();
+        if (!author) return;
+        document.querySelectorAll('form').forEach((form) => {
+            if (!(form instanceof HTMLFormElement)) return;
+            let input = form.querySelector('input[name="publisher_author"]');
+            if (!(input instanceof HTMLInputElement)) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'publisher_author';
+                form.appendChild(input);
+            }
+            input.value = author;
+        });
+    };
+
+    const syncLangSelect = () => {
+        if (!(langSelect instanceof HTMLSelectElement)) return;
+        const saved = String(mdwStorageGet(LANG_KEY) || '').trim();
+        const current = String(window.MDW_LANG || '').trim();
+        const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
+        const allowed = new Set(list.map((l) => String(l?.code || '')).filter(Boolean));
+        const next = (saved && allowed.has(saved)) ? saved : (allowed.has(current) ? current : '');
+        if (next) langSelect.value = next;
+    };
+
+    const show = () => {
+        overlay.hidden = false;
+        document.documentElement.classList.add('modal-open');
+        setStatus(t('wpm.setup_hint', 'Set your author name and UI language.'), 'info');
+        if (authorInput instanceof HTMLInputElement) {
+            authorInput.focus();
+            authorInput.select();
+        }
+    };
+    const hide = () => {
+        overlay.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+        setStatus('', 'info');
+    };
+
+    const save = () => {
+        const author = (authorInput instanceof HTMLInputElement) ? String(authorInput.value || '').trim() : '';
+        if (!author) {
+            setStatus(t('wpm.author_required', 'Please enter your author name.'), 'error');
+            authorInput?.focus?.();
+            return;
+        }
+        setAuthor(author);
+        applyAuthorToForms(author);
+        const lang = (langSelect instanceof HTMLSelectElement) ? String(langSelect.value || '').trim() : '';
+        if (lang) {
+            mdwStorageSet(LANG_KEY, lang);
+            if (String(window.MDW_LANG || '') !== lang) {
+                if (mdwSetLangCookie(lang)) {
+                    window.location.reload();
+                    return;
+                }
+            }
+        }
+        hide();
+    };
+
+    const maybeShow = () => {
+        if (!isWpm()) return;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (!auth || !auth.token || auth.role !== 'user') return;
+        if (getAuthor()) return;
+        syncLangSelect();
+        show();
+    };
+
+    window.__mdwMaybeShowWpmSetup = maybeShow;
+    window.__mdwGetWpmAuthor = getAuthor;
+
+    document.addEventListener('submit', (e) => {
+        if (!isWpm()) return;
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const author = getAuthor();
+        if (!author) return;
+        let input = form.querySelector('input[name="publisher_author"]');
+        if (!(input instanceof HTMLInputElement)) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'publisher_author';
+            form.appendChild(input);
+        }
+        input.value = author;
+    }, true);
+
+    saveBtn?.addEventListener('click', save);
+    const isPlainEnter = (e) =>
+        (e.key === 'Enter' || e.code === 'NumpadEnter') &&
+        !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey;
+
+    modal?.addEventListener('keydown', (e) => {
+        if (!isPlainEnter(e)) return;
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+        e.preventDefault();
+        save();
+    });
+    if (authorInput instanceof HTMLInputElement) authorInput.value = getAuthor();
+    syncLangSelect();
+    applyAuthorToForms(getAuthor());
+    maybeShow();
+})();
+
+// Enter-to-submit for inputs inside forms (textarea excluded).
+(function(){
+    const skipTypes = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color']);
+    const isTextInput = (input) => {
+        const type = String(input.getAttribute('type') || 'text').toLowerCase();
+        return !skipTypes.has(type);
+    };
+    document.addEventListener('keydown', (e) => {
+        if (!(e.key === 'Enter' || e.code === 'NumpadEnter') || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        const target = e.target;
+        if (target instanceof HTMLTextAreaElement) return;
+        if (target instanceof HTMLInputElement && !isTextInput(target)) return;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
+        const form = target.closest('form');
+        if (!form) return;
+        e.preventDefault();
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    });
+})();
+
+(function(){
     const btn = document.getElementById('themeToggle');
     const icon = document.getElementById('themeIcon');
     const root = document.documentElement;
@@ -363,7 +761,7 @@
         const fromServer = s && typeof s.ui_theme === 'string' ? s.ui_theme.trim().toLowerCase() : '';
         if (isPublisherMode() && (fromServer === 'dark' || fromServer === 'light')) return fromServer;
         try {
-            const v = String(localStorage.getItem('mdsite-theme') || '').trim().toLowerCase();
+            const v = String(mdwStorageGet('mdsite-theme') || '').trim().toLowerCase();
             if (v === 'dark' || v === 'light') return v;
         } catch {}
         return root.classList.contains('dark') ? 'dark' : 'light';
@@ -379,7 +777,7 @@
         const useDark = mode === 'dark';
         root.classList.toggle('dark', useDark);
         root.classList.toggle('theme-light', !useDark);
-        localStorage.setItem('mdsite-theme', useDark ? 'dark' : 'light');
+        mdwStorageSet('mdsite-theme', useDark ? 'dark' : 'light');
         updateIcon();
     }
 
@@ -452,7 +850,7 @@
 
     const readShortcutMod = () => {
         try {
-            const v = localStorage.getItem(SHORTCUT_MOD_KEY);
+            const v = mdwStorageGet(SHORTCUT_MOD_KEY);
             if (v === 'command' || v === 'option') return v;
         } catch {}
         return isApple ? 'command' : 'option';
@@ -460,7 +858,7 @@
 
     const writeShortcutMod = (v) => {
         const next = (v === 'command' || v === 'option') ? v : (isApple ? 'command' : 'option');
-        try { localStorage.setItem(SHORTCUT_MOD_KEY, next); } catch {}
+        try { mdwStorageSet(SHORTCUT_MOD_KEY, next); } catch {}
         window.__mdwShortcutMod = next;
         return next;
     };
@@ -486,10 +884,10 @@
         const serverPreset = s && typeof s.theme_preset === 'string' ? s.theme_preset.trim() : '';
         if (isPublisherMode() && serverPreset) {
             const normalized = serverPreset.toLowerCase() === 'candy' && findTheme('Candy') ? 'Candy' : (findTheme(serverPreset)?.name || 'default');
-            try { localStorage.setItem(STORAGE_PRESET, normalized); } catch {}
+            try { mdwStorageSet(STORAGE_PRESET, normalized); } catch {}
             return normalized;
         }
-        const raw = String(localStorage.getItem(STORAGE_PRESET) || '').trim();
+        const raw = String(mdwStorageGet(STORAGE_PRESET) || '').trim();
         if (!raw) return 'default';
         if (raw.toLowerCase() === 'candy' && findTheme('Candy')) return 'Candy';
         const t = findTheme(raw);
@@ -498,7 +896,7 @@
 
     const readOverrides = () => {
         try {
-            const raw = localStorage.getItem(STORAGE_OVERRIDES);
+            const raw = mdwStorageGet(STORAGE_OVERRIDES);
             if (!raw) return { preview: {}, editor: {} };
             const obj = JSON.parse(raw);
             const preview = (obj && typeof obj.preview === 'object' && obj.preview) ? obj.preview : {};
@@ -510,7 +908,7 @@
     };
 
     const writeOverrides = (o) => {
-        localStorage.setItem(STORAGE_OVERRIDES, JSON.stringify(o || { preview: {}, editor: {} }));
+        mdwStorageSet(STORAGE_OVERRIDES, JSON.stringify(o || { preview: {}, editor: {} }));
     };
 
     const ensureStyleEl = () => {
@@ -701,6 +1099,10 @@
     const appTitleInput = document.getElementById('appTitleInput');
     const appTitleSaveBtn = document.getElementById('appTitleSaveBtn');
     const appTitleStatus = document.getElementById('appTitleStatus');
+    const deleteAfterOverview = document.getElementById('deleteAfterOverview');
+    const deleteAfterNext = document.getElementById('deleteAfterNext');
+    const allowUserDeleteToggle = document.getElementById('allowUserDeleteToggle');
+    const allowUserDeleteStatus = document.getElementById('allowUserDeleteStatus');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -732,9 +1134,26 @@
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
 
+    const setAllowUserDeleteStatus = (msg, kind = 'info') => {
+        if (!(allowUserDeleteStatus instanceof HTMLElement)) return;
+        allowUserDeleteStatus.textContent = String(msg || '');
+        allowUserDeleteStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
     const readAppTitleSetting = () => {
         const s = getSettings();
         return s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
+    };
+    const readAllowUserDeleteSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'allow_user_delete') ? true : !!s.allow_user_delete;
+    };
+    const readUiLanguageSetting = () => {
+        const s = getSettings();
+        return s && typeof s.ui_language === 'string' ? s.ui_language.trim() : '';
     };
 
     const applyAppTitleUi = (title) => {
@@ -743,6 +1162,16 @@
         if (!(textEl instanceof HTMLElement)) return;
         const next = title && title.trim() ? title.trim() : 'Markdown Manager';
         textEl.textContent = next;
+    };
+
+    const syncDeleteAfterUi = () => {
+        const v = mdwReadDeleteAfter();
+        if (deleteAfterOverview instanceof HTMLInputElement) {
+            deleteAfterOverview.checked = v === 'overview';
+        }
+        if (deleteAfterNext instanceof HTMLInputElement) {
+            deleteAfterNext.checked = v === 'next';
+        }
     };
 
     const updateThemeUi = () => {
@@ -786,6 +1215,8 @@
         }
     };
 
+    let persistSettingsOnClose = async () => true;
+
     const open = () => {
         if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) return;
         if (typeof window.__mdwCloseLinkModal === 'function') window.__mdwCloseLinkModal();
@@ -814,7 +1245,16 @@
         if (appTitleInput instanceof HTMLInputElement) {
             appTitleInput.value = readAppTitleSetting();
         }
+        if (allowUserDeleteToggle instanceof HTMLInputElement) {
+            allowUserDeleteToggle.checked = readAllowUserDeleteSetting();
+        }
+        if (langSelect instanceof HTMLSelectElement) {
+            const uiLang = readUiLanguageSetting();
+            if (uiLang) langSelect.value = uiLang;
+        }
         setAppTitleStatus(t('theme.app_title.hint', 'Leave blank to use the default.'), 'info');
+        syncDeleteAfterUi();
+        setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
 
         overlay.hidden = false;
         modal.hidden = false;
@@ -822,11 +1262,23 @@
         setTimeout(() => presetSelect?.focus(), 0);
     };
 
-    const close = () => {
+    const performClose = () => {
         overlay.hidden = true;
         modal.hidden = true;
         document.documentElement.classList.remove('modal-open');
         btn?.focus();
+    };
+
+    const close = async (opts = {}) => {
+        const force = !!(opts && opts.force);
+        if (force) {
+            performClose();
+            try { await persistSettingsOnClose(); } catch (e) { console.error('settings close save failed', e); }
+            return;
+        }
+        const ok = await persistSettingsOnClose();
+        if (!ok) return;
+        performClose();
     };
 
     window.__mdwCloseThemeModal = close;
@@ -860,6 +1312,65 @@
         setOverridesStatus(t('theme.overrides.saved', 'Saved'), 'ok');
     };
 
+    const saveAppTitleSetting = async (nextTitle) => {
+        setAppTitleStatus(t('theme.app_title.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setAppTitleStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const ok = await saveSettingsToServer({ app_title: nextTitle });
+            if (!ok) throw new Error(t('theme.app_title.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.app_title = nextTitle;
+            }
+            applyAppTitleUi(nextTitle);
+            if (typeof window.__mdwUpdateAuthTitle === 'function') {
+                window.__mdwUpdateAuthTitle();
+            }
+            setAppTitleStatus(t('theme.app_title.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('app title save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.app_title.save_failed', 'Save failed');
+            setAppTitleStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveAllowUserDeleteSetting = async (nextValue) => {
+        setAllowUserDeleteStatus(t('theme.permissions.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setAllowUserDeleteStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const ok = await saveSettingsToServer({ allow_user_delete: nextValue });
+            if (!ok) throw new Error(t('theme.permissions.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.allow_user_delete = nextValue;
+            }
+            if (typeof window.__mdwApplyDeletePermissions === 'function') {
+                window.__mdwApplyDeletePermissions();
+            }
+            setAllowUserDeleteStatus(t('theme.permissions.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('allow user delete save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.permissions.save_failed', 'Save failed');
+            setAllowUserDeleteStatus(msg, 'error');
+            return false;
+        }
+    };
+
     const resetOverrides = () => {
         writeOverrides({ preview: {}, editor: {} });
         Object.values(inputs).forEach((el) => {
@@ -871,39 +1382,30 @@
 
     if (btn && modal && overlay) {
         btn.addEventListener('click', open);
-        overlay.addEventListener('click', close);
-        closeBtn?.addEventListener('click', close);
-        cancelBtn?.addEventListener('click', close);
+        overlay.addEventListener('click', () => close());
+        closeBtn?.addEventListener('click', () => close());
+        cancelBtn?.addEventListener('click', () => close());
         resetBtn?.addEventListener('click', resetOverrides);
         saveBtn?.addEventListener('click', persistFromInputs);
         appTitleSaveBtn?.addEventListener('click', async () => {
             if (!(appTitleInput instanceof HTMLInputElement)) return;
-            setAppTitleStatus(t('theme.app_title.saving', 'Saving…'), 'info');
-            try {
-                if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
-                    setAppTitleStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
-                    if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
-                    return;
-                }
-                const nextTitle = String(appTitleInput.value || '').trim();
-                const ok = await saveSettingsToServer({ app_title: nextTitle });
-                if (!ok) throw new Error(t('theme.app_title.save_failed', 'Save failed'));
-                if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
-                    window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
-                    window.MDW_META_CONFIG._settings.app_title = nextTitle;
-                }
-                applyAppTitleUi(nextTitle);
-                if (typeof window.__mdwUpdateAuthTitle === 'function') {
-                    window.__mdwUpdateAuthTitle();
-                }
-                setAppTitleStatus(t('theme.app_title.saved', 'Saved'), 'ok');
-            } catch (e) {
-                console.error('app title save failed', e);
-                const msg = (e && typeof e.message === 'string' && e.message.trim())
-                    ? e.message.trim()
-                    : t('theme.app_title.save_failed', 'Save failed');
-                setAppTitleStatus(msg, 'error');
-            }
+            const nextTitle = String(appTitleInput.value || '').trim();
+            await saveAppTitleSetting(nextTitle);
+        });
+
+        const onDeleteAfterChange = (e) => {
+            const input = e.target;
+            if (!(input instanceof HTMLInputElement)) return;
+            if (input.name !== 'deleteAfter') return;
+            mdwWriteDeleteAfter(input.value);
+        };
+        deleteAfterOverview?.addEventListener('change', onDeleteAfterChange);
+        deleteAfterNext?.addEventListener('change', onDeleteAfterChange);
+
+        allowUserDeleteToggle?.addEventListener('change', async () => {
+            if (!(allowUserDeleteToggle instanceof HTMLInputElement)) return;
+            const next = !!allowUserDeleteToggle.checked;
+            await saveAllowUserDeleteSetting(next);
         });
 
         const onKbdModChange = (e) => {
@@ -916,22 +1418,24 @@
         kbdModCommand?.addEventListener('change', onKbdModChange);
 
         if (langSelect instanceof HTMLSelectElement) {
-            langSelect.addEventListener('change', () => {
+            langSelect.addEventListener('change', async () => {
                 const v = String(langSelect.value || '').trim();
                 if (!v) return;
                 const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
                 const allowed = new Set(list.map(x => String(x?.code || '')).filter(Boolean));
                 if (!allowed.has(v)) return;
+                const isSuperuser = (typeof window.__mdwIsSuperuser === 'function') ? window.__mdwIsSuperuser() : false;
+                if (isSuperuser) {
+                    try {
+                        const ok = await saveSettingsToServer({ ui_language: v });
+                        if (ok && window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                            window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                            window.MDW_META_CONFIG._settings.ui_language = v;
+                        }
+                    } catch {}
+                }
                 if (String(window.MDW_LANG || '') === v) return;
-                const parts = [
-                    `mdw_lang=${encodeURIComponent(v)}`,
-                    'Path=/',
-                    `Max-Age=${60 * 60 * 24 * 365}`,
-                    'SameSite=Lax',
-                ];
-                if (window.location && window.location.protocol === 'https:') parts.push('Secure');
-                document.cookie = parts.join('; ');
-                window.location.reload();
+                if (mdwSetLangCookie(v)) window.location.reload();
             });
         }
 
@@ -1047,19 +1551,69 @@
             syncMetaUiRules(publisherMetaInputs);
         }
 
-        metaSaveBtn?.addEventListener('click', async () => {
+        const readVisibilityFromConfig = (inputs, fields) => {
+            const out = {};
+            inputs.forEach((input) => {
+                const key = String(input.dataset.metaKey || '').trim();
+                if (!key || out[key]) return;
+                const f = (fields && typeof fields === 'object') ? fields[key] : null;
+                const mdVis = f ? !!f.markdown_visible : true;
+                const htmlVis = f ? (!!f.html_visible && mdVis) : false;
+                out[key] = { markdown_visible: mdVis, html_visible: htmlVis };
+            });
+            return out;
+        };
+
+        const hasFieldDiff = (current, next) => {
+            const keys = new Set([...Object.keys(current || {}), ...Object.keys(next || {})]);
+            for (const key of keys) {
+                const c = current[key] || {};
+                const n = next[key] || {};
+                if (!!c.markdown_visible !== !!n.markdown_visible) return true;
+                if (!!c.html_visible !== !!n.html_visible) return true;
+            }
+            return false;
+        };
+
+        const hasMetaChanges = () => {
+            if (!baseMetaInputs.length && !publisherMetaInputs.length) return false;
+            const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+            const pubCfg = (window.MDW_META_PUBLISHER_CONFIG && typeof window.MDW_META_PUBLISHER_CONFIG === 'object')
+                ? window.MDW_META_PUBLISHER_CONFIG
+                : null;
+            const currentBase = readVisibilityFromConfig(
+                baseMetaInputs,
+                (cfg && cfg.fields && typeof cfg.fields === 'object') ? cfg.fields : {}
+            );
+            const nextBase = readMetaUi(baseMetaInputs);
+            if (hasFieldDiff(currentBase, nextBase)) return true;
+            const currentPub = readVisibilityFromConfig(
+                publisherMetaInputs,
+                (pubCfg && pubCfg.fields && typeof pubCfg.fields === 'object') ? pubCfg.fields : {}
+            );
+            const nextPub = readMetaUi(publisherMetaInputs);
+            if (hasFieldDiff(currentPub, nextPub)) return true;
+            const s = getSettings() || {};
+            const nextSettings = readPublisherSettings();
+            if (!!s.publisher_mode !== !!nextSettings.publisher_mode) return true;
+            if (String(s.publisher_default_author || '') !== String(nextSettings.publisher_default_author || '')) return true;
+            if (!!s.publisher_require_h2 !== !!nextSettings.publisher_require_h2) return true;
+            return false;
+        };
+
+        const saveMetadataSettings = async () => {
             setMetaStatus(t('theme.metadata.saving', 'Saving…'), 'info');
             try {
                 if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
                     setMetaStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
                     if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
-                    return;
+                    return false;
                 }
                 const publisherSettings = readPublisherSettings();
                 if (publisherSettings.publisher_mode && !publisherSettings.publisher_default_author) {
-                    setMetaStatus(t('theme.publisher.author_required', 'Please enter an author name to enable publisher mode.'), 'error');
+                    setMetaStatus(t('theme.publisher.author_required', 'Please enter an author name to enable WPM.'), 'error');
                     try { publisherAuthorInput?.focus?.(); } catch {}
-                    return;
+                    return false;
                 }
                 // Also persist UI theme + theme preset to disk so publisher mode is consistent across devices.
                 try {
@@ -1067,7 +1621,7 @@
                     publisherSettings.ui_theme = uiTheme;
                 } catch {}
                 try {
-                    const preset = String(localStorage.getItem(STORAGE_PRESET) || '').trim();
+                    const preset = String(mdwStorageGet(STORAGE_PRESET) || '').trim();
                     publisherSettings.theme_preset = preset || 'default';
                 } catch {
                     publisherSettings.theme_preset = 'default';
@@ -1090,7 +1644,7 @@
                     const errCode = (data && data.error) ? String(data.error) : '';
                     const serverMsg = (data && data.message) ? String(data.message) : '';
                     if (errCode === 'publisher_author_required') {
-                        throw new Error(t('theme.publisher.author_required', 'Please enter an author name to enable publisher mode.'));
+                        throw new Error(t('theme.publisher.author_required', 'Please enter an author name to enable WPM.'));
                     }
                     if (errCode === 'auth_required') {
                         if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
@@ -1114,11 +1668,39 @@
                 if (ta instanceof HTMLTextAreaElement) {
                     ta.dispatchEvent(new Event('input', { bubbles: true }));
                 }
+                return true;
             } catch (e) {
                 console.error('metadata settings save failed', e);
                 const msg = (e && typeof e.message === 'string' && e.message.trim()) ? e.message.trim() : t('theme.metadata.save_failed', 'Save failed');
                 setMetaStatus(msg, 'error');
+                return false;
             }
+        };
+
+        persistSettingsOnClose = async () => {
+            if (appTitleInput instanceof HTMLInputElement) {
+                const nextTitle = String(appTitleInput.value || '').trim();
+                if (nextTitle !== readAppTitleSetting()) {
+                    const ok = await saveAppTitleSetting(nextTitle);
+                    if (!ok) return false;
+                }
+            }
+            if (allowUserDeleteToggle instanceof HTMLInputElement) {
+                const next = !!allowUserDeleteToggle.checked;
+                if (next !== readAllowUserDeleteSetting()) {
+                    const ok = await saveAllowUserDeleteSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (hasMetaChanges()) {
+                const ok = await saveMetadataSettings();
+                if (!ok) return false;
+            }
+            return true;
+        };
+
+        metaSaveBtn?.addEventListener('click', async () => {
+            await saveMetadataSettings();
         });
 
         presetSelect?.addEventListener('change', () => {
@@ -1126,7 +1708,7 @@
             const v = String(presetSelect.value || '').trim();
             const t = findTheme(v);
             const nextPreset = t ? t.name : 'default';
-            localStorage.setItem(STORAGE_PRESET, nextPreset);
+            mdwStorageSet(STORAGE_PRESET, nextPreset);
             if (isPublisherMode()) {
                 try {
                     const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
@@ -1387,14 +1969,14 @@
         if (isPublisherMode()) {
             const pageTitle = String(mergedMeta.page_title || '').trim();
             if (!pageTitle) {
-                alert(t('flash.publisher_requires_page_title', 'Website publisher mode requires a page_title metadata line.'));
+                alert(t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.'));
                 event.preventDefault();
                 event.stopPropagation();
                 return;
             }
             const pagePicture = String(mergedMeta.page_picture || '').trim();
             if (!pagePicture) {
-                alert(t('flash.publisher_requires_page_picture', 'Website publisher mode requires a page_picture metadata line.'));
+                alert(t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.'));
                 event.preventDefault();
                 event.stopPropagation();
                 return;
@@ -1883,6 +2465,7 @@
 
     const deleteFile = (file) => {
         if (!file) return;
+        if (typeof window.__mdwCanDelete === 'function' && !window.__mdwCanDelete()) return;
         if (isEditorPage) {
             const input = document.getElementById('deleteFileInput');
             const form = document.getElementById('deleteForm');
@@ -2008,6 +2591,7 @@
         if (t instanceof HTMLElement && t.matches('input, textarea, [contenteditable="true"]')) return;
 
         if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (typeof window.__mdwCanDelete === 'function' && !window.__mdwCanDelete()) return;
             const form = document.querySelector('form.deleteForm');
             if (!(form instanceof HTMLFormElement)) return;
             e.preventDefault();
@@ -2045,6 +2629,50 @@
             window.location.href = url;
         }
     });
+
+    let touchStartX = null;
+    let touchStartY = null;
+    let touchStartTime = 0;
+    const SWIPE_MIN_X = 60;
+    const SWIPE_MAX_Y = 45;
+    const SWIPE_MAX_MS = 900;
+
+    const shouldIgnoreSwipe = (target) => {
+        if (!(target instanceof HTMLElement)) return false;
+        if (target.closest('input, textarea, [contenteditable="true"]')) return true;
+        if (target.closest('pre, code')) return true;
+        return false;
+    };
+
+    document.addEventListener('touchstart', (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        if (shouldIgnoreSwipe(e.target)) return;
+        const t = e.touches[0];
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+        touchStartTime = Date.now();
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (touchStartX === null || touchStartY === null) return;
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        const dt = Date.now() - touchStartTime;
+        touchStartX = null;
+        touchStartY = null;
+        touchStartTime = 0;
+
+        if (Math.abs(dx) < SWIPE_MIN_X) return;
+        if (Math.abs(dy) > SWIPE_MAX_Y) return;
+        if (dt > SWIPE_MAX_MS) return;
+
+        const targetFile = dx < 0 ? (nav?.next || null) : (nav?.prev || null);
+        if (!targetFile) return;
+        const url = `index.php?file=${encodeURIComponent(targetFile)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(targetFile)}`;
+        window.location.href = url;
+    }, { passive: true });
 })();
 
 // NAVIGATIE, FILTER & DOCUMENT LADEN
@@ -2070,6 +2698,7 @@
     const filterReset = document.getElementById('filterReset');
     const filterClear = document.getElementById('filterClear');
     const explorerCollapseToggle = document.getElementById('explorerCollapseToggle');
+    const params = new URLSearchParams(window.location.search);
 
     if (!filterInput) return;
 
@@ -2104,12 +2733,12 @@
             explorerCollapseToggle.title = label;
             explorerCollapseToggle.setAttribute('aria-label', label);
             if (save) {
-                try { localStorage.setItem(KEY, next ? '1' : '0'); } catch {}
+                try { mdwStorageSet(KEY, next ? '1' : '0'); } catch {}
             }
         };
 
         const initial = (() => {
-            try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
+            try { return mdwStorageGet(KEY) === '1'; } catch { return false; }
         })();
         apply(initial, false);
 
@@ -2235,6 +2864,17 @@
             return { el, text, section };
         });
 
+    const openFromQuery = () => {
+        const openParam = params.get('open') || '';
+        if (!openParam) return;
+        const section = overview.querySelector(`[data-folder-section="${CSS.escape(openParam)}"]`);
+        if (section instanceof HTMLElement) {
+            section.setAttribute('data-user-open', '1');
+            setFolderOpen(section, true);
+        }
+    };
+    openFromQuery();
+
     const normalizeSort = (value) => String(value || '').trim().toLowerCase();
     const sortNoteItems = (mode) => {
         const lists = Array.from(overview.querySelectorAll('.notes-list'));
@@ -2279,14 +2919,14 @@
         const SORT_KEY = 'mdw_nav_sort';
         const options = Array.from(navSortSelect.options).map(o => o.value);
         const stored = (() => {
-            try { return localStorage.getItem(SORT_KEY) || ''; } catch { return ''; }
+            try { return mdwStorageGet(SORT_KEY) || ''; } catch { return ''; }
         })();
         const initial = options.includes(stored) ? stored : (navSortSelect.value || 'date');
         navSortSelect.value = initial;
         sortNoteItems(initial);
         navSortSelect.addEventListener('change', () => {
             const next = options.includes(navSortSelect.value) ? navSortSelect.value : 'date';
-            try { localStorage.setItem(SORT_KEY, next); } catch {}
+            try { mdwStorageSet(SORT_KEY, next); } catch {}
             sortNoteItems(next);
         });
     })();
@@ -2347,7 +2987,6 @@
     }
 
     // q parameter uit URL
-    const params = new URLSearchParams(window.location.search);
     const qParam = params.get('q');
     if (qParam) {
         filterInput.value = qParam;
@@ -2485,6 +3124,9 @@
             if (window.MathJax?.typesetPromise) {
                 try { await window.MathJax.typesetPromise([preview]); } catch {}
             }
+            if (typeof window.__mdwRenderMermaid === 'function') {
+                try { await window.__mdwRenderMermaid(preview); } catch {}
+            }
 
             // Update browser history
             history.pushState({file: data.file}, '', `?file=${encodeURIComponent(data.file)}`);
@@ -2505,6 +3147,15 @@
     }
 
     update();
+
+    const focusParam = params.get('focus');
+    if (focusParam && !params.get('file')) {
+        const el = overview.querySelector(`[data-file="${CSS.escape(focusParam)}"] a.kbd-item`);
+        if (el instanceof HTMLAnchorElement) {
+            try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+            el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    }
 })();
 
 	// Add link modal (edit.php)
@@ -2578,9 +3229,9 @@
 	        if (typeof window.__mdwCloseImageModal === 'function') {
 	            window.__mdwCloseImageModal();
 	        }
-	        if (typeof window.__mdwCloseThemeModal === 'function') {
-	            window.__mdwCloseThemeModal();
-	        }
+        if (typeof window.__mdwCloseThemeModal === 'function') {
+            window.__mdwCloseThemeModal({ force: true });
+        }
 	        overlay.hidden = false;
 	        modal.hidden = false;
 	        document.documentElement.classList.add('modal-open');
@@ -2867,7 +3518,7 @@
 
     const loadCache = () => {
         try {
-            const raw = localStorage.getItem(CACHE_KEY);
+            const raw = mdwStorageGet(CACHE_KEY);
             if (!raw) return false;
             const parsed = JSON.parse(raw);
             if (!parsed || !Array.isArray(parsed.items)) return false;
@@ -2882,7 +3533,7 @@
 
     const saveCache = () => {
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
+            mdwStorageSet(CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
         } catch {}
     };
 
@@ -2987,9 +3638,9 @@
 	        if (typeof window.__mdwCloseLinkModal === 'function') {
 	            window.__mdwCloseLinkModal();
 	        }
-	        if (typeof window.__mdwCloseThemeModal === 'function') {
-	            window.__mdwCloseThemeModal();
-	        }
+        if (typeof window.__mdwCloseThemeModal === 'function') {
+            window.__mdwCloseThemeModal({ force: true });
+        }
         overlay.hidden = false;
         modal.hidden = false;
         document.documentElement.classList.add('modal-open');
@@ -3282,6 +3933,9 @@
             if (window.MathJax?.typesetPromise) {
                 window.MathJax.typesetPromise([prev]).catch(() => {});
             }
+            if (typeof window.__mdwRenderMermaid === 'function') {
+                window.__mdwRenderMermaid(prev).catch(() => {});
+            }
             status.textContent = 'Preview up to date';
         })
         .catch(() => {
@@ -3395,14 +4049,14 @@
     wrapToggle?.addEventListener('click', () => {
         const on = !isWrapOn();
         document.documentElement.classList.toggle('mdw-wrap-on', on);
-        try { localStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch {}
+        try { mdwStorageSet(WRAP_KEY, on ? '1' : '0'); } catch {}
         applyWrapUi();
         ta.focus();
     });
     lineNumbersToggle?.addEventListener('click', () => {
         const on = !isLinesOn();
         document.documentElement.classList.toggle('mdw-lines-off', !on);
-        try { localStorage.setItem(LINES_KEY, on ? '1' : '0'); } catch {}
+        try { mdwStorageSet(LINES_KEY, on ? '1' : '0'); } catch {}
         applyLinesUi();
         ta.focus();
     });
@@ -3831,15 +4485,22 @@
             return;
         }
 
-        // Uppercase: Ctrl+Alt+ArrowUp
-        if (!e.shiftKey && e.key === 'ArrowUp') {
+        // Comment: Ctrl+Alt+/
+        if (e.code === 'Slash') {
+            e.preventDefault();
+            wrapOrUnwrap('<!-- ', ' -->');
+            return;
+        }
+
+        // Uppercase: Ctrl+Alt+PageUp (Shift also allowed to avoid OS conflicts)
+        if (e.key === 'PageUp') {
             e.preventDefault();
             transformSelectionOrWord((s) => s.toUpperCase());
             return;
         }
 
-        // Lowercase: Ctrl+Alt+ArrowDown
-        if (!e.shiftKey && e.key === 'ArrowDown') {
+        // Lowercase: Ctrl+Alt+PageDown (Shift also allowed to avoid OS conflicts)
+        if (e.key === 'PageDown') {
             e.preventDefault();
             transformSelectionOrWord((s) => s.toLowerCase());
             return;
@@ -3881,7 +4542,7 @@
         root.style.setProperty('--col-right', right);
 
         if (save) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            mdwStorageSet(STORAGE_KEY, JSON.stringify({
                 left, mid, right
             }));
         }
@@ -3889,7 +4550,7 @@
 
     // laad opgeslagen waarden
     try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        const saved = JSON.parse(mdwStorageGet(STORAGE_KEY) || 'null');
         if (saved && saved.left && saved.mid && saved.right) {
             applyWidths(saved.left, saved.mid, saved.right, false);
         }

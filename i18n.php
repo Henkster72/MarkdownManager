@@ -51,6 +51,23 @@ function mdw_i18n_list_languages($projectDir, $dirRel) {
     return $langs;
 }
 
+function mdw_i18n_default_lang_from_config($codes) {
+    if (!is_array($codes) || !$codes) return '';
+    if (!function_exists('env_str')) return '';
+    $raw = trim((string)env_str('METADATA_CONFIG_FILE', 'metadata_config.json'));
+    if ($raw === '') $raw = 'metadata_config.json';
+    if (!str_starts_with($raw, '/') && !preg_match('/^[A-Za-z]:[\\\\\\/]/', $raw)) {
+        if (str_starts_with($raw, './')) $raw = substr($raw, 2);
+        $raw = __DIR__ . '/' . ltrim($raw, "/\\");
+    }
+    if (!is_file($raw)) return '';
+    $json = json_decode((string)@file_get_contents($raw), true);
+    if (!is_array($json)) return '';
+    $lang = isset($json['_settings']['ui_language']) ? trim((string)$json['_settings']['ui_language']) : '';
+    if ($lang !== '' && isset($codes[$lang])) return $lang;
+    return '';
+}
+
 function mdw_i18n_pick_lang($availableLangs) {
     $codes = [];
     foreach ($availableLangs as $l) {
@@ -58,6 +75,8 @@ function mdw_i18n_pick_lang($availableLangs) {
     }
     $cookie = isset($_COOKIE['mdw_lang']) ? (string)$_COOKIE['mdw_lang'] : '';
     if ($cookie !== '' && isset($codes[$cookie])) return $cookie;
+    $cfgLang = mdw_i18n_default_lang_from_config($codes);
+    if ($cfgLang !== '') return $cfgLang;
     return isset($codes['en']) ? 'en' : (array_key_first($codes) ?: 'en');
 }
 

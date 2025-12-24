@@ -6,6 +6,8 @@ MarkdownManager is a small, fast app that turns a folder of plain text notes int
 
 Sharpen your thinking.
 
+New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
+
 ## What's new in 0.3
 
 - Website publication mode for turning Markdown into a publish-ready content flow with metadata, publish states, and strict author/subtitle rules.
@@ -116,7 +118,7 @@ Everything you read and edit is stored as normal `*.md` files in this directory 
 
 When the Markdown textarea is focused:
 
-- Shortcut modifier: by default shortcuts use `Ctrl+Alt` (Windows/Linux). On macOS you can switch to `Ctrl+Command` in the Settings modal; then replace `Alt` with `Cmd` in the shortcuts below.
+- Shortcut system: choose Windows/Linux (`Ctrl+Alt`) or Mac (`Ctrl+Command`) in the Settings modal.
 
 - `Ctrl+Z` -- undo (up to 25 steps)
 - `Ctrl+Shift+Z` -- redo
@@ -130,8 +132,9 @@ When the Markdown textarea is focused:
 - `Ctrl+Alt+Q` -- toggle blockquote for line(s) (`> ...`)
 - `Ctrl+Alt+U` -- toggle bullet list for line(s) (`- ...`)
 - `Ctrl+Alt+O` -- fenced code block (wraps with ``` fences)
-- `Ctrl+Alt+ArrowUp` -- uppercase selection (or current word)
-- `Ctrl+Alt+ArrowDown` -- lowercase selection (or current word)
+- `Ctrl+Alt+/` -- comment selection (`<!-- ... -->`)
+- `Ctrl+Alt+PageUp` (or `Ctrl+Alt+Shift+PageUp`) -- uppercase selection (or current word)
+- `Ctrl+Alt+PageDown` (or `Ctrl+Alt+Shift+PageDown`) -- lowercase selection (or current word)
 - `Ctrl+Alt++` -- increase heading level (`#` -> `##` ...)
 - `Ctrl+Alt+-` -- decrease heading level (`##` -> `#` -> none)
 - `Ctrl+Alt+1..6` -- set heading level directly
@@ -209,6 +212,7 @@ It supports a practical subset:
 - Images (`![alt](url)`) including relative paths
 - Links (`[label](https://example.com)`)
 - Fenced code blocks (```), with optional language token
+- Mermaid diagrams (```mermaid fenced blocks, rendered via Mermaid.js from a CDN)
 - Blockquotes (`>`)
 - Horizontal rules
 - GFM-ish tables

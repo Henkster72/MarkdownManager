@@ -89,10 +89,10 @@
       "secondary": "Secundair"
     },
     "kbd_modifier": {
-      "label": "Sneltoets-modifier",
-      "option": "Ctrl + Option (⌃⌥)",
-      "command": "Ctrl + Command (⌃⌘)",
-      "tip": "Tip: macOS VoiceOver gebruikt Ctrl+Option; kies Ctrl+Command om conflicten te voorkomen."
+      "label": "Sneltoets-systeem",
+      "option": "Windows / Linux (Ctrl + Alt)",
+      "command": "Mac (Ctrl + Command)",
+      "tip": "Kies het systeem voor de sneltoetsen (opgeslagen in deze browser)."
     },
     "language": {
       "label": "Taal",
@@ -109,6 +109,20 @@
     },
     "editor_view": {
       "title": "Editorweergave"
+    },
+    "delete_after": {
+      "label": "Na verwijderen",
+      "overview": "Terug naar overzicht",
+      "next": "Volgende notitie openen",
+      "hint": "Opgeslagen in deze browser."
+    },
+    "permissions": {
+      "title": "Rechten",
+      "allow_user_delete": "Gebruikers mogen notities verwijderen",
+      "hint": "Opgeslagen voor alle gebruikers.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
     },
     "overrides": {
       "summary": "Aanpassingen (optioneel)",
@@ -148,12 +162,12 @@
       "save_failed": "Opslaan mislukt"
     },
     "publisher": {
-      "title": "Website publicatiemodus",
-      "enable": "Website publicatiemodus inschakelen",
-      "hint": "Voegt publicatiestatussen toe (Concept / Verwerking / Gepubliceerd) en toont ze in het overzicht. Schakelt geheime notities uit. Vereist een auteurnaam; subtitel is optioneel.",
+      "title": "WPM (Website publicatiemodus)",
+      "enable": "WPM inschakelen",
+      "hint": "WPM voegt publicatiestatussen toe (Concept / Verwerking / Gepubliceerd) en toont ze in het overzicht. Schakelt geheime notities uit. Vereist een auteurnaam; subtitel is optioneel.",
       "author_label": "Auteurnaam",
       "author_placeholder": "Jouw naam",
-      "author_required": "Vul een auteurnaam in om de publicatiemodus in te schakelen.",
+      "author_required": "Vul een auteurnaam in om WPM in te schakelen.",
       "require_subtitle": "Subtitel (##) vereisen"
     }
   },
@@ -162,7 +176,14 @@
     "login_title": "Inloggen",
     "setup_title": "Wachtwoorden instellen",
     "login_submit": "Inloggen",
-    "setup_submit": "Wachtwoorden opslaan"
+    "setup_submit": "Wachtwoorden opslaan",
+    "wrong_password": "Onjuist wachtwoord.",
+    "missing_password": "Vul een wachtwoord in.",
+    "signing_in": "Bezig met inloggen...",
+    "saving": "Opslaan...",
+    "set_passwords": "Vul beide wachtwoorden in.",
+    "failed": "Authenticatie mislukt.",
+    "locked": "Te veel pogingen. Probeer opnieuw over {time}."
   },
   "link_modal": {
     "title": "Link toevoegen",
@@ -236,10 +257,10 @@
     "folder_not_exist_prefix": "Map bestaat niet:",
     "file_exists_prefix": "Bestand bestaat al:",
     "file_create_failed": "Kon bestand niet aanmaken.",
-    "publisher_requires_subtitle": "Website publicatiemodus vereist een subtitelregel die begint met \"##\".",
-    "publisher_author_required": "Website publicatiemodus vereist een auteurnaam.",
-    "publisher_requires_page_title": "Website publicatiemodus vereist een page_title metaregel.",
-    "publisher_requires_page_picture": "Website publicatiemodus vereist een page_picture metaregel."
+    "publisher_requires_subtitle": "WPM vereist een subtitelregel die begint met \"##\".",
+    "publisher_author_required": "WPM vereist een auteurnaam.",
+    "publisher_requires_page_title": "WPM vereist een page_title metaregel.",
+    "publisher_requires_page_picture": "WPM vereist een page_picture metaregel."
   },
   "secret": {
     "wrong_password": "Onjuist wachtwoord.",
@@ -250,6 +271,15 @@
     "back_to_index": "Terug naar index"
   },
   "readme": {
-    "shortcut_modifier_note": "Sneltoets-modifier: standaard gebruiken sneltoetsen Ctrl+Alt (Windows/Linux). Op macOS kun je in Instellingen overschakelen naar Ctrl+Command; vervang dan Alt door ⌘ in de sneltoetsen hieronder."
+    "shortcut_modifier_note": "Sneltoets-systeem: kies Windows/Linux (Ctrl+Alt) of Mac (Ctrl+Command) in Instellingen."
+  },
+  "wpm": {
+    "setup_title": "WPM instellen",
+    "setup_hint": "Vul je auteurnaam en UI-taal in.",
+    "author_label": "Auteurnaam",
+    "author_placeholder": "Jouw naam",
+    "language_label": "UI-taal",
+    "author_required": "Vul je auteurnaam in.",
+    "save": "Opslaan"
   }
 }

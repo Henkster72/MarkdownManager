@@ -322,12 +322,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             exit;
         }
 	        $full = __DIR__ . '/' . $san;
-	        $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
+            $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
             $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
             $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
             $authIsSuperuser = function_exists('mdw_auth_verify_token')
                 ? mdw_auth_verify_token('superuser', $authToken)
                 : false;
+            $authIsUser = function_exists('mdw_auth_verify_token')
+                ? mdw_auth_verify_token('user', $authToken)
+                : false;
+            $postedAuthor = isset($_POST['publisher_author']) ? trim((string)$_POST['publisher_author']) : '';
 	        // Normalize line endings so the editor doesn't appear "dirty" after save.
 	        $content = str_replace(["\r\n", "\r"], "\n", $content);
 	        $submittedMeta = [];
@@ -360,25 +364,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                 }
             }
+	        $author = '';
 	        if (!empty($MDW_PUBLISHER_MODE)) {
-	            $author = isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '';
-	            if ($author === '') {
-	                $save_error = mdw_t('flash.publisher_author_required', 'Website publisher mode requires an author name.');
+	            $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
+	            if ($authIsUser && $author === '') {
+	                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
+	            } else if ($author === '') {
+	                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
 	            } else {
 	                $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
 	                if ($pageTitle === '') {
-	                    $save_error = mdw_t('flash.publisher_requires_page_title', 'Website publisher mode requires a page_title metadata line.');
+	                    $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.');
 	                } else {
 	                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
 	                    if ($pagePicture === '') {
-	                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'Website publisher mode requires a page_picture metadata line.');
+	                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.');
 	                    }
 	                }
 	            }
 	            if ($save_error === null) {
 	                $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
 	                if ($requireH2 && !mdw_md_has_h2($content)) {
-	                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'Website publisher mode requires a subtitle line starting with "##".');
+	                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".');
 	                }
 	            }
 	        }
@@ -406,6 +413,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
 	            // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
 	            $opts = !empty($metaOverrides) ? ['set' => $metaOverrides] : [];
+	            if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
+	                $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
+	                $settingsOverride['publisher_default_author'] = $author;
+	                $opts['settings'] = $settingsOverride;
+	            }
 	            $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
 
 	        $tmp = $full . '.tmp';
@@ -479,10 +491,33 @@ $current_publish_state_lower = strtolower($current_publish_state);
 <title><?=h($current_title)?> • md edit</title>
 
 <script>
+// Namespace localStorage per app base URL to avoid cross-instance collisions.
+(function(){
+    const loc = window.location;
+    const origin = String(loc.origin || '');
+    const path = String(loc.pathname || '/');
+    const dir = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+    const prefix = `mdw:${origin}${dir}`;
+    const storageKey = (key) => `${prefix}:${key}`;
+    window.__mdwStoragePrefix = prefix;
+    window.__mdwStorageKey = storageKey;
+    window.__mdwStorageGet = (key) => {
+        try { return localStorage.getItem(storageKey(key)); } catch { return null; }
+    };
+    window.__mdwStorageSet = (key, value) => {
+        try { localStorage.setItem(storageKey(key), value); } catch {}
+    };
+    window.__mdwStorageRemove = (key) => {
+        try { localStorage.removeItem(storageKey(key)); } catch {}
+    };
+})();
+</script>
+
+<script>
 // Bootstrap editor pane widths early (pre-CSS) to avoid layout shift on reload/save.
 (function(){
     try {
-        const raw = localStorage.getItem('mdw_editor_col_widths');
+        const raw = window.__mdwStorageGet('mdw_editor_col_widths');
         if (!raw) return;
         const saved = JSON.parse(raw);
         const ok = (v) => (typeof v === 'string') && /^\d+(\.\d+)?%$/.test(v);
@@ -499,7 +534,7 @@ $current_publish_state_lower = strtolower($current_publish_state);
 // Bootstrap editor word wrap early (pre-CSS) to avoid layout shift on reload/save.
 (function(){
     try {
-        if (localStorage.getItem('mdw_editor_wrap') === '1') {
+        if (window.__mdwStorageGet('mdw_editor_wrap') === '1') {
             document.documentElement.classList.add('mdw-wrap-on');
         }
     } catch {}
@@ -510,7 +545,7 @@ $current_publish_state_lower = strtolower($current_publish_state);
 // Bootstrap line numbers early (pre-CSS) to avoid layout shift on reload/save.
 (function(){
     try {
-        if (localStorage.getItem('mdw_editor_lines') === '0') {
+        if (window.__mdwStorageGet('mdw_editor_lines') === '0') {
             document.documentElement.classList.add('mdw-lines-off');
         }
     } catch {}
@@ -525,7 +560,7 @@ $current_publish_state_lower = strtolower($current_publish_state);
 <script>
 // theme bootstrap (zonder Tailwind)
 (function(){
-    const saved = localStorage.getItem('mdsite-theme');
+    const saved = window.__mdwStorageGet('mdsite-theme');
     const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const mode = saved || (prefers ? 'dark' : 'light');
     const useDark = mode === 'dark';
@@ -538,8 +573,8 @@ $current_publish_state_lower = strtolower($current_publish_state);
     try {
         const hasUser = <?= $MDW_AUTH_META['has_user'] ? 'true' : 'false' ?>;
         const hasSuper = <?= $MDW_AUTH_META['has_superuser'] ? 'true' : 'false' ?>;
-        const role = localStorage.getItem('mdw_auth_role') || '';
-        const token = localStorage.getItem('mdw_auth_token') || '';
+        const role = window.__mdwStorageGet('mdw_auth_role') || '';
+        const token = window.__mdwStorageGet('mdw_auth_token') || '';
         if (!role || !token || (!hasUser && !hasSuper)) {
             document.documentElement.classList.add('auth-locked');
         }
@@ -560,6 +595,11 @@ window.MathJax = {
 };
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true });
+window.mermaid = mermaid;
+</script>
 </head>
 
 <body class="app-body edit-page">
@@ -936,12 +976,41 @@ window.MathJax = {
 			    </div>
 			</div>
 
+			<div class="auth-overlay" id="wpmUserOverlay" hidden>
+				<div class="modal auth-modal" id="wpmUserModal" role="dialog" aria-modal="true" aria-labelledby="wpmUserTitle">
+					<div class="modal-header">
+						<div class="modal-title" id="wpmUserTitle"><?=h(mdw_t('wpm.setup_title','WPM setup'))?></div>
+					</div>
+					<div class="modal-body">
+						<div class="status-text" style="margin-bottom: 0.6rem;">
+							<?=h(mdw_t('wpm.setup_hint','Set your author name and UI language.'))?>
+						</div>
+						<label class="modal-label" for="wpmAuthorInput"><?=h(mdw_t('wpm.author_label','Author name'))?></label>
+						<input id="wpmAuthorInput" type="text" class="input" autocomplete="name" placeholder="<?=h(mdw_t('wpm.author_placeholder','Your name'))?>">
+						<label class="modal-label" for="wpmLangSelect" style="margin-top: 0.6rem;"><?=h(mdw_t('wpm.language_label','UI language'))?></label>
+						<select id="wpmLangSelect" class="input" style="width: 100%;">
+							<?php foreach ($MDW_LANGS as $l): ?>
+								<?php
+									$code = (string)($l['code'] ?? '');
+									$label = (string)($l['native'] ?? ($l['label'] ?? $code));
+								?>
+								<option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
+							<?php endforeach; ?>
+						</select>
+						<div id="wpmUserStatus" class="status-text" style="margin-top: 0.5rem;"></div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-primary" id="wpmUserSaveBtn"><?=h(mdw_t('wpm.save','Save'))?></button>
+					</div>
+				</div>
+			</div>
+
 			<div class="auth-overlay" id="authOverlay" hidden>
 				<div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
 					<div class="modal-header">
 						<div class="modal-title" id="authModalTitle"><?=h($APP_NAME)?></div>
 					</div>
-					<div class="modal-body">
+					<form class="modal-body" id="authForm" autocomplete="on">
 						<div id="authSetupFields" hidden>
 							<div class="modal-field">
 								<label class="modal-label" for="authSetupUserPassword">User password</label>
@@ -960,9 +1029,9 @@ window.MathJax = {
 							</div>
 						</div>
 						<div id="authStatus" class="status-text" style="margin-top: 0.5rem;"></div>
-					</div>
+					</form>
 					<div class="modal-footer">
-						<button type="button" class="btn btn-ghost" id="authSubmitBtn">
+						<button type="submit" form="authForm" class="btn btn-ghost" id="authSubmitBtn">
 							<span class="pi pi-login"></span>
 							<span class="btn-label">Login</span>
 						</button>
@@ -1055,19 +1124,36 @@ window.MathJax = {
 				        </div>
 
 				        <div class="modal-field">
-				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts modifier'))?></div>
+				            <div class="modal-label"><?=h(mdw_t('theme.delete_after.label','After deleting a note'))?></div>
+				            <div class="modal-row" style="gap: 1rem; margin: 0;">
+				                <label class="radio">
+				                    <input type="radio" name="deleteAfter" id="deleteAfterOverview" value="overview">
+				                    <span><?=h(mdw_t('theme.delete_after.overview','Back to overview'))?></span>
+				                </label>
+				                <label class="radio">
+				                    <input type="radio" name="deleteAfter" id="deleteAfterNext" value="next">
+				                    <span><?=h(mdw_t('theme.delete_after.next','Open next note'))?></span>
+				                </label>
+				            </div>
+				            <div class="status-text">
+				                <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
+				            </div>
+				        </div>
+
+				        <div class="modal-field">
+				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
 				            <div class="modal-row" style="gap: 1rem; margin: 0;">
 				                <label class="radio">
 				                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModOption" value="option">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Ctrl + Option (⌃⌥)'))?></span>
+			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
 			                </label>
 			                <label class="radio">
 			                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModCommand" value="command">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Ctrl + Command (⌃⌘)'))?></span>
+			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
 			                </label>
 			            </div>
 			            <div class="status-text">
-			                <?=h(mdw_t('theme.kbd_modifier.tip','Tip: macOS VoiceOver uses Ctrl+Option; choose Ctrl+Command to avoid conflicts.'))?>
+			                <?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?>
 			            </div>
 			        </div>
 
@@ -1098,6 +1184,17 @@ window.MathJax = {
 			            </div>
 			        </div>
 
+			        <div class="modal-field" data-auth-superuser="1">
+			            <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
+			            <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
+			            </label>
+			            <div id="allowUserDeleteStatus" class="status-text" style="margin-top: 0.35rem;">
+			                <?=h(mdw_t('theme.permissions.hint','Saved for all users.'))?>
+			            </div>
+			        </div>
+
 				        <details style="margin-top: 0.8rem;">
 				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.metadata.title','Metadata'))?></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
@@ -1109,13 +1206,13 @@ window.MathJax = {
 				                        : !empty($META_CFG['_settings']['publisher_require_h2']);
 				                ?>
 				                <div class="modal-field" style="margin: 0;">
-				                    <div class="modal-label"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <div class="modal-label"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
 				                    <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                        <input id="publisherModeToggle" type="checkbox" <?= $publisherMode ? 'checked' : '' ?>>
-				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable website publisher mode'))?></span>
+				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable WPM'))?></span>
 				                    </label>
 				                    <div class="status-text" style="margin-top: 0.35rem;">
-				                        <?=h(mdw_t('theme.publisher.hint','Adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
+				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
 				                    </div>
 				                    <div style="display:grid; grid-template-columns: 1fr; gap: 0.35rem; margin-top: 0.6rem;">
 				                        <label class="status-text" for="publisherAuthorInput"><?=h(mdw_t('theme.publisher.author_label','Author name'))?></label>
@@ -1149,7 +1246,7 @@ window.MathJax = {
 				                    <?php endforeach; ?>
 				                </div>
 				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
-				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
 				                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>

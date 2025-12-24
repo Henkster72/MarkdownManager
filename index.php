@@ -63,6 +63,22 @@ function sanitize_md_path($path) {
     return $path;
 }
 
+function sanitize_md_path_like($path) {
+    if (!is_string($path)) return null;
+    $path = trim($path);
+    if ($path === '' || strpos($path, '..') !== false) return null;
+
+    $path = str_replace("\\", "/", $path);
+    $path = trim($path, "/");
+    $parts = explode('/', $path);
+    foreach ($parts as $p) {
+        if ($p === '') return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $p)) return null;
+    }
+    if (!preg_match('/\.md$/i', end($parts))) return null;
+    return $path;
+}
+
 function sanitize_new_md_path($path) {
     if (!is_string($path) || trim($path) === '') return null;
 
@@ -388,6 +404,62 @@ function try_secret_login($passwordInput) {
 	    } else if ($_POST['action'] === 'delete') {
         $postedFile = isset($_POST['file']) ? (string)$_POST['file'] : '';
         $san = sanitize_md_path($postedFile);
+        $allowUserDelete = !array_key_exists('allow_user_delete', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['allow_user_delete']);
+        $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
+        $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+        $authRequired = function_exists('mdw_auth_has_role')
+            ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
+            : false;
+        $authIsSuperuser = function_exists('mdw_auth_verify_token')
+            ? mdw_auth_verify_token('superuser', $authToken)
+            : false;
+        $authIsUser = function_exists('mdw_auth_verify_token')
+            ? mdw_auth_verify_token('user', $authToken)
+            : false;
+
+        $deleteAfter = isset($_POST['delete_after']) ? trim((string)$_POST['delete_after']) : '';
+        if ($deleteAfter !== 'next') $deleteAfter = 'overview';
+        $returnOpen = sanitize_folder_name($_POST['return_open'] ?? '') ?? null;
+        $returnFilter = sanitize_folder_name($_POST['return_filter'] ?? '') ?? null;
+        $returnFocus = sanitize_md_path_like($_POST['return_focus'] ?? '') ?? null;
+
+        $nextFile = null;
+        $prevFile = null;
+        if ($deleteAfter === 'next' && $san) {
+            $dir = folder_from_path($san);
+            $entries = list_md_in_dir_sorted($dir);
+            $paths = [];
+            foreach ($entries as $e) {
+                $p = $e['path'];
+                if (!is_string($p) || $p === '') continue;
+                if (is_secret_file($p) && !is_secret_authenticated()) continue;
+                $paths[] = $p;
+            }
+            $idx = array_search($san, $paths, true);
+            if ($idx !== false) {
+                if ($idx > 0) $prevFile = $paths[$idx - 1];
+                if ($idx < (count($paths) - 1)) $nextFile = $paths[$idx + 1];
+            }
+        }
+
+        if ($authRequired && !$authIsSuperuser) {
+            if (!$allowUserDelete || !$authIsUser) {
+                $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
+                $redirect = 'index.php';
+                if ($returnFilter) {
+                    $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                    if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+                } else if ($returnOpen) {
+                    $redirect = 'index.php?open=' . rawurlencode($returnOpen);
+                    if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+                } else if ($returnFocus) {
+                    $redirect = 'index.php?focus=' . rawurlencode($returnFocus);
+                }
+                header('Location: ' . $redirect);
+                exit;
+            }
+        }
+
         if (!$san) {
             $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
         } else if (is_secret_file($san) && !is_secret_authenticated()) {
@@ -408,7 +480,35 @@ function try_secret_login($passwordInput) {
                 $_SESSION['flash_error'] = $msg;
             }
         }
-	        header('Location: index.php');
+
+        $redirect = 'index.php';
+        if ($deleteAfter === 'next') {
+            $target = $nextFile ?: $prevFile;
+            if ($target) {
+                $targetFolder = folder_from_path($target);
+                $redirect = 'index.php?file=' . rawurlencode($target) . '&folder=' . rawurlencode($targetFolder) . '&focus=' . rawurlencode($target);
+            } else if ($returnFilter) {
+                $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+            } else if ($returnOpen) {
+                $redirect = 'index.php?open=' . rawurlencode($returnOpen);
+                if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+            } else if ($returnFocus) {
+                $redirect = 'index.php?focus=' . rawurlencode($returnFocus);
+            }
+        } else {
+            if ($returnFilter) {
+                $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+            } else if ($returnOpen) {
+                $redirect = 'index.php?open=' . rawurlencode($returnOpen);
+                if ($returnFocus) $redirect .= '&focus=' . rawurlencode($returnFocus);
+            } else if ($returnFocus) {
+                $redirect = 'index.php?focus=' . rawurlencode($returnFocus);
+            }
+        }
+
+	        header('Location: ' . $redirect);
 	        exit;
 		    } else if ($_POST['action'] === 'create_folder') {
                 $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
@@ -538,16 +638,22 @@ function try_secret_login($passwordInput) {
 		                        $content = "# " . $baseTitle . "\n";
 		                    }
 		                }
+		                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+		                $authIsUser = function_exists('mdw_auth_verify_token')
+		                    ? mdw_auth_verify_token('user', $authToken)
+		                    : false;
+		                $postedAuthor = isset($_POST['publisher_author']) ? trim((string)$_POST['publisher_author']) : '';
+		                $author = '';
 		                if (!empty($MDW_PUBLISHER_MODE)) {
-		                    $author = isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '';
-		                    if ($author === '') {
+		                    $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
+		                    if (($authIsUser && $author === '') || $author === '') {
 		                        $_SESSION['new_md_draft'] = [
 		                            'folder' => $draftFolder,
 		                            'file' => $draftFile,
 		                            'content' => $draftContent,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
-		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'Website publisher mode requires an author name.');
+		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
 		                        header('Location: index.php?new=1');
 		                        exit;
 		                    }
@@ -559,13 +665,19 @@ function try_secret_login($passwordInput) {
 		                            'content' => $draftContent,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
-		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'Website publisher mode requires a subtitle line starting with "##".');
+		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".');
 		                        header('Location: index.php?new=1');
 		                        exit;
 		                    }
 		                }
 		                // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
-		                $content = mdw_hidden_meta_ensure_block($content, $sanNew);
+		                $opts = [];
+		                if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
+		                    $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
+		                    $settingsOverride['publisher_default_author'] = $author;
+		                    $opts['settings'] = $settingsOverride;
+		                }
+		                $content = mdw_hidden_meta_ensure_block($content, $sanNew, $opts);
 		                $full = __DIR__ . '/' . $sanNew;
 	                $parentDir = dirname($full);
 	                if (!is_dir($parentDir) || !is_writable($parentDir)) {
@@ -712,6 +824,29 @@ if ($requested) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($article_title)?></title>
 
+<script>
+// Namespace localStorage per app base URL to avoid cross-instance collisions.
+(function(){
+    const loc = window.location;
+    const origin = String(loc.origin || '');
+    const path = String(loc.pathname || '/');
+    const dir = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+    const prefix = `mdw:${origin}${dir}`;
+    const storageKey = (key) => `${prefix}:${key}`;
+    window.__mdwStoragePrefix = prefix;
+    window.__mdwStorageKey = storageKey;
+    window.__mdwStorageGet = (key) => {
+        try { return localStorage.getItem(storageKey(key)); } catch { return null; }
+    };
+    window.__mdwStorageSet = (key, value) => {
+        try { localStorage.setItem(storageKey(key), value); } catch {}
+    };
+    window.__mdwStorageRemove = (key) => {
+        try { localStorage.removeItem(storageKey(key)); } catch {}
+    };
+})();
+</script>
+
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/htmlpreview.css">
@@ -719,7 +854,7 @@ if ($requested) {
 
 <script>
 (function(){
-    const saved = localStorage.getItem('mdsite-theme');
+    const saved = window.__mdwStorageGet('mdsite-theme');
     const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const mode = saved || (prefers ? 'dark' : 'light');
     const useDark = mode === 'dark';
@@ -732,8 +867,8 @@ if ($requested) {
     try {
         const hasUser = <?= $MDW_AUTH_META['has_user'] ? 'true' : 'false' ?>;
         const hasSuper = <?= $MDW_AUTH_META['has_superuser'] ? 'true' : 'false' ?>;
-        const role = localStorage.getItem('mdw_auth_role') || '';
-        const token = localStorage.getItem('mdw_auth_token') || '';
+        const role = window.__mdwStorageGet('mdw_auth_role') || '';
+        const token = window.__mdwStorageGet('mdw_auth_token') || '';
         if (!role || !token || (!hasUser && !hasSuper)) {
             document.documentElement.classList.add('auth-locked');
         }
@@ -754,6 +889,11 @@ window.MathJax = {
 };
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true });
+window.mermaid = mermaid;
+</script>
 </head>
 
 <body class="app-body index-page">
@@ -974,12 +1114,41 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 	    <?=date('Y')?> • <a href="https://github.com/Henkster72/MarkdownManager" target="_blank" rel="noopener noreferrer">Markdown Manager</a> • <a href="https://allroundwebsite.com" target="_blank" rel="noopener noreferrer">Allroundwebsite.com</a>
 	</footer>
 
+		<div class="auth-overlay" id="wpmUserOverlay" hidden>
+			<div class="modal auth-modal" id="wpmUserModal" role="dialog" aria-modal="true" aria-labelledby="wpmUserTitle">
+				<div class="modal-header">
+					<div class="modal-title" id="wpmUserTitle"><?=h(mdw_t('wpm.setup_title','WPM setup'))?></div>
+				</div>
+				<div class="modal-body">
+					<div class="status-text" style="margin-bottom: 0.6rem;">
+						<?=h(mdw_t('wpm.setup_hint','Set your author name and UI language.'))?>
+					</div>
+					<label class="modal-label" for="wpmAuthorInput"><?=h(mdw_t('wpm.author_label','Author name'))?></label>
+					<input id="wpmAuthorInput" type="text" class="input" autocomplete="name" placeholder="<?=h(mdw_t('wpm.author_placeholder','Your name'))?>">
+					<label class="modal-label" for="wpmLangSelect" style="margin-top: 0.6rem;"><?=h(mdw_t('wpm.language_label','UI language'))?></label>
+					<select id="wpmLangSelect" class="input" style="width: 100%;">
+						<?php foreach ($MDW_LANGS as $l): ?>
+							<?php
+								$code = (string)($l['code'] ?? '');
+								$label = (string)($l['native'] ?? ($l['label'] ?? $code));
+							?>
+							<option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
+						<?php endforeach; ?>
+					</select>
+					<div id="wpmUserStatus" class="status-text" style="margin-top: 0.5rem;"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-primary" id="wpmUserSaveBtn"><?=h(mdw_t('wpm.save','Save'))?></button>
+				</div>
+			</div>
+		</div>
+
 		<div class="auth-overlay" id="authOverlay" hidden>
 			<div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
 				<div class="modal-header">
 					<div class="modal-title" id="authModalTitle"><?=h($APP_NAME)?></div>
 				</div>
-				<div class="modal-body">
+				<form class="modal-body" id="authForm" autocomplete="on">
 					<div id="authSetupFields" hidden>
 						<div class="modal-field">
 							<label class="modal-label" for="authSetupUserPassword">User password</label>
@@ -998,9 +1167,9 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 						</div>
 					</div>
 					<div id="authStatus" class="status-text" style="margin-top: 0.5rem;"></div>
-				</div>
+				</form>
 				<div class="modal-footer">
-					<button type="button" class="btn btn-ghost" id="authSubmitBtn">
+					<button type="submit" form="authForm" class="btn btn-ghost" id="authSubmitBtn">
 						<span class="pi pi-login"></span>
 						<span class="btn-label">Login</span>
 					</button>
@@ -1079,19 +1248,19 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 		        </details>
 
 				        <div class="modal-field">
-				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts modifier'))?></div>
+				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
 				            <div class="modal-row" style="gap: 1rem; margin: 0;">
 				                <label class="radio">
 				                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModOption" value="option">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Ctrl + Option (⌃⌥)'))?></span>
+			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
 			                </label>
 			                <label class="radio">
 			                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModCommand" value="command">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Ctrl + Command (⌃⌘)'))?></span>
+			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
 			                </label>
 			            </div>
 			            <div class="status-text">
-			                <?=h(mdw_t('theme.kbd_modifier.tip','Tip: macOS VoiceOver uses Ctrl+Option; choose Ctrl+Command to avoid conflicts.'))?>
+			                <?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?>
 			            </div>
 			        </div>
 
@@ -1111,6 +1280,23 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 				            </div>
 			        </div>
 
+			        <div class="modal-field">
+			            <div class="modal-label"><?=h(mdw_t('theme.delete_after.label','After deleting a note'))?></div>
+			            <div class="modal-row" style="gap: 1rem; margin: 0;">
+			                <label class="radio">
+			                    <input type="radio" name="deleteAfter" id="deleteAfterOverview" value="overview">
+			                    <span><?=h(mdw_t('theme.delete_after.overview','Back to overview'))?></span>
+			                </label>
+			                <label class="radio">
+			                    <input type="radio" name="deleteAfter" id="deleteAfterNext" value="next">
+			                    <span><?=h(mdw_t('theme.delete_after.next','Open next note'))?></span>
+			                </label>
+			            </div>
+			            <div class="status-text">
+			                <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
+			            </div>
+			        </div>
+
 			        <div class="modal-field" data-auth-superuser="1">
 			            <label class="modal-label" for="appTitleInput"><?=h(mdw_t('theme.app_title.label','App title'))?></label>
 			            <div class="modal-row" style="gap: 0.6rem; margin: 0;">
@@ -1119,6 +1305,17 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 			            </div>
 			            <div id="appTitleStatus" class="status-text" style="margin-top: 0.35rem;">
 			                <?=h(mdw_t('theme.app_title.hint','Leave blank to use the default.'))?>
+			            </div>
+			        </div>
+
+			        <div class="modal-field" data-auth-superuser="1">
+			            <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
+			            <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
+			            </label>
+			            <div id="allowUserDeleteStatus" class="status-text" style="margin-top: 0.35rem;">
+			                <?=h(mdw_t('theme.permissions.hint','Saved for all users.'))?>
 			            </div>
 			        </div>
 
@@ -1133,13 +1330,13 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 				                        : !empty($META_CFG['_settings']['publisher_require_h2']);
 				                ?>
 				                <div class="modal-field" style="margin: 0;">
-				                    <div class="modal-label"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <div class="modal-label"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
 				                    <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                        <input id="publisherModeToggle" type="checkbox" <?= $publisherMode ? 'checked' : '' ?>>
-				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable website publisher mode'))?></span>
+				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable WPM'))?></span>
 				                    </label>
 				                    <div class="status-text" style="margin-top: 0.35rem;">
-				                        <?=h(mdw_t('theme.publisher.hint','Adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
+				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
 				                    </div>
 				                    <div style="display:grid; grid-template-columns: 1fr; gap: 0.35rem; margin-top: 0.6rem;">
 				                        <label class="status-text" for="publisherAuthorInput"><?=h(mdw_t('theme.publisher.author_label','Author name'))?></label>
@@ -1173,7 +1370,7 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 				                    <?php endforeach; ?>
 				                </div>
 				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
-				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','Website publisher mode'))?></div>
+				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
 				                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>

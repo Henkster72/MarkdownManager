@@ -413,6 +413,78 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
     return $text;
 }
 
+function mdw_extract_html_comments($text) {
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $lines = explode("\n", $text);
+    $comments = [];
+    $out = [];
+    $in_codeblock = false;
+    $in_comment = false;
+    $buffer = '';
+
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*```/', $line)) {
+            $out[] = $line;
+            $in_codeblock = !$in_codeblock;
+            continue;
+        }
+
+        if ($in_codeblock) {
+            $out[] = $line;
+            continue;
+        }
+
+        $line_out = '';
+        $pos = 0;
+        $len = strlen($line);
+        while ($pos < $len) {
+            if ($in_comment) {
+                $end = strpos($line, '-->', $pos);
+                if ($end === false) {
+                    $buffer .= substr($line, $pos) . "\n";
+                    $pos = $len;
+                    break;
+                }
+                $buffer .= substr($line, $pos, $end - $pos);
+                $comments[] = $buffer;
+                $token = '@@MDW_COMMENT_' . (count($comments) - 1) . '@@';
+                $line_out .= $token;
+                $buffer = '';
+                $in_comment = false;
+                $pos = $end + 3;
+                continue;
+            }
+
+            $start = strpos($line, '<!--', $pos);
+            if ($start === false) {
+                $line_out .= substr($line, $pos);
+                $pos = $len;
+                break;
+            }
+            $line_out .= substr($line, $pos, $start - $pos);
+            $pos = $start + 4;
+            $in_comment = true;
+        }
+
+        $out[] = $line_out;
+    }
+
+    if ($in_comment) {
+        return [$text, []];
+    }
+
+    return [implode("\n", $out), $comments];
+}
+
+function mdw_restore_html_comments($html, $comments) {
+    if (!$comments || !is_array($comments)) return $html;
+    foreach ($comments as $i => $comment) {
+        $token = '@@MDW_COMMENT_' . $i . '@@';
+        $html = str_replace($token, '<!--' . $comment . '-->', $html);
+    }
+    return $html;
+}
+
 function split_md_table_row($line) {
     $line = trim($line);
     if ($line === '') return [];
@@ -543,7 +615,9 @@ function mdw_metadata_default_config() {
             'publisher_mode' => false,
             'publisher_default_author' => '',
             'publisher_require_h2' => true,
+            'allow_user_delete' => true,
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
+            'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
             'theme_preset' => 'default',
             'app_title' => '',
@@ -570,6 +644,9 @@ function mdw_metadata_normalize_config($cfg) {
     $publisherMode = !empty($inSettings['publisher_mode']);
     $publisherDefaultAuthor = isset($inSettings['publisher_default_author']) ? trim((string)$inSettings['publisher_default_author']) : '';
     $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
+    $allowUserDelete = !array_key_exists('allow_user_delete', $inSettings) ? true : (bool)$inSettings['allow_user_delete'];
+    $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
+    if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
     if ($uiTheme !== 'dark' && $uiTheme !== 'light') $uiTheme = '';
     $themePreset = isset($inSettings['theme_preset']) ? trim((string)$inSettings['theme_preset']) : 'default';
@@ -579,6 +656,8 @@ function mdw_metadata_normalize_config($cfg) {
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $publisherDefaultAuthor,
         'publisher_require_h2' => (bool)$publisherRequireH2,
+        'allow_user_delete' => (bool)$allowUserDelete,
+        'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
         'app_title' => $appTitle,
@@ -777,10 +856,13 @@ function mdw_metadata_settings() {
         'publisher_mode' => !empty($s['publisher_mode']),
         'publisher_default_author' => isset($s['publisher_default_author']) ? trim((string)$s['publisher_default_author']) : '',
         'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
+        'allow_user_delete' => !array_key_exists('allow_user_delete', $s) ? true : (bool)$s['allow_user_delete'],
+        'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
         'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
     ];
+    if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';
     if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
     if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
     return $out;
@@ -1004,10 +1086,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
     $pcfg = mdw_metadata_load_publisher_config();
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
+    [$text, $comments] = mdw_extract_html_comments($text);
     $lines = explode("\n",$text);
 
     $html = [];
     $in_codeblock = false;
+    $codeblock_type = null;
     $listStack = [];
 
     // Render metadata block (optional, based on config).
@@ -1136,17 +1220,30 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
 	        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
 	            $closeAllLists();
 	            if ($in_codeblock) {
-	                $html[] = "</code></pre>";
+	                if ($codeblock_type === 'mermaid') {
+	                    $html[] = "</pre>";
+	                } else {
+	                    $html[] = "</code></pre>";
+	                }
 	                $in_codeblock = false;
+	                $codeblock_type = null;
 	            } else {
 	                $in_codeblock = true;
 	                $lang = trim((string)($m[1] ?? ''));
-	                $langEsc = $lang ? htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') : '';
-	                $langAttr = $lang ? ' class="language-'.$langEsc.'"' : '';
-	                $langDataAttr = $lang ? ' data-lang="'.$langEsc.'"' : '';
-	                $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
-	                $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
-	                $html[] = '<pre'.$preAttr.$langDataAttr.'><code'.$langAttr.'>';
+	                if (strtolower($lang) === 'mermaid') {
+	                    $codeblock_type = 'mermaid';
+	                    $preCls = md_join_classes('mermaid', $p['codeblock_pre_class'] ?? '');
+	                    $preAttr = $preCls ? ' class="'.htmlspecialchars($preCls, ENT_QUOTES, 'UTF-8').'"' : ' class="mermaid"';
+	                    $html[] = '<pre'.$preAttr.'>';
+	                } else {
+	                    $codeblock_type = 'code';
+	                    $langEsc = $lang ? htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') : '';
+	                    $langAttr = $lang ? ' class="language-'.$langEsc.'"' : '';
+	                    $langDataAttr = $lang ? ' data-lang="'.$langEsc.'"' : '';
+	                    $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
+	                    $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
+	                    $html[] = '<pre'.$preAttr.$langDataAttr.'><code'.$langAttr.'>';
+	                }
 	            }
 	            continue;
 	        }
@@ -1381,9 +1478,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
     }
 
     $closeAllLists();
-    if ($in_codeblock) $html[]="</code></pre>";
+    if ($in_codeblock) {
+        $html[] = ($codeblock_type === 'mermaid') ? '</pre>' : '</code></pre>';
+    }
 
-    return implode("\n",$html);
+    $output = implode("\n",$html);
+    return mdw_restore_html_comments($output, $comments);
 }
 
 /* TITLE FROM MD */
