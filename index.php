@@ -42,6 +42,19 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
+define('MDW_NEW_MD_TITLE_MIN', 3);
+define('MDW_NEW_MD_TITLE_MAX', 80);
+define('MDW_NEW_MD_SLUG_MIN', 3);
+define('MDW_NEW_MD_SLUG_MAX', 80);
+
+function mdw_strlen($s) {
+    return function_exists('mb_strlen') ? mb_strlen($s) : strlen($s);
+}
+
+function mdw_substr($s, $len) {
+    return function_exists('mb_substr') ? mb_substr($s, 0, $len) : substr($s, 0, $len);
+}
+
 
 /* SECURITY / PATH CLEAN */
 function sanitize_md_path($path) {
@@ -95,10 +108,10 @@ function sanitize_new_md_path($path) {
     $cleanParts = [];
     foreach ($parts as $p) {
         if ($p === '') return null;
-        $p = preg_replace('/\\s+/u', '_', $p);
+        $p = preg_replace('/\\s+/u', '-', $p);
         $p = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $p);
-        $p = preg_replace('/_+/', '_', $p);
-        $p = trim($p, '_');
+        $p = preg_replace('/-+/', '-', $p);
+        $p = trim($p, '-');
         if ($p === '' || $p === '.' || $p === '..') return null;
         $cleanParts[] = $p;
     }
@@ -106,6 +119,21 @@ function sanitize_new_md_path($path) {
     $out = implode('/', $cleanParts);
     if (!preg_match('/\\.md$/i', $out)) $out .= '.md';
     return $out;
+}
+
+function sanitize_new_md_slug($slug) {
+    if (!is_string($slug)) return null;
+    $slug = trim($slug);
+    if ($slug === '') return null;
+    $slug = preg_replace('/\\.md$/i', '', $slug);
+    $slug = str_replace(['\\', '/'], ' ', $slug);
+    $slug = preg_replace('/\\s+/u', '-', $slug);
+    $slug = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $slug);
+    $slug = preg_replace('/-+/', '-', $slug);
+    $slug = trim($slug, '-');
+    $slug = trim($slug, '.');
+    if ($slug === '' || $slug === '.' || $slug === '..') return null;
+    return $slug;
 }
 
 function sanitize_folder_name($folder) {
@@ -589,22 +617,50 @@ function try_secret_login($passwordInput) {
 		        $_SESSION['flash_ok'] = mdw_t('flash.folder_created_prefix', 'Folder created:') . ' ' . $name;
 		        header('Location: index.php?folder=' . rawurlencode($name));
 		        exit;
-			    } else if ($_POST['action'] === 'create') {
-		        $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
-		        $prefixDate = isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
+            } else if ($_POST['action'] === 'create') {
+            $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
+            $prefixDate = isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
                 $draftFolder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : 'root';
-                $draftFile = isset($_POST['new_file']) ? (string)$_POST['new_file'] : '';
+                $draftTitle = isset($_POST['new_title']) ? (string)$_POST['new_title'] : '';
+                $draftSlug = isset($_POST['new_slug']) ? (string)$_POST['new_slug'] : (isset($_POST['new_file']) ? (string)$_POST['new_file'] : '');
                 $draftContent = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
-		        if (trim($postedPath) === '') {
-		            $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
-	            $folder = sanitize_folder_name($folder) ?? 'root';
-	            $file = isset($_POST['new_file']) ? (string)$_POST['new_file'] : '';
-            $file = trim(str_replace("\\", "/", $file));
-            $file = ltrim($file, "/");
-            if ($prefixDate && !preg_match('/^\d{2}-\d{2}-\d{2}-/', $file)) {
-                $file = date('y-m-d-') . $file;
+                $titleInput = trim((string)($draftTitle ?? ''));
+                $titleInput = preg_replace('/\\s+/u', ' ', $titleInput);
+                $titleLen = mdw_strlen($titleInput);
+                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+                $authIsSuperuser = function_exists('mdw_auth_verify_token')
+                    ? mdw_auth_verify_token('superuser', $authToken)
+                    : false;
+            if (trim($postedPath) === '') {
+                $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
+            $folder = sanitize_folder_name($folder) ?? 'root';
+            $slugInput = trim((string)($draftSlug ?? ''));
+            if (!$authIsSuperuser || $slugInput === '') $slugInput = $titleInput;
+            $slug = sanitize_new_md_slug($slugInput);
+            $maxSlugLen = min(MDW_NEW_MD_SLUG_MAX, $titleLen);
+            if ($titleInput === '' || $titleLen < MDW_NEW_MD_TITLE_MIN) {
+                $_SESSION['flash_error'] = mdw_t('flash.title_too_short', 'Title is too short.', ['min' => MDW_NEW_MD_TITLE_MIN]);
+            } else if ($titleLen > MDW_NEW_MD_TITLE_MAX) {
+                $_SESSION['flash_error'] = mdw_t('flash.title_too_long', 'Title is too long.', ['max' => MDW_NEW_MD_TITLE_MAX]);
+            } else if (!$slug) {
+                $_SESSION['flash_error'] = mdw_t('flash.invalid_filename_hint', 'Invalid filename. Adjust the title (spaces become hyphens) and try again.');
+            } else {
+                if ($maxSlugLen < MDW_NEW_MD_SLUG_MIN) {
+                    $_SESSION['flash_error'] = mdw_t('flash.slug_too_short', 'Slug is too short.', ['min' => MDW_NEW_MD_SLUG_MIN]);
+                } else {
+                    $slug = mdw_substr($slug, $maxSlugLen);
+                    $slug = rtrim($slug, '-.');
+                    if ($slug === '' || mdw_strlen($slug) < MDW_NEW_MD_SLUG_MIN) {
+                        $_SESSION['flash_error'] = mdw_t('flash.slug_too_short', 'Slug is too short.', ['min' => MDW_NEW_MD_SLUG_MIN]);
+                    } else {
+                        $file = $slug . '.md';
+                        if ($prefixDate && !preg_match('/^\\d{2}-\\d{2}-\\d{2}-/', $file)) {
+                            $file = date('y-m-d-') . $file;
+                        }
+                        $postedPath = ($folder && $folder !== 'root') ? ($folder . '/' . $file) : $file;
+                    }
+                }
             }
-            $postedPath = ($folder && $folder !== 'root') ? ($folder . '/' . $file) : $file;
         } else if ($prefixDate) {
             $tmp = trim(str_replace("\\", "/", $postedPath));
             $tmp = ltrim($tmp, "/");
@@ -616,10 +672,12 @@ function try_secret_login($passwordInput) {
             $postedPath = ($d === '.' || $d === '') ? $b : ($d . '/' . $b);
         }
 
-		        $sanNew = sanitize_new_md_path($postedPath);
+		        $sanNew = $postedPath ? sanitize_new_md_path($postedPath) : null;
 		        $open_new_panel = true;
 		        if (!$sanNew) {
-		            $_SESSION['flash_error'] = mdw_t('flash.invalid_filename_hint', 'Invalid filename. Adjust the title (spaces become underscores) and try again.');
+		            if (!isset($_SESSION['flash_error']) || $_SESSION['flash_error'] === '') {
+		                $_SESSION['flash_error'] = mdw_t('flash.invalid_filename_hint', 'Invalid filename. Adjust the title (spaces become hyphens) and try again.');
+		            }
 		        } else if (is_secret_file($sanNew) && !is_secret_authenticated()) {
 		            $_SESSION['flash_error'] = mdw_t('flash.secret_marked_locked', 'This path is marked as secret. Unlock first via the viewer.');
 		        } else {
@@ -631,7 +689,10 @@ function try_secret_login($passwordInput) {
 		            } else {
 		                $content = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
 		                if (trim($content) === '') {
-		                    $baseTitle = preg_replace('/\.md$/i', '', basename($sanNew));
+		                    $baseTitle = trim((string)($titleInput ?? ''));
+                        if ($baseTitle === '') {
+                            $baseTitle = preg_replace('/\.md$/i', '', basename($sanNew));
+                        }
 		                    if (!empty($MDW_PUBLISHER_MODE)) {
 		                        $content = "# " . $baseTitle . "\n\n## Subtitle\n";
 		                    } else {
@@ -649,11 +710,12 @@ function try_secret_login($passwordInput) {
 		                    if (($authIsUser && $author === '') || $author === '') {
 		                        $_SESSION['new_md_draft'] = [
 		                            'folder' => $draftFolder,
-		                            'file' => $draftFile,
+		                            'title' => $draftTitle,
+		                            'slug' => $draftSlug,
 		                            'content' => $draftContent,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
-		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
+		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
 		                        header('Location: index.php?new=1');
 		                        exit;
 		                    }
@@ -661,11 +723,12 @@ function try_secret_login($passwordInput) {
 		                    if ($requireH2 && !mdw_md_has_h2($content)) {
 		                        $_SESSION['new_md_draft'] = [
 		                            'folder' => $draftFolder,
-		                            'file' => $draftFile,
+		                            'title' => $draftTitle,
+		                            'slug' => $draftSlug,
 		                            'content' => $draftContent,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
-		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".');
+		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
 		                        header('Location: index.php?new=1');
 		                        exit;
 		                    }
@@ -703,7 +766,8 @@ function try_secret_login($passwordInput) {
             // Preserve the form input so the user can adjust it after an error.
             $_SESSION['new_md_draft'] = [
                 'folder' => $draftFolder,
-                'file' => $draftFile,
+                'title' => $draftTitle,
+                'slug' => $draftSlug,
                 'content' => $draftContent,
                 'prefix_date' => $prefixDate ? 1 : 0,
             ];
@@ -803,15 +867,17 @@ if ($requested) {
 			    }
 			}
 
-        $new_md_file_value = $today_prefix;
+        $new_md_title_value = '';
+        $new_md_slug_value = '';
         $new_md_content_value = '';
-        $new_md_prefix_checked = true;
+        $new_md_prefix_checked = empty($MDW_PUBLISHER_MODE);
         if (is_array($new_md_draft)) {
             $draftFolder = sanitize_folder_name((string)($new_md_draft['folder'] ?? '')) ?? 'root';
             if ($draftFolder === 'root' || in_array($draftFolder, $existingFolders, true)) {
                 $default_new_folder = $draftFolder;
             }
-            $new_md_file_value = (string)($new_md_draft['file'] ?? $new_md_file_value);
+            $new_md_title_value = (string)($new_md_draft['title'] ?? $new_md_title_value);
+            $new_md_slug_value = (string)($new_md_draft['slug'] ?? (string)($new_md_draft['file'] ?? $new_md_slug_value));
             $new_md_content_value = (string)($new_md_draft['content'] ?? '');
             $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
         }
@@ -999,7 +1065,7 @@ window.mermaid = mermaid;
         <div>
             <div style="font-size: 0.9rem; font-weight: 600;"><?=h(mdw_t('index.new_markdown.title','New markdown'))?></div>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                <?=h(mdw_t('index.new_markdown.relative_path','Relative path, e.g.'))?> <code>finance/25-12-12-Note.md</code>
+                <?=h(mdw_t('index.new_markdown.relative_path','Pick a folder, add a title, and a slug is created for the filename.'))?>
             </div>
         </div>
         <button id="newMdClose" type="button" class="btn btn-ghost btn-small"><?=h(mdw_t('index.new_markdown.close','Close'))?></button>
@@ -1021,8 +1087,23 @@ window.mermaid = mermaid;
 			                <span>yy-mm-dd-</span>
 			            </label>
 			            </div>
-			            <input id="newMdFile" name="new_file" class="input" style="width: 100%;" type="text" value="<?=h($new_md_file_value)?>" placeholder="<?=h(mdw_t('index.new_markdown.filename_placeholder','title.md'))?>" required>
-                        <div id="newMdFileHint" class="status-text" style="display:none; margin-top: 0.25rem;"></div>
+                        <div style="display:flex; flex-direction: column; gap: 0.35rem;">
+                            <label class="status-text" for="newMdTitle"><?=h(mdw_t('index.new_markdown.title_label','Title'))?></label>
+                            <input id="newMdTitle" name="new_title" class="input" style="width: 100%;" type="text" value="<?=h($new_md_title_value)?>" placeholder="<?=h(mdw_t('index.new_markdown.title_placeholder','Your title'))?>" minlength="<?=MDW_NEW_MD_TITLE_MIN?>" maxlength="<?=MDW_NEW_MD_TITLE_MAX?>" data-title-min="<?=MDW_NEW_MD_TITLE_MIN?>" data-title-max="<?=MDW_NEW_MD_TITLE_MAX?>" required>
+                            <div id="newMdTitleHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
+                        </div>
+                        <div style="display:flex; flex-direction: column; gap: 0.35rem;">
+                            <label class="status-text" for="newMdFile"><?=h(mdw_t('index.new_markdown.slug_label','Slug / filename'))?></label>
+                            <div style="display:flex; align-items:center; gap: 0.4rem;">
+                                <input id="newMdFile" name="new_slug" class="input" style="width: 100%;" type="text" value="<?=h($new_md_slug_value)?>" placeholder="<?=h(mdw_t('index.new_markdown.filename_placeholder','my-title'))?>" minlength="<?=MDW_NEW_MD_SLUG_MIN?>" maxlength="<?=MDW_NEW_MD_SLUG_MAX?>" data-slug-min="<?=MDW_NEW_MD_SLUG_MIN?>" data-slug-max="<?=MDW_NEW_MD_SLUG_MAX?>" required>
+                                <span class="status-text">.md</span>
+                            </div>
+                            <div id="newMdFileHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
+                            <div id="newMdFilePreview" class="status-text" data-label="<?=h(mdw_t('index.new_markdown.filename_preview','Filename'))?>" style="margin-top: 0.1rem; display: none;">
+                                <?=h(mdw_t('index.new_markdown.filename_preview','Filename'))?>: <code id="newMdFilePreviewValue"></code>
+                            </div>
+                            <div class="status-text" data-auth-regular="1" style="margin-top: 0.1rem;"><?=h(mdw_t('index.new_markdown.slug_locked','Only a superuser can edit the slug.'))?></div>
+                        </div>
 			        </div>
 			        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="<?=h(mdw_t('index.new_markdown.content_placeholder', "# Title\n\nStart writing..."))?>"><?=h($new_md_content_value)?></textarea>
 			        <div style="display: flex; justify-content: flex-end;">
@@ -1125,8 +1206,8 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 					</div>
 					<label class="modal-label" for="wpmAuthorInput"><?=h(mdw_t('wpm.author_label','Author name'))?></label>
 					<input id="wpmAuthorInput" type="text" class="input" autocomplete="name" placeholder="<?=h(mdw_t('wpm.author_placeholder','Your name'))?>">
-					<label class="modal-label" for="wpmLangSelect" style="margin-top: 0.6rem;"><?=h(mdw_t('wpm.language_label','UI language'))?></label>
-					<select id="wpmLangSelect" class="input" style="width: 100%;">
+						<label class="modal-label" for="wpmLangSelect" style="margin-top: 0.6rem;"><?=h(mdw_t('wpm.language_label','UI language'))?></label>
+						<select id="wpmLangSelect" class="input" style="width: 100%;">
 						<?php foreach ($MDW_LANGS as $l): ?>
 							<?php
 								$code = (string)($l['code'] ?? '');
@@ -1134,14 +1215,25 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 							?>
 							<option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
 						<?php endforeach; ?>
-					</select>
-					<div id="wpmUserStatus" class="status-text" style="margin-top: 0.5rem;"></div>
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-primary" id="wpmUserSaveBtn"><?=h(mdw_t('wpm.save','Save'))?></button>
+						</select>
+						<div class="modal-label" style="margin-top: 0.6rem;"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
+						<label class="radio" style="margin-top: 0.35rem;">
+							<input type="radio" name="wpmKbdShortcutMod" id="wpmKbdShortcutModOption" value="option">
+							<span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
+						</label>
+						<label class="radio">
+							<input type="radio" name="wpmKbdShortcutMod" id="wpmKbdShortcutModCommand" value="command">
+							<span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
+						</label>
+						<div class="status-text" style="margin-top: 0.35rem;"><?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?></div>
+						<div id="wpmUserStatus" class="status-text" style="margin-top: 0.5rem;"></div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-ghost" id="wpmUserSwitchBtn"><?=h(mdw_t('wpm.switch_user','Switch user'))?></button>
+						<button type="button" class="btn btn-primary" id="wpmUserSaveBtn"><?=h(mdw_t('wpm.save','Save'))?></button>
+					</div>
 				</div>
 			</div>
-		</div>
 
 		<div class="auth-overlay" id="authOverlay" hidden>
 			<div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">

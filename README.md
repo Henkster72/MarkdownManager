@@ -1,12 +1,16 @@
-# MarkdownManager (flat-file PHP notes) v0.3.1
+# MarkdownManager v0.3.1.1
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
-MarkdownManager is a small, fast app that turns a folder of plain text notes into a clean, searchable notebook you host yourself. No database. No lock-in. Just your files, readable and editable in a friendly web interface.
+MarkdownManager is a small, fast app that turns a folder of plain text notes into a clean, searchable notebook you host yourself. No database. Flat-file MD notes. No lock-in. Just your files, readable and editable in a friendly web interface.
 
 Sharpen your thinking.
 
 New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
+
+## What's new in 0.3.1.1
+
+- WPM bugfixes: title-first MD creation with slug validation, date prefix optional by default in WPM, and superuser-only filename/slug changes.
 
 ## What's new in 0.3.1
 
@@ -26,9 +30,9 @@ New and exciting: thanks to user input, Mermaid diagram support is now built in.
 
 See `CHANGELOG.md`.
 
-## Website publication mode (publisher)
+## Website publication mode (WPM)
 
-Website publication mode is meant for teams or individuals who want to treat Markdown as a lightweight CMS. It adds structured metadata, publishing states, and stricter content rules while keeping the same flat-file workflow.
+Website publication mode is meant for teams or individuals who want to treat Markdown as a lightweight CMS. It adds structured metadata, publishing states, and stricter content rules while keeping the same flat-file workflow. This can be coupled to AW-SSG if needed to get a seemless website publication tool.
 
 ### How it works
 
@@ -403,6 +407,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.3.1.1: WPM bugfixes for title-first MD creation with slug validation, date prefix default behavior, and superuser-only slug changes.
 - 0.3.1: Major translation effort (DE/FR/PT UI + localized tutorials), language-aware onboarding in WPM, HTML preview upgrades (caret footnotes, inline HTML, strikethrough, themed buttons, stronger link parsing), AJAX save + replace modal, and complementary secondary accent.
 - 0.3: Website publication mode with metadata-driven publish states, author/subtitle requirements, server-saved settings, and UI enhancements (explorer sorting, date display, mobile layout refinements, app title override, settings cleanup).
 - 0.2.1: Theme support (file-based themes + per-user overrides), HTML export/copy from the editor, built-in image manager (upload + browse + insert), reserved `themes/` + `images/` folders (configurable in `.env`), improved MathJax rendering in live preview, and a handful of editor/mobile UX fixes (modal overlap, responsive toolbar).

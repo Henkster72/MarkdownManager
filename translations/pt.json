@@ -35,9 +35,14 @@
       "title": "Novo markdown",
       "close": "Fechar",
       "create_edit": "Criar e editar",
-      "relative_path": "Caminho relativo, por ex.",
-      "date_prefix_title": "Adiciona um prefixo yy-mm-dd- para que as notas sejam ordenadas por data.",
-      "filename_placeholder": "titulo.md",
+      "relative_path": "Escolha uma pasta, adicione um título e um slug é criado para o nome do ficheiro.",
+      "title_label": "Título",
+      "title_placeholder": "O seu título",
+      "slug_label": "Slug / nome do ficheiro",
+      "filename_preview": "Nome do ficheiro",
+      "slug_locked": "Apenas um superutilizador pode editar o slug.",
+      "date_prefix_title": "Adiciona um prefixo yy-mm-dd- ao nome do ficheiro.",
+      "filename_placeholder": "meu-titulo",
       "content_placeholder": "# Título\n\nComece a escrever..."
     },
     "new_folder_title": "Criar uma nova pasta"
@@ -50,6 +55,7 @@
       "save": "Guardar",
       "publish": "Publicar",
       "publish_title": "Enviar para processamento",
+      "rename": "Renomear",
       "revert": "Reverter",
       "delete": "Eliminar",
       "wrap": "Quebra",
@@ -63,6 +69,7 @@
       "processing": "Processamento",
       "published": "Publicado"
     },
+    "new_md_hint": "Use +MD na barra superior para criar um novo ficheiro markdown.",
     "preview_title": "Pré-visualização HTML",
     "preview": {
       "export_title": "Transferir uma exportação HTML simples",
@@ -219,6 +226,14 @@
     "upload_failed": "Falha no envio.",
     "uploaded": "Enviado."
   },
+  "rename_modal": {
+    "title": "Renomear ficheiro",
+    "slug_label": "Novo slug",
+    "slug_placeholder": "novo-titulo",
+    "prefix_hint": "Prefixo de data mantido:",
+    "confirm": "Renomear",
+    "cancel": "Cancelar"
+  },
   "nav": {
     "collapse_folder": "Recolher pasta",
     "expand_folder": "Expandir pasta",
@@ -242,10 +257,14 @@
       "enter_title": "Introduza um título para o nome do ficheiro.",
       "no_trailing_slash": "O nome do ficheiro não pode terminar com uma barra.",
       "no_empty_parts": "O nome do ficheiro não pode conter partes de caminho vazias.",
-      "adjust_title": "Ajuste o título para que contenha letras/números (os espaços tornam-se underscores).",
+      "adjust_title": "Ajuste o título para que contenha letras/números (os espaços tornam-se hífens).",
       "no_dot_parts": "O nome do ficheiro não pode conter partes de caminho \".\" ou \"..\".",
       "invalid_filename": "Nome de ficheiro inválido.",
-      "adjusted_hint": "Nome de ficheiro ajustado: espaços → underscores; caracteres não suportados removidos."
+      "adjusted_hint": "Slug ajustado: espaços → hífens; caracteres não suportados removidos.",
+      "title_too_short": "O título é demasiado curto (mín {min}).",
+      "title_too_long": "O título é demasiado longo (máx {max}).",
+      "slug_too_short": "O slug é demasiado curto (mín {min}).",
+      "slug_too_long": "O slug é demasiado longo (máx {max})."
     }
   },
   "flash": {
@@ -261,15 +280,20 @@
     "path_exists_not_folder_prefix": "O caminho já existe (não é uma pasta):",
     "folder_create_failed": "Não foi possível criar a pasta.",
     "folder_created_prefix": "Pasta criada:",
-    "invalid_filename_hint": "Nome de ficheiro inválido. Ajuste o título (os espaços tornam-se underscores) e tente novamente.",
+    "invalid_filename_hint": "Nome de ficheiro inválido. Ajuste o título (os espaços tornam-se hífens) e tente novamente.",
+    "title_too_short": "O título é demasiado curto (mín {min}).",
+    "title_too_long": "O título é demasiado longo (máx {max}).",
+    "slug_too_short": "O slug é demasiado curto (mín {min}).",
+    "rename_failed": "Não foi possível renomear o ficheiro.",
+    "rename_no_change": "O nome do ficheiro não mudou.",
     "secret_marked_locked": "Este caminho está marcado como secreto. Desbloqueie primeiro no visualizador.",
     "folder_not_exist_prefix": "A pasta não existe:",
     "file_exists_prefix": "O ficheiro já existe:",
     "file_create_failed": "Não foi possível criar o ficheiro.",
-    "publisher_requires_subtitle": "O WPM requer uma linha de subtítulo a começar com \"##\".",
-    "publisher_author_required": "O WPM requer um nome de autor.",
-    "publisher_requires_page_title": "O WPM requer uma linha de metadados page_title.",
-    "publisher_requires_page_picture": "O WPM requer uma linha de metadados page_picture."
+    "publisher_requires_subtitle": "{app} requer uma linha de subtítulo a começar com \"##\".",
+    "publisher_author_required": "{app} requer um nome de autor.",
+    "publisher_requires_page_title": "{app} requer uma linha de metadados page_title.",
+    "publisher_requires_page_picture": "{app} requer uma linha de metadados page_picture."
   },
   "secret": {
     "wrong_password": "Palavra-passe incorreta.",
@@ -283,12 +307,13 @@
     "shortcut_modifier_note": "Sistema de atalhos: escolha Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) nas definições."
   },
   "wpm": {
-    "setup_title": "Configuração do WPM",
+    "setup_title": "configuração",
     "setup_hint": "Defina o seu nome de autor e o idioma da UI.",
     "author_label": "Nome do autor",
     "author_placeholder": "O seu nome",
     "language_label": "Idioma da UI",
     "author_required": "Introduza o seu nome de autor.",
-    "save": "Guardar"
+    "save": "Guardar",
+    "switch_user": "Mudar utilizador"
   }
 }

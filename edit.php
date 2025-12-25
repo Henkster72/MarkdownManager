@@ -25,6 +25,19 @@ $MDW_LANGS = mdw_i18n_list_languages(__DIR__, $TRANSLATIONS_DIR);
 $MDW_LANG = mdw_i18n_pick_lang($MDW_LANGS);
 mdw_i18n_load(__DIR__, $TRANSLATIONS_DIR, $MDW_LANG);
 
+define('MDW_NEW_MD_TITLE_MIN', 3);
+define('MDW_NEW_MD_TITLE_MAX', 80);
+define('MDW_NEW_MD_SLUG_MIN', 3);
+define('MDW_NEW_MD_SLUG_MAX', 80);
+
+function mdw_strlen($s) {
+    return function_exists('mb_strlen') ? mb_strlen($s) : strlen($s);
+}
+
+function mdw_substr($s, $len) {
+    return function_exists('mb_substr') ? mb_substr($s, 0, $len) : substr($s, 0, $len);
+}
+
 function sanitize_folder_name($folder) {
     if (!is_string($folder)) return null;
     $folder = trim($folder);
@@ -61,6 +74,21 @@ function sanitize_md_path($path) {
     if (!is_file($full)) return null;
 
     return $path;
+}
+
+function sanitize_new_md_slug($slug) {
+    if (!is_string($slug)) return null;
+    $slug = trim($slug);
+    if ($slug === '') return null;
+    $slug = preg_replace('/\\.md$/i', '', $slug);
+    $slug = str_replace(['\\', '/'], ' ', $slug);
+    $slug = preg_replace('/\\s+/u', '-', $slug);
+    $slug = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $slug);
+    $slug = preg_replace('/-+/', '-', $slug);
+    $slug = trim($slug, '-');
+    $slug = trim($slug, '.');
+    if ($slug === '' || $slug === '.' || $slug === '..') return null;
+    return $slug;
 }
 
 /* ESCAPE */
@@ -363,6 +391,65 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
     }
 }
 
+/* HANDLE RENAME (superuser) */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'rename') {
+    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
+    if ($csrf === '' || !hash_equals($CSRF_TOKEN, $csrf)) {
+        $save_error = mdw_t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.');
+    } else {
+        $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+        $authIsSuperuser = function_exists('mdw_auth_verify_token')
+            ? mdw_auth_verify_token('superuser', $authToken)
+            : false;
+        if (!$authIsSuperuser) {
+            $save_error = mdw_t('auth.superuser_required', 'Superuser login required.');
+        } else {
+            $postedFile = isset($_POST['file']) ? (string)$_POST['file'] : '';
+            $san = sanitize_md_path($postedFile);
+            if (!$san) {
+                $save_error = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+            } else {
+                $rawSlug = isset($_POST['new_slug']) ? (string)$_POST['new_slug'] : '';
+                $slug = sanitize_new_md_slug($rawSlug);
+                $slugLen = $slug ? mdw_strlen($slug) : 0;
+                if (!$slug || $slugLen < MDW_NEW_MD_SLUG_MIN) {
+                    $save_error = mdw_t('flash.slug_too_short', 'Slug is too short.', ['min' => MDW_NEW_MD_SLUG_MIN]);
+                } else if ($slugLen > MDW_NEW_MD_SLUG_MAX) {
+                    $slug = mdw_substr($slug, MDW_NEW_MD_SLUG_MAX);
+                    $slug = rtrim($slug, '-.');
+                }
+                if ($save_error === null) {
+                    $dir = dirname($san);
+                    if ($dir === '.' || $dir === '') $dir = '';
+                    $base = basename($san);
+                    $prefix = '';
+                    if (preg_match('/^\\d{2}-\\d{2}-\\d{2}-/', $base, $m)) {
+                        $prefix = $m[0];
+                    }
+                    $newBase = $prefix . $slug . '.md';
+                    $newPath = $dir ? ($dir . '/' . $newBase) : $newBase;
+                    if ($newPath === $san) {
+                        $save_error = mdw_t('flash.rename_no_change', 'Filename did not change.');
+                    } else if (is_file(__DIR__ . '/' . $newPath)) {
+                        $save_error = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $newPath;
+                    } else {
+                        $oldFull = __DIR__ . '/' . $san;
+                        $newFull = __DIR__ . '/' . $newPath;
+                        if (!@rename($oldFull, $newFull)) {
+                            $err = error_get_last();
+                            $save_error = mdw_t('flash.rename_failed', 'Could not rename file.');
+                            if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                        } else {
+                            header('Location: edit.php?file=' . rawurlencode($newPath));
+                            exit;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 /* HANDLE SAVE */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
@@ -411,46 +498,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if ($existingState === '') $existingState = 'Concept';
             $desiredPublishState = null;
             $allowedPublishStates = ['Concept', 'Processing', 'Published'];
-            if (!empty($MDW_PUBLISHER_MODE)) {
-                if ($authIsSuperuser) {
-                    if ($publishStateInput !== '') {
-                        $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
-                        if (in_array($candidate, $allowedPublishStates, true)) {
-                            $desiredPublishState = $candidate;
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    if ($authIsSuperuser) {
+                        if ($publishStateInput !== '') {
+                            $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
+                            if (in_array($candidate, $allowedPublishStates, true)) {
+                                $desiredPublishState = $candidate;
+                            }
                         }
-                    }
-                } else {
-                    if ($existingState === 'Published') {
-                        $desiredPublishState = 'Published';
-                    } else if ($publishAction === 'publish') {
-                        $desiredPublishState = 'Processing';
                     } else {
                         $desiredPublishState = $existingState !== '' ? $existingState : 'Concept';
                     }
                 }
-            }
 	        $author = '';
 	        if (!empty($MDW_PUBLISHER_MODE)) {
 	            $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
 	            if ($authIsUser && $author === '') {
-	                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
+                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
 	            } else if ($author === '') {
-	                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.');
+                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
 	            } else {
 	                $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
 	                if ($pageTitle === '') {
-	                    $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.');
+                    $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
 	                } else {
 	                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
 	                    if ($pagePicture === '') {
-	                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.');
+                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
 	                    }
 	                }
 	            }
 	            if ($save_error === null) {
 	                $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
 	                if ($requireH2 && !mdw_md_has_h2($content)) {
-	                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".');
+                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
 	                }
 	            }
 	        }
@@ -606,6 +687,18 @@ if (!empty($MDW_PUBLISHER_MODE)) {
     if ($current_publish_state === '') $current_publish_state = 'Concept';
 }
 $current_publish_state_lower = strtolower($current_publish_state);
+
+$rename_slug_value = '';
+$rename_prefix_value = '';
+if ($requested) {
+    $base = basename($requested);
+    if (preg_match('/^\\d{2}-\\d{2}-\\d{2}-/', $base, $m)) {
+        $rename_prefix_value = $m[0];
+        $base = substr($base, strlen($rename_prefix_value));
+    }
+    $base = preg_replace('/\\.md$/i', '', $base);
+    $rename_slug_value = $base;
+}
 
 ?>
 <!DOCTYPE html>
@@ -765,15 +858,16 @@ window.mermaid = mermaid;
 	                    </div>
 	                </div>
 	            </div>
-	            <div class="app-header-actions">
+            <div class="app-header-actions">
                 <div id="saveStatusChip" class="chip" style="background-color: #166534; color: white; <?= ($saved_flag && !$save_error) ? '' : 'display:none;' ?>"><?=h(mdw_t('common.saved','Saved'))?></div>
                 <?php if ($save_error): ?>
                     <div class="chip" style="background-color: var(--danger); color: white;"<?= $save_error_details ? ' title="' . h($save_error_details) . '"' : '' ?>><?=h($save_error)?></div>
                 <?php endif; ?>
 
-		                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
-		                    <span class="pi pi-list"></span>
-		                </button>
+                    <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
+                    <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
+                        <span class="pi pi-list"></span>
+                    </button>
 		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('theme.settings_title','Settings'))?>" aria-label="<?=h(mdw_t('theme.settings_title','Settings'))?>" data-auth-superuser="1">
 		                    <span class="pi pi-gear"></span>
 		                </button>
@@ -813,6 +907,9 @@ window.mermaid = mermaid;
 	                        <div class="nav-filter-row">
 	                            <input id="filterInput" class="input" type="text" placeholder="<?=h(mdw_t('common.filter_placeholder','Filter…'))?>">
 	                        </div>
+                        <div class="status-text" style="margin-top: 0.35rem;">
+                            <?=h(mdw_t('edit.new_md_hint','Use +MD in the top bar to create a new markdown file.'))?>
+                        </div>
 	                    </header>
 	                    <div class="pane-body nav-body">
 	                        <?php
@@ -854,12 +951,12 @@ window.mermaid = mermaid;
 			                                    <span class="pi pi-image"></span>
 			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
 			                                </button>
-			                                <button type="submit" form="editor-form" class="btn btn-ghost">
+		                                <button type="submit" form="editor-form" class="btn btn-ghost">
 			                                    <span class="pi pi-floppydisk"></span>
 			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
 			                                </button>
 			                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
-			                                    <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-regular="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
+                                    <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-superuser="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
 			                                        <span class="pi pi-upload"></span>
 			                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
 			                                    </button>
@@ -877,6 +974,10 @@ window.mermaid = mermaid;
 			                                        <?php endforeach; ?>
 			                                    </select>
 			                                <?php endif; ?>
+                                        <button type="button" id="renameFileBtn" class="btn btn-ghost" data-auth-superuser="1" <?= $requested ? '' : 'disabled' ?>>
+                                            <span class="pi pi-edit"></span>
+                                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.rename','Rename'))?></span>
+                                        </button>
 		                                <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
@@ -964,6 +1065,40 @@ window.mermaid = mermaid;
 		    <footer class="app-footer">
 		        <?=date('Y')?> • <a href="https://github.com/Henkster72/MarkdownManager" target="_blank" rel="noopener noreferrer">Markdown Manager</a> • <a href="https://allroundwebsite.com" target="_blank" rel="noopener noreferrer">Allroundwebsite.com</a>
 		    </footer>
+
+        <div class="modal-overlay" id="renameModalOverlay" hidden></div>
+        <div class="modal" id="renameModal" role="dialog" aria-modal="true" aria-labelledby="renameModalTitle" hidden>
+            <div class="modal-header">
+                <div class="modal-title" id="renameModalTitle"><?=h(mdw_t('rename_modal.title','Rename file'))?></div>
+                <button type="button" class="btn btn-ghost icon-button" id="renameModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
+                    <span class="pi pi-cross"></span>
+                </button>
+            </div>
+            <form method="post" action="edit.php" id="renameModalForm">
+                <input type="hidden" name="action" value="rename">
+                <input type="hidden" name="file" value="<?=h($requested ?? '')?>">
+                <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+                <input type="hidden" name="auth_role" id="renameAuthRole" value="">
+                <input type="hidden" name="auth_token" id="renameAuthToken" value="">
+                <div class="modal-body">
+                    <?php if ($rename_prefix_value !== ''): ?>
+                        <div class="status-text" style="margin-bottom: 0.35rem;">
+                            <?=h(mdw_t('rename_modal.prefix_hint','Date prefix kept:'))?> <code><?=h($rename_prefix_value)?></code>
+                        </div>
+                    <?php endif; ?>
+                    <label class="modal-label" for="renameModalSlug"><?=h(mdw_t('rename_modal.slug_label','New slug'))?></label>
+                    <div style="display:flex; align-items:center; gap: 0.4rem;">
+                        <input id="renameModalSlug" name="new_slug" class="input" type="text" value="<?=h($rename_slug_value)?>" placeholder="<?=h(mdw_t('rename_modal.slug_placeholder','new-title'))?>" data-slug-min="<?=MDW_NEW_MD_SLUG_MIN?>" data-slug-max="<?=MDW_NEW_MD_SLUG_MAX?>" data-prefix="<?=h($rename_prefix_value)?>" required>
+                        <span class="status-text">.md</span>
+                    </div>
+                    <div id="renameModalStatus" class="status-text" style="margin-top: 0.35rem;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" id="renameModalCancel"><?=h(mdw_t('rename_modal.cancel','Cancel'))?></button>
+                    <button type="submit" class="btn btn-primary" id="renameModalConfirm"><?=h(mdw_t('rename_modal.confirm','Rename'))?></button>
+                </div>
+            </form>
+        </div>
 
 		<div class="modal-overlay" id="linkModalOverlay" hidden></div>
 		<div class="modal" id="linkModal" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle" hidden>
@@ -1171,9 +1306,20 @@ window.mermaid = mermaid;
 								<option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
 							<?php endforeach; ?>
 						</select>
+						<div class="modal-label" style="margin-top: 0.6rem;"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
+						<label class="radio" style="margin-top: 0.35rem;">
+							<input type="radio" name="wpmKbdShortcutMod" id="wpmKbdShortcutModOption" value="option">
+							<span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
+						</label>
+						<label class="radio">
+							<input type="radio" name="wpmKbdShortcutMod" id="wpmKbdShortcutModCommand" value="command">
+							<span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
+						</label>
+						<div class="status-text" style="margin-top: 0.35rem;"><?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?></div>
 						<div id="wpmUserStatus" class="status-text" style="margin-top: 0.5rem;"></div>
 					</div>
 					<div class="modal-footer">
+						<button type="button" class="btn btn-ghost" id="wpmUserSwitchBtn"><?=h(mdw_t('wpm.switch_user','Switch user'))?></button>
 						<button type="button" class="btn btn-primary" id="wpmUserSaveBtn"><?=h(mdw_t('wpm.save','Save'))?></button>
 					</div>
 				</div>

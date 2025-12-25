@@ -35,9 +35,14 @@
       "title": "New markdown",
       "close": "Close",
       "create_edit": "Create & edit",
-      "relative_path": "Relative path, e.g.",
-      "date_prefix_title": "Adds a yy-mm-dd- prefix so notes sort nicely by date.",
-      "filename_placeholder": "title.md",
+      "relative_path": "Pick a folder, add a title, and a slug is created for the filename.",
+      "title_label": "Title",
+      "title_placeholder": "Your title",
+      "slug_label": "Slug / filename",
+      "filename_preview": "Filename",
+      "slug_locked": "Only a superuser can edit the slug.",
+      "date_prefix_title": "Adds a yy-mm-dd- prefix to the filename.",
+      "filename_placeholder": "my-title",
       "content_placeholder": "# Title\n\nStart writing..."
     },
     "new_folder_title": "Create a new folder"
@@ -50,6 +55,7 @@
       "save": "Save",
       "publish": "Publish",
       "publish_title": "Send to processing",
+      "rename": "Rename",
       "revert": "Revert",
       "delete": "Delete",
       "wrap": "Wrap",
@@ -63,6 +69,7 @@
       "processing": "Processing",
       "published": "Published"
     },
+    "new_md_hint": "Use +MD in the top bar to create a new markdown file.",
     "preview_title": "HTML preview",
     "preview": {
       "export_title": "Download a plain HTML export",
@@ -219,6 +226,14 @@
     "upload_failed": "Upload failed.",
     "uploaded": "Uploaded."
   },
+  "rename_modal": {
+    "title": "Rename file",
+    "slug_label": "New slug",
+    "slug_placeholder": "new-title",
+    "prefix_hint": "Date prefix kept:",
+    "confirm": "Rename",
+    "cancel": "Cancel"
+  },
   "nav": {
     "collapse_folder": "Collapse folder",
     "expand_folder": "Expand folder",
@@ -242,10 +257,14 @@
       "enter_title": "Please enter a title for the filename.",
       "no_trailing_slash": "The filename cannot end with a slash.",
       "no_empty_parts": "The filename cannot contain empty path parts.",
-      "adjust_title": "Please adjust the title so it contains letters/numbers (spaces become underscores).",
+      "adjust_title": "Please adjust the title so it contains letters/numbers (spaces become hyphens).",
       "no_dot_parts": "The filename cannot contain \".\" or \"..\" path parts.",
       "invalid_filename": "Invalid filename.",
-      "adjusted_hint": "Adjusted filename: spaces → underscores; unsupported characters removed."
+      "adjusted_hint": "Adjusted slug: spaces → hyphens; unsupported characters removed.",
+      "title_too_short": "Title is too short (min {min}).",
+      "title_too_long": "Title is too long (max {max}).",
+      "slug_too_short": "Slug is too short (min {min}).",
+      "slug_too_long": "Slug is too long (max {max})."
     }
   },
   "flash": {
@@ -261,15 +280,20 @@
     "path_exists_not_folder_prefix": "Path already exists (not a folder):",
     "folder_create_failed": "Could not create folder.",
     "folder_created_prefix": "Folder created:",
-    "invalid_filename_hint": "Invalid filename. Adjust the title (spaces become underscores) and try again.",
+    "invalid_filename_hint": "Invalid filename. Adjust the title (spaces become hyphens) and try again.",
+    "title_too_short": "Title is too short (min {min}).",
+    "title_too_long": "Title is too long (max {max}).",
+    "slug_too_short": "Slug is too short (min {min}).",
+    "rename_failed": "Could not rename file.",
+    "rename_no_change": "Filename did not change.",
     "secret_marked_locked": "This path is marked as secret. Unlock first via the viewer.",
     "folder_not_exist_prefix": "Folder does not exist:",
     "file_exists_prefix": "File already exists:",
     "file_create_failed": "Could not create file.",
-    "publisher_requires_subtitle": "WPM requires a subtitle line starting with \"##\".",
-    "publisher_author_required": "WPM requires an author name.",
-    "publisher_requires_page_title": "WPM requires a page_title metadata line.",
-    "publisher_requires_page_picture": "WPM requires a page_picture metadata line."
+    "publisher_requires_subtitle": "{app} requires a subtitle line starting with \"##\".",
+    "publisher_author_required": "{app} requires an author name.",
+    "publisher_requires_page_title": "{app} requires a page_title metadata line.",
+    "publisher_requires_page_picture": "{app} requires a page_picture metadata line."
   },
   "secret": {
     "wrong_password": "Wrong password.",
@@ -283,12 +307,13 @@
     "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal."
   },
   "wpm": {
-    "setup_title": "WPM setup",
+    "setup_title": "setup",
     "setup_hint": "Set your author name and UI language.",
     "author_label": "Author name",
     "author_placeholder": "Your name",
     "language_label": "UI language",
     "author_required": "Please enter your author name.",
-    "save": "Save"
+    "save": "Save",
+    "switch_user": "Switch user"
   }
 }

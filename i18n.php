@@ -121,8 +121,13 @@ function mdw_i18n_get($key) {
     return is_string($cur) ? $cur : null;
 }
 
-function mdw_t($key, $fallback = '') {
+function mdw_t($key, $fallback = '', $vars = null) {
     $v = mdw_i18n_get($key);
-    if (is_string($v) && $v !== '') return $v;
-    return is_string($fallback) ? $fallback : '';
+    $out = (is_string($v) && $v !== '') ? $v : (is_string($fallback) ? $fallback : '');
+    if (is_array($vars)) {
+        foreach ($vars as $k => $val) {
+            $out = str_replace('{' . $k . '}', (string)$val, $out);
+        }
+    }
+    return $out;
 }

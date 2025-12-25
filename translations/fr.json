@@ -35,9 +35,14 @@
       "title": "Nouveau markdown",
       "close": "Fermer",
       "create_edit": "Créer et modifier",
-      "relative_path": "Chemin relatif, ex.",
-      "date_prefix_title": "Ajoute un préfixe yy-mm-dd- pour que les notes se trient par date.",
-      "filename_placeholder": "titre.md",
+      "relative_path": "Choisissez un dossier, ajoutez un titre et un slug est créé pour le nom de fichier.",
+      "title_label": "Titre",
+      "title_placeholder": "Votre titre",
+      "slug_label": "Slug / nom de fichier",
+      "filename_preview": "Nom de fichier",
+      "slug_locked": "Seul un superutilisateur peut modifier le slug.",
+      "date_prefix_title": "Ajoute un préfixe yy-mm-dd- au nom de fichier.",
+      "filename_placeholder": "mon-titre",
       "content_placeholder": "# Titre\n\nCommencez à écrire..."
     },
     "new_folder_title": "Créer un nouveau dossier"
@@ -50,6 +55,7 @@
       "save": "Enregistrer",
       "publish": "Publier",
       "publish_title": "Envoyer au traitement",
+      "rename": "Renommer",
       "revert": "Rétablir",
       "delete": "Supprimer",
       "wrap": "Renvoi",
@@ -63,6 +69,7 @@
       "processing": "En traitement",
       "published": "Publié"
     },
+    "new_md_hint": "Utilisez +MD dans la barre du haut pour créer un nouveau fichier markdown.",
     "preview_title": "Aperçu HTML",
     "preview": {
       "export_title": "Télécharger un export HTML simple",
@@ -219,6 +226,14 @@
     "upload_failed": "Échec du téléversement.",
     "uploaded": "Téléversé."
   },
+  "rename_modal": {
+    "title": "Renommer le fichier",
+    "slug_label": "Nouveau slug",
+    "slug_placeholder": "nouveau-titre",
+    "prefix_hint": "Préfixe de date conservé :",
+    "confirm": "Renommer",
+    "cancel": "Annuler"
+  },
   "nav": {
     "collapse_folder": "Réduire le dossier",
     "expand_folder": "Développer le dossier",
@@ -242,10 +257,14 @@
       "enter_title": "Veuillez saisir un titre pour le nom de fichier.",
       "no_trailing_slash": "Le nom de fichier ne peut pas se terminer par une barre oblique.",
       "no_empty_parts": "Le nom de fichier ne peut pas contenir de segments de chemin vides.",
-      "adjust_title": "Veuillez ajuster le titre pour qu'il contienne des lettres/chiffres (les espaces deviennent des underscores).",
+      "adjust_title": "Veuillez ajuster le titre pour qu'il contienne des lettres/chiffres (les espaces deviennent des tirets).",
       "no_dot_parts": "Le nom de fichier ne peut pas contenir \".\" ou \"..\" dans le chemin.",
       "invalid_filename": "Nom de fichier invalide.",
-      "adjusted_hint": "Nom de fichier ajusté : espaces → underscores ; caractères non pris en charge supprimés."
+      "adjusted_hint": "Slug ajusté : espaces → tirets ; caractères non pris en charge supprimés.",
+      "title_too_short": "Le titre est trop court (min {min}).",
+      "title_too_long": "Le titre est trop long (max {max}).",
+      "slug_too_short": "Le slug est trop court (min {min}).",
+      "slug_too_long": "Le slug est trop long (max {max})."
     }
   },
   "flash": {
@@ -261,15 +280,20 @@
     "path_exists_not_folder_prefix": "Le chemin existe déjà (pas un dossier) :",
     "folder_create_failed": "Impossible de créer le dossier.",
     "folder_created_prefix": "Dossier créé :",
-    "invalid_filename_hint": "Nom de fichier invalide. Ajustez le titre (les espaces deviennent des underscores) et réessayez.",
+    "invalid_filename_hint": "Nom de fichier invalide. Ajustez le titre (les espaces deviennent des tirets) et réessayez.",
+    "title_too_short": "Le titre est trop court (min {min}).",
+    "title_too_long": "Le titre est trop long (max {max}).",
+    "slug_too_short": "Le slug est trop court (min {min}).",
+    "rename_failed": "Impossible de renommer le fichier.",
+    "rename_no_change": "Le nom de fichier n'a pas changé.",
     "secret_marked_locked": "Ce chemin est marqué comme secret. Déverrouillez d'abord via la visionneuse.",
     "folder_not_exist_prefix": "Le dossier n'existe pas :",
     "file_exists_prefix": "Le fichier existe déjà :",
     "file_create_failed": "Impossible de créer le fichier.",
-    "publisher_requires_subtitle": "WPM nécessite une ligne de sous-titre commençant par \"##\".",
-    "publisher_author_required": "WPM nécessite un nom d'auteur.",
-    "publisher_requires_page_title": "WPM nécessite une ligne de métadonnées page_title.",
-    "publisher_requires_page_picture": "WPM nécessite une ligne de métadonnées page_picture."
+    "publisher_requires_subtitle": "{app} nécessite une ligne de sous-titre commençant par \"##\".",
+    "publisher_author_required": "{app} nécessite un nom d'auteur.",
+    "publisher_requires_page_title": "{app} nécessite une ligne de métadonnées page_title.",
+    "publisher_requires_page_picture": "{app} nécessite une ligne de métadonnées page_picture."
   },
   "secret": {
     "wrong_password": "Mot de passe incorrect.",
@@ -283,12 +307,13 @@
     "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres."
   },
   "wpm": {
-    "setup_title": "Configuration WPM",
+    "setup_title": "configuration",
     "setup_hint": "Définissez votre nom d'auteur et la langue de l'UI.",
     "author_label": "Nom de l'auteur",
     "author_placeholder": "Votre nom",
     "language_label": "Langue de l'UI",
     "author_required": "Veuillez saisir votre nom d'auteur.",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "switch_user": "Changer d'utilisateur"
   }
 }

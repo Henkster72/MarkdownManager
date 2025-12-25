@@ -1,7 +1,7 @@
 .preview-content {
   --theme-bg: #FFFFFF;
   --theme-primary: #318e89;
-  --theme-secondary: #E6F4F3;
+  --theme-secondary: #62df9e;
   background: var(--theme-bg);
   color: #003D47;
   font-family: "Nunito", var(--font-sans);

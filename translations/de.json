@@ -35,9 +35,14 @@
       "title": "Neues Markdown",
       "close": "Schließen",
       "create_edit": "Erstellen & bearbeiten",
-      "relative_path": "Relativer Pfad, z. B.",
-      "date_prefix_title": "Fügt ein yy-mm-dd- Präfix hinzu, damit Notizen nach Datum sortieren.",
-      "filename_placeholder": "titel.md",
+      "relative_path": "Ordner wählen, Titel eingeben, ein Slug wird für den Dateinamen erstellt.",
+      "title_label": "Titel",
+      "title_placeholder": "Dein Titel",
+      "slug_label": "Slug / Dateiname",
+      "filename_preview": "Dateiname",
+      "slug_locked": "Nur ein Superuser kann den Slug ändern.",
+      "date_prefix_title": "Fügt dem Dateinamen ein yy-mm-dd- Präfix hinzu.",
+      "filename_placeholder": "mein-titel",
       "content_placeholder": "# Titel\n\nSchreiben Sie los..."
     },
     "new_folder_title": "Neuen Ordner erstellen"
@@ -50,6 +55,7 @@
       "save": "Speichern",
       "publish": "Veröffentlichen",
       "publish_title": "Zur Verarbeitung senden",
+      "rename": "Umbenennen",
       "revert": "Zurücksetzen",
       "delete": "Löschen",
       "wrap": "Umbruch",
@@ -63,6 +69,7 @@
       "processing": "Verarbeitung",
       "published": "Veröffentlicht"
     },
+    "new_md_hint": "Nutze +MD in der oberen Leiste, um eine neue Markdown-Datei zu erstellen.",
     "preview_title": "HTML-Vorschau",
     "preview": {
       "export_title": "Einen einfachen HTML-Export herunterladen",
@@ -219,6 +226,14 @@
     "upload_failed": "Upload fehlgeschlagen.",
     "uploaded": "Hochgeladen."
   },
+  "rename_modal": {
+    "title": "Datei umbenennen",
+    "slug_label": "Neuer Slug",
+    "slug_placeholder": "neuer-titel",
+    "prefix_hint": "Datumspräfix bleibt erhalten:",
+    "confirm": "Umbenennen",
+    "cancel": "Abbrechen"
+  },
   "nav": {
     "collapse_folder": "Ordner einklappen",
     "expand_folder": "Ordner ausklappen",
@@ -242,10 +257,14 @@
       "enter_title": "Bitte einen Titel für den Dateinamen eingeben.",
       "no_trailing_slash": "Der Dateiname darf nicht mit einem Schrägstrich enden.",
       "no_empty_parts": "Der Dateiname darf keine leeren Pfadteile enthalten.",
-      "adjust_title": "Bitte den Titel anpassen, sodass er Buchstaben/Zahlen enthält (Leerzeichen werden zu Unterstrichen).",
+      "adjust_title": "Bitte den Titel anpassen, sodass er Buchstaben/Zahlen enthält (Leerzeichen werden zu Bindestrichen).",
       "no_dot_parts": "Der Dateiname darf keine \".\" oder \"..\" Pfadteile enthalten.",
       "invalid_filename": "Ungültiger Dateiname.",
-      "adjusted_hint": "Angepasster Dateiname: Leerzeichen → Unterstriche; nicht unterstützte Zeichen entfernt."
+      "adjusted_hint": "Slug angepasst: Leerzeichen → Bindestriche; nicht unterstützte Zeichen entfernt.",
+      "title_too_short": "Titel ist zu kurz (min {min}).",
+      "title_too_long": "Titel ist zu lang (max {max}).",
+      "slug_too_short": "Slug ist zu kurz (min {min}).",
+      "slug_too_long": "Slug ist zu lang (max {max})."
     }
   },
   "flash": {
@@ -261,15 +280,20 @@
     "path_exists_not_folder_prefix": "Pfad existiert bereits (kein Ordner):",
     "folder_create_failed": "Ordner konnte nicht erstellt werden.",
     "folder_created_prefix": "Ordner erstellt:",
-    "invalid_filename_hint": "Ungültiger Dateiname. Passen Sie den Titel an (Leerzeichen werden zu Unterstrichen) und versuchen Sie es erneut.",
+    "invalid_filename_hint": "Ungültiger Dateiname. Passen Sie den Titel an (Leerzeichen werden zu Bindestrichen) und versuchen Sie es erneut.",
+    "title_too_short": "Titel ist zu kurz (min {min}).",
+    "title_too_long": "Titel ist zu lang (max {max}).",
+    "slug_too_short": "Slug ist zu kurz (min {min}).",
+    "rename_failed": "Datei konnte nicht umbenannt werden.",
+    "rename_no_change": "Dateiname wurde nicht geändert.",
     "secret_marked_locked": "Dieser Pfad ist als geheim markiert. Zuerst über den Viewer entsperren.",
     "folder_not_exist_prefix": "Ordner existiert nicht:",
     "file_exists_prefix": "Datei existiert bereits:",
     "file_create_failed": "Datei konnte nicht erstellt werden.",
-    "publisher_requires_subtitle": "WPM erfordert eine Untertitelzeile, die mit \"##\" beginnt.",
-    "publisher_author_required": "WPM erfordert einen Autorennamen.",
-    "publisher_requires_page_title": "WPM erfordert eine page_title-Metadatenzeile.",
-    "publisher_requires_page_picture": "WPM erfordert eine page_picture-Metadatenzeile."
+    "publisher_requires_subtitle": "{app} erfordert eine Untertitelzeile, die mit \"##\" beginnt.",
+    "publisher_author_required": "{app} erfordert einen Autorennamen.",
+    "publisher_requires_page_title": "{app} erfordert eine page_title-Metadatenzeile.",
+    "publisher_requires_page_picture": "{app} erfordert eine page_picture-Metadatenzeile."
   },
   "secret": {
     "wrong_password": "Falsches Passwort.",
@@ -283,12 +307,13 @@
     "shortcut_modifier_note": "Tastenkürzel-System: Wählen Sie Windows/Linux (Strg+Alt) oder Mac (Strg+Command) in den Einstellungen."
   },
   "wpm": {
-    "setup_title": "WPM einrichten",
+    "setup_title": "einrichten",
     "setup_hint": "Legen Sie Ihren Autorennamen und die UI-Sprache fest.",
     "author_label": "Autorenname",
     "author_placeholder": "Ihr Name",
     "language_label": "UI-Sprache",
     "author_required": "Bitte geben Sie Ihren Autorennamen ein.",
-    "save": "Speichern"
+    "save": "Speichern",
+    "switch_user": "Benutzer wechseln"
   }
 }

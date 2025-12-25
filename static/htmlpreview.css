@@ -1,8 +1,8 @@
 .preview-content {
     --base: var(--theme-primary, currentColor);
-    --theme-secondary: hsl(from var(--base) calc(h - 180) s l) !important;
+    --theme-secondary-fallback: hsl(from var(--base) calc(h - 180) s l);
     --preview-accent: var(--accent);
-    --accent: var(--theme-secondary, var(--preview-accent));
+    --accent: var(--theme-secondary, var(--theme-secondary-fallback, var(--preview-accent)));
     font-family: var(--font-sans);
     font-size: 0.87rem;
     line-height: 1.55;

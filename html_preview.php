@@ -30,12 +30,25 @@ function normalize_md_link_url($url) {
 function html_preview_sanitize_dir_name($name, $fallback) {
     $name = is_string($name) ? trim($name) : '';
     if ($name === '') return $fallback;
-    if (strpos($name, '..') !== false) return $fallback;
     $name = str_replace("\\", "/", $name);
-    $name = trim($name, "/");
-    if ($name === '' || strpos($name, '/') !== false) return $fallback;
-    if (!preg_match('/^[A-Za-z0-9._\\-\\p{L}\\p{N}]+$/u', $name)) return $fallback;
-    return $name;
+    if (preg_match('~^[a-z][a-z0-9+.-]*:~i', $name) || str_starts_with($name, '//')) return $fallback;
+    if (str_starts_with($name, './')) $name = substr($name, 2);
+    $isAbs = str_starts_with($name, '/');
+    $parts = array_values(array_filter(explode('/', $name), fn($p) => $p !== ''));
+    if (empty($parts)) return $fallback;
+    $safe = [];
+    foreach ($parts as $p) {
+        if ($p === '.' || $p === '..') {
+            $safe[] = $p;
+            continue;
+        }
+        if (!preg_match('/^[A-Za-z0-9._\\-\\p{L}\\p{N}]+$/u', $p)) return $fallback;
+        $safe[] = $p;
+    }
+    $clean = implode('/', $safe);
+    if ($clean === '') return $fallback;
+    if ($isAbs && strpos($clean, '..') !== false) return $fallback;
+    return $isAbs ? '/' . $clean : $clean;
 }
 
 function html_preview_images_dir() {

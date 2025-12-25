@@ -35,9 +35,14 @@
       "title": "Nieuwe markdown",
       "close": "Sluiten",
       "create_edit": "Aanmaken & bewerken",
-      "relative_path": "Relatief pad, bijv.",
-      "date_prefix_title": "Voegt een yy-mm-dd- prefix toe zodat notities netjes op datum sorteren.",
-      "filename_placeholder": "titel.md",
+      "relative_path": "Kies een map, geef een titel en er wordt een slug gemaakt voor de bestandsnaam.",
+      "title_label": "Titel",
+      "title_placeholder": "Je titel",
+      "slug_label": "Slug / bestandsnaam",
+      "filename_preview": "Bestandsnaam",
+      "slug_locked": "Alleen een superuser kan de slug aanpassen.",
+      "date_prefix_title": "Voegt een yy-mm-dd- prefix toe aan de bestandsnaam.",
+      "filename_placeholder": "mijn-titel",
       "content_placeholder": "# Titel\n\nBegin met schrijven..."
     },
     "new_folder_title": "Nieuwe map maken"
@@ -50,6 +55,7 @@
       "save": "Opslaan",
       "publish": "Publiceren",
       "publish_title": "Naar verwerking",
+      "rename": "Hernoem",
       "revert": "Terugzetten",
       "delete": "Verwijderen",
       "wrap": "Wrap",
@@ -63,6 +69,7 @@
       "processing": "Verwerking",
       "published": "Gepubliceerd"
     },
+    "new_md_hint": "Gebruik +MD in de bovenbalk om een nieuwe markdown te maken.",
     "preview_title": "HTML-voorbeeld",
     "preview": {
       "export_title": "Download een eenvoudige HTML-export",
@@ -219,6 +226,14 @@
     "upload_failed": "Upload mislukt.",
     "uploaded": "Geupload."
   },
+  "rename_modal": {
+    "title": "Bestand hernoemen",
+    "slug_label": "Nieuwe slug",
+    "slug_placeholder": "nieuwe-titel",
+    "prefix_hint": "Datum-prefix blijft staan:",
+    "confirm": "Hernoem",
+    "cancel": "Annuleren"
+  },
   "nav": {
     "collapse_folder": "Map inklappen",
     "expand_folder": "Map uitklappen",
@@ -242,10 +257,14 @@
       "enter_title": "Geef een titel op voor de bestandsnaam.",
       "no_trailing_slash": "De bestandsnaam mag niet eindigen met een slash.",
       "no_empty_parts": "De bestandsnaam mag geen lege mapdelen bevatten.",
-      "adjust_title": "Pas de titel aan zodat er letters/cijfers in staan (spaties worden underscores).",
+      "adjust_title": "Pas de titel aan zodat er letters/cijfers in staan (spaties worden koppeltekens).",
       "no_dot_parts": "De bestandsnaam mag geen \".\" of \"..\" mapdelen bevatten.",
       "invalid_filename": "Ongeldige bestandsnaam.",
-      "adjusted_hint": "Aangepaste bestandsnaam: spaties → underscores; niet-ondersteunde tekens verwijderd."
+      "adjusted_hint": "Slug aangepast: spaties → koppeltekens; niet-ondersteunde tekens verwijderd.",
+      "title_too_short": "Titel is te kort (min {min}).",
+      "title_too_long": "Titel is te lang (max {max}).",
+      "slug_too_short": "Slug is te kort (min {min}).",
+      "slug_too_long": "Slug is te lang (max {max})."
     }
   },
   "flash": {
@@ -261,15 +280,20 @@
     "path_exists_not_folder_prefix": "Pad bestaat al (geen map):",
     "folder_create_failed": "Kon map niet aanmaken.",
     "folder_created_prefix": "Map aangemaakt:",
-    "invalid_filename_hint": "Bestandsnaam bevat ongeldige tekens. Pas de titel aan (spaties worden underscores) en probeer opnieuw.",
+    "invalid_filename_hint": "Bestandsnaam bevat ongeldige tekens. Pas de titel aan (spaties worden koppeltekens) en probeer opnieuw.",
+    "title_too_short": "Titel is te kort (min {min}).",
+    "title_too_long": "Titel is te lang (max {max}).",
+    "slug_too_short": "Slug is te kort (min {min}).",
+    "rename_failed": "Kon bestand niet hernoemen.",
+    "rename_no_change": "Bestandsnaam is niet veranderd.",
     "secret_marked_locked": "Dit pad staat als geheim gemarkeerd. Ontgrendel eerst via de viewer.",
     "folder_not_exist_prefix": "Map bestaat niet:",
     "file_exists_prefix": "Bestand bestaat al:",
     "file_create_failed": "Kon bestand niet aanmaken.",
-    "publisher_requires_subtitle": "WPM vereist een subtitelregel die begint met \"##\".",
-    "publisher_author_required": "WPM vereist een auteurnaam.",
-    "publisher_requires_page_title": "WPM vereist een page_title metaregel.",
-    "publisher_requires_page_picture": "WPM vereist een page_picture metaregel."
+    "publisher_requires_subtitle": "{app} vereist een subtitelregel die begint met \"##\".",
+    "publisher_author_required": "{app} vereist een auteurnaam.",
+    "publisher_requires_page_title": "{app} vereist een page_title metaregel.",
+    "publisher_requires_page_picture": "{app} vereist een page_picture metaregel."
   },
   "secret": {
     "wrong_password": "Onjuist wachtwoord.",
@@ -283,12 +307,13 @@
     "shortcut_modifier_note": "Sneltoets-systeem: kies Windows/Linux (Ctrl+Alt) of Mac (Ctrl+Command) in Instellingen."
   },
   "wpm": {
-    "setup_title": "WPM instellen",
+    "setup_title": "instellen",
     "setup_hint": "Vul je auteurnaam en UI-taal in.",
     "author_label": "Auteurnaam",
     "author_placeholder": "Jouw naam",
     "language_label": "UI-taal",
     "author_required": "Vul je auteurnaam in.",
-    "save": "Opslaan"
+    "save": "Opslaan",
+    "switch_user": "Wissel gebruiker"
   }
 }

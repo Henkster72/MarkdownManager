@@ -117,12 +117,44 @@ const mdwApplyMermaidTheme = () => {
         return out || fallback;
     };
     const cssVar = (name, fallback) => val(styles.getPropertyValue(name), fallback);
-    const text = val(styles.color, cssVar('--text-main', '#111827'));
-    const bg = cssVar('--theme-bg', cssVar('--bg-panel-alt', val(styles.backgroundColor, '#ffffff')));
-    const surface = cssVar('--theme-surface', cssVar('--surface-code', bg));
-    const border = cssVar('--theme-border', cssVar('--border-soft', surface));
-    const primary = cssVar('--theme-primary', cssVar('--accent', text));
-    const secondary = cssVar('--theme-secondary', cssVar('--text-muted', primary));
+    const normalizeMermaidColor = (value, fallback) => {
+        const raw = String(value || '').trim();
+        if (!raw) return fallback;
+        const srgbMatch = raw.match(/^color\((?:srgb|display-p3)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)(?:\s*\/\s*([0-9.]+))?\)$/i);
+        if (srgbMatch) {
+            const r = Math.round(Math.max(0, Math.min(1, parseFloat(srgbMatch[1]))) * 255);
+            const g = Math.round(Math.max(0, Math.min(1, parseFloat(srgbMatch[2]))) * 255);
+            const b = Math.round(Math.max(0, Math.min(1, parseFloat(srgbMatch[3]))) * 255);
+            const aRaw = srgbMatch[4];
+            if (aRaw !== undefined) {
+                const a = Math.max(0, Math.min(1, parseFloat(aRaw)));
+                if (!Number.isNaN(a) && a < 1) return `rgba(${r}, ${g}, ${b}, ${a})`;
+            }
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        return raw;
+    };
+    const resolveCssColor = (value, fallback) => {
+        const raw = String(value || '').trim();
+        if (!raw) return fallback;
+        const host = probe || document.body;
+        const el = document.createElement('span');
+        el.style.color = raw;
+        el.style.display = 'none';
+        host.appendChild(el);
+        const computed = getComputedStyle(el).color;
+        host.removeChild(el);
+        return normalizeMermaidColor(computed || '', fallback);
+    };
+    const text = resolveCssColor(val(styles.color, cssVar('--text-main', '#111827')), '#111827');
+    const bg = resolveCssColor(cssVar('--theme-bg', cssVar('--bg-panel-alt', val(styles.backgroundColor, '#ffffff'))), '#ffffff');
+    const surface = resolveCssColor(cssVar('--theme-surface', cssVar('--surface-code', bg)), bg);
+    const border = resolveCssColor(cssVar('--theme-border', cssVar('--border-soft', surface)), surface);
+    const primary = resolveCssColor(cssVar('--theme-primary', cssVar('--accent', text)), text);
+    const secondary = resolveCssColor(
+        cssVar('--theme-secondary', cssVar('--theme-secondary-fallback', cssVar('--text-muted', primary))),
+        primary
+    );
     const fontFamily = val(styles.fontFamily, cssVar('--font-sans', 'sans-serif'));
     const fontSize = val(styles.fontSize, '14px');
 
@@ -659,13 +691,17 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     const authorInput = document.getElementById('wpmAuthorInput');
     const langSelect = document.getElementById('wpmLangSelect');
+    const kbdModOption = document.getElementById('wpmKbdShortcutModOption');
+    const kbdModCommand = document.getElementById('wpmKbdShortcutModCommand');
     const saveBtn = document.getElementById('wpmUserSaveBtn');
+    const switchBtn = document.getElementById('wpmUserSwitchBtn');
     const statusEl = document.getElementById('wpmUserStatus');
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const AUTHOR_KEY = 'mdw_wpm_author';
     const LANG_KEY = 'mdw_ui_lang';
     const TUTORIAL_SEEN_KEY = 'mdw_wpm_tutorial_seen';
+    const SHORTCUT_MOD_KEY = 'mdw_shortcut_mod';
 
     const isWpm = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
@@ -705,6 +741,31 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return next;
     };
 
+    const isApple = (() => {
+        try {
+            const p = String(navigator.platform || '');
+            const ua = String(navigator.userAgent || '');
+            return /Mac|iPhone|iPad|iPod/i.test(p) || /Macintosh|iPhone|iPad|iPod/i.test(ua);
+        } catch {
+            return false;
+        }
+    })();
+
+    const readShortcutMod = () => {
+        try {
+            const v = mdwStorageGet(SHORTCUT_MOD_KEY);
+            if (v === 'command' || v === 'option') return v;
+        } catch {}
+        return isApple ? 'command' : 'option';
+    };
+
+    const writeShortcutMod = (v) => {
+        const next = (v === 'command' || v === 'option') ? v : (isApple ? 'command' : 'option');
+        try { mdwStorageSet(SHORTCUT_MOD_KEY, next); } catch {}
+        window.__mdwShortcutMod = next;
+        return next;
+    };
+
     const setStatus = (msg, kind = 'info') => {
         if (!(statusEl instanceof HTMLElement)) return;
         statusEl.textContent = String(msg || '');
@@ -737,6 +798,12 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const allowed = new Set(list.map((l) => String(l?.code || '')).filter(Boolean));
         const next = (saved && allowed.has(saved)) ? saved : (allowed.has(current) ? current : '');
         if (next) langSelect.value = next;
+    };
+
+    const syncShortcutMod = () => {
+        const mod = readShortcutMod();
+        if (kbdModOption instanceof HTMLInputElement) kbdModOption.checked = mod === 'option';
+        if (kbdModCommand instanceof HTMLInputElement) kbdModCommand.checked = mod === 'command';
     };
 
     const ensureDefaultLang = () => {
@@ -778,9 +845,21 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return true;
     };
 
+    const getAppTitle = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
+        return raw || 'Markdown Manager';
+    };
+
     const show = () => {
         overlay.hidden = false;
         document.documentElement.classList.add('modal-open');
+        const titleEl = document.getElementById('wpmUserTitle');
+        if (titleEl) {
+            const appTitle = getAppTitle();
+            titleEl.textContent = appTitle ? `${appTitle} • ${t('wpm.setup_title', 'WPM setup')}` : t('wpm.setup_title', 'WPM setup');
+        }
         setStatus(t('wpm.setup_hint', 'Set your author name and UI language.'), 'info');
         if (authorInput instanceof HTMLInputElement) {
             authorInput.focus();
@@ -812,6 +891,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 }
             }
         }
+        if (kbdModOption instanceof HTMLInputElement && kbdModOption.checked) {
+            writeShortcutMod('option');
+        } else if (kbdModCommand instanceof HTMLInputElement && kbdModCommand.checked) {
+            writeShortcutMod('command');
+        }
         hide();
     };
 
@@ -827,6 +911,17 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     window.__mdwMaybeShowWpmSetup = maybeShow;
     window.__mdwGetWpmAuthor = getAuthor;
+
+    switchBtn?.addEventListener('click', () => {
+        try {
+            mdwStorageRemove('mdw_auth_role');
+            mdwStorageRemove('mdw_auth_token');
+        } catch {}
+        hide();
+        if (typeof window.__mdwShowAuthModal === 'function') {
+            window.__mdwShowAuthModal();
+        }
+    });
 
     document.addEventListener('submit', (e) => {
         if (!isWpm()) return;
@@ -858,6 +953,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     });
     if (authorInput instanceof HTMLInputElement) authorInput.value = getAuthor();
     syncLangSelect();
+    syncShortcutMod();
     applyAuthorToForms(getAuthor());
     maybeShow();
 })();
@@ -1904,7 +2000,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const form = document.getElementById('editor-form');
     if (!(editor instanceof HTMLTextAreaElement) || !(form instanceof HTMLFormElement)) return;
 
-    const t = (k, f) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f) : (typeof f === 'string' ? f : ''));
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const metaLineRe = /^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u;
 
@@ -1922,6 +2018,12 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
+    };
+    const getAppTitle = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = settings && typeof settings.app_title === 'string' ? settings.app_title.trim() : '';
+        return raw || 'Markdown Manager';
     };
 
     const publisherOrder = [
@@ -2129,14 +2231,14 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (isPublisherMode()) {
             const pageTitle = String(mergedMeta.page_title || '').trim();
             if (!pageTitle) {
-                alert(t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.'));
+                alert(t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', { app: getAppTitle() }));
                 event.preventDefault();
                 event.stopPropagation();
                 return;
             }
             const pagePicture = String(mergedMeta.page_picture || '').trim();
             if (!pagePicture) {
-                alert(t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.'));
+                alert(t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', { app: getAppTitle() }));
                 event.preventDefault();
                 event.stopPropagation();
                 return;
@@ -2264,28 +2366,56 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     }, true);
 })();
 
-// +MD panel toggle (index.php)
+// +MD panel toggle (index.php + edit.php)
 (function(){
     const newMdToggle = document.getElementById('newMdToggle');
     const newMdPanel = document.getElementById('newMdPanel');
     const newMdClose = document.getElementById('newMdClose');
     const newMdPrefixDate = document.getElementById('newMdPrefixDate');
-    const newMdFile = document.getElementById('newMdFile');
-    const newMdFileHint = document.getElementById('newMdFileHint');
-    const newMdForm = newMdFile?.closest?.('form');
+    const newMdTitle = document.getElementById('newMdTitle');
+    const newMdSlug = document.getElementById('newMdFile');
+    const newMdTitleHint = document.getElementById('newMdTitleHint');
+    const newMdSlugHint = document.getElementById('newMdFileHint');
+    const newMdPreview = document.getElementById('newMdFilePreview');
+    const newMdPreviewValue = document.getElementById('newMdFilePreviewValue');
+    const newMdForm = newMdSlug?.closest?.('form');
     const newMdContent = newMdForm?.querySelector?.('textarea[name="new_content"]') || null;
     const newFolderBtn = document.getElementById('newFolderBtn');
     const newFolderForm = document.getElementById('newFolderForm');
     const newFolderName = document.getElementById('newFolderName');
 
-    if (!newMdToggle || !newMdPanel) return;
+    if (!newMdToggle) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+
+    const inferFolderFromUrl = () => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const folder = params.get('folder');
+            if (folder) return folder;
+            const file = params.get('file');
+            if (file && file.includes('/')) return file.split('/')[0];
+        } catch {}
+        return null;
+    };
+
+    const redirectToIndex = () => {
+        const folder = inferFolderFromUrl();
+        const url = folder ? `index.php?new=1&folder=${encodeURIComponent(folder)}` : 'index.php?new=1';
+        window.location.href = url;
+    };
+
+    if (!newMdPanel) {
+        newMdToggle.addEventListener('click', redirectToIndex);
+        return;
+    }
 
     const open = () => {
         newMdPanel.style.display = 'block';
-        if (newMdFile instanceof HTMLInputElement) {
-            newMdFile.focus();
-            if (newMdFile.value) newMdFile.setSelectionRange(newMdFile.value.length, newMdFile.value.length);
+        setSlugReadonly();
+        const focusTarget = (newMdTitle instanceof HTMLInputElement) ? newMdTitle : newMdSlug;
+        if (focusTarget instanceof HTMLInputElement) {
+            focusTarget.focus();
+            if (focusTarget.value) focusTarget.setSelectionRange(focusTarget.value.length, focusTarget.value.length);
         }
     };
     const close = () => { newMdPanel.style.display = 'none'; };
@@ -2305,189 +2435,228 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         ? /[^\p{L}\p{N}._-]+/gu
         : /[^A-Za-z0-9._-]+/g;
     const whitespaceRe = /\s+/g;
+    const titleMin = Number(newMdTitle?.dataset?.titleMin || 3);
+    const titleMax = Number(newMdTitle?.dataset?.titleMax || 80);
+    const slugMin = Number(newMdSlug?.dataset?.slugMin || 3);
+    const slugMax = Number(newMdSlug?.dataset?.slugMax || 80);
 
-    const setNewMdHint = (msg, variant) => {
-        if (!(newMdFileHint instanceof HTMLElement)) return;
+    const isSuperuser = () => (typeof window.__mdwIsSuperuser === 'function') ? window.__mdwIsSuperuser() : false;
+
+    const setHint = (el, msg, variant) => {
+        if (!(el instanceof HTMLElement)) return;
         if (!msg) {
-            newMdFileHint.textContent = '';
-            newMdFileHint.style.color = '';
-            newMdFileHint.style.display = 'none';
+            el.textContent = '';
+            el.style.color = '';
+            el.style.display = 'none';
             return;
         }
-        newMdFileHint.textContent = msg;
-        newMdFileHint.style.display = 'block';
-        newMdFileHint.style.color = variant === 'danger' ? 'var(--danger)' : 'var(--text-muted)';
+        el.textContent = msg;
+        el.style.display = 'block';
+        el.style.color = variant === 'danger' ? 'var(--danger)' : 'var(--text-muted)';
     };
 
-    const sanitizeNewMdPath = (raw) => {
-        const original = (raw || '').toString();
-        let v = original.replace(/\\/g, '/').trim();
-        v = v.replace(/\/{2,}/g, '/');
-        v = v.replace(/^\/+/, '');
-        if (!v) return { ok: false, value: '', changed: false, reason: t('js.new_md.enter_title', 'Please enter a title for the filename.') };
-        if (v.endsWith('/')) return { ok: false, value: '', changed: false, reason: t('js.new_md.no_trailing_slash', 'The filename cannot end with a slash.') };
+    const getTitleValue = () => (newMdTitle?.value || '').toString().trim().replace(whitespaceRe, ' ');
 
-        const parts = v.split('/');
-        const outParts = [];
-        let changed = v !== original;
+    const setSlugReadonly = () => {
+        if (!(newMdSlug instanceof HTMLInputElement)) return;
+        const hasTitle = !!getTitleValue();
+        const allowEdit = isSuperuser() && hasTitle;
+        newMdSlug.readOnly = !allowEdit;
+    };
 
-        for (const part0 of parts) {
-            if (part0 === '') return { ok: false, value: '', changed, reason: t('js.new_md.no_empty_parts', 'The filename cannot contain empty path parts.') };
+    const slugify = (raw) => {
+        let v = (raw || '').toString().trim();
+        if (!v) return '';
+        v = v.replace(/\\.md$/i, '');
+        v = v.replace(/[\\\\/]+/g, ' ');
+        v = v.replace(whitespaceRe, '-');
+        v = v.replace(invalidCharsRe, '');
+        v = v.replace(/-+/g, '-');
+        v = v.replace(/^[-.]+|[-.]+$/g, '');
+        return v;
+    };
 
-            let part = part0.replace(whitespaceRe, '_');
-            if (part !== part0) changed = true;
-
-            const cleaned = part.replace(invalidCharsRe, '');
-            if (cleaned !== part) changed = true;
-            part = cleaned;
-
-            const collapsed = part.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-            if (collapsed !== part) changed = true;
-            part = collapsed;
-
-            if (!part) return { ok: false, value: '', changed, reason: t('js.new_md.adjust_title', 'Please adjust the title so it contains letters/numbers (spaces become underscores).') };
-            if (part === '.' || part === '..') return { ok: false, value: '', changed, reason: t('js.new_md.no_dot_parts', 'The filename cannot contain \".\" or \"..\" path parts.') };
-            outParts.push(part);
+    const buildFilenamePreview = () => {
+        if (!(newMdPreviewValue instanceof HTMLElement)) return;
+        const slug = slugify(newMdSlug?.value || '');
+        if (!slug) {
+            newMdPreviewValue.textContent = '';
+            if (newMdPreview instanceof HTMLElement) newMdPreview.style.display = 'none';
+            return;
         }
-
-        return { ok: true, value: outParts.join('/'), changed, reason: '' };
+        if (newMdPreview instanceof HTMLElement) newMdPreview.style.display = '';
+        const prefix = (newMdPrefixDate instanceof HTMLInputElement) ? String(newMdPrefixDate.dataset.datePrefix || '') : '';
+        const usePrefix = !!(newMdPrefixDate instanceof HTMLInputElement && newMdPrefixDate.checked && prefix);
+        const withPrefix = usePrefix && !slug.startsWith(prefix) ? `${prefix}${slug}` : slug;
+        newMdPreviewValue.textContent = `${withPrefix}.md`;
     };
 
-    const ensureMdExtension = () => {
-        if (!(newMdFile instanceof HTMLInputElement)) return;
-        const v = (newMdFile.value || '').trim();
-        if (!v) return;
-        if (/\.md$/i.test(v)) return;
-        newMdFile.value = v + '.md';
-    };
-
-    const sanitizeNewMdFileInput = ({ showHint } = { showHint: false }) => {
-        if (!(newMdFile instanceof HTMLInputElement)) return true;
-
-        const raw = newMdFile.value || '';
-        const res = sanitizeNewMdPath(raw);
-        if (!res.ok) {
-            newMdFile.setCustomValidity(res.reason || t('js.new_md.invalid_filename', 'Invalid filename.'));
-            if (showHint) setNewMdHint(res.reason, 'danger');
+    const validateTitle = ({ showHint } = { showHint: false }) => {
+        if (!(newMdTitle instanceof HTMLInputElement)) return true;
+        const title = getTitleValue();
+        const len = title.length;
+        if (!title) {
+            const msg = t('js.new_md.enter_title', 'Please enter a title for the filename.');
+            newMdTitle.setCustomValidity(msg);
+            if (showHint) setHint(newMdTitleHint, msg, 'danger');
             return false;
         }
+        if (len < titleMin) {
+            const msg = t('js.new_md.title_too_short', 'Title is too short (min {min}).', { min: titleMin });
+            newMdTitle.setCustomValidity(msg);
+            if (showHint) setHint(newMdTitleHint, msg, 'danger');
+            return false;
+        }
+        if (len > titleMax) {
+            const msg = t('js.new_md.title_too_long', 'Title is too long (max {max}).', { max: titleMax });
+            newMdTitle.setCustomValidity(msg);
+            if (showHint) setHint(newMdTitleHint, msg, 'danger');
+            return false;
+        }
+        newMdTitle.setCustomValidity('');
+        if (showHint) setHint(newMdTitleHint, '', 'info');
+        return true;
+    };
 
-        newMdFile.setCustomValidity('');
-        if (res.changed && res.value && res.value !== raw) {
-            newMdFile.value = res.value;
-            if (showHint) setNewMdHint(t('js.new_md.adjusted_hint', 'Adjusted filename: spaces → underscores; unsupported characters removed.'), 'info');
+    const applySlugLimits = (slug, maxLen) => {
+        if (slug.length <= maxLen) return { value: slug, changed: false };
+        let trimmed = slug.slice(0, Math.max(0, maxLen));
+        trimmed = trimmed.replace(/[-.]+$/g, '');
+        return { value: trimmed, changed: true };
+    };
+
+    const validateSlug = ({ showHint, allowAdjust } = { showHint: false, allowAdjust: true }) => {
+        if (!(newMdSlug instanceof HTMLInputElement)) return true;
+        const titleLen = getTitleValue().length;
+        const maxLen = Math.min(slugMax, titleLen || slugMax);
+        const raw = newMdSlug.value || '';
+        let slug = slugify(raw);
+        let changed = slug !== raw;
+        if (titleLen > 0 && titleLen < titleMin) {
+            newMdSlug.setCustomValidity('');
+            if (showHint) setHint(newMdSlugHint, '', 'info');
+            return true;
+        }
+        if (titleLen === 0 && slug === '') {
+            newMdSlug.setCustomValidity('');
+            if (showHint) setHint(newMdSlugHint, '', 'info');
+            return true;
+        }
+        if (!slug) {
+            const msg = t('js.new_md.adjust_title', 'Please adjust the title so it contains letters/numbers (spaces become hyphens).');
+            newMdSlug.setCustomValidity(msg);
+            if (showHint) setHint(newMdSlugHint, msg, 'danger');
+            return false;
+        }
+        const capped = applySlugLimits(slug, maxLen);
+        if (capped.changed) {
+            slug = capped.value;
+            changed = true;
+        }
+        if (slug.length < slugMin) {
+            const msg = t('js.new_md.slug_too_short', 'Slug is too short (min {min}).', { min: slugMin });
+            newMdSlug.setCustomValidity(msg);
+            if (showHint) setHint(newMdSlugHint, msg, 'danger');
+            return false;
+        }
+        if (slug.length > maxLen) {
+            const msg = t('js.new_md.slug_too_long', 'Slug is too long (max {max}).', { max: maxLen });
+            newMdSlug.setCustomValidity(msg);
+            if (showHint) setHint(newMdSlugHint, msg, 'danger');
+            return false;
+        }
+        newMdSlug.setCustomValidity('');
+        if (allowAdjust && changed) {
+            newMdSlug.value = slug;
+            if (showHint) setHint(newMdSlugHint, t('js.new_md.adjusted_hint', 'Adjusted slug: spaces → hyphens; unsupported characters removed.'), 'info');
         } else if (showHint) {
-            setNewMdHint('', 'info');
+            setHint(newMdSlugHint, '', 'info');
         }
         return true;
     };
 
-    const applyPrefixToggle = () => {
-        if (!(newMdPrefixDate instanceof HTMLInputElement)) return;
-        if (!(newMdFile instanceof HTMLInputElement)) return;
-        const prefix = newMdPrefixDate.dataset.datePrefix || '';
-        const v = newMdFile.value || '';
 
-        if (newMdPrefixDate.checked) {
-            if (v.trim() === '' && prefix) {
-                newMdFile.value = prefix;
-                return;
-            }
-            if (!/^\d{2}-\d{2}-\d{2}-/.test(v) && prefix) {
-                newMdFile.value = prefix + v;
-            }
+    const syncSlugFromTitle = ({ showHint } = { showHint: false }) => {
+        if (!(newMdSlug instanceof HTMLInputElement)) return;
+        const title = getTitleValue();
+        if (!title) {
+            newMdSlug.value = '';
+            setHint(newMdSlugHint, '', 'info');
             return;
         }
-
-        // Remove an existing yy-mm-dd- prefix when unchecked.
-        newMdFile.value = v.replace(/^\d{2}-\d{2}-\d{2}-/, '');
-    };
-
-    const isPrefixOnly = (v) => {
-        if (!(newMdPrefixDate instanceof HTMLInputElement)) return false;
-        const prefix = String(newMdPrefixDate.dataset.datePrefix || '');
-        return !!prefix && String(v || '').trim() === prefix;
-    };
-
-    let autoFilename = (() => {
-        if (!(newMdFile instanceof HTMLInputElement)) return false;
-        const v = (newMdFile.value || '').trim();
-        return v === '' || isPrefixOnly(v);
-    })();
-
-    const findFirstH1 = (raw) => {
-        const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
-        let inFence = false;
-        for (const line of lines) {
-            if (/^\s*```/.test(line)) {
-                inFence = !inFence;
-                continue;
-            }
-            if (inFence) continue;
-            const m = line.match(/^\s*#\s+(.+?)\s*$/);
-            if (m && m[1]) return String(m[1]).trim();
+        const maxLen = Math.min(slugMax, title.length);
+        let slug = slugify(title);
+        if (slug.length > maxLen) {
+            slug = slug.slice(0, Math.max(0, maxLen)).replace(/[-.]+$/g, '');
         }
-        return '';
-    };
-
-    const maybeAutofillFileFromContent = () => {
-        if (!autoFilename) return;
-        if (!(newMdFile instanceof HTMLInputElement)) return;
-        if (!(newMdContent instanceof HTMLTextAreaElement)) return;
-
-        const h1 = findFirstH1(newMdContent.value);
-        if (!h1) return;
-
-        const safeTitle = h1.replace(/[\\/]+/g, ' ').trim();
-        if (!safeTitle) return;
-
-        const sanitized = sanitizeNewMdPath(safeTitle);
-        if (!sanitized.ok || !sanitized.value) return;
-
-        const prefix = (newMdPrefixDate instanceof HTMLInputElement) ? String(newMdPrefixDate.dataset.datePrefix || '') : '';
-        const current = (newMdFile.value || '').trim();
-        const keepPrefix = prefix && (isPrefixOnly(current) || current.startsWith(prefix));
-        const base = sanitized.value;
-        const next = keepPrefix ? (prefix + base) : base;
-
-        if (newMdFile.value !== next) {
-            newMdFile.value = next;
-            ensureMdExtension();
-            applyPrefixToggle();
-            sanitizeNewMdFileInput({ showHint: true });
+        if (!slug) {
+            newMdSlug.value = '';
+            return;
         }
+        newMdSlug.value = slug;
+        validateSlug({ showHint, allowAdjust: true });
     };
 
-    newMdPrefixDate?.addEventListener('change', applyPrefixToggle);
-    newMdFile?.addEventListener('input', () => {
-        autoFilename = false;
-        sanitizeNewMdFileInput({ showHint: true });
+    newMdPrefixDate?.addEventListener('change', () => {
+        buildFilenamePreview();
     });
-    newMdFile?.addEventListener('blur', () => {
-        sanitizeNewMdFileInput({ showHint: true });
-        ensureMdExtension();
+
+    newMdTitle?.addEventListener('input', () => {
+        validateTitle({ showHint: true });
+        setSlugReadonly();
+        syncSlugFromTitle({ showHint: true });
+        validateSlug({ showHint: true, allowAdjust: true });
+        buildFilenamePreview();
     });
-    newMdContent?.addEventListener('input', maybeAutofillFileFromContent);
+
+    newMdSlug?.addEventListener('input', () => {
+        validateSlug({ showHint: true, allowAdjust: true });
+        buildFilenamePreview();
+    });
+    newMdSlug?.addEventListener('blur', () => {
+        validateSlug({ showHint: true, allowAdjust: true });
+        buildFilenamePreview();
+    });
+
     if (newMdForm instanceof HTMLFormElement) {
         newMdForm.addEventListener('submit', (e) => {
-            applyPrefixToggle();
-            if (!sanitizeNewMdFileInput({ showHint: true })) {
+            const okTitle = validateTitle({ showHint: true });
+            const okSlug = validateSlug({ showHint: true, allowAdjust: true });
+            buildFilenamePreview();
+            if (!okTitle || !okSlug) {
                 e.preventDefault();
-                try { newMdFile?.focus(); } catch {}
-                try { newMdFile?.reportValidity?.(); } catch {}
+                try { (okTitle ? newMdSlug : newMdTitle)?.focus?.(); } catch {}
+                try { (okTitle ? newMdSlug : newMdTitle)?.reportValidity?.(); } catch {}
                 return;
             }
-            ensureMdExtension();
+            const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+            if (auth && auth.role && auth.token) {
+                const ensureInput = (name, value) => {
+                    let input = newMdForm.querySelector(`input[name="${name}"]`);
+                    if (!(input instanceof HTMLInputElement)) {
+                        input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        newMdForm.appendChild(input);
+                    }
+                    input.value = String(value || '');
+                };
+                ensureInput('auth_role', auth.role);
+                ensureInput('auth_token', auth.token);
+            }
         });
     }
 
     if (newMdPanel.style.display !== 'none' && newMdPanel.style.display !== '') {
         open();
     }
-    applyPrefixToggle();
-    maybeAutofillFileFromContent();
-    sanitizeNewMdFileInput({ showHint: false });
-    setNewMdHint('', 'info');
+    setSlugReadonly();
+    validateTitle({ showHint: false });
+    syncSlugFromTitle({ showHint: false });
+    validateSlug({ showHint: false, allowAdjust: true });
+    buildFilenamePreview();
+    setHint(newMdSlugHint, '', 'info');
+    setHint(newMdTitleHint, '', 'info');
 
     newFolderBtn?.addEventListener('click', () => {
         if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
@@ -2542,12 +2711,14 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!(e.key === 'n' || e.key === 'N')) return;
 
         const newMdPanel = document.getElementById('newMdPanel');
+        const newMdTitle = document.getElementById('newMdTitle');
         const newMdFile = document.getElementById('newMdFile');
-        if (newMdPanel && newMdFile instanceof HTMLInputElement) {
+        const focusTarget = (newMdTitle instanceof HTMLInputElement) ? newMdTitle : newMdFile;
+        if (newMdPanel && focusTarget instanceof HTMLInputElement) {
             e.preventDefault();
             newMdPanel.style.display = 'block';
-            newMdFile.focus();
-            if (newMdFile.value) newMdFile.setSelectionRange(newMdFile.value.length, newMdFile.value.length);
+            focusTarget.focus();
+            if (focusTarget.value) focusTarget.setSelectionRange(focusTarget.value.length, focusTarget.value.length);
             return;
         }
 
@@ -4211,6 +4382,126 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             e.preventDefault();
             if (!replaceAllBtn.disabled) replaceAll();
         }
+    });
+})();
+
+// Rename modal (edit.php, superuser only)
+(function(){
+    const btn = document.getElementById('renameFileBtn');
+    const modal = document.getElementById('renameModal');
+    const overlay = document.getElementById('renameModalOverlay');
+    const closeBtn = document.getElementById('renameModalClose');
+    const cancelBtn = document.getElementById('renameModalCancel');
+    const form = document.getElementById('renameModalForm');
+    const input = document.getElementById('renameModalSlug');
+    const statusEl = document.getElementById('renameModalStatus');
+    const authRoleInput = document.getElementById('renameAuthRole');
+    const authTokenInput = document.getElementById('renameAuthToken');
+    if (!btn || !modal || !overlay || !form || !input) return;
+
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    const slugMin = Number(input.dataset.slugMin || 3);
+    const slugMax = Number(input.dataset.slugMax || 80);
+
+    const supportsUnicodeProps = (() => {
+        try { new RegExp('\\p{L}', 'u'); return true; } catch { return false; }
+    })();
+    const invalidCharsRe = supportsUnicodeProps
+        ? /[^\p{L}\p{N}._-]+/gu
+        : /[^A-Za-z0-9._-]+/g;
+    const whitespaceRe = /\s+/g;
+
+    const setStatus = (msg, kind = 'info') => {
+        if (!(statusEl instanceof HTMLElement)) return;
+        statusEl.textContent = String(msg || '');
+        statusEl.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const slugify = (raw) => {
+        let v = (raw || '').toString().trim();
+        if (!v) return '';
+        v = v.replace(/\\.md$/i, '');
+        v = v.replace(/[\\\\/]+/g, ' ');
+        v = v.replace(whitespaceRe, '-');
+        v = v.replace(invalidCharsRe, '');
+        v = v.replace(/-+/g, '-');
+        v = v.replace(/^[-.]+|[-.]+$/g, '');
+        return v;
+    };
+
+    const validate = () => {
+        const raw = input.value || '';
+        let slug = slugify(raw);
+        if (!slug) {
+            const msg = t('js.new_md.adjust_title', 'Please adjust the title so it contains letters/numbers (spaces become hyphens).');
+            input.setCustomValidity(msg);
+            setStatus(msg, 'error');
+            return false;
+        }
+        if (slug.length > slugMax) {
+            slug = slug.slice(0, Math.max(0, slugMax)).replace(/[-.]+$/g, '');
+        }
+        if (slug.length < slugMin) {
+            const msg = t('js.new_md.slug_too_short', 'Slug is too short (min {min}).', { min: slugMin });
+            input.setCustomValidity(msg);
+            setStatus(msg, 'error');
+            return false;
+        }
+        input.setCustomValidity('');
+        input.value = slug;
+        setStatus('');
+        return true;
+    };
+
+    const open = () => {
+        if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+            alert(t('auth.superuser_required', 'Superuser login required.'));
+            return;
+        }
+        overlay.hidden = false;
+        modal.hidden = false;
+        document.documentElement.classList.add('modal-open');
+        setStatus('');
+        setTimeout(() => {
+            input.focus();
+            input.select();
+        }, 0);
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        modal.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+        setStatus('');
+    };
+
+    btn.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    cancelBtn?.addEventListener('click', close);
+    overlay.addEventListener('click', close);
+
+    form.addEventListener('submit', (e) => {
+        if (!validate()) {
+            e.preventDefault();
+            try { input.focus(); } catch {}
+            return;
+        }
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (authRoleInput instanceof HTMLInputElement) authRoleInput.value = String(auth?.role || '');
+        if (authTokenInput instanceof HTMLInputElement) authTokenInput.value = String(auth?.token || '');
+    });
+
+    input.addEventListener('input', () => {
+        validate();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (modal.hidden) return;
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        e.preventDefault();
+        close();
     });
 })();
 
