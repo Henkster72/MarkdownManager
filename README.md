@@ -403,6 +403,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.3.1: Major translation effort (DE/FR/PT UI + localized tutorials), language-aware onboarding in WPM, HTML preview upgrades (caret footnotes, inline HTML, strikethrough, themed buttons, stronger link parsing), AJAX save + replace modal, and complementary secondary accent.
 - 0.3: Website publication mode with metadata-driven publish states, author/subtitle requirements, server-saved settings, and UI enhancements (explorer sorting, date display, mobile layout refinements, app title override, settings cleanup).
 - 0.2.1: Theme support (file-based themes + per-user overrides), HTML export/copy from the editor, built-in image manager (upload + browse + insert), reserved `themes/` + `images/` folders (configurable in `.env`), improved MathJax rendering in live preview, and a handful of editor/mobile UX fixes (modal overlap, responsive toolbar).
 - 0.2: Plugin-based explorer (HTML/PDF/links), shared `explorer_view.php`, improved folder UX (toggle state, back caret), header SVG logo, +MD folder dropdown, internal/external link modal (with search), and `.md` links route via `index.php?file=...` for subfolder installs.
