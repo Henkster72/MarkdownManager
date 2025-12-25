@@ -327,8 +327,100 @@ function fix_mathjax_currency_in_math_delimiters($text) {
     return $text;
 }
 
-function inline_md($text, $mdPath = null, $profile = 'edit') {
+function mdw_extract_footnotes($text) {
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $lines = explode("\n", $text);
+    $out = [];
+    $footnotes = [];
+    $in_codeblock = false;
+
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*```/', $line)) {
+            $out[] = $line;
+            $in_codeblock = !$in_codeblock;
+            continue;
+        }
+
+        if (!$in_codeblock && preg_match('/^\s*\[(\^?)([A-Za-z0-9_-]+)\]:\s*(.+)$/', $line, $m)) {
+            $isCaret = ($m[1] ?? '') === '^';
+            $label = (string)($m[2] ?? '');
+            $rest = trim((string)($m[3] ?? ''));
+            if ($label !== '' && $rest !== '' && !isset($footnotes[$label])) {
+                $isLikelyUrl = !$isCaret && preg_match('~^(https?://|/|\\./|\\.\\./|#)~i', $rest);
+                if ($isLikelyUrl) {
+                    $url = $rest;
+                    $title = '';
+                    if (preg_match('/^(.+?)\s+"([^"]+)"\s*$/s', $rest, $tm)) {
+                        $url = trim((string)$tm[1]);
+                        $title = trim((string)$tm[2]);
+                    }
+                    $footnotes[$label] = [
+                        'type' => 'link',
+                        'url' => $url,
+                        'title' => $title,
+                    ];
+                } else {
+                    $footnotes[$label] = [
+                        'type' => 'text',
+                        'text' => $rest,
+                    ];
+                }
+            }
+            continue;
+        }
+
+        $out[] = $line;
+    }
+
+    return [implode("\n", $out), $footnotes];
+}
+
+function mdw_collect_footnote_refs($text) {
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $lines = explode("\n", $text);
+    $order = [];
+    $seen = [];
+    $labels = [];
+    $in_codeblock = false;
+
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*```/', $line)) {
+            $in_codeblock = !$in_codeblock;
+            continue;
+        }
+        if ($in_codeblock) continue;
+
+        if (preg_match_all('/\[([^\]]+)\]\[(\d+)\]/', $line, $m, PREG_SET_ORDER)) {
+            foreach ($m as $match) {
+                $label = trim((string)($match[1] ?? ''));
+                $num = (string)($match[2] ?? '');
+                if ($num === '') continue;
+                if (!isset($labels[$num]) && $label !== '') $labels[$num] = $label;
+                if (isset($seen[$num])) continue;
+                $seen[$num] = true;
+                $order[] = $num;
+            }
+        }
+
+        if (preg_match_all('/\[\^([A-Za-z0-9_-]+)\]/', $line, $m, PREG_SET_ORDER)) {
+            foreach ($m as $match) {
+                $num = (string)($match[1] ?? '');
+                if ($num === '') continue;
+                if (isset($seen[$num])) continue;
+                $seen[$num] = true;
+                $order[] = $num;
+            }
+        }
+    }
+
+    return ['order' => $order, 'labels' => $labels];
+}
+
+function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
     $p = md_render_profile($profile);
+    $footnotes = (is_array($context) && isset($context['footnotes']) && is_array($context['footnotes']))
+        ? $context['footnotes']
+        : [];
 
     // Protect inline code spans from further processing (and MathJax fixes).
     $codeSpans = [];
@@ -338,13 +430,24 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
         return $key;
     }, $text);
 
+    // Preserve basic inline HTML tags so they don't get escaped.
+    $rawHtmlTags = [];
+    $allowedTags = ['a','span','strong','em','code','kbd','br','hr','u','s','del','sup','sub','small','mark'];
+    $text = preg_replace_callback('/(?<!\\\\)<\\s*(\\/)?\\s*([A-Za-z][A-Za-z0-9:-]*)\\b([^>]*)>/', function($m) use (&$rawHtmlTags, $allowedTags){
+        $tag = strtolower((string)$m[2]);
+        if (!in_array($tag, $allowedTags, true)) return $m[0];
+        $key = '@@MD_HTML_' . count($rawHtmlTags) . '@@';
+        $rawHtmlTags[$key] = '<' . ($m[1] ? '/' : '') . $m[2] . $m[3] . '>';
+        return $key;
+    }, $text);
+
     $text = fix_mathjax_currency_in_math_delimiters($text);
 
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
     // ![alt](url "title")
     $text = preg_replace_callback(
-        '/!\[([^\]]*)\]\(([^)]*)\)/',
+        '/!\[([^\]]*)\]\((?<img>(?:[^()]+|\((?&img)\))*)\)/',
         function($m) use ($mdPath){
             $alt = $m[1];
             $innerRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
@@ -364,6 +467,8 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
         $text
     );
 
+    // ~~strikethrough~~
+    $text = preg_replace('/~~([^~]+)~~/', '<del class="md-del">$1</del>', $text);
     // **bold**
     $text = preg_replace('/\*\*([^*]+)\*\*/', $p['bold_repl'], $text);
     // *italic*
@@ -372,7 +477,7 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
     // [text](url) {: class="foo bar"}
     $linkClass = $p['link_class'];
     $text = preg_replace_callback(
-        "/\\[([^\\]]+)\\]\\(([^)]+)\\)(?:\\s*\\{:\\s*class\\s*=\\s*(?:\"([^\"]+)\"|&quot;([^&]+)&quot;|&#039;([^']+)&#039;)\\s*\\})?/i",
+        "/\\[([^\\]]+)\\]\\((?<url>(?:[^()]+|\\((?&url)\\))*)\\)(?:\\s*\\{:\\s*class\\s*=\\s*(?:\"([^\"]+)\"|&quot;([^&]+)&quot;|&#039;([^']+)&#039;)\\s*\\})?/i",
         function($m) use ($mdPath, $linkClass){
             $label = $m[1];
             $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
@@ -397,6 +502,52 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
         $text
     );
 
+    // [text][1] (numeric footnotes)
+    $text = preg_replace_callback(
+        "/\\[([^\\]]+)\\]\\[(\\d+)\\]/",
+        function($m) use ($mdPath, $footnotes){
+            $labelEsc = $m[1];
+            $key = (string)($m[2] ?? '');
+            if (!isset($footnotes[$key])) return $m[0];
+
+            $labelRaw = html_entity_decode($labelEsc, ENT_QUOTES, 'UTF-8');
+            $labelRaw = trim($labelRaw);
+            $titleRaw = trim((string)($footnotes[$key]['title'] ?? ''));
+            $urlRaw = trim((string)($footnotes[$key]['url'] ?? ''));
+
+            $hover = $labelRaw !== '' ? $labelRaw : ($titleRaw !== '' ? $titleRaw : $urlRaw);
+            $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
+            $numEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+
+            return '<sup class="md-footnote"><a class="md-footnote-ref" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
+        },
+        $text
+    );
+
+    // [^1] (caret footnotes)
+    $text = preg_replace_callback(
+        "/\\[\\^([A-Za-z0-9_-]+)\\]/",
+        function($m) use ($footnotes){
+            $key = (string)($m[1] ?? '');
+            if ($key === '' || !isset($footnotes[$key])) return $m[0];
+            $fn = $footnotes[$key];
+            $hover = '';
+            $type = isset($fn['type']) ? (string)$fn['type'] : '';
+            if ($type === 'link') {
+                $titleRaw = trim((string)($fn['title'] ?? ''));
+                $urlRaw = trim((string)($fn['url'] ?? ''));
+                $hover = $titleRaw !== '' ? $titleRaw : $urlRaw;
+            } else {
+                $textRaw = trim((string)($fn['text'] ?? ''));
+                $hover = trim(strip_tags($textRaw));
+            }
+            $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
+            $numEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+            return '<sup class="md-footnote"><a class="md-footnote-ref" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
+        },
+        $text
+    );
+
     // Restore protected inline code spans.
     if (!empty($codeSpans)) {
         foreach ($codeSpans as $key => $raw) {
@@ -407,6 +558,14 @@ function inline_md($text, $mdPath = null, $profile = 'edit') {
                 '<code class="'.$p['inline_code_class'].'">'.$rawEsc.'</code>',
                 $text
             );
+        }
+    }
+
+    // Restore preserved HTML tags.
+    if (!empty($rawHtmlTags)) {
+        foreach ($rawHtmlTags as $key => $raw) {
+            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+            $text = str_replace($keyEsc, $raw, $text);
         }
     }
 
@@ -1075,7 +1234,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
 }
 
 /* BLOCK MARKDOWN -> HTML */
-function md_to_html($text, $mdPath = null, $profile = 'edit') {
+function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $p = md_render_profile($profile);
 
     $meta = [];
@@ -1087,7 +1246,21 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
     [$text, $comments] = mdw_extract_html_comments($text);
+    $context = is_array($context) ? $context : [];
+    [$text, $localFootnotes] = mdw_extract_footnotes($text);
+    $footnotes = (isset($context['footnotes']) && is_array($context['footnotes'])) ? $context['footnotes'] : [];
+    foreach ($localFootnotes as $k => $v) {
+        if (!isset($footnotes[$k])) $footnotes[$k] = $v;
+    }
+    $context['footnotes'] = $footnotes;
     $lines = explode("\n",$text);
+    $footnoteInfo = mdw_collect_footnote_refs($text);
+    $footnoteRefs = (is_array($footnoteInfo) && isset($footnoteInfo['order']) && is_array($footnoteInfo['order']))
+        ? $footnoteInfo['order']
+        : [];
+    $footnoteLabels = (is_array($footnoteInfo) && isset($footnoteInfo['labels']) && is_array($footnoteInfo['labels']))
+        ? $footnoteInfo['labels']
+        : [];
 
     $html = [];
     $in_codeblock = false;
@@ -1338,7 +1511,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
             }
             $i--;
             $inner = implode("\n", $bq);
-            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile) . "\n" . '</blockquote>';
+            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, $context) . "\n" . '</blockquote>';
             continue;
         }
 
@@ -1379,7 +1552,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
                 $a = $align[$c];
                 $thCls = md_join_classes($p['th_class'] ?? '', 'align-'.$a);
                 $thAttr = $thCls ? ' class="'.htmlspecialchars($thCls, ENT_QUOTES, 'UTF-8').'"' : '';
-                $table[] = '<th'.$thAttr.'>' . inline_md($txt, $mdPath, $profile) . '</th>';
+                $table[] = '<th'.$thAttr.'>' . inline_md($txt, $mdPath, $profile, $context) . '</th>';
             }
             $table[] = '</tr></thead>';
             $table[] = '<tbody>';
@@ -1390,7 +1563,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
                     $a = $align[$c];
                     $tdCls = md_join_classes($p['td_class'] ?? '', 'align-'.$a);
                     $tdAttr = $tdCls ? ' class="'.htmlspecialchars($tdCls, ENT_QUOTES, 'UTF-8').'"' : '';
-                    $table[] = '<td'.$tdAttr.'>' . inline_md($txt, $mdPath, $profile) . '</td>';
+                    $table[] = '<td'.$tdAttr.'>' . inline_md($txt, $mdPath, $profile, $context) . '</td>';
                 }
                 $table[] = '</tr>';
             }
@@ -1411,7 +1584,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
             $cls = $clsMap[$level] ?? ($profile === 'view' ? "font-bold mt-4 mb-2" : "md-heading");
             $clsAttr = $cls ? ' class="'.htmlspecialchars($cls, ENT_QUOTES, 'UTF-8').'"' : '';
 
-            $html[] = "<$tag$clsAttr>".inline_md($content, $mdPath, $profile)."</$tag>";
+            $html[] = "<$tag$clsAttr>".inline_md($content, $mdPath, $profile, $context)."</$tag>";
             continue;
         }
 
@@ -1456,7 +1629,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
 
             $liClass = $p['li_class'] ?? '';
             $liAttr = $liClass ? ' class="'.htmlspecialchars($liClass, ENT_QUOTES, 'UTF-8').'"' : '';
-            $html[] = '<li'.$liAttr.'>' . inline_md($content, $mdPath, $profile);
+            $html[] = '<li'.$liAttr.'>' . inline_md($content, $mdPath, $profile, $context);
             $listStack[$topIndex]['liOpen'] = true;
             continue;
         }
@@ -1473,13 +1646,47 @@ function md_to_html($text, $mdPath = null, $profile = 'edit') {
 
             $pClass = $p['p_class'] ?? '';
             $pAttr = $pClass ? ' class="'.htmlspecialchars($pClass, ENT_QUOTES, 'UTF-8').'"' : '';
-            $html[]='<p'.$pAttr.'>'.inline_md($line, $mdPath, $profile).'</p>';
+            $html[]='<p'.$pAttr.'>'.inline_md($line, $mdPath, $profile, $context).'</p>';
         }
     }
 
     $closeAllLists();
     if ($in_codeblock) {
         $html[] = ($codeblock_type === 'mermaid') ? '</pre>' : '</code></pre>';
+    }
+
+    if (!empty($footnoteRefs)) {
+        $items = [];
+        foreach ($footnoteRefs as $num) {
+            if (!isset($footnotes[$num])) continue;
+            $numEsc = htmlspecialchars((string)$num, ENT_QUOTES, 'UTF-8');
+            $fn = $footnotes[$num];
+            $type = isset($fn['type']) ? (string)$fn['type'] : '';
+
+            if ($type === 'text') {
+                $textRaw = trim((string)($fn['text'] ?? ''));
+                if ($textRaw === '') continue;
+                $textHtml = inline_md($textRaw, $mdPath, $profile, $context);
+                $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-label">['.$numEsc.']:</span> <span class="md-footnote-text">'.$textHtml.'</span></li>';
+                continue;
+            }
+
+            $urlRaw = trim((string)($fn['url'] ?? ''));
+            if ($urlRaw === '') continue;
+            $titleRaw = trim((string)($fn['title'] ?? ''));
+            $labelRaw = isset($footnoteLabels[$num]) ? trim((string)$footnoteLabels[$num]) : '';
+            $linkText = $titleRaw !== '' ? $titleRaw : ($labelRaw !== '' ? $labelRaw : $urlRaw);
+
+            $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
+            $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
+            $linkEsc = htmlspecialchars($linkText, ENT_QUOTES, 'UTF-8');
+            $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-label">['.$numEsc.']:</span> <a class="externlink" href="'.
+                $urlEsc.
+                '" target="_blank" rel="noopener noreferrer">'.$linkEsc.'</a></li>';
+        }
+        if (!empty($items)) {
+            $html[] = '<ol class="md-footnotes">' . implode("\n", $items) . '</ol>';
+        }
     }
 
     $output = implode("\n",$html);

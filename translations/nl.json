@@ -17,7 +17,8 @@
     "filter_placeholder": "Filter…",
     "item_count_one": "{n} item",
     "item_count_other": "{n} items",
-    "total_items": "{n} items totaal"
+    "total_items": "{n} items totaal",
+    "details": "Details"
   },
   "index": {
     "contents": "Overzicht",
@@ -208,7 +209,15 @@
     "alt_placeholder": "Alt-tekst (optioneel)",
     "search_images": "Zoek afbeeldingen...",
     "tip_insert": "Tip: klik op een afbeelding om",
-    "tip_at_cursor": "bij de cursor in te voegen."
+    "tip_at_cursor": "bij de cursor in te voegen.",
+    "loading": "Laden…",
+    "no_images": "Geen afbeeldingen gevonden.",
+    "load_failed": "Kon afbeeldingen niet laden.",
+    "choose_first": "Kies eerst een afbeelding.",
+    "missing_csrf": "CSRF-token ontbreekt. Herlaad de pagina.",
+    "uploading": "Uploaden…",
+    "upload_failed": "Upload mislukt.",
+    "uploaded": "Geupload."
   },
   "nav": {
     "collapse_folder": "Map inklappen",

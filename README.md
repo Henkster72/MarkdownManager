@@ -1,4 +1,4 @@
-# MarkdownManager (flat-file PHP notes) v0.3
+# MarkdownManager (flat-file PHP notes) v0.3.1
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -8,12 +8,23 @@ Sharpen your thinking.
 
 New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
 
+## What's new in 0.3.1
+
+- Major translation effort: added DE/FR/PT UI strings and localized tutorials, plus a first-run tutorial that opens per language in WPM mode.
+- HTML preview improvements: caret footnotes, inline HTML support, strikethrough, button styling, and more robust link/class parsing.
+- Editor UX upgrades: AJAX save without refresh, visible save status, replace modal, and better error diagnostics.
+- Theme refinements: complementary secondary accent for better contrast and updated preview spacing.
+
 ## What's new in 0.3
 
 - Website publication mode for turning Markdown into a publish-ready content flow with metadata, publish states, and strict author/subtitle rules.
 - Explorer sorting by date, title, or filename (with the date shown next to the slug).
 - Settings upgrades for superusers: app title override and editor view toggles moved into Settings to free toolbar space.
 - Mobile and layout refinements for the explorer overlay and header.
+
+## Changelog
+
+See `CHANGELOG.md`.
 
 ## Website publication mode (publisher)
 
@@ -122,10 +133,12 @@ When the Markdown textarea is focused:
 
 - `Ctrl+Z` -- undo (up to 25 steps)
 - `Ctrl+Shift+Z` -- redo
+- `Ctrl+Alt+S` -- save
 - `Ctrl+Alt+B` -- bold (`**...**`)
 - `Ctrl+Alt+I` -- italic (`*...*`)
 - `Ctrl+Alt+X` -- strikethrough (`~~...~~`)
 - `Ctrl+Alt+\`` -- inline code (`` `...` ``)
+- `Ctrl+Alt+H` -- replace (opens the replace modal)
 - `Ctrl+Alt+L` -- insert link (opens the link modal)
 - `Ctrl+Alt+K` -- insert link (opens the link modal)
 - `Ctrl+Alt+M` -- insert image (opens the image modal)

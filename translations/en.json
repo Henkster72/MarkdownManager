@@ -17,7 +17,8 @@
     "filter_placeholder": "Filter…",
     "item_count_one": "{n} item",
     "item_count_other": "{n} items",
-    "total_items": "{n} total items"
+    "total_items": "{n} total items",
+    "details": "Details"
   },
   "index": {
     "contents": "Overview",
@@ -208,7 +209,15 @@
     "alt_placeholder": "Alt text (optional)",
     "search_images": "Search images...",
     "tip_insert": "Tip: click an image to insert",
-    "tip_at_cursor": "at the cursor."
+    "tip_at_cursor": "at the cursor.",
+    "loading": "Loading…",
+    "no_images": "No images found.",
+    "load_failed": "Failed to load images.",
+    "choose_first": "Choose an image first.",
+    "missing_csrf": "Missing CSRF token. Reload the page.",
+    "uploading": "Uploading…",
+    "upload_failed": "Upload failed.",
+    "uploaded": "Uploaded."
   },
   "nav": {
     "collapse_folder": "Collapse folder",

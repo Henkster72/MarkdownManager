@@ -66,6 +66,60 @@ function sanitize_md_path($path) {
 /* ESCAPE */
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
+function mdw_perm_user_name($uid) {
+    if ($uid === false || $uid === null) return 'unknown';
+    if (function_exists('posix_getpwuid')) {
+        $info = @posix_getpwuid($uid);
+        if (is_array($info) && isset($info['name'])) {
+            return $info['name'] . '(' . $uid . ')';
+        }
+    }
+    return (string)$uid;
+}
+
+function mdw_perm_group_name($gid) {
+    if ($gid === false || $gid === null) return 'unknown';
+    if (function_exists('posix_getgrgid')) {
+        $info = @posix_getgrgid($gid);
+        if (is_array($info) && isset($info['name'])) {
+            return $info['name'] . '(' . $gid . ')';
+        }
+    }
+    return (string)$gid;
+}
+
+function mdw_perm_diag($fullPath) {
+    $parts = [];
+    $dir = dirname($fullPath);
+    if ($dir !== '') {
+        $parts[] = 'dir=' . $dir;
+        if (is_dir($dir)) {
+            $parts[] = 'dir_w=' . (is_writable($dir) ? 'yes' : 'no');
+            $perm = @fileperms($dir);
+            if ($perm !== false) $parts[] = 'dir_perm=' . substr(sprintf('%o', $perm), -4);
+            $owner = @fileowner($dir);
+            if ($owner !== false) $parts[] = 'dir_owner=' . mdw_perm_user_name($owner);
+            $group = @filegroup($dir);
+            if ($group !== false) $parts[] = 'dir_group=' . mdw_perm_group_name($group);
+        } else {
+            $parts[] = 'dir_missing=yes';
+        }
+    }
+    $parts[] = 'file=' . $fullPath;
+    if (file_exists($fullPath)) {
+        $parts[] = 'file_w=' . (is_writable($fullPath) ? 'yes' : 'no');
+        $perm = @fileperms($fullPath);
+        if ($perm !== false) $parts[] = 'file_perm=' . substr(sprintf('%o', $perm), -4);
+        $owner = @fileowner($fullPath);
+        if ($owner !== false) $parts[] = 'file_owner=' . mdw_perm_user_name($owner);
+        $group = @filegroup($fullPath);
+        if ($group !== false) $parts[] = 'file_group=' . mdw_perm_group_name($group);
+    } else {
+        $parts[] = 'file_missing=yes';
+    }
+    return implode(', ', $parts);
+}
+
 require_once __DIR__ . '/html_preview.php';
 require_once __DIR__ . '/themes_lib.php';
 
@@ -269,6 +323,7 @@ $dirMap     = list_md_by_subdir_sorted();
 $folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
 
 $save_error = null;
+$save_error_details = null;
 $saved_flag = isset($_GET['saved']) ? true : false;
 $use_posted_content = false;
 $posted_content_for_render = '';
@@ -311,13 +366,23 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
 
 /* HANDLE SAVE */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string)$_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
     $postedFile = isset($_POST['file']) ? $_POST['file'] : '';
+    if ($postedFile === '' && isset($_GET['file'])) {
+        $postedFile = (string)$_GET['file'];
+    }
     $san = sanitize_md_path($postedFile);
     if (!$san) {
         $save_error = 'Invalid file path.';
     } else {
         if (is_secret_file($san) && !is_secret_authenticated()) {
             // niet stiekem saven als je niet ingelogd bent
+            if ($isAjax) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'forbidden']);
+                exit;
+            }
             header('Location: index.php?file='.rawurlencode($san));
             exit;
         }
@@ -418,28 +483,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 	                $settingsOverride['publisher_default_author'] = $author;
 	                $opts['settings'] = $settingsOverride;
 	            }
-	            $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
+		            $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
 
-	        $tmp = $full . '.tmp';
-	        if (file_put_contents($tmp, $content) === false) {
-	            $save_error = 'Kon tijdelijke file niet schrijven.';
-	        } else {
-            if (!rename($tmp, $full)) {
-                $save_error = 'Kon originele file niet overschrijven.';
-            } else {
-                header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                exit;
-	            }
+                    $parentDir = dirname($full);
+                    $dirWritable = is_dir($parentDir) && is_writable($parentDir);
+                    $fileWritable = is_writable($full);
+                    if (!$dirWritable && !$fileWritable) {
+                        $save_error = mdw_t('flash.no_write_permissions', 'no write permissions') . ': ' . $parentDir;
+                        $save_error .= ' ' . mdw_t(
+                            'flash.permissions_hint',
+                            'Fix by making this directory writable for the web server/PHP user (chown/chmod; on SELinux also set the right context).'
+                        );
+                        $diag = mdw_perm_diag($full);
+                        if ($diag !== '') $save_error_details = $diag;
+                    } else if ($dirWritable) {
+                        $tmp = $full . '.tmp';
+                        if (file_put_contents($tmp, $content) === false) {
+                            $err = error_get_last();
+                            if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
+                                if ($isAjax) {
+                                    header('Content-Type: application/json; charset=utf-8');
+                                    echo json_encode(['ok' => true]);
+                                    exit;
+                                }
+                                header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                exit;
+                            }
+                            $save_error = 'Kon tijdelijke file niet schrijven.';
+                            if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                            $diag = mdw_perm_diag($full);
+                            if ($diag !== '') $save_error_details = $diag;
+                        } else {
+                            if (!rename($tmp, $full)) {
+                                $err = error_get_last();
+                                $save_error = 'Kon originele file niet overschrijven.';
+                                if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                                $diag = mdw_perm_diag($full);
+                                if ($diag !== '') $save_error_details = $diag;
+                            } else {
+                                if ($isAjax) {
+                                    header('Content-Type: application/json; charset=utf-8');
+                                    echo json_encode(['ok' => true]);
+                                    exit;
+                                }
+                                header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                exit;
+                            }
+                        }
+                    } else {
+                        if (file_put_contents($full, $content, LOCK_EX) === false) {
+                            $err = error_get_last();
+                            $save_error = 'Kon bestand niet schrijven.';
+                            if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                            $diag = mdw_perm_diag($full);
+                            if ($diag !== '') $save_error_details = $diag;
+                        } else {
+                            if ($isAjax) {
+                                header('Content-Type: application/json; charset=utf-8');
+                                echo json_encode(['ok' => true]);
+                                exit;
+                            }
+                            header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
+                            exit;
+                        }
+                    }
 	        }
-	        }
-	        $requested = $san;
-	        if ($save_error !== null) {
-	            $use_posted_content = true;
-	            $posted_content_for_render = $content;
-	        }
-	    }
-	}
-
+        $requested = $san;
+        if ($save_error !== null) {
+            $use_posted_content = true;
+            $posted_content_for_render = $content;
+        }
+    }
+    if ($isAjax) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => false,
+            'error' => (string)($save_error ?: 'Save failed.'),
+            'details' => $save_error_details,
+        ]);
+        exit;
+    }
+}
 /* LOAD REQUESTED FILE CONTENT */
 $current_title   = 'Editor';
 $current_content = '';
@@ -640,12 +765,11 @@ window.mermaid = mermaid;
 	                    </div>
 	                </div>
 	            </div>
-		            <div class="app-header-actions">
-	                <?php if ($saved_flag && !$save_error): ?>
-	                    <div class="chip" style="background-color: #166534; color: white;"><?=h(mdw_t('common.saved','Saved'))?></div>
-	                <?php elseif ($save_error): ?>
-	                    <div class="chip" style="background-color: var(--danger); color: white;"><?=h($save_error)?></div>
-	                <?php endif; ?>
+	            <div class="app-header-actions">
+                <div id="saveStatusChip" class="chip" style="background-color: #166534; color: white; <?= ($saved_flag && !$save_error) ? '' : 'display:none;' ?>"><?=h(mdw_t('common.saved','Saved'))?></div>
+                <?php if ($save_error): ?>
+                    <div class="chip" style="background-color: var(--danger); color: white;"<?= $save_error_details ? ' title="' . h($save_error_details) . '"' : '' ?>><?=h($save_error)?></div>
+                <?php endif; ?>
 
 		                <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
 		                    <span class="pi pi-list"></span>
@@ -788,6 +912,13 @@ window.mermaid = mermaid;
                         <footer class="editor-footer">
                             <div class="editor-footer-right">
                                 <span id="liveStatus" class="status-text"></span>
+                                <div id="saveErrorPanel" class="save-error-panel" <?= $save_error ? '' : 'hidden' ?>>
+                                    <div id="saveErrorMessage" class="save-error-message"><?=h($save_error ?? '')?></div>
+                                    <details id="saveErrorDetailsWrap" class="save-error-details" <?= $save_error_details ? '' : 'hidden' ?>>
+                                        <summary><?=h(mdw_t('common.details','Details'))?></summary>
+                                        <code id="saveErrorDetails"><?=h($save_error_details ?? '')?></code>
+                                    </details>
+                                </div>
                             </div>
                         </footer>
                     </form>
@@ -852,6 +983,10 @@ window.mermaid = mermaid;
 	                <input type="radio" name="linkMode" value="external">
 	                <span><?=h(mdw_t('link_modal.mode_external','External'))?></span>
 	            </label>
+                <label class="radio">
+                    <input type="radio" name="linkMode" value="footnote">
+                    <span><?=h(mdw_t('link_modal.mode_footnote','Footnote'))?></span>
+                </label>
                 <label class="radio">
                     <input type="radio" name="linkMode" value="youtube">
                     <span><?=h(mdw_t('link_modal.mode_youtube','YouTube'))?></span>
@@ -921,6 +1056,20 @@ window.mermaid = mermaid;
 	                <input id="externalLinkUrl" type="url" class="input" placeholder="<?=h(mdw_t('link_modal.url_placeholder','https://example.com/'))?>">
 	            </div>
 	        </div>
+            <div id="linkModalFootnote" class="link-modal-section" hidden>
+                <div class="modal-field">
+                    <label class="modal-label" for="footnoteLinkText"><?=h(mdw_t('link_modal.footnote_text_label','Footnote text'))?></label>
+                    <input id="footnoteLinkText" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.footnote_text_placeholder','e.g. Tweede Kamer'))?>">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="footnoteLinkUrl"><?=h(mdw_t('link_modal.footnote_url_label','Footnote URL'))?></label>
+                    <input id="footnoteLinkUrl" type="url" class="input" placeholder="<?=h(mdw_t('link_modal.url_placeholder','https://example.com/'))?>">
+                </div>
+                <div class="modal-field">
+                    <label class="modal-label" for="footnoteLinkTitle"><?=h(mdw_t('link_modal.footnote_title_label','Footnote title (optional)'))?></label>
+                    <input id="footnoteLinkTitle" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.footnote_title_placeholder','e.g. Ongekend onrecht'))?>">
+                </div>
+            </div>
 	        <div id="linkModalYoutube" class="link-modal-section" hidden>
 	            <div class="modal-field">
 	                <label class="modal-label" for="youtubeLinkInput"><?=h(mdw_t('link_modal.youtube_label','YouTube ID or URL'))?></label>
@@ -971,8 +1120,33 @@ window.mermaid = mermaid;
 		            </div>
 		        </div>
 			    </div>
-			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+			<div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
 			        <button type="button" class="btn btn-ghost btn-small" id="imageModalCancel"><?=h(mdw_t('common.close','Close'))?></button>
+			    </div>
+			</div>
+
+			<div class="modal-overlay no-blur" id="replaceModalOverlay" hidden></div>
+			<div class="modal modal-small" id="replaceModal" role="dialog" aria-modal="true" aria-labelledby="replaceModalTitle" hidden>
+			    <div class="modal-header">
+			        <div class="modal-title" id="replaceModalTitle"><?=h(mdw_t('replace_modal.title','Replace'))?></div>
+			        <button type="button" class="btn btn-ghost icon-button" id="replaceModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
+			            <span class="pi pi-cross"></span>
+			        </button>
+			    </div>
+			    <div class="modal-body">
+			        <div class="modal-field">
+			            <label class="modal-label" for="replaceFindInput"><?=h(mdw_t('replace_modal.find_label','Find'))?></label>
+			            <input id="replaceFindInput" type="text" class="input" autocomplete="off">
+			        </div>
+			        <div class="modal-field">
+			            <label class="modal-label" for="replaceWithInput"><?=h(mdw_t('replace_modal.replace_label','Replace with'))?></label>
+			            <input id="replaceWithInput" type="text" class="input" autocomplete="off">
+			        </div>
+			        <div class="status-text" id="replaceModalStatus" style="min-height: 1.1em;"></div>
+			    </div>
+			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+			        <button type="button" class="btn btn-ghost btn-small" id="replaceAllBtn" disabled><?=h(mdw_t('replace_modal.replace_all','Replace all'))?></button>
+			        <button type="button" class="btn btn-primary btn-small" id="replaceNextBtn" disabled><?=h(mdw_t('replace_modal.replace_next','Replace next'))?></button>
 			    </div>
 			</div>
 

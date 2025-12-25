@@ -1,0 +1,294 @@
+{
+  "_meta": { "label": "French", "native": "Français" },
+  "common": {
+    "back": "Retour",
+    "close": "Fermer",
+    "clear": "Effacer",
+    "cancel": "Annuler",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "saved": "Enregistré",
+    "secret": "secret",
+    "folder": "Dossier",
+    "root": "Racine",
+    "notes": "Aperçu",
+    "markdown": "Markdown",
+    "items": "éléments",
+    "filter_placeholder": "Filtrer…",
+    "item_count_one": "{n} élément",
+    "item_count_other": "{n} éléments",
+    "total_items": "{n} éléments au total",
+    "details": "Détails"
+  },
+  "index": {
+    "contents": "Aperçu",
+    "filter_desc": "Filtrer par titre. Les plus récents d'abord (selon le préfixe de nom de fichier yy-mm-dd-).",
+    "filter_placeholder": "Tapez pour filtrer...",
+    "filter_clear": "Effacer le filtre",
+    "title_rule": {
+      "prefix": "Le premier",
+      "middle": "dans chaque .md devient le titre ; HTML utilise",
+      "or": "(ou",
+      "suffix": ")."
+    },
+    "new_markdown": {
+      "title": "Nouveau markdown",
+      "close": "Fermer",
+      "create_edit": "Créer et modifier",
+      "relative_path": "Chemin relatif, ex.",
+      "date_prefix_title": "Ajoute un préfixe yy-mm-dd- pour que les notes se trient par date.",
+      "filename_placeholder": "titre.md",
+      "content_placeholder": "# Titre\n\nCommencez à écrire..."
+    },
+    "new_folder_title": "Créer un nouveau dossier"
+  },
+  "edit": {
+    "unsaved_title": "Modifications non enregistrées",
+    "toolbar": {
+      "link": "Lien",
+      "image": "Image",
+      "save": "Enregistrer",
+      "publish": "Publier",
+      "publish_title": "Envoyer au traitement",
+      "revert": "Rétablir",
+      "delete": "Supprimer",
+      "wrap": "Renvoi",
+      "wrap_title": "Retour à la ligne",
+      "lines": "Lignes",
+      "lines_title": "Numéros de ligne"
+    },
+    "publish_state_label": "État de publication",
+    "publish_state": {
+      "concept": "Concept",
+      "processing": "En traitement",
+      "published": "Publié"
+    },
+    "preview_title": "Aperçu HTML",
+    "preview": {
+      "export_title": "Télécharger un export HTML simple",
+      "export_btn": "Télécharger HTML",
+      "copy_title": "Copier du HTML simple dans le presse-papiers",
+      "copy_btn": "Copier HTML"
+    },
+    "nav": {
+      "open_files_aria": "Afficher les fichiers",
+      "close_files_aria": "Fermer les fichiers",
+      "collapse_overview": "Réduire l'aperçu",
+      "expand_overview": "Développer l'aperçu"
+    }
+  },
+  "theme": {
+    "settings_title": "Paramètres",
+    "title": "Paramètres",
+    "preset": "Préréglage",
+    "default": "Par défaut",
+    "applies_hint": "S'applique uniquement à l'éditeur Markdown + aperçu HTML.",
+    "default_preview": "Thème par défaut (utilise les styles intégrés)",
+    "preview_label": "aperçu",
+    "swatch": {
+      "primary": "Primaire",
+      "secondary": "Secondaire"
+    },
+    "kbd_modifier": {
+      "label": "Système de raccourcis",
+      "option": "Windows / Linux (Ctrl + Alt)",
+      "command": "Mac (Ctrl + Command)",
+      "tip": "Choisissez le système pour les raccourcis (enregistré dans ce navigateur)."
+    },
+    "language": {
+      "label": "Langue",
+      "hint": "Choisissez la langue de l'UI (détectée automatiquement depuis translations/*.json)."
+    },
+    "app_title": {
+      "label": "Titre de l'application",
+      "placeholder": "Markdown Manager",
+      "save": "Enregistrer le titre",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement",
+      "hint": "Laissez vide pour utiliser la valeur par défaut."
+    },
+    "editor_view": {
+      "title": "Vue de l'éditeur"
+    },
+    "delete_after": {
+      "label": "Après suppression d'une note",
+      "overview": "Retour à l'aperçu",
+      "next": "Ouvrir la note suivante",
+      "hint": "Enregistré dans ce navigateur."
+    },
+    "permissions": {
+      "title": "Autorisations",
+      "allow_user_delete": "Autoriser les utilisateurs à supprimer des notes",
+      "hint": "Enregistré pour tous les utilisateurs.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
+    "overrides": {
+      "summary": "Surcharges (optionnel)",
+      "saved_auto": "Les surcharges sont enregistrées dans votre navigateur (localStorage) automatiquement pendant la saisie.",
+      "preview_section": "Aperçu HTML",
+      "editor_section": "Éditeur Markdown",
+      "save_title": "Enregistrer les surcharges maintenant",
+      "save_btn": "Enregistrer les surcharges",
+      "reset_title": "Effacer les surcharges",
+      "reset_btn": "Réinitialiser les surcharges",
+      "saved": "Enregistré",
+      "cleared": "Effacé",
+      "placeholders": {
+        "preview_bg": "Arrière-plan (ex. #ffffff)",
+        "preview_text": "Couleur du texte (ex. #111827)",
+        "preview_font": "Famille de police (ex. Playfair Display)",
+        "preview_font_size": "Taille de police (ex. 16px)",
+        "heading_font": "Police des titres (ex. Montserrat)",
+        "heading_color": "Couleur des titres (ex. rgb(229,33,157))",
+        "list_color": "Couleur des listes (optionnel)",
+        "blockquote_tint": "Teinte des citations (optionnel)",
+        "editor_font": "Famille de police (ex. Playfair Display)",
+        "editor_font_size": "Taille de police (ex. 15px)",
+        "editor_accent": "Couleur d'accent (ex. rgb(229,33,157))"
+      }
+    }
+    ,
+    "metadata": {
+      "title": "Métadonnées",
+      "hint": "Contrôlez si les métadonnées sont affichées dans l'éditeur Markdown et/ou l'aperçu HTML. Si elles sont masquées dans Markdown, elles sont aussi masquées dans l'aperçu HTML.",
+      "field": "Champ",
+      "show_markdown": "Markdown",
+      "show_html": "HTML",
+      "save": "Enregistrer les paramètres de métadonnées",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
+    "publisher": {
+      "title": "WPM (mode de publication de site web)",
+      "enable": "Activer WPM",
+      "hint": "WPM ajoute des états de publication (Concept / Traitement / Publié) et les affiche dans l'aperçu. Désactive les notes secrètes. Nécessite un nom d'auteur ; l'exigence de sous-titre est facultative.",
+      "author_label": "Nom de l'auteur",
+      "author_placeholder": "Votre nom",
+      "author_required": "Veuillez saisir un nom d'auteur pour activer WPM.",
+      "require_subtitle": "Exiger un sous-titre (##)"
+    }
+  },
+  "auth": {
+    "superuser_required": "Connexion superutilisateur requise.",
+    "login_title": "Connexion",
+    "setup_title": "Définir les mots de passe",
+    "login_submit": "Se connecter",
+    "setup_submit": "Enregistrer les mots de passe",
+    "wrong_password": "Mot de passe incorrect.",
+    "missing_password": "Entrez un mot de passe.",
+    "signing_in": "Connexion...",
+    "saving": "Enregistrement...",
+    "set_passwords": "Définissez les deux mots de passe.",
+    "failed": "Échec de l'authentification.",
+    "locked": "Trop de tentatives. Réessayez dans {time}."
+  },
+  "link_modal": {
+    "title": "Ajouter un lien",
+    "mode_internal": "Interne",
+    "mode_external": "Externe",
+    "mode_youtube": "YouTube",
+    "search_notes": "Rechercher des notes...",
+    "clear_search_aria": "Effacer la recherche",
+    "link_text_label": "Texte du lien",
+    "link_text_placeholder": "ex. prix spot de l'or",
+    "url_label": "URL",
+    "url_placeholder": "https://example.com/",
+    "youtube_label": "ID YouTube ou URL",
+    "youtube_placeholder": "yob8SkcOKaYv ou https://youtu.be/",
+    "insert": "Insérer le lien"
+  },
+  "image_modal": {
+    "title": "Insérer une image",
+    "choose_file": "Choisir un fichier",
+    "no_file": "Aucun fichier choisi",
+    "upload": "Téléverser",
+    "alt_placeholder": "Texte alternatif (optionnel)",
+    "search_images": "Rechercher des images...",
+    "tip_insert": "Astuce : cliquez sur une image pour l’insérer",
+    "tip_at_cursor": "au niveau du curseur.",
+    "loading": "Chargement…",
+    "no_images": "Aucune image trouvée.",
+    "load_failed": "Impossible de charger les images.",
+    "choose_first": "Choisissez d'abord une image.",
+    "missing_csrf": "Jeton CSRF manquant. Rechargez la page.",
+    "uploading": "Téléversement…",
+    "upload_failed": "Échec du téléversement.",
+    "uploaded": "Téléversé."
+  },
+  "nav": {
+    "collapse_folder": "Réduire le dossier",
+    "expand_folder": "Développer le dossier",
+    "sort_label": "Trier",
+    "sort_date": "Date",
+    "sort_title": "Titre",
+    "sort_slug": "Nom de fichier",
+    "no_notes_yet": "Aucune note pour le moment.",
+    "nothing_here_yet": "Rien ici pour le moment."
+  },
+  "js": {
+    "confirm_delete": "Supprimer \"{file}\" ?",
+    "this_file": "ce fichier",
+    "prompt_new_folder": "Nom du nouveau dossier (sans barres obliques) :",
+    "invalid_folder_alert": "Nom de dossier invalide.",
+    "unsaved_confirm": "Vous avez des modifications non enregistrées. Les abandonner et continuer ?",
+    "export_failed": "Échec de l'export. Vérifiez la console pour plus de détails.",
+    "copy_failed": "Échec de la copie. Vérifiez la console pour plus de détails.",
+    "copied": "Copié",
+    "new_md": {
+      "enter_title": "Veuillez saisir un titre pour le nom de fichier.",
+      "no_trailing_slash": "Le nom de fichier ne peut pas se terminer par une barre oblique.",
+      "no_empty_parts": "Le nom de fichier ne peut pas contenir de segments de chemin vides.",
+      "adjust_title": "Veuillez ajuster le titre pour qu'il contienne des lettres/chiffres (les espaces deviennent des underscores).",
+      "no_dot_parts": "Le nom de fichier ne peut pas contenir \".\" ou \"..\" dans le chemin.",
+      "invalid_filename": "Nom de fichier invalide.",
+      "adjusted_hint": "Nom de fichier ajusté : espaces → underscores ; caractères non pris en charge supprimés."
+    }
+  },
+  "flash": {
+    "csrf_invalid": "Session invalide (CSRF). Rechargez la page.",
+    "invalid_file_path": "Chemin de fichier invalide.",
+    "secret_locked": "La note secrète est verrouillée. Déverrouillez d'abord via la visionneuse.",
+    "deleted_prefix": "Supprimé :",
+    "delete_failed": "Impossible de supprimer le fichier.",
+    "no_write_permissions": "pas d'autorisations d'écriture",
+    "invalid_folder_name": "Nom de dossier invalide.",
+    "reserved_folder_name": "Ce nom de dossier est réservé.",
+    "folder_exists_prefix": "Le dossier existe déjà :",
+    "path_exists_not_folder_prefix": "Le chemin existe déjà (pas un dossier) :",
+    "folder_create_failed": "Impossible de créer le dossier.",
+    "folder_created_prefix": "Dossier créé :",
+    "invalid_filename_hint": "Nom de fichier invalide. Ajustez le titre (les espaces deviennent des underscores) et réessayez.",
+    "secret_marked_locked": "Ce chemin est marqué comme secret. Déverrouillez d'abord via la visionneuse.",
+    "folder_not_exist_prefix": "Le dossier n'existe pas :",
+    "file_exists_prefix": "Le fichier existe déjà :",
+    "file_create_failed": "Impossible de créer le fichier.",
+    "publisher_requires_subtitle": "WPM nécessite une ligne de sous-titre commençant par \"##\".",
+    "publisher_author_required": "WPM nécessite un nom d'auteur.",
+    "publisher_requires_page_title": "WPM nécessite une ligne de métadonnées page_title.",
+    "publisher_requires_page_picture": "WPM nécessite une ligne de métadonnées page_picture."
+  },
+  "secret": {
+    "wrong_password": "Mot de passe incorrect.",
+    "title": "Document protégé",
+    "desc": "Cette note est protégée. Entrez le mot de passe pour continuer.",
+    "password_placeholder": "Mot de passe",
+    "unlock_btn": "Déverrouiller",
+    "back_to_index": "Retour à l'index"
+  },
+  "readme": {
+    "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres."
+  },
+  "wpm": {
+    "setup_title": "Configuration WPM",
+    "setup_hint": "Définissez votre nom d'auteur et la langue de l'UI.",
+    "author_label": "Nom de l'auteur",
+    "author_placeholder": "Votre nom",
+    "language_label": "Langue de l'UI",
+    "author_required": "Veuillez saisir votre nom d'auteur.",
+    "save": "Enregistrer"
+  }
+}

@@ -16,7 +16,10 @@ pie title Q2 time allocation
   "Admin" : 12
   "Breaks" : 8
 ```
-
+Tutorial:
+<iframe src="https://www.youtube.com/embed/slhwXolN2Jc" frameborder="0"></iframe>
+{: class="lazyload ytframe"}
+{: class="ytframe-wrapper"}
 ## Simple workflow (diagram)
 
 ```mermaid
@@ -24,6 +27,10 @@ flowchart LR
   Idea --> Draft --> Review --> Publish
   Review -->|Needs changes| Draft
 ```
+Tutorial:
+<iframe src="https://www.youtube.com/embed/UDno58GxlHE" frameborder="0"></iframe>
+{: class="lazyload ytframe"}
+{: class="ytframe-wrapper"}
 
 ## Monthly activity (bar + line)
 
@@ -35,5 +42,10 @@ xychart-beta
   bar "Created" [42, 58, 63, 77, 88, 95]
   line "Published" [30, 40, 52, 60, 72, 85]
 ```
+Tutorial:
+<iframe src="https://www.youtube.com/embed/3J4U2GmASIM" frameborder="0"></iframe>
+{: class="lazyload ytframe"}
+{: class="ytframe-wrapper"}
 
-Find more demos and examples here on mermaid https://mermaid.live/
+
+Find more demos and examples on [Mermaid Live](https://mermaid.live/).

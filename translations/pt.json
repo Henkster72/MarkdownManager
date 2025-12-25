@@ -1,0 +1,294 @@
+{
+  "_meta": { "label": "Portuguese", "native": "Português" },
+  "common": {
+    "back": "Voltar",
+    "close": "Fechar",
+    "clear": "Limpar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "saved": "Guardado",
+    "secret": "secreto",
+    "folder": "Pasta",
+    "root": "Raiz",
+    "notes": "Visão geral",
+    "markdown": "Markdown",
+    "items": "itens",
+    "filter_placeholder": "Filtrar…",
+    "item_count_one": "{n} item",
+    "item_count_other": "{n} itens",
+    "total_items": "{n} itens no total",
+    "details": "Detalhes"
+  },
+  "index": {
+    "contents": "Visão geral",
+    "filter_desc": "Filtrar por título. Mais recentes primeiro (com base no prefixo do nome do ficheiro yy-mm-dd-).",
+    "filter_placeholder": "Digite para filtrar...",
+    "filter_clear": "Limpar filtro",
+    "title_rule": {
+      "prefix": "O primeiro",
+      "middle": "em cada .md torna-se o título; o HTML usa",
+      "or": "(ou",
+      "suffix": ")."
+    },
+    "new_markdown": {
+      "title": "Novo markdown",
+      "close": "Fechar",
+      "create_edit": "Criar e editar",
+      "relative_path": "Caminho relativo, por ex.",
+      "date_prefix_title": "Adiciona um prefixo yy-mm-dd- para que as notas sejam ordenadas por data.",
+      "filename_placeholder": "titulo.md",
+      "content_placeholder": "# Título\n\nComece a escrever..."
+    },
+    "new_folder_title": "Criar uma nova pasta"
+  },
+  "edit": {
+    "unsaved_title": "Alterações não guardadas",
+    "toolbar": {
+      "link": "Ligação",
+      "image": "Imagem",
+      "save": "Guardar",
+      "publish": "Publicar",
+      "publish_title": "Enviar para processamento",
+      "revert": "Reverter",
+      "delete": "Eliminar",
+      "wrap": "Quebra",
+      "wrap_title": "Quebra de linha",
+      "lines": "Linhas",
+      "lines_title": "Números de linha"
+    },
+    "publish_state_label": "Estado de publicação",
+    "publish_state": {
+      "concept": "Conceito",
+      "processing": "Processamento",
+      "published": "Publicado"
+    },
+    "preview_title": "Pré-visualização HTML",
+    "preview": {
+      "export_title": "Transferir uma exportação HTML simples",
+      "export_btn": "Transferir HTML",
+      "copy_title": "Copiar HTML simples para a área de transferência",
+      "copy_btn": "Copiar HTML"
+    },
+    "nav": {
+      "open_files_aria": "Mostrar ficheiros",
+      "close_files_aria": "Fechar ficheiros",
+      "collapse_overview": "Recolher visão geral",
+      "expand_overview": "Expandir visão geral"
+    }
+  },
+  "theme": {
+    "settings_title": "Definições",
+    "title": "Definições",
+    "preset": "Predefinição",
+    "default": "Predefinido",
+    "applies_hint": "Aplica-se apenas ao editor Markdown + pré-visualização HTML.",
+    "default_preview": "Tema predefinido (usa estilos incorporados)",
+    "preview_label": "pré-visualização",
+    "swatch": {
+      "primary": "Primário",
+      "secondary": "Secundário"
+    },
+    "kbd_modifier": {
+      "label": "Sistema de atalhos",
+      "option": "Windows / Linux (Ctrl + Alt)",
+      "command": "Mac (Ctrl + Command)",
+      "tip": "Escolha o sistema a seguir pelos atalhos (guardado neste navegador)."
+    },
+    "language": {
+      "label": "Idioma",
+      "hint": "Escolha o idioma da UI (detetado automaticamente a partir de translations/*.json)."
+    },
+    "app_title": {
+      "label": "Título da app",
+      "placeholder": "Markdown Manager",
+      "save": "Guardar título",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar",
+      "hint": "Deixe em branco para usar o predefinido."
+    },
+    "editor_view": {
+      "title": "Vista do editor"
+    },
+    "delete_after": {
+      "label": "Após apagar uma nota",
+      "overview": "Voltar à visão geral",
+      "next": "Abrir a nota seguinte",
+      "hint": "Guardado neste navegador."
+    },
+    "permissions": {
+      "title": "Permissões",
+      "allow_user_delete": "Permitir que os utilizadores eliminem notas",
+      "hint": "Guardado para todos os utilizadores.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
+    "overrides": {
+      "summary": "Substituições (opcional)",
+      "saved_auto": "As substituições são guardadas automaticamente no seu navegador (localStorage) enquanto escreve.",
+      "preview_section": "Pré-visualização HTML",
+      "editor_section": "Editor Markdown",
+      "save_title": "Guardar substituições agora",
+      "save_btn": "Guardar substituições",
+      "reset_title": "Limpar substituições",
+      "reset_btn": "Repor substituições",
+      "saved": "Guardado",
+      "cleared": "Limpo",
+      "placeholders": {
+        "preview_bg": "Fundo (p. ex. #ffffff)",
+        "preview_text": "Cor do texto (p. ex. #111827)",
+        "preview_font": "Família de tipo de letra (p. ex. Playfair Display)",
+        "preview_font_size": "Tamanho do tipo de letra (p. ex. 16px)",
+        "heading_font": "Tipo de letra dos títulos (p. ex. Montserrat)",
+        "heading_color": "Cor dos títulos (p. ex. rgb(229,33,157))",
+        "list_color": "Cor da lista (opcional)",
+        "blockquote_tint": "Tom do bloco de citação (opcional)",
+        "editor_font": "Família de tipo de letra (p. ex. Playfair Display)",
+        "editor_font_size": "Tamanho do tipo de letra (p. ex. 15px)",
+        "editor_accent": "Cor de destaque (p. ex. rgb(229,33,157))"
+      }
+    }
+    ,
+    "metadata": {
+      "title": "Metadados",
+      "hint": "Controle se os metadados são mostrados no editor Markdown e/ou na pré-visualização HTML. Se estiver oculto no Markdown, também fica oculto na pré-visualização HTML.",
+      "field": "Campo",
+      "show_markdown": "Markdown",
+      "show_html": "HTML",
+      "save": "Guardar definições de metadados",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
+    "publisher": {
+      "title": "WPM (modo de publicação de websites)",
+      "enable": "Ativar WPM",
+      "hint": "O WPM adiciona estados de publicação (Conceito / Processamento / Publicado) e mostra-os na visão geral. Desativa notas secretas. Requer um nome de autor; o requisito de subtítulo é opcional.",
+      "author_label": "Nome do autor",
+      "author_placeholder": "O seu nome",
+      "author_required": "Introduza um nome de autor para ativar o WPM.",
+      "require_subtitle": "Exigir subtítulo (##)"
+    }
+  },
+  "auth": {
+    "superuser_required": "É necessário iniciar sessão como superutilizador.",
+    "login_title": "Iniciar sessão",
+    "setup_title": "Definir palavras-passe",
+    "login_submit": "Iniciar sessão",
+    "setup_submit": "Guardar palavras-passe",
+    "wrong_password": "Palavra-passe incorreta.",
+    "missing_password": "Introduza uma palavra-passe.",
+    "signing_in": "A iniciar sessão...",
+    "saving": "A guardar...",
+    "set_passwords": "Defina ambas as palavras-passe.",
+    "failed": "Falha na autenticação.",
+    "locked": "Demasiadas tentativas. Tente novamente em {time}."
+  },
+  "link_modal": {
+    "title": "Adicionar ligação",
+    "mode_internal": "Interna",
+    "mode_external": "Externa",
+    "mode_youtube": "YouTube",
+    "search_notes": "Pesquisar notas...",
+    "clear_search_aria": "Limpar pesquisa",
+    "link_text_label": "Texto da ligação",
+    "link_text_placeholder": "p. ex. preço spot do ouro",
+    "url_label": "URL",
+    "url_placeholder": "https://example.com/",
+    "youtube_label": "ID do YouTube ou URL",
+    "youtube_placeholder": "yob8SkcOKaYv ou https://youtu.be/",
+    "insert": "Inserir ligação"
+  },
+  "image_modal": {
+    "title": "Inserir imagem",
+    "choose_file": "Escolher ficheiro",
+    "no_file": "Nenhum ficheiro selecionado",
+    "upload": "Enviar",
+    "alt_placeholder": "Texto alternativo (opcional)",
+    "search_images": "Pesquisar imagens...",
+    "tip_insert": "Dica: clique numa imagem para inserir",
+    "tip_at_cursor": "no cursor.",
+    "loading": "A carregar…",
+    "no_images": "Nenhuma imagem encontrada.",
+    "load_failed": "Falha ao carregar imagens.",
+    "choose_first": "Escolha primeiro uma imagem.",
+    "missing_csrf": "Token CSRF em falta. Recarregue a página.",
+    "uploading": "A enviar…",
+    "upload_failed": "Falha no envio.",
+    "uploaded": "Enviado."
+  },
+  "nav": {
+    "collapse_folder": "Recolher pasta",
+    "expand_folder": "Expandir pasta",
+    "sort_label": "Ordenar",
+    "sort_date": "Data",
+    "sort_title": "Título",
+    "sort_slug": "Nome do ficheiro",
+    "no_notes_yet": "Ainda não há notas.",
+    "nothing_here_yet": "Ainda não há nada aqui."
+  },
+  "js": {
+    "confirm_delete": "Eliminar \"{file}\"?",
+    "this_file": "este ficheiro",
+    "prompt_new_folder": "Nome da nova pasta (sem barras):",
+    "invalid_folder_alert": "Nome de pasta inválido.",
+    "unsaved_confirm": "Tem alterações não guardadas. Descartar e continuar?",
+    "export_failed": "Falha na exportação. Consulte a consola para mais detalhes.",
+    "copy_failed": "Falha na cópia. Consulte a consola para mais detalhes.",
+    "copied": "Copiado",
+    "new_md": {
+      "enter_title": "Introduza um título para o nome do ficheiro.",
+      "no_trailing_slash": "O nome do ficheiro não pode terminar com uma barra.",
+      "no_empty_parts": "O nome do ficheiro não pode conter partes de caminho vazias.",
+      "adjust_title": "Ajuste o título para que contenha letras/números (os espaços tornam-se underscores).",
+      "no_dot_parts": "O nome do ficheiro não pode conter partes de caminho \".\" ou \"..\".",
+      "invalid_filename": "Nome de ficheiro inválido.",
+      "adjusted_hint": "Nome de ficheiro ajustado: espaços → underscores; caracteres não suportados removidos."
+    }
+  },
+  "flash": {
+    "csrf_invalid": "Sessão inválida (CSRF). Recarregue a página.",
+    "invalid_file_path": "Caminho de ficheiro inválido.",
+    "secret_locked": "A nota secreta está bloqueada. Desbloqueie primeiro no visualizador.",
+    "deleted_prefix": "Eliminado:",
+    "delete_failed": "Não foi possível eliminar o ficheiro.",
+    "no_write_permissions": "sem permissões de escrita",
+    "invalid_folder_name": "Nome de pasta inválido.",
+    "reserved_folder_name": "Este nome de pasta está reservado.",
+    "folder_exists_prefix": "A pasta já existe:",
+    "path_exists_not_folder_prefix": "O caminho já existe (não é uma pasta):",
+    "folder_create_failed": "Não foi possível criar a pasta.",
+    "folder_created_prefix": "Pasta criada:",
+    "invalid_filename_hint": "Nome de ficheiro inválido. Ajuste o título (os espaços tornam-se underscores) e tente novamente.",
+    "secret_marked_locked": "Este caminho está marcado como secreto. Desbloqueie primeiro no visualizador.",
+    "folder_not_exist_prefix": "A pasta não existe:",
+    "file_exists_prefix": "O ficheiro já existe:",
+    "file_create_failed": "Não foi possível criar o ficheiro.",
+    "publisher_requires_subtitle": "O WPM requer uma linha de subtítulo a começar com \"##\".",
+    "publisher_author_required": "O WPM requer um nome de autor.",
+    "publisher_requires_page_title": "O WPM requer uma linha de metadados page_title.",
+    "publisher_requires_page_picture": "O WPM requer uma linha de metadados page_picture."
+  },
+  "secret": {
+    "wrong_password": "Palavra-passe incorreta.",
+    "title": "Documento protegido",
+    "desc": "Esta nota está protegida. Introduza a palavra-passe para continuar.",
+    "password_placeholder": "Palavra-passe",
+    "unlock_btn": "Desbloquear",
+    "back_to_index": "Voltar ao índice"
+  },
+  "readme": {
+    "shortcut_modifier_note": "Sistema de atalhos: escolha Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) nas definições."
+  },
+  "wpm": {
+    "setup_title": "Configuração do WPM",
+    "setup_hint": "Defina o seu nome de autor e o idioma da UI.",
+    "author_label": "Nome do autor",
+    "author_placeholder": "O seu nome",
+    "language_label": "Idioma da UI",
+    "author_required": "Introduza o seu nome de autor.",
+    "save": "Guardar"
+  }
+}

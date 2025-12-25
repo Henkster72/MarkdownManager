@@ -1,4 +1,6 @@
 .preview-content {
+    --base: var(--theme-primary, currentColor);
+    --theme-secondary: hsl(from var(--base) calc(h - 180) s l) !important;
     --preview-accent: var(--accent);
     --accent: var(--theme-secondary, var(--preview-accent));
     font-family: var(--font-sans);
@@ -126,6 +128,45 @@
     text-decoration: none !important;
 }
 
+.preview-content .md-del {
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+    text-decoration-color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+.preview-content a.default-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.85em;
+    text-decoration: none;
+}
+
+.preview-content a.default-button:hover {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.preview-content a.default-button.freebutton {
+    background: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 75%, #000);
+    color: var(--theme-bg, #ffffff);
+}
+
+.preview-content a.default-button.freebutton:hover {
+    background: color-mix(in srgb, var(--accent) 88%, #000);
+}
+
+.preview-content a.default-button.small-button {
+    font-size: 0.78em;
+    padding: 0.2rem 0.6rem;
+}
+
 .preview-content .pdflink:before {
     font-family: "Pop Icon";
     font-size: 1.3rem;
@@ -161,6 +202,19 @@
     min-width: 0;
     border: 1px solid var(--surface-code-border);
     position: relative;
+}
+
+.preview-content pre.mermaid {
+    background-color: var(--theme-bg, var(--surface-code));
+    border-color: var(--theme-border, var(--surface-code-border));
+    color: inherit;
+    font-family: inherit;
+}
+
+.preview-content pre.mermaid svg {
+    max-width: 100%;
+    height: auto;
+    font-family: inherit;
 }
 
 .preview-content pre[data-lang] {
@@ -248,6 +302,39 @@
     word-break: break-word;
 }
 
+.preview-content .ytframe-wrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.preview-content .ytframe {
+    width: 66%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+}
+
+.preview-content .md-footnotes {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.85rem 0;
+}
+
+.preview-content .md-footnote-item {
+    margin: 0.2rem 0;
+}
+
+.preview-content .md-footnote-label {
+    font-weight: 600;
+    margin-right: 0.35rem;
+}
+
+@media (min-width: 1100px) {
+    .preview-content {
+        padding: 1.5vw 3vw;
+    }
+}
+
 /* Mobile: aggressively wrap long tokens (URLs, hashes, code) to avoid viewport overflow */
 @media (max-width: 700px) {
     .preview-container {
@@ -276,5 +363,11 @@
         white-space: pre-wrap;
         overflow-wrap: anywhere;
         word-break: break-all;
+    }
+}
+
+@media (max-width: 900px) {
+    .preview-content .ytframe {
+        width: 100%;
     }
 }

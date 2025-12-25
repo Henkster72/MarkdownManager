@@ -90,6 +90,15 @@ const mdwRenderMermaid = async (root) => {
     const scope = root instanceof HTMLElement ? root : document;
     const nodes = scope.querySelectorAll('.mermaid');
     if (!nodes.length) return;
+    nodes.forEach((node) => {
+        if (!(node instanceof HTMLElement)) return;
+        if (typeof node.__mdwMermaidSrc !== 'string') {
+            node.__mdwMermaidSrc = node.textContent || '';
+        } else {
+            node.textContent = node.__mdwMermaidSrc;
+        }
+        node.removeAttribute('data-processed');
+    });
     try {
         await mermaid.run({ nodes });
     } catch (err) {
@@ -97,6 +106,77 @@ const mdwRenderMermaid = async (root) => {
     }
 };
 window.__mdwRenderMermaid = mdwRenderMermaid;
+
+const mdwApplyMermaidTheme = () => {
+    const mermaid = window.mermaid;
+    if (!mermaid || typeof mermaid.initialize !== 'function') return false;
+    const probe = document.querySelector('.preview-content') || document.querySelector('.preview-container') || document.body;
+    const styles = getComputedStyle(probe || document.body);
+    const val = (v, fallback) => {
+        const out = String(v || '').trim();
+        return out || fallback;
+    };
+    const cssVar = (name, fallback) => val(styles.getPropertyValue(name), fallback);
+    const text = val(styles.color, cssVar('--text-main', '#111827'));
+    const bg = cssVar('--theme-bg', cssVar('--bg-panel-alt', val(styles.backgroundColor, '#ffffff')));
+    const surface = cssVar('--theme-surface', cssVar('--surface-code', bg));
+    const border = cssVar('--theme-border', cssVar('--border-soft', surface));
+    const primary = cssVar('--theme-primary', cssVar('--accent', text));
+    const secondary = cssVar('--theme-secondary', cssVar('--text-muted', primary));
+    const fontFamily = val(styles.fontFamily, cssVar('--font-sans', 'sans-serif'));
+    const fontSize = val(styles.fontSize, '14px');
+
+    mermaid.initialize({
+        startOnLoad: true,
+        theme: 'base',
+        themeVariables: {
+            fontFamily,
+            fontSize,
+            background: bg,
+            primaryColor: surface,
+            primaryTextColor: text,
+            primaryBorderColor: border,
+            secondaryColor: bg,
+            secondaryTextColor: text,
+            secondaryBorderColor: border,
+            tertiaryColor: surface,
+            tertiaryTextColor: text,
+            tertiaryBorderColor: border,
+            lineColor: primary,
+            textColor: text,
+            mainBkg: bg,
+            nodeBorder: border,
+            clusterBkg: surface,
+            clusterBorder: border,
+            titleColor: text,
+            edgeLabelBackground: surface,
+            actorBkg: surface,
+            actorBorder: border,
+            actorTextColor: text,
+            noteBkgColor: surface,
+            noteTextColor: text,
+            noteBorderColor: border,
+            pie1: primary,
+            pie2: secondary,
+            pie3: text,
+            pie4: border,
+        },
+    });
+    return true;
+};
+window.__mdwApplyMermaidTheme = mdwApplyMermaidTheme;
+
+const mdwRefreshMermaid = (root) => {
+    if (!mdwApplyMermaidTheme()) return;
+    mdwRenderMermaid(root || document).catch(() => {});
+};
+window.__mdwRefreshMermaid = mdwRefreshMermaid;
+
+if (document.readyState === 'complete') {
+    mdwRefreshMermaid();
+} else {
+    window.addEventListener('load', () => mdwRefreshMermaid(), { once: true });
+}
 
 const mdwSetLangCookie = (lang) => {
     const v = String(lang || '').trim();
@@ -585,11 +665,37 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     const AUTHOR_KEY = 'mdw_wpm_author';
     const LANG_KEY = 'mdw_ui_lang';
+    const TUTORIAL_SEEN_KEY = 'mdw_wpm_tutorial_seen';
 
     const isWpm = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(s && s.publisher_mode);
+    };
+
+    const getDefaultLang = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = s && typeof s.ui_language === 'string' ? s.ui_language.trim() : '';
+        const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
+        const allowed = new Set(list.map((l) => String(l?.code || '')).filter(Boolean));
+        if (raw && (!allowed.size || allowed.has(raw))) return raw;
+        const current = String(window.MDW_LANG || '').trim();
+        if (current && (!allowed.size || allowed.has(current))) return current;
+        return allowed.size ? Array.from(allowed)[0] : '';
+    };
+
+    const normalizeTutorialLang = (lang) => {
+        const raw = String(lang || '').trim().toLowerCase();
+        if (!raw) return 'en';
+        const base = raw.includes('-') ? raw.split('-')[0] : raw;
+        const supported = new Set(['en', 'nl', 'de', 'fr', 'pt']);
+        return supported.has(base) ? base : 'en';
+    };
+
+    const tutorialPathForLang = (lang) => {
+        const code = normalizeTutorialLang(lang);
+        return `tutorials/md_tutorial_${code}.md`;
     };
 
     const getAuthor = () => String(mdwStorageGet(AUTHOR_KEY) || '').trim();
@@ -626,11 +732,50 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const syncLangSelect = () => {
         if (!(langSelect instanceof HTMLSelectElement)) return;
         const saved = String(mdwStorageGet(LANG_KEY) || '').trim();
-        const current = String(window.MDW_LANG || '').trim();
+        const current = getDefaultLang();
         const list = Array.isArray(window.MDW_LANGS) ? window.MDW_LANGS : [];
         const allowed = new Set(list.map((l) => String(l?.code || '')).filter(Boolean));
         const next = (saved && allowed.has(saved)) ? saved : (allowed.has(current) ? current : '');
         if (next) langSelect.value = next;
+    };
+
+    const ensureDefaultLang = () => {
+        const saved = String(mdwStorageGet(LANG_KEY) || '').trim();
+        if (saved) return saved;
+        const next = getDefaultLang();
+        if (!next) return '';
+        mdwStorageSet(LANG_KEY, next);
+        if (String(window.MDW_LANG || '') !== next) {
+            mdwSetLangCookie(next);
+        }
+        return next;
+    };
+
+    const isNewWpmUser = () => {
+        const hasAuthor = !!getAuthor();
+        const hasLang = !!String(mdwStorageGet(LANG_KEY) || '').trim();
+        return !hasAuthor && !hasLang;
+    };
+
+    const maybeOpenTutorial = () => {
+        if (!isWpm()) return false;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (!auth || !auth.token || auth.role !== 'user') return false;
+        if (!isNewWpmUser()) return false;
+        if (String(mdwStorageGet(TUTORIAL_SEEN_KEY) || '').trim() === '1') return false;
+
+        const lang = ensureDefaultLang() || String(window.MDW_LANG || '').trim();
+        const tutorialFile = tutorialPathForLang(lang);
+        const params = new URLSearchParams(window.location.search || '');
+        const currentFile = params.get('file') || '';
+        const inEdit = /\/edit\.php$/i.test(window.location.pathname || '');
+        if (inEdit && currentFile === tutorialFile) {
+            mdwStorageSet(TUTORIAL_SEEN_KEY, '1');
+            return false;
+        }
+        mdwStorageSet(TUTORIAL_SEEN_KEY, '1');
+        window.location.href = `edit.php?file=${encodeURIComponent(tutorialFile)}`;
+        return true;
     };
 
     const show = () => {
@@ -674,6 +819,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!isWpm()) return;
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
         if (!auth || !auth.token || auth.role !== 'user') return;
+        if (maybeOpenTutorial()) return;
         if (getAuthor()) return;
         syncLangSelect();
         show();
@@ -779,6 +925,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         root.classList.toggle('theme-light', !useDark);
         mdwStorageSet('mdsite-theme', useDark ? 'dark' : 'light');
         updateIcon();
+        if (typeof window.__mdwRefreshMermaid === 'function') {
+            window.__mdwRefreshMermaid();
+        }
     }
 
     btn.addEventListener('click', function(){
@@ -1067,6 +1216,17 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const css = overridesCss(overrides).trim();
         const styleEl = ensureStyleEl();
         styleEl.textContent = css ? (css + '\n') : '';
+        const themeLink = document.getElementById('mdwThemeHtmlpreviewCss');
+        if (themeLink && themeLink.tagName === 'LINK' && !themeLink.disabled) {
+            themeLink.addEventListener('load', () => {
+                if (typeof window.__mdwRefreshMermaid === 'function') {
+                    window.__mdwRefreshMermaid();
+                }
+            }, { once: true });
+        }
+        if (typeof window.__mdwRefreshMermaid === 'function') {
+            window.__mdwRefreshMermaid();
+        }
     };
 
     window.__mdwApplyTheme = applyTheme;
@@ -3171,12 +3331,16 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     const internalSection = document.getElementById('linkModalInternal');
     const externalSection = document.getElementById('linkModalExternal');
+    const footnoteSection = document.getElementById('linkModalFootnote');
     const youtubeSection = document.getElementById('linkModalYoutube');
     const picker = document.getElementById('linkPicker');
     const pickerFilter = document.getElementById('linkPickerFilter');
     const pickerFilterClear = document.getElementById('linkPickerFilterClear');
     const externalText = document.getElementById('externalLinkText');
     const externalUrl = document.getElementById('externalLinkUrl');
+    const footnoteText = document.getElementById('footnoteLinkText');
+    const footnoteUrl = document.getElementById('footnoteLinkUrl');
+    const footnoteTitle = document.getElementById('footnoteLinkTitle');
     const youtubeInput = document.getElementById('youtubeLinkInput');
 
     const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
@@ -3211,13 +3375,16 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     let selectedTitle = null;
 
     const setMode = (next) => {
-        mode = next === 'external' || next === 'youtube' ? next : 'internal';
+        mode = (next === 'external' || next === 'youtube' || next === 'footnote') ? next : 'internal';
         if (internalSection) internalSection.hidden = mode !== 'internal';
         if (externalSection) externalSection.hidden = mode !== 'external';
+        if (footnoteSection) footnoteSection.hidden = mode !== 'footnote';
         if (youtubeSection) youtubeSection.hidden = mode !== 'youtube';
         validate();
         if (mode === 'external') {
             externalUrl?.focus();
+        } else if (mode === 'footnote') {
+            footnoteUrl?.focus();
         } else if (mode === 'youtube') {
             youtubeInput?.focus();
         } else {
@@ -3256,6 +3423,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
         if (externalText) externalText.value = '';
         if (externalUrl) externalUrl.value = '';
+        if (footnoteText) footnoteText.value = '';
+        if (footnoteUrl) footnoteUrl.value = '';
+        if (footnoteTitle) footnoteTitle.value = '';
         if (youtubeInput) youtubeInput.value = '';
         validate();
         btn.focus();
@@ -3299,6 +3469,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             insertBtn.disabled = url === '';
             return;
         }
+        if (mode === 'footnote') {
+            const url = String(footnoteUrl?.value || '').trim();
+            insertBtn.disabled = url === '';
+            return;
+        }
         if (mode === 'youtube') {
             const id = extractYoutubeId(youtubeInput?.value || '');
             insertBtn.disabled = !id;
@@ -3327,6 +3502,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     });
 
     externalUrl?.addEventListener('input', validate);
+    footnoteUrl?.addEventListener('input', validate);
     youtubeInput?.addEventListener('input', validate);
 
     picker?.addEventListener('click', (e) => {
@@ -3426,6 +3602,92 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return id;
     };
 
+    const extractFootnotes = (text) => {
+        const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+        const body = [];
+        const defs = [];
+        let inCode = false;
+        for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+                inCode = !inCode;
+                body.push(line);
+                continue;
+            }
+            if (!inCode) {
+                const m = line.match(/^\s*\[(\d+)\]:\s*(.+)$/);
+                if (m) {
+                    defs.push({ label: m[1], content: String(m[2] || '').trim() });
+                    continue;
+                }
+            }
+            body.push(line);
+        }
+        return { body: body.join('\n'), defs };
+    };
+
+    const findFootnoteMax = (text) => {
+        const re = /\[(\d+)\]:|\[[^\]]+\]\[(\d+)\]/g;
+        let max = 0;
+        let match;
+        while ((match = re.exec(text))) {
+            const num = match[1] || match[2];
+            if (!num) continue;
+            const n = parseInt(num, 10);
+            if (Number.isFinite(n) && n > max) max = n;
+        }
+        return max;
+    };
+
+    const renumberFootnotes = (text) => {
+        const { body, defs } = extractFootnotes(text);
+        const defMap = new Map();
+        defs.forEach((d) => {
+            if (d && !defMap.has(d.label)) defMap.set(d.label, d.content);
+        });
+
+        const refRe = /\[([^\]]+)\]\[(\d+)\]/g;
+        const order = [];
+        const mapping = new Map();
+        let m;
+        while ((m = refRe.exec(body))) {
+            const oldLabel = m[2];
+            if (!mapping.has(oldLabel)) {
+                mapping.set(oldLabel, String(order.length + 1));
+                order.push(oldLabel);
+            }
+        }
+
+        const replaced = body.replace(refRe, (full, label, oldLabel) => {
+            const next = mapping.get(oldLabel) || oldLabel;
+            return `[${label}][${next}]`;
+        });
+
+        const used = new Set(mapping.keys());
+        const newDefs = [];
+        order.forEach((oldLabel) => {
+            const def = defMap.get(oldLabel);
+            if (!def) return;
+            const next = mapping.get(oldLabel) || oldLabel;
+            newDefs.push(`[${next}]: ${def}`);
+        });
+        const extraDefs = defs
+            .filter((d) => d && !used.has(d.label))
+            .map((d) => `[${d.label}]: ${d.content}`);
+
+        const allDefs = newDefs.concat(extraDefs);
+        if (!allDefs.length) return { text: replaced, mapping };
+
+        const trimmed = replaced.replace(/\s*$/, '');
+        const sep = trimmed.trim() ? '\n\n' : '';
+        return { text: trimmed + sep + allDefs.join('\n') + '\n', mapping };
+    };
+
+    const appendFootnoteDefinition = (text, line) => {
+        const trimmed = String(text || '').replace(/\s*$/, '');
+        const sep = trimmed.trim() ? '\n\n' : '';
+        return trimmed + sep + line + '\n';
+    };
+
     const insertLink = () => {
         if (mode === 'external') {
             const url = String(externalUrl?.value || '').trim();
@@ -3447,6 +3709,38 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 '{: class="ytframe-wrapper"}',
             ].join('\n');
             insertBlockAtSelection(block);
+            close();
+            return;
+        }
+        if (mode === 'footnote') {
+            const url = String(footnoteUrl?.value || '').trim();
+            if (!url) return;
+            const selection = getEditorSelectionText();
+            const text = selection || String(footnoteText?.value || '').trim() || url;
+            const titleRaw = String(footnoteTitle?.value || '').trim();
+            const titleSafe = titleRaw.replace(/"/g, "'");
+            const nextLabel = findFootnoteMax(editor.value) + 1;
+            const ref = `[${text}][${nextLabel}]`;
+            const def = `[${nextLabel}]: ${url}${titleSafe ? ` "${titleSafe}"` : ''}`;
+
+            const start = editor.selectionStart ?? 0;
+            const end = editor.selectionEnd ?? 0;
+            const before = editor.value.slice(0, start);
+            const after = editor.value.slice(end);
+            let nextValue = before + ref + after;
+            nextValue = appendFootnoteDefinition(nextValue, def);
+            const renumbered = renumberFootnotes(nextValue);
+            const newLabel = renumbered.mapping.get(String(nextLabel)) || String(nextLabel);
+            const refFinal = `[${text}][${newLabel}]`;
+
+            editor.value = renumbered.text;
+            let caret = before.length + ref.length;
+            const probeStart = Math.max(0, before.length - 64);
+            const idx = editor.value.indexOf(refFinal, probeStart);
+            if (idx !== -1) caret = idx + refFinal.length;
+            editor.setSelectionRange(caret, caret);
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            editor.focus();
             close();
             return;
         }
@@ -3496,6 +3790,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const editor = document.getElementById('editor');
     if (!btn || !modal || !overlay || !uploadBtn || !listEl || !filterEl || !editor) return;
 
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
     const apiUrl = 'image_manager.php';
     let items = [];
     const CACHE_KEY = 'mdw_image_cache_v1';
@@ -3577,7 +3872,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             });
 
         if (filtered.length === 0) {
-            listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">No images found.</div>';
+            listEl.innerHTML = `<div class="status-text" style="padding:0.5rem;">${t('image_modal.no_images', 'No images found.')}</div>`;
             return;
         }
 
@@ -3612,25 +3907,25 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const loadList = async () => {
         setStatus('');
         if (!items.length) {
-            listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">Loading…</div>';
+            listEl.innerHTML = `<div class="status-text" style="padding:0.5rem;">${t('image_modal.loading', 'Loading…')}</div>`;
         }
         try {
             const res = await fetch(`${apiUrl}?action=list`, { headers: { 'Accept': 'application/json' } });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data || data.ok !== true) {
-                throw new Error((data && data.error) ? data.error : 'Failed to load images.');
+                throw new Error((data && data.error) ? data.error : t('image_modal.load_failed', 'Failed to load images.'));
             }
             items = Array.isArray(data.images) ? data.images : [];
             saveCache();
             render();
         } catch (err) {
             if (items.length) {
-                setStatus(err?.message || 'Failed to load images.', 'error');
+                setStatus(err?.message || t('image_modal.load_failed', 'Failed to load images.'), 'error');
                 return;
             }
             items = [];
-            listEl.innerHTML = '<div class="status-text" style="padding:0.5rem;">Failed to load images.</div>';
-            setStatus(err?.message || 'Failed to load images.', 'error');
+            listEl.innerHTML = `<div class="status-text" style="padding:0.5rem;">${t('image_modal.load_failed', 'Failed to load images.')}</div>`;
+            setStatus(err?.message || t('image_modal.load_failed', 'Failed to load images.'), 'error');
         }
     };
 
@@ -3699,17 +3994,17 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!(uploadInput instanceof HTMLInputElement)) return;
         const file = uploadInput.files && uploadInput.files[0];
         if (!file) {
-            setStatus('Choose an image first.', 'error');
+            setStatus(t('image_modal.choose_first', 'Choose an image first.'), 'error');
             uploadInput.focus();
             return;
         }
         const csrf = (csrfInput instanceof HTMLInputElement) ? csrfInput.value : '';
         if (!csrf) {
-            setStatus('Missing CSRF token. Reload the page.', 'error');
+            setStatus(t('image_modal.missing_csrf', 'Missing CSRF token. Reload the page.'), 'error');
             return;
         }
 
-        setStatus('Uploading…');
+        setStatus(t('image_modal.uploading', 'Uploading…'));
         uploadBtn.disabled = true;
         try {
             const fd = new FormData();
@@ -3720,13 +4015,13 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             const res = await fetch(apiUrl, { method: 'POST', body: fd });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data || data.ok !== true) {
-                throw new Error((data && data.error) ? data.error : 'Upload failed.');
+                throw new Error((data && data.error) ? data.error : t('image_modal.upload_failed', 'Upload failed.'));
             }
 
             const path = String(data.path || '');
-            const file = String(data.file || '');
+            const uploadedFile = String(data.file || '');
             const alt = String(altInput?.value || '').trim() || String(data.alt || '') || guessAlt(path);
-            const token = imageTokenForFile(file, path);
+            const token = imageTokenForFile(uploadedFile, path);
             if (token) {
                 insertAtSelection(`![${alt}](${token})`);
             }
@@ -3734,10 +4029,10 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             uploadInput.value = '';
             setPickLabel('');
             if (altInput instanceof HTMLInputElement) altInput.value = '';
-            setStatus('Uploaded.', 'ok');
+            setStatus(t('image_modal.uploaded', 'Uploaded.'), 'ok');
             await loadList();
         } catch (err) {
-            setStatus(err?.message || 'Upload failed.', 'error');
+            setStatus(err?.message || t('image_modal.upload_failed', 'Upload failed.'), 'error');
         } finally {
             uploadBtn.disabled = false;
         }
@@ -3755,6 +4050,167 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const alt = String(altInput?.value || '').trim() || suggestedAlt || guessAlt(file || path);
         insertAtSelection(`![${alt}](${token})`);
         close();
+    });
+})();
+
+// Replace modal (edit.php)
+(function(){
+    const modal = document.getElementById('replaceModal');
+    const overlay = document.getElementById('replaceModalOverlay');
+    const closeBtn = document.getElementById('replaceModalClose');
+    const replaceNextBtn = document.getElementById('replaceNextBtn');
+    const replaceAllBtn = document.getElementById('replaceAllBtn');
+    const findInput = document.getElementById('replaceFindInput');
+    const replaceInput = document.getElementById('replaceWithInput');
+    const statusEl = document.getElementById('replaceModalStatus');
+    const editor = document.getElementById('editor');
+    if (!modal || !overlay || !replaceNextBtn || !replaceAllBtn || !findInput || !replaceInput || !editor) return;
+
+    const setStatus = (msg, kind = 'info') => {
+        if (!statusEl) return;
+        statusEl.textContent = String(msg || '');
+        statusEl.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const updateButtons = () => {
+        const needle = String(findInput.value || '');
+        const hasNeedle = needle.trim() !== '';
+        replaceNextBtn.disabled = !hasNeedle;
+        replaceAllBtn.disabled = !hasNeedle;
+    };
+
+    const open = () => {
+        if (typeof window.__mdwCloseLinkModal === 'function') {
+            window.__mdwCloseLinkModal();
+        }
+        if (typeof window.__mdwCloseImageModal === 'function') {
+            window.__mdwCloseImageModal();
+        }
+        if (typeof window.__mdwCloseThemeModal === 'function') {
+            window.__mdwCloseThemeModal({ force: true });
+        }
+        overlay.hidden = false;
+        modal.hidden = false;
+        document.documentElement.classList.add('modal-open');
+        setStatus('');
+
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        if (end > start) {
+            const selected = editor.value.slice(start, end);
+            if (selected) findInput.value = selected;
+        }
+        updateButtons();
+        setTimeout(() => {
+            findInput.focus();
+            findInput.select();
+        }, 0);
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        modal.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+        setStatus('');
+        editor.focus();
+    };
+
+    window.__mdwOpenReplaceModal = open;
+    window.__mdwCloseReplaceModal = close;
+
+    const replaceRange = (start, end, replacement) => {
+        const scrollTop = editor.scrollTop;
+        editor.setRangeText(replacement, start, end, 'select');
+        editor.scrollTop = scrollTop;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const findNextIndex = (needle) => {
+        const hay = editor.value;
+        const start = editor.selectionEnd ?? 0;
+        let idx = hay.indexOf(needle, start);
+        if (idx === -1 && start > 0) idx = hay.indexOf(needle, 0);
+        return idx;
+    };
+
+    const replaceNext = () => {
+        const needle = String(findInput.value || '');
+        if (!needle) return;
+        const replacement = String(replaceInput.value || '');
+        const selStart = editor.selectionStart ?? 0;
+        const selEnd = editor.selectionEnd ?? 0;
+        if (selEnd > selStart && editor.value.slice(selStart, selEnd) === needle) {
+            replaceRange(selStart, selEnd, replacement);
+            setStatus('Replaced.', 'ok');
+            return;
+        }
+
+        const idx = findNextIndex(needle);
+        if (idx === -1) {
+            setStatus('No matches found.', 'error');
+            return;
+        }
+        replaceRange(idx, idx + needle.length, replacement);
+        setStatus('Replaced.', 'ok');
+    };
+
+    const replaceAll = () => {
+        const needle = String(findInput.value || '');
+        if (!needle) return;
+        const replacement = String(replaceInput.value || '');
+        const hay = editor.value;
+        let idx = hay.indexOf(needle);
+        if (idx === -1) {
+            setStatus('No matches found.', 'error');
+            return;
+        }
+
+        let out = '';
+        let start = 0;
+        let count = 0;
+        while (idx !== -1) {
+            out += hay.slice(start, idx) + replacement;
+            start = idx + needle.length;
+            count++;
+            idx = hay.indexOf(needle, start);
+        }
+        out += hay.slice(start);
+
+        const scrollTop = editor.scrollTop;
+        editor.value = out;
+        editor.scrollTop = scrollTop;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const lastIdx = out.lastIndexOf(replacement);
+        if (lastIdx >= 0) editor.setSelectionRange(lastIdx, lastIdx + replacement.length);
+        setStatus(`${count} replaced.`, 'ok');
+    };
+
+    overlay.addEventListener('click', close);
+    closeBtn?.addEventListener('click', close);
+    replaceNextBtn.addEventListener('click', replaceNext);
+    replaceAllBtn.addEventListener('click', replaceAll);
+    findInput.addEventListener('input', updateButtons);
+    replaceInput.addEventListener('input', updateButtons);
+
+    document.addEventListener('keydown', (e) => {
+        if (modal.hidden) return;
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        e.preventDefault();
+        close();
+    });
+
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!replaceNextBtn.disabled) replaceNext();
+        }
+        if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            if (!replaceAllBtn.disabled) replaceAll();
+        }
     });
 })();
 
@@ -3842,11 +4298,100 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const isWrapOn = () => document.documentElement.classList.contains('mdw-wrap-on');
     const isLinesOn = () => !document.documentElement.classList.contains('mdw-lines-off');
 
+    const saveChip = document.getElementById('saveStatusChip');
+    const saveErrorPanel = document.getElementById('saveErrorPanel');
+    const saveErrorMessage = document.getElementById('saveErrorMessage');
+    const saveErrorDetailsWrap = document.getElementById('saveErrorDetailsWrap');
+    const saveErrorDetails = document.getElementById('saveErrorDetails');
+    let saveChipTimer = null;
+    const showSaveChip = () => {
+        if (!saveChip) return;
+        saveChip.style.display = '';
+        if (saveChipTimer) clearTimeout(saveChipTimer);
+        saveChipTimer = setTimeout(() => {
+            saveChip.style.display = 'none';
+        }, 1800);
+    };
+    const showSaveError = (message, details) => {
+        if (saveErrorMessage) saveErrorMessage.textContent = message || 'Save failed.';
+        if (saveErrorDetails) saveErrorDetails.textContent = details || '';
+        if (saveErrorDetailsWrap) saveErrorDetailsWrap.hidden = !details;
+        if (saveErrorPanel) saveErrorPanel.hidden = false;
+    };
+    const clearSaveError = () => {
+        if (saveErrorPanel) saveErrorPanel.hidden = true;
+        if (saveErrorMessage) saveErrorMessage.textContent = '';
+        if (saveErrorDetails) saveErrorDetails.textContent = '';
+        if (saveErrorDetailsWrap) saveErrorDetailsWrap.hidden = true;
+    };
+
     let ignoreBeforeUnload = false;
     const setIgnoreBeforeUnload = () => { ignoreBeforeUnload = true; };
+    const clearIgnoreBeforeUnload = () => { ignoreBeforeUnload = false; };
 
     editorForm?.addEventListener('submit', setIgnoreBeforeUnload);
     deleteForm?.addEventListener('submit', setIgnoreBeforeUnload);
+
+    const ajaxSave = async () => {
+        if (!(editorForm instanceof HTMLFormElement)) return;
+        if (!(ta instanceof HTMLTextAreaElement)) return;
+        const action = editorForm.getAttribute('action') || window.location.pathname + window.location.search;
+        const fd = new FormData(editorForm);
+        if (!fd.has('content')) fd.set('content', ta.value);
+        if (!fd.has('action')) fd.set('action', 'save');
+        const fileVal = String(fd.get('file') || '').trim();
+        if (!fileVal) {
+            const fromState = String(window.CURRENT_FILE || '').trim();
+            if (fromState) {
+                fd.set('file', fromState);
+            } else {
+                const qsFile = new URLSearchParams(window.location.search).get('file');
+                if (qsFile) fd.set('file', qsFile);
+            }
+        }
+
+        if (status) status.textContent = 'Saving…';
+        clearSaveError();
+        try {
+            const res = await fetch(action, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || data.ok !== true) {
+                const msg = (data && data.error) ? String(data.error) : 'Save failed.';
+                if (status) status.textContent = msg;
+                showSaveError(msg, data && data.details ? String(data.details) : '');
+                clearIgnoreBeforeUnload();
+                return;
+            }
+            if (typeof window.__mdwResetDirty === 'function') {
+                window.__mdwResetDirty();
+            }
+            if (status) status.textContent = 'Saved';
+            showSaveChip();
+            clearSaveError();
+        } catch (err) {
+            if (status) status.textContent = 'Save failed.';
+            showSaveError('Save failed.', '');
+        } finally {
+            clearIgnoreBeforeUnload();
+        }
+    };
+
+    editorForm?.addEventListener('submit', (e) => {
+        if (!(editorForm instanceof HTMLFormElement)) return;
+        const submitter = e.submitter;
+        const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const isPublish = (
+            (submitter instanceof HTMLElement && submitter.getAttribute('name') === 'publish_action') ||
+            (active && active.getAttribute('name') === 'publish_action')
+        );
+        if (isPublish) return;
+        e.preventDefault();
+        ajaxSave();
+    });
 
     function setDirty(isDirty) {
         window.__mdDirty = !!isDirty;
@@ -3992,6 +4537,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 (function(){
     const ta = document.getElementById('editor');
     if (!(ta instanceof HTMLTextAreaElement)) return;
+    const editorForm = document.getElementById('editor-form');
 
     const wrapToggle = document.getElementById('wrapToggle');
     const lineNumbersToggle = document.getElementById('lineNumbersToggle');
@@ -4408,6 +4954,28 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     ta.addEventListener('keydown', (e) => {
         if (!isModKey(e)) return;
+
+        // Save: Ctrl+Alt+S
+        if (!e.shiftKey && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            if (editorForm instanceof HTMLFormElement) {
+                if (typeof editorForm.requestSubmit === 'function') {
+                    editorForm.requestSubmit();
+                } else {
+                    editorForm.submit();
+                }
+            }
+            return;
+        }
+
+        // Replace modal: Ctrl+Alt+H
+        if (!e.shiftKey && (e.key === 'h' || e.key === 'H')) {
+            e.preventDefault();
+            if (typeof window.__mdwOpenReplaceModal === 'function') {
+                window.__mdwOpenReplaceModal();
+            }
+            return;
+        }
 
         // Bold: Ctrl+Alt+B
         if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {

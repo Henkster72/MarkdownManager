@@ -276,6 +276,15 @@ a:hover {
   overflow: hidden;
 }
 
+.modal.modal-small {
+  width: min(420px, calc(100vw - 2rem));
+}
+
+.modal-overlay.no-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .auth-locked body.app-body {
   overflow: hidden;
 }
@@ -1269,7 +1278,13 @@ a:hover {
 .editor-form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .editor-body { flex: 1 1 auto; position: relative; display: grid; grid-template-columns: auto 1fr; border-radius: 0.5rem; border: 1px solid var(--border-soft); background: var(--surface-code); overflow: hidden; }
 .editor-footer { padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; }
+.editor-footer-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
 .status-text { font-size: 0.65rem; color: var(--text-muted); }
+.save-error-panel { margin-top: 0.4rem; padding: 0.45rem 0.6rem; border: 1px solid var(--danger); background: rgba(220, 38, 38, 0.08); border-radius: 0.5rem; max-width: 52ch; }
+.save-error-message { font-size: 0.7rem; color: var(--danger); font-weight: 600; }
+.save-error-details { margin-top: 0.35rem; }
+.save-error-details summary { cursor: pointer; font-size: 0.65rem; color: var(--text-muted); }
+.save-error-details code { display: block; margin-top: 0.3rem; font-size: 0.6rem; color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
 
 
 /* Small helper for icon-only buttons */
