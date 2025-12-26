@@ -788,6 +788,11 @@ function mdw_metadata_default_config() {
             'publisher_default_author' => '',
             'publisher_require_h2' => true,
             'allow_user_delete' => true,
+            'copy_buttons_enabled' => true,
+            'copy_include_meta' => true,
+            'copy_html_mode' => 'dry',
+            'post_date_format' => 'mdy_short',
+            'post_date_align' => 'left',
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
@@ -817,6 +822,14 @@ function mdw_metadata_normalize_config($cfg) {
     $publisherDefaultAuthor = isset($inSettings['publisher_default_author']) ? trim((string)$inSettings['publisher_default_author']) : '';
     $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
     $allowUserDelete = !array_key_exists('allow_user_delete', $inSettings) ? true : (bool)$inSettings['allow_user_delete'];
+    $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $inSettings) ? true : (bool)$inSettings['copy_buttons_enabled'];
+    $copyIncludeMeta = !array_key_exists('copy_include_meta', $inSettings) ? true : (bool)$inSettings['copy_include_meta'];
+    $copyHtmlMode = isset($inSettings['copy_html_mode']) ? trim((string)$inSettings['copy_html_mode']) : 'dry';
+    if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+    $postDateFormat = isset($inSettings['post_date_format']) ? trim((string)$inSettings['post_date_format']) : 'mdy_short';
+    if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
+    $postDateAlign = isset($inSettings['post_date_align']) ? trim((string)$inSettings['post_date_align']) : 'left';
+    if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
     $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
     if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
@@ -829,6 +842,11 @@ function mdw_metadata_normalize_config($cfg) {
         'publisher_default_author' => $publisherDefaultAuthor,
         'publisher_require_h2' => (bool)$publisherRequireH2,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
+        'copy_include_meta' => (bool)$copyIncludeMeta,
+        'copy_html_mode' => $copyHtmlMode,
+        'post_date_format' => $postDateFormat,
+        'post_date_align' => $postDateAlign,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
@@ -1029,15 +1047,211 @@ function mdw_metadata_settings() {
         'publisher_default_author' => isset($s['publisher_default_author']) ? trim((string)$s['publisher_default_author']) : '',
         'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
         'allow_user_delete' => !array_key_exists('allow_user_delete', $s) ? true : (bool)$s['allow_user_delete'],
+        'copy_buttons_enabled' => !array_key_exists('copy_buttons_enabled', $s) ? true : (bool)$s['copy_buttons_enabled'],
+        'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
+        'copy_html_mode' => isset($s['copy_html_mode']) ? trim((string)$s['copy_html_mode']) : 'dry',
+        'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
+        'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
         'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
     ];
+    if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
+    if (!in_array($out['post_date_align'], ['left', 'center', 'right'], true)) $out['post_date_align'] = 'left';
+    if (!in_array($out['copy_html_mode'], ['dry', 'medium', 'wet'], true)) $out['copy_html_mode'] = 'dry';
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';
     if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
     if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
     return $out;
+}
+
+function mdw_parse_date_parts($raw) {
+    $raw = trim((string)$raw);
+    if ($raw === '') return null;
+    if (preg_match('/^(\\d{4})[\\-\\/\\._](\\d{1,2})[\\-\\/\\._](\\d{1,2})/', $raw, $m)) {
+        return [(int)$m[1], (int)$m[2], (int)$m[3]];
+    }
+    if (preg_match('/^(\\d{1,2})[\\-\\/\\._](\\d{1,2})[\\-\\/\\._](\\d{4})/', $raw, $m)) {
+        return [(int)$m[3], (int)$m[2], (int)$m[1]];
+    }
+    if (preg_match('/^(\\d{2})[\\-\\/\\._](\\d{1,2})[\\-\\/\\._](\\d{1,2})/', $raw, $m)) {
+        $yy = (int)$m[1];
+        $year = $yy < 70 ? (2000 + $yy) : (1900 + $yy);
+        return [$year, (int)$m[2], (int)$m[3]];
+    }
+    $ts = strtotime($raw);
+    if ($ts === false) return null;
+    return [(int)date('Y', $ts), (int)date('n', $ts), (int)date('j', $ts)];
+}
+
+function mdw_post_date_months($lang) {
+    $lang = strtolower(trim((string)$lang));
+    $lang = $lang !== '' ? substr($lang, 0, 2) : 'en';
+    $map = [
+        'en' => [
+            'short' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            'long' => ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+        ],
+        'nl' => [
+            'short' => ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
+            'long' => ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'],
+        ],
+        'de' => [
+            'short' => ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'],
+            'long' => ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'],
+        ],
+        'fr' => [
+            'short' => ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'],
+            'long' => ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+        ],
+        'pt' => [
+            'short' => ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'],
+            'long' => ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
+        ],
+    ];
+    if (!isset($map[$lang])) $lang = 'en';
+    return $map[$lang];
+}
+
+function mdw_format_post_date_value($raw, $format, $lang = null) {
+    $parts = mdw_parse_date_parts($raw);
+    if (!$parts) return (string)$raw;
+    [$year, $month, $day] = $parts;
+    if ($month < 1 || $month > 12) return (string)$raw;
+    $lang = $lang !== null ? (string)$lang : (string)($GLOBALS['MDW_I18N_LANG'] ?? 'en');
+    $months = mdw_post_date_months($lang);
+    $format = in_array($format, ['mdy_short', 'dmy_long'], true) ? $format : 'mdy_short';
+    if ($format === 'dmy_long') {
+        $label = $months['long'][$month - 1] ?? '';
+        if ($label === '') return (string)$raw;
+        if (strtolower(substr((string)$lang, 0, 2)) === 'de') {
+            return sprintf('%d. %s %d', $day, $label, $year);
+        }
+        return sprintf('%d %s %d', $day, $label, $year);
+    }
+    $label = $months['short'][$month - 1] ?? '';
+    if ($label === '') return (string)$raw;
+    return sprintf('%s %d, %d', $label, $day, $year);
+}
+
+function mdw_attr_list_parse_line($line) {
+    $line = trim((string)$line);
+    if ($line === '') return null;
+    if (!preg_match_all('/\\{:\\s*[^}]+\\}/', $line, $m)) return null;
+    $stripped = trim(preg_replace('/\\{:\\s*[^}]+\\}/', '', $line));
+    if ($stripped !== '') return null;
+    $attrs = ['class' => '', 'style' => ''];
+    foreach ($m[0] as $chunk) {
+        if (!preg_match('/\\{:\\s*([^}]+)\\}/', $chunk, $cm)) continue;
+        $inner = (string)$cm[1];
+        if (!preg_match_all('/\\b(class|style)\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s]+))/i', $inner, $am, PREG_SET_ORDER)) {
+            continue;
+        }
+        foreach ($am as $match) {
+            $key = strtolower((string)($match[1] ?? ''));
+            $val = $match[3] ?? ($match[4] ?? ($match[5] ?? ''));
+            $val = html_entity_decode((string)$val, ENT_QUOTES, 'UTF-8');
+            if ($key === 'class') {
+                $val = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', $val);
+                $val = trim(preg_replace('/\\s+/', ' ', $val));
+                if ($val !== '') {
+                    $attrs['class'] = trim($attrs['class'] . ' ' . $val);
+                }
+            } else if ($key === 'style') {
+                $val = preg_replace('/[^A-Za-z0-9_\\-\\s:;,#.%()]/', '', $val);
+                $val = trim($val);
+                if ($val !== '') {
+                    $attrs['style'] = trim($attrs['style'] . '; ' . $val);
+                }
+            }
+        }
+    }
+    $out = [];
+    if (isset($attrs['class']) && $attrs['class'] !== '') $out['class'] = $attrs['class'];
+    if (isset($attrs['style']) && $attrs['style'] !== '') $out['style'] = trim($attrs['style'], '; ');
+    return $out ?: null;
+}
+
+function mdw_apply_attr_list_to_html($html, $attrs) {
+    if (!is_string($html) || !$attrs || !is_array($attrs)) return $html;
+    if (!preg_match('/^<([A-Za-z][A-Za-z0-9:-]*)([^>]*)>/', $html, $m)) return $html;
+    $tag = $m[1];
+    $attrStr = (string)($m[2] ?? '');
+
+    if (isset($attrs['class']) && $attrs['class'] !== '') {
+        if (preg_match('/\\bclass\\s*=\\s*\"([^\"]*)\"/i', $attrStr, $cm)) {
+            $merged = trim(preg_replace('/\\s+/', ' ', trim($cm[1]) . ' ' . $attrs['class']));
+            $attrStr = preg_replace('/\\bclass\\s*=\\s*\"[^\"]*\"/i', ' class="'.htmlspecialchars($merged, ENT_QUOTES, 'UTF-8').'"', $attrStr, 1);
+        } else {
+            $attrStr .= ' class="'.htmlspecialchars($attrs['class'], ENT_QUOTES, 'UTF-8').'"';
+        }
+    }
+    if (isset($attrs['style']) && $attrs['style'] !== '') {
+        if (preg_match('/\\bstyle\\s*=\\s*\"([^\"]*)\"/i', $attrStr, $sm)) {
+            $existing = trim((string)$sm[1]);
+            $extra = trim((string)$attrs['style']);
+            $merged = $existing !== '' ? rtrim($existing, ';') . '; ' . $extra : $extra;
+            $attrStr = preg_replace('/\\bstyle\\s*=\\s*\"[^\"]*\"/i', ' style="'.htmlspecialchars($merged, ENT_QUOTES, 'UTF-8').'"', $attrStr, 1);
+        } else {
+            $attrStr .= ' style="'.htmlspecialchars($attrs['style'], ENT_QUOTES, 'UTF-8').'"';
+        }
+    }
+
+    $newTag = '<' . $tag . $attrStr . '>';
+    return $newTag . substr($html, strlen($m[0]));
+}
+
+function mdw_merge_attr_list($base, $extra) {
+    if (!$base) return $extra;
+    if (!$extra) return $base;
+    $out = $base;
+    if (isset($extra['class']) && $extra['class'] !== '') {
+        $out['class'] = trim(($out['class'] ?? '') . ' ' . $extra['class']);
+    }
+    if (isset($extra['style']) && $extra['style'] !== '') {
+        $existing = trim((string)($out['style'] ?? ''));
+        $extraStyle = trim((string)$extra['style']);
+        if ($existing !== '' && $extraStyle !== '') {
+            $out['style'] = rtrim($existing, ';') . '; ' . $extraStyle;
+        } else if ($extraStyle !== '') {
+            $out['style'] = $extraStyle;
+        }
+    }
+    return $out;
+}
+
+function mdw_apply_attr_list_to_last_html(&$html, $attrs) {
+    if (!$attrs || !is_array($attrs) || !is_array($html)) return false;
+    for ($i = count($html) - 1; $i >= 0; $i--) {
+        $entry = $html[$i];
+        if (!is_string($entry)) continue;
+        $trim = trim($entry);
+        if ($trim === '' || $trim[0] !== '<') continue;
+        if (preg_match('/^<\\//', $trim)) continue;
+        if (!preg_match('/^<([A-Za-z][A-Za-z0-9:-]*)(\\s|>)/', $trim)) continue;
+        $html[$i] = mdw_apply_attr_list_to_html($entry, $attrs);
+        return true;
+    }
+    return false;
+}
+
+function mdw_attr_list_extract_classes($line) {
+    $line = trim((string)$line);
+    if ($line === '') return null;
+    if (!preg_match_all('/\\{:\\s*[^}]+\\}/', $line, $m)) return null;
+    $stripped = trim(preg_replace('/\\{:\\s*[^}]+\\}/', '', $line));
+    if ($stripped !== '') return null;
+    $classes = [];
+    foreach ($m[0] as $chunk) {
+        if (!preg_match('/\\bclass\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s]+))/i', $chunk, $cm)) continue;
+        $val = $cm[2] ?? ($cm[3] ?? ($cm[4] ?? ''));
+        $val = html_entity_decode((string)$val, ENT_QUOTES, 'UTF-8');
+        $val = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', $val);
+        $val = trim(preg_replace('/\\s+/', ' ', $val));
+        if ($val !== '') $classes[] = $val;
+    }
+    return $classes;
 }
 
 function mdw_auth_hash_password($password) {
@@ -1323,6 +1537,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 if (array_key_exists('enabled', $spec) && !$spec['enabled']) continue;
                 $v = trim((string)$meta[$k]);
                 if ($v === '') continue;
+                if ($k === 'post_date') {
+                    $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
+                }
                 $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
                 $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
                 $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
@@ -1353,20 +1570,35 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $v = trim((string)$meta[$k]);
         if ($v === '') continue;
         if (isset($mappedMetaKeys[$k])) continue;
+        if ($k === 'post_date') {
+            $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
+        }
         $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
         $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
         $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
         if (!$mdVis) $htmlVis = false;
         if (!$htmlVis) continue;
         $label = $f && isset($f['label']) ? (string)$f['label'] : $k;
-        $metaShown[] = ['k' => $k, 'label' => $label, 'value' => $v];
+        $isPostDate = ($k === 'post_date');
+        $metaShown[] = [
+            'k' => $k,
+            'label' => $label,
+            'value' => $v,
+            'no_label' => $isPostDate,
+            'align' => $isPostDate ? ($settings['post_date_align'] ?? 'left') : null,
+        ];
     }
 
     if (!empty($metaShown)) {
         $html[] = '<dl class="md-meta">';
         foreach ($metaShown as $it) {
-            $labelEsc = htmlspecialchars((string)$it['label'], ENT_QUOTES, 'UTF-8');
             $valEsc = htmlspecialchars((string)$it['value'], ENT_QUOTES, 'UTF-8');
+            if (!empty($it['no_label'])) {
+                $align = in_array((string)$it['align'], ['left', 'center', 'right'], true) ? (string)$it['align'] : 'left';
+                $html[] = '<div class="md-meta-row meta-post-date meta-align-' . $align . '"><dd>' . $valEsc . '</dd></div>';
+                continue;
+            }
+            $labelEsc = htmlspecialchars((string)$it['label'], ENT_QUOTES, 'UTF-8');
             $html[] = '<div class="md-meta-row"><dt>' . $labelEsc . '</dt><dd>' . $valEsc . '</dd></div>';
         }
         $html[] = '</dl>';
@@ -1449,12 +1681,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $classes = [];
                 $consume = 0;
                 for ($j = $i + 1; $j < $count && $consume < 2; $j++) {
-                    if (preg_match('/^\\s*\\{:\\s*class\\s*=\\s*"([^"]+)"\\s*\\}\\s*$/', $lines[$j], $cm)) {
-                        $classes[] = trim((string)$cm[1]);
-                        $consume++;
-                        continue;
+                    $found = mdw_attr_list_extract_classes($lines[$j]);
+                    if ($found === null || empty($found)) break;
+                    foreach ($found as $cls) {
+                        $classes[] = $cls;
                     }
-                    break;
+                    $consume++;
                 }
 
                 $iframeClass = '';
@@ -1479,6 +1711,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $i += $consume;
                 continue;
             }
+        }
+
+        $attrLine = mdw_attr_list_parse_line($line);
+        if ($attrLine) {
+            mdw_apply_attr_list_to_last_html($html, $attrLine);
+            continue;
         }
 
         // MathJax display blocks: \[ ... \] on their own lines (allow indentation, incl. inside list items)
@@ -1523,8 +1761,19 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $i++;
             }
             $i--;
+            $bqAttrs = null;
+            while (!empty($bq)) {
+                $parsed = mdw_attr_list_parse_line($bq[count($bq) - 1]);
+                if (!$parsed) break;
+                array_pop($bq);
+                $bqAttrs = mdw_merge_attr_list($bqAttrs, $parsed);
+            }
             $inner = implode("\n", $bq);
-            $html[] = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, $context) . "\n" . '</blockquote>';
+            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, $context) . "\n" . '</blockquote>';
+            if ($bqAttrs) {
+                $bqHtml = mdw_apply_attr_list_to_html($bqHtml, $bqAttrs);
+            }
+            $html[] = $bqHtml;
             continue;
         }
 

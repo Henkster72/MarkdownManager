@@ -28,6 +28,15 @@
   align-items: baseline;
   padding: 0.15rem 0;
 }
+.md-meta-row.meta-post-date {
+  display: block;
+}
+.md-meta-row.meta-post-date dd {
+  margin: 0;
+}
+.md-meta-row.meta-post-date.meta-align-left dd { text-align: left; }
+.md-meta-row.meta-post-date.meta-align-center dd { text-align: center; }
+.md-meta-row.meta-post-date.meta-align-right dd { text-align: right; }
 .md-meta dt {
   font-weight: 700;
   opacity: 0.85;
@@ -202,6 +211,16 @@
     min-width: 0;
     border: 1px solid var(--surface-code-border);
     position: relative;
+}
+.preview-content pre .code-copy-btn {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    font-size: 0.7rem;
+    z-index: 2;
 }
 
 .preview-content pre.mermaid {

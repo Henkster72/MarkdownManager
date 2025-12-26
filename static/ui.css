@@ -354,6 +354,35 @@ a:hover {
   overflow: auto;
 }
 
+@media (min-width: 960px) {
+  .theme-modal .modal-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1.25rem;
+    align-content: start;
+  }
+
+  .theme-modal .modal-body > details {
+    grid-column: 1 / -1;
+  }
+
+  .theme-modal .modal-field {
+    margin-bottom: 0;
+  }
+}
+
+.theme-modal .settings-io-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem 1.25rem;
+}
+
+@media (min-width: 960px) {
+  .theme-modal .settings-io-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .modal-row {
   display: flex;
   gap: 1.25rem;
@@ -512,6 +541,48 @@ a:hover {
   font-size: 0.68rem;
 }
 
+.copy-btn {
+  position: relative;
+}
+
+.copy-btn .btn-icon-stack {
+  display: inline-grid;
+  place-items: center;
+  width: 1em;
+  height: 1em;
+}
+
+.copy-btn .btn-icon-stack .pi {
+  grid-area: 1 / 1;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.copy-btn .copy-check {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.copy-btn.is-copied .copy-icon {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.copy-btn.is-copied .copy-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.copy-btn.is-copied {
+  background: color-mix(in srgb, #16a34a 28%, var(--bg-panel-alt));
+  border-color: color-mix(in srgb, #16a34a 45%, var(--border-soft));
+  color: #ffffff;
+}
+
+.copy-btn.is-copied:hover:not(:disabled) {
+  background: color-mix(in srgb, #16a34a 35%, var(--bg-panel-alt));
+  border-color: color-mix(in srgb, #16a34a 55%, var(--border-soft));
+}
+
 /* Layout main ------------------------------------------------------------- */
 
 .app-main {
@@ -571,6 +642,7 @@ a:hover {
 .mdw-explorer-collapsed #links_md_overview .pane-title,
 .mdw-explorer-collapsed #links_md_overview .pane-subtitle,
 .mdw-explorer-collapsed #links_md_overview .nav-filter-row,
+.mdw-explorer-collapsed #links_md_overview .status-text,
 .mdw-explorer-collapsed #links_md_overview .pane-body,
 .mdw-explorer-collapsed #links_md_overview #mobileNavClose {
   display: none;
@@ -1236,6 +1308,15 @@ a:hover {
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+}
+
+.preview-copy-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
 }
 
 /* eenvoudige typografie als markdown.css ontbreekt */

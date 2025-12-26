@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1.2
+
+- Settings modal cleanup: UI settings grouped under a collapsible section, theme label clarified, import/export in two columns on large screens, and no background blur.
+- Copy workflow upgrades: preview copy buttons + per-code-block copy buttons with checkmark feedback, HTML copy modes (dry/medium/wet), and metadata include toggle.
+- HTML preview polish: post date formatting + alignment options with translations, and clearer separation between preview rendering and export/copy output.
+- Settings portability: JSON import/export (excluding author) including metadata/fields and theme settings.
+
 ## 0.3.1
 
 - Major translation effort: added DE/FR/PT UI strings, localized tutorials, and language-aware onboarding for WPM.

@@ -87,7 +87,7 @@
   "theme": {
     "settings_title": "Settings",
     "title": "Settings",
-    "preset": "Preset",
+    "preset": "Theme",
     "default": "Default",
     "applies_hint": "Applies only to the Markdown editor + HTML preview.",
     "default_preview": "Default theme (uses built-in styles)",
@@ -95,6 +95,9 @@
     "swatch": {
       "primary": "Primary",
       "secondary": "Secondary"
+    },
+    "ui": {
+      "title": "User interface"
     },
     "kbd_modifier": {
       "label": "Keyboard shortcuts system",
@@ -132,15 +135,47 @@
       "saved": "Saved",
       "save_failed": "Save failed"
     },
+    "copy": {
+      "title": "Copy buttons",
+      "show_buttons": "Show preview copy buttons",
+      "include_meta": "Include metadata in copy",
+      "html_mode_label": "HTML copy mode",
+      "html_mode_dry": "Dry HTML (no classes/styles)",
+      "html_mode_medium": "Medium dry HTML (classes only)",
+      "html_mode_wet": "Wet HTML (inline styles)",
+      "hint": "Saved for all users.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
+    "post_date_format": {
+      "label": "Post date format",
+      "option_mdy_short": "Nov 20, 2025",
+      "option_dmy_long": "16 December 2025",
+      "hint": "Saved for all users.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
+    "post_date_align": {
+      "label": "Post date alignment",
+      "option_left": "Left",
+      "option_center": "Center",
+      "option_right": "Right",
+      "hint": "Saved for all users.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
     "overrides": {
-      "summary": "Overrides (optional)",
-      "saved_auto": "Overrides are saved in your browser (localStorage) automatically as you type.",
+      "summary": "Theme adjustments (optional)",
+      "saved_auto": "Theme adjustments are saved in your browser (localStorage) automatically as you type.",
       "preview_section": "HTML preview",
       "editor_section": "Markdown editor",
-      "save_title": "Save overrides now",
-      "save_btn": "Save overrides",
-      "reset_title": "Clear overrides",
-      "reset_btn": "Reset overrides",
+      "save_title": "Save theme adjustments now",
+      "save_btn": "Save theme adjustments",
+      "reset_title": "Clear theme adjustments",
+      "reset_btn": "Reset theme adjustments",
       "saved": "Saved",
       "cleared": "Cleared",
       "placeholders": {
@@ -168,6 +203,20 @@
       "saving": "Saving…",
       "saved": "Saved",
       "save_failed": "Save failed"
+    },
+    "settings_io": {
+      "title": "Settings import/export",
+      "export_label": "Export",
+      "export_btn": "Export settings",
+      "import_label": "Import",
+      "import_btn": "Import settings",
+      "import_missing": "Choose a JSON file.",
+      "import_invalid": "Invalid settings file.",
+      "importing": "Importing…",
+      "imported": "Imported. Reloading…",
+      "exported": "Exported.",
+      "export_failed": "Export failed",
+      "import_failed": "Import failed"
     },
     "publisher": {
       "title": "WPM (Website publication mode)",
@@ -253,6 +302,7 @@
     "export_failed": "Export failed. Check the console for details.",
     "copy_failed": "Copy failed. Check the console for details.",
     "copied": "Copied",
+    "copy_code": "Copy code",
     "new_md": {
       "enter_title": "Please enter a title for the filename.",
       "no_trailing_slash": "The filename cannot end with a slash.",

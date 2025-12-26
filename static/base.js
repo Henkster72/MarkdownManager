@@ -1359,6 +1359,18 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const deleteAfterNext = document.getElementById('deleteAfterNext');
     const allowUserDeleteToggle = document.getElementById('allowUserDeleteToggle');
     const allowUserDeleteStatus = document.getElementById('allowUserDeleteStatus');
+    const copyButtonsToggle = document.getElementById('copyButtonsToggle');
+    const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
+    const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
+    const copySettingsStatus = document.getElementById('copySettingsStatus');
+    const settingsExportBtn = document.getElementById('settingsExportBtn');
+    const settingsImportBtn = document.getElementById('settingsImportBtn');
+    const settingsImportFile = document.getElementById('settingsImportFile');
+    const settingsImportExportStatus = document.getElementById('settingsImportExportStatus');
+    const postDateFormatSelect = document.getElementById('postDateFormatSelect');
+    const postDateFormatStatus = document.getElementById('postDateFormatStatus');
+    const postDateAlignSelect = document.getElementById('postDateAlignSelect');
+    const postDateAlignStatus = document.getElementById('postDateAlignStatus');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -1398,6 +1410,37 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
 
+    const setCopySettingsStatus = (msg, kind = 'info') => {
+        if (!(copySettingsStatus instanceof HTMLElement)) return;
+        copySettingsStatus.textContent = String(msg || '');
+        copySettingsStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const setSettingsIoStatus = (msg, kind = 'info') => {
+        if (!(settingsImportExportStatus instanceof HTMLElement)) return;
+        settingsImportExportStatus.textContent = String(msg || '');
+        settingsImportExportStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const setPostDateFormatStatus = (msg, kind = 'info') => {
+        if (!(postDateFormatStatus instanceof HTMLElement)) return;
+        postDateFormatStatus.textContent = String(msg || '');
+        postDateFormatStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+    const setPostDateAlignStatus = (msg, kind = 'info') => {
+        if (!(postDateAlignStatus instanceof HTMLElement)) return;
+        postDateAlignStatus.textContent = String(msg || '');
+        postDateAlignStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
     const readAppTitleSetting = () => {
         const s = getSettings();
         return s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
@@ -1406,6 +1449,31 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const s = getSettings();
         if (!s || typeof s !== 'object') return true;
         return !Object.prototype.hasOwnProperty.call(s, 'allow_user_delete') ? true : !!s.allow_user_delete;
+    };
+    const readCopyButtonsSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'copy_buttons_enabled') ? true : !!s.copy_buttons_enabled;
+    };
+    const readCopyIncludeMetaSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'copy_include_meta') ? true : !!s.copy_include_meta;
+    };
+    const readCopyHtmlModeSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.copy_html_mode === 'string' ? s.copy_html_mode.trim() : '';
+        return (v === 'wet' || v === 'dry' || v === 'medium') ? v : 'dry';
+    };
+    const readPostDateFormatSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.post_date_format === 'string' ? s.post_date_format.trim() : '';
+        return (v === 'mdy_short' || v === 'dmy_long') ? v : 'mdy_short';
+    };
+    const readPostDateAlignSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.post_date_align === 'string' ? s.post_date_align.trim() : '';
+        return (v === 'left' || v === 'center' || v === 'right') ? v : 'left';
     };
     const readUiLanguageSetting = () => {
         const s = getSettings();
@@ -1419,6 +1487,15 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const next = title && title.trim() ? title.trim() : 'Markdown Manager';
         textEl.textContent = next;
     };
+
+    const applyCopyButtonsSetting = (enabled) => {
+        const show = !!enabled;
+        document.querySelectorAll('[data-copy-buttons="1"]').forEach((el) => {
+            if (!(el instanceof HTMLElement)) return;
+            el.hidden = !show;
+        });
+    };
+    window.__mdwApplyCopyButtonsSetting = applyCopyButtonsSetting;
 
     const syncDeleteAfterUi = () => {
         const v = mdwReadDeleteAfter();
@@ -1471,6 +1548,62 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }
     };
 
+    const normalizePresetName = (raw) => {
+        const name = String(raw || '').trim();
+        if (!name) return 'default';
+        if (name.toLowerCase() === 'candy' && findTheme('Candy')) return 'Candy';
+        const t = findTheme(name);
+        return t ? t.name : 'default';
+    };
+
+    const sanitizeFilename = (name) => {
+        const base = String(name || '').trim() || 'settings';
+        const cleaned = base.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+        return cleaned || 'settings';
+    };
+
+    const downloadJsonFile = (filename, data) => {
+        const text = JSON.stringify(data, null, 2);
+        const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    };
+
+    const buildSettingsExport = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : {};
+        const pubCfg = (window.MDW_META_PUBLISHER_CONFIG && typeof window.MDW_META_PUBLISHER_CONFIG === 'object') ? window.MDW_META_PUBLISHER_CONFIG : {};
+        const settings = { ...(cfg._settings || {}) };
+        delete settings.publisher_default_author;
+        if (!settings.ui_language) {
+            const activeLang = String(window.MDW_LANG || '').trim();
+            if (activeLang) settings.ui_language = activeLang;
+        }
+        const appTitle = readAppTitleSetting() || 'Markdown Manager';
+        const name = `${appTitle}_settings`;
+        const themePreset = normalizePresetName(readPreset());
+        const themeOverrides = readOverrides();
+        return {
+            name,
+            _meta: { version: 1 },
+            settings,
+            fields: cfg.fields || {},
+            publisher: {
+                fields: pubCfg.fields || {},
+                html_map: pubCfg.html_map || {},
+            },
+            theme: {
+                preset: themePreset,
+                overrides: themeOverrides,
+            },
+        };
+    };
+
     let persistSettingsOnClose = async () => true;
 
     const open = () => {
@@ -1504,6 +1637,21 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (allowUserDeleteToggle instanceof HTMLInputElement) {
             allowUserDeleteToggle.checked = readAllowUserDeleteSetting();
         }
+        if (copyButtonsToggle instanceof HTMLInputElement) {
+            copyButtonsToggle.checked = readCopyButtonsSetting();
+        }
+        if (copyIncludeMetaToggle instanceof HTMLInputElement) {
+            copyIncludeMetaToggle.checked = readCopyIncludeMetaSetting();
+        }
+        if (copyHtmlModeSelect instanceof HTMLSelectElement) {
+            copyHtmlModeSelect.value = readCopyHtmlModeSetting();
+        }
+        if (postDateFormatSelect instanceof HTMLSelectElement) {
+            postDateFormatSelect.value = readPostDateFormatSetting();
+        }
+        if (postDateAlignSelect instanceof HTMLSelectElement) {
+            postDateAlignSelect.value = readPostDateAlignSetting();
+        }
         if (langSelect instanceof HTMLSelectElement) {
             const uiLang = readUiLanguageSetting();
             if (uiLang) langSelect.value = uiLang;
@@ -1511,6 +1659,10 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         setAppTitleStatus(t('theme.app_title.hint', 'Leave blank to use the default.'), 'info');
         syncDeleteAfterUi();
         setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
+        setCopySettingsStatus(t('theme.copy.hint', 'Saved for all users.'), 'info');
+        setPostDateFormatStatus(t('theme.post_date_format.hint', 'Saved for all users.'), 'info');
+        setPostDateAlignStatus(t('theme.post_date_align.hint', 'Saved for all users.'), 'info');
+        setSettingsIoStatus('', 'info');
 
         overlay.hidden = false;
         modal.hidden = false;
@@ -1627,6 +1779,149 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }
     };
 
+    const saveCopyButtonsSetting = async (nextValue) => {
+        setCopySettingsStatus(t('theme.copy.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setCopySettingsStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const ok = await saveSettingsToServer({ copy_buttons_enabled: nextValue });
+            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.copy_buttons_enabled = nextValue;
+            }
+            applyCopyButtonsSetting(nextValue);
+            setCopySettingsStatus(t('theme.copy.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('copy buttons save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.copy.save_failed', 'Save failed');
+            setCopySettingsStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveCopyIncludeMetaSetting = async (nextValue) => {
+        setCopySettingsStatus(t('theme.copy.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setCopySettingsStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const ok = await saveSettingsToServer({ copy_include_meta: nextValue });
+            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.copy_include_meta = nextValue;
+            }
+            setCopySettingsStatus(t('theme.copy.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('copy include meta save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.copy.save_failed', 'Save failed');
+            setCopySettingsStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveCopyHtmlModeSetting = async (nextValue) => {
+        setCopySettingsStatus(t('theme.copy.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setCopySettingsStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = (nextValue === 'wet' || nextValue === 'dry' || nextValue === 'medium') ? nextValue : 'dry';
+            const ok = await saveSettingsToServer({ copy_html_mode: value });
+            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.copy_html_mode = value;
+            }
+            setCopySettingsStatus(t('theme.copy.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('copy html mode save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.copy.save_failed', 'Save failed');
+            setCopySettingsStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const refreshPreviewAfterSettings = () => {
+        const ta = document.getElementById('editor');
+        if (ta instanceof HTMLTextAreaElement) {
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    };
+
+    const savePostDateFormatSetting = async (nextValue) => {
+        setPostDateFormatStatus(t('theme.post_date_format.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setPostDateFormatStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = (nextValue === 'mdy_short' || nextValue === 'dmy_long') ? nextValue : 'mdy_short';
+            const ok = await saveSettingsToServer({ post_date_format: value });
+            if (!ok) throw new Error(t('theme.post_date_format.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.post_date_format = value;
+            }
+            refreshPreviewAfterSettings();
+            setPostDateFormatStatus(t('theme.post_date_format.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('post date format save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.post_date_format.save_failed', 'Save failed');
+            setPostDateFormatStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const savePostDateAlignSetting = async (nextValue) => {
+        setPostDateAlignStatus(t('theme.post_date_align.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setPostDateAlignStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = (nextValue === 'left' || nextValue === 'center' || nextValue === 'right') ? nextValue : 'left';
+            const ok = await saveSettingsToServer({ post_date_align: value });
+            if (!ok) throw new Error(t('theme.post_date_align.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.post_date_align = value;
+            }
+            refreshPreviewAfterSettings();
+            setPostDateAlignStatus(t('theme.post_date_align.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('post date align save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.post_date_align.save_failed', 'Save failed');
+            setPostDateAlignStatus(msg, 'error');
+            return false;
+        }
+    };
+
     const resetOverrides = () => {
         writeOverrides({ preview: {}, editor: {} });
         Object.values(inputs).forEach((el) => {
@@ -1634,6 +1929,64 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         });
         applyTheme();
         setOverridesStatus(t('theme.overrides.cleared', 'Cleared'), 'ok');
+    };
+
+    const buildImportPayload = (data) => {
+        if (!data || typeof data !== 'object') return null;
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : {};
+        const curSettings = (cfg && cfg._settings && typeof cfg._settings === 'object') ? cfg._settings : {};
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        const authMeta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object') ? window.MDW_AUTH_META : { has_user: false, has_superuser: false };
+        const authRequired = !!(authMeta.has_user || authMeta.has_superuser);
+
+        const settingsIn = (data.settings && typeof data.settings === 'object') ? data.settings
+            : ((data._settings && typeof data._settings === 'object') ? data._settings : {});
+        const nextSettings = { ...curSettings, ...settingsIn };
+        nextSettings.publisher_default_author = String(curSettings.publisher_default_author || '');
+
+        const fieldsIn = (data.fields && typeof data.fields === 'object')
+            ? data.fields
+            : ((data.config && typeof data.config === 'object' && data.config.fields && typeof data.config.fields === 'object')
+                ? data.config.fields
+                : {});
+
+        const publisherRaw = (data.publisher && typeof data.publisher === 'object')
+            ? data.publisher
+            : ((data.publisher_config && typeof data.publisher_config === 'object') ? data.publisher_config : {});
+
+        const publisherFieldsIn = (publisherRaw.fields && typeof publisherRaw.fields === 'object')
+            ? publisherRaw.fields
+            : publisherRaw;
+        const publisherHtmlMapIn = (publisherRaw.html_map && typeof publisherRaw.html_map === 'object')
+            ? publisherRaw.html_map
+            : ((data.publisher_html_map && typeof data.publisher_html_map === 'object') ? data.publisher_html_map : null);
+
+        const csrf = String(window.MDW_CSRF || '');
+        if (!csrf) return null;
+
+        const publisherConfig = { fields: publisherFieldsIn };
+        if (publisherHtmlMapIn && typeof publisherHtmlMapIn === 'object') {
+            publisherConfig.html_map = publisherHtmlMapIn;
+        }
+
+        return {
+            csrf,
+            config: { fields: fieldsIn },
+            publisher_config: publisherConfig,
+            settings: nextSettings,
+            auth: (authRequired && auth && auth.role && auth.token) ? { role: auth.role, token: auth.token } : null,
+        };
+    };
+
+    const applyImportedTheme = (theme) => {
+        if (!theme || typeof theme !== 'object') return;
+        const preset = normalizePresetName(theme.preset);
+        try { mdwStorageSet('mdw-theme-preset', preset); } catch {}
+        if (theme.overrides && typeof theme.overrides === 'object') {
+            writeOverrides(theme.overrides);
+        }
+        applyTheme();
+        updateThemeUi();
     };
 
     if (btn && modal && overlay) {
@@ -1662,6 +2015,118 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (!(allowUserDeleteToggle instanceof HTMLInputElement)) return;
             const next = !!allowUserDeleteToggle.checked;
             await saveAllowUserDeleteSetting(next);
+        });
+
+        copyButtonsToggle?.addEventListener('change', async () => {
+            if (!(copyButtonsToggle instanceof HTMLInputElement)) return;
+            const next = !!copyButtonsToggle.checked;
+            await saveCopyButtonsSetting(next);
+        });
+
+        copyIncludeMetaToggle?.addEventListener('change', async () => {
+            if (!(copyIncludeMetaToggle instanceof HTMLInputElement)) return;
+            const next = !!copyIncludeMetaToggle.checked;
+            await saveCopyIncludeMetaSetting(next);
+        });
+
+        copyHtmlModeSelect?.addEventListener('change', async () => {
+            if (!(copyHtmlModeSelect instanceof HTMLSelectElement)) return;
+            const next = String(copyHtmlModeSelect.value || '').trim();
+            await saveCopyHtmlModeSetting(next);
+        });
+
+        settingsExportBtn?.addEventListener('click', () => {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setSettingsIoStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return;
+            }
+            try {
+                const data = buildSettingsExport();
+                const filename = sanitizeFilename(data.name) + '.json';
+                downloadJsonFile(filename, data);
+                setSettingsIoStatus(t('theme.settings_io.exported', 'Exported.'), 'ok');
+            } catch (e) {
+                console.error('settings export failed', e);
+                setSettingsIoStatus(t('theme.settings_io.export_failed', 'Export failed'), 'error');
+            }
+        });
+
+        settingsImportBtn?.addEventListener('click', async () => {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setSettingsIoStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return;
+            }
+            const file = settingsImportFile instanceof HTMLInputElement ? settingsImportFile.files?.[0] : null;
+            if (!file) {
+                setSettingsIoStatus(t('theme.settings_io.import_missing', 'Choose a JSON file.'), 'error');
+                return;
+            }
+            setSettingsIoStatus(t('theme.settings_io.importing', 'Importing…'), 'info');
+            try {
+                const text = await file.text();
+                let data = null;
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    setSettingsIoStatus(t('theme.settings_io.import_invalid', 'Invalid settings file.'), 'error');
+                    return;
+                }
+                const payload = buildImportPayload(data);
+                if (!payload) {
+                    setSettingsIoStatus(t('theme.settings_io.import_invalid', 'Invalid settings file.'), 'error');
+                    return;
+                }
+                const res = await fetch('metadata_config_save.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const resp = await res.json().catch(() => null);
+                if (!res.ok || !resp || resp.ok !== true) {
+                    const errCode = resp && resp.error ? String(resp.error) : '';
+                    if (errCode === 'publisher_author_required') {
+                        setSettingsIoStatus(t('theme.publisher.author_required', 'Please enter an author name to enable WPM.'), 'error');
+                    } else if (errCode === 'auth_required') {
+                        setSettingsIoStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                        if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                    } else if (errCode === 'csrf' || errCode === 'no_session') {
+                        setSettingsIoStatus(t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.'), 'error');
+                    } else {
+                        setSettingsIoStatus(t('theme.settings_io.import_failed', 'Import failed'), 'error');
+                    }
+                    return;
+                }
+                if (resp.config) window.MDW_META_CONFIG = resp.config;
+                if (resp.publisher_config) window.MDW_META_PUBLISHER_CONFIG = resp.publisher_config;
+                let themeData = null;
+                if (data && typeof data === 'object') {
+                    if (data.theme && typeof data.theme === 'object') {
+                        themeData = data.theme;
+                    } else if (data.settings && typeof data.settings === 'object' && data.settings.theme_preset) {
+                        themeData = { preset: data.settings.theme_preset };
+                    }
+                }
+                if (themeData) applyImportedTheme(themeData);
+                setSettingsIoStatus(t('theme.settings_io.imported', 'Imported. Reloading…'), 'ok');
+                if (settingsImportFile instanceof HTMLInputElement) settingsImportFile.value = '';
+                setTimeout(() => window.location.reload(), 600);
+            } catch (e) {
+                console.error('settings import failed', e);
+                setSettingsIoStatus(t('theme.settings_io.import_failed', 'Import failed'), 'error');
+            }
+        });
+
+        postDateFormatSelect?.addEventListener('change', async () => {
+            if (!(postDateFormatSelect instanceof HTMLSelectElement)) return;
+            const next = String(postDateFormatSelect.value || '').trim();
+            await savePostDateFormatSetting(next);
+        });
+        postDateAlignSelect?.addEventListener('change', async () => {
+            if (!(postDateAlignSelect instanceof HTMLSelectElement)) return;
+            const next = String(postDateAlignSelect.value || '').trim();
+            await savePostDateAlignSetting(next);
         });
 
         const onKbdModChange = (e) => {
@@ -1948,6 +2413,34 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                     if (!ok) return false;
                 }
             }
+            if (copyButtonsToggle instanceof HTMLInputElement) {
+                const next = !!copyButtonsToggle.checked;
+                if (next !== readCopyButtonsSetting()) {
+                    const ok = await saveCopyButtonsSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (copyIncludeMetaToggle instanceof HTMLInputElement) {
+                const next = !!copyIncludeMetaToggle.checked;
+                if (next !== readCopyIncludeMetaSetting()) {
+                    const ok = await saveCopyIncludeMetaSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (postDateFormatSelect instanceof HTMLSelectElement) {
+                const next = String(postDateFormatSelect.value || '').trim();
+                if (next !== readPostDateFormatSetting()) {
+                    const ok = await savePostDateFormatSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (postDateAlignSelect instanceof HTMLSelectElement) {
+                const next = String(postDateAlignSelect.value || '').trim();
+                if (next !== readPostDateAlignSetting()) {
+                    const ok = await savePostDateAlignSetting(next);
+                    if (!ok) return false;
+                }
+            }
             if (hasMetaChanges()) {
                 const ok = await saveMetadataSettings();
                 if (!ok) return false;
@@ -1991,6 +2484,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     }
 
     // Always apply on load (even if the UI isn't on this page)
+    applyCopyButtonsSetting(readCopyButtonsSetting());
     applyTheme();
 })();
 
@@ -4772,6 +5266,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (typeof window.__mdwRenderMermaid === 'function') {
                 window.__mdwRenderMermaid(prev).catch(() => {});
             }
+            if (typeof window.__mdwInitCodeCopyButtons === 'function') {
+                window.__mdwInitCodeCopyButtons();
+            }
             status.textContent = 'Preview up to date';
         })
         .catch(() => {
@@ -5484,44 +5981,32 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     });
 })();
 
-// Export HTML preview (edit.php)
+// Export HTML preview (edit.php + index.php)
 (function(){
-    const btn = document.getElementById('exportHtmlBtn');
-    const copyBtn = document.getElementById('copyHtmlBtn');
+    const exportBtn = document.getElementById('exportHtmlBtn');
+    const copyHtmlBtn = document.getElementById('copyHtmlBtn');
+    const copyMdBtn = document.getElementById('copyMdBtn');
     const preview = document.getElementById('preview');
-    if ((!btn && !copyBtn) || !preview) return;
+    if (!exportBtn && !copyHtmlBtn && !copyMdBtn) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const editor = document.getElementById('editor');
 
-    const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
-    const dirname = (p) => {
-        p = normalizePath(p);
-        const idx = p.lastIndexOf('/');
-        return idx === -1 ? '' : p.slice(0, idx);
+    const readCopyIncludeMetaSetting = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'copy_include_meta') ? true : !!s.copy_include_meta;
     };
-    const relativePath = (fromFile, toFile) => {
-        const fromDir = dirname(fromFile);
-        const fromParts = fromDir ? fromDir.split('/').filter(Boolean) : [];
-        const to = normalizePath(toFile);
-        const toParts = to.split('/').filter(Boolean);
-        if (toParts.length === 0) return '';
-        const toDirParts = toParts.slice(0, -1);
-        const toName = toParts[toParts.length - 1];
-
-        let i = 0;
-        while (i < fromParts.length && i < toDirParts.length && fromParts[i] === toDirParts[i]) i++;
-        const up = fromParts.length - i;
-        const down = toDirParts.slice(i);
-        const out = [];
-        for (let k = 0; k < up; k++) out.push('..');
-        out.push(...down);
-        out.push(toName);
-        return out.join('/');
+    const readCopyHtmlModeSetting = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const v = s && typeof s.copy_html_mode === 'string' ? s.copy_html_mode.trim() : '';
+        return (v === 'wet' || v === 'dry' || v === 'medium') ? v : 'dry';
     };
 
     const getBasename = (p) => {
-        const s = normalizePath(p);
+        const s = String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
         const parts = s.split('/').filter(Boolean);
         return parts.length ? parts[parts.length - 1] : 'export.md';
     };
@@ -5533,51 +6018,211 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const rewriteInternalMdLinksForExport = (rootEl) => {
-        if (!rootEl || !(rootEl instanceof HTMLElement)) return;
-        rootEl.querySelectorAll('a[href]').forEach(a => {
-            const rawHref = a.getAttribute('href') || '';
-            if (!rawHref || rawHref.startsWith('#')) return;
+    const collectAllowedMetaKeys = () => {
+        const keys = new Set();
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const fields = cfg && cfg.fields && typeof cfg.fields === 'object' ? cfg.fields : {};
+        Object.keys(fields || {}).forEach((k) => {
+            const key = String(k || '').trim().toLowerCase();
+            if (key) keys.add(key);
+        });
+        const pubCfg = (window.MDW_META_PUBLISHER_CONFIG && typeof window.MDW_META_PUBLISHER_CONFIG === 'object')
+            ? window.MDW_META_PUBLISHER_CONFIG
+            : null;
+        const pubFields = pubCfg && pubCfg.fields && typeof pubCfg.fields === 'object' ? pubCfg.fields : {};
+        Object.keys(pubFields || {}).forEach((k) => {
+            const key = String(k || '').trim().toLowerCase();
+            if (key) keys.add(key);
+        });
+        if (!keys.size) keys.add('date');
+        return keys;
+    };
 
-            let url;
-            try {
-                url = new URL(rawHref, window.location.href);
-            } catch {
-                return;
+    const stripHiddenMeta = (raw) => {
+        const metaLineRe = /^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u;
+        const allowed = collectAllowedMetaKeys();
+        const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
+        if (!lines.length) return '';
+        if (lines[0]) lines[0] = lines[0].replace(/^\uFEFF/, '');
+        const out = [];
+        for (const line of lines) {
+            const normalized = String(line)
+                .replace(/\u00a0/g, ' ')
+                .replace(/[\u200B\uFEFF]/g, '');
+            const match = normalized.match(metaLineRe);
+            if (match) {
+                const key = String(match[1] || '').trim().toLowerCase();
+                if (key && allowed.has(key)) {
+                    continue;
+                }
             }
-
-            const fileParam = url.searchParams.get('file');
-            if (!fileParam) return;
-            const targetFile = normalizePath(fileParam);
-            if (!/\.md$/i.test(targetFile)) return;
-
-            const other = new URLSearchParams(url.searchParams);
-            other.delete('file');
-            const qs = other.toString();
-            const hash = url.hash || '';
-
-            let outHref = relativePath(window.CURRENT_FILE || '', targetFile);
-            if (qs) outHref += '?' + qs;
-            if (hash) outHref += hash;
-
-            a.setAttribute('href', outHref);
-            a.removeAttribute('target');
-            a.removeAttribute('rel');
-        });
+            out.push(line);
+        }
+        return out.join('\n');
     };
 
-    const stripAllClassesForExport = (rootEl) => {
+    const getMarkdownSource = () => {
+        if (editor instanceof HTMLTextAreaElement) return editor.value || '';
+        if (typeof window.MDW_CURRENT_MD === 'string') return window.MDW_CURRENT_MD;
+        return null;
+    };
+
+    const stripMetaHtml = (rootEl) => {
         if (!rootEl || !(rootEl instanceof HTMLElement)) return;
-        rootEl.querySelectorAll('[class]').forEach(el => {
-            el.removeAttribute('class');
-        });
+        rootEl.querySelectorAll('.md-meta').forEach(el => el.remove());
     };
 
-    const getServerRenderedHtml = async () => {
-        if (!window.CURRENT_FILE) return '';
-        if (!(editor instanceof HTMLTextAreaElement)) return preview.innerHTML || '';
+    const stripCssAttributes = (rootEl) => {
+        if (!(rootEl instanceof Element)) return;
+        const strip = (el) => {
+            el.removeAttribute('class');
+            el.removeAttribute('style');
+        };
+        strip(rootEl);
+        rootEl.querySelectorAll('[class], [style]').forEach((el) => strip(el));
+    };
+
+    const stripInlineStyles = (rootEl) => {
+        if (!(rootEl instanceof Element)) return;
+        rootEl.removeAttribute('style');
+        rootEl.querySelectorAll('[style]').forEach((el) => el.removeAttribute('style'));
+    };
+
+    const stripPreviewClasses = (rootEl) => {
+        if (!(rootEl instanceof Element)) return;
+        const filterClasses = (el) => {
+            const raw = el.getAttribute('class');
+            if (!raw) return;
+            const keep = raw
+                .split(/\s+/)
+                .map((c) => String(c || '').trim())
+                .filter((c) => c && c.indexOf('md-') !== 0 && c.indexOf('meta-') !== 0);
+            if (keep.length) {
+                el.setAttribute('class', keep.join(' '));
+            } else {
+                el.removeAttribute('class');
+            }
+        };
+        filterClasses(rootEl);
+        rootEl.querySelectorAll('[class]').forEach((el) => filterClasses(el));
+    };
+
+    const collectElements = (rootEl) => {
+        if (!(rootEl instanceof Element)) return [];
+        return [rootEl, ...Array.from(rootEl.querySelectorAll('*'))];
+    };
+
+    const inlineComputedStyles = (sourceRoot, targetRoot) => {
+        if (!(sourceRoot instanceof Element) || !(targetRoot instanceof Element)) return;
+        const srcEls = collectElements(sourceRoot);
+        const dstEls = collectElements(targetRoot);
+        const len = Math.min(srcEls.length, dstEls.length);
+        for (let i = 0; i < len; i++) {
+            const srcEl = srcEls[i];
+            const dstEl = dstEls[i];
+            if (!(dstEl instanceof Element)) continue;
+            const computed = window.getComputedStyle(srcEl);
+            let style = '';
+            for (let j = 0; j < computed.length; j++) {
+                const prop = computed[j];
+                const val = computed.getPropertyValue(prop);
+                if (!val) continue;
+                style += `${prop}:${val};`;
+            }
+            if (style) dstEl.setAttribute('style', style.trim());
+        }
+    };
+
+    const applyHtmlMode = (targetRoot, htmlMode, sourceRoot) => {
+        if (!(targetRoot instanceof Element)) return;
+        if (htmlMode === 'dry') {
+            stripCssAttributes(targetRoot);
+            return;
+        }
+        if (htmlMode === 'medium') {
+            stripInlineStyles(targetRoot);
+            stripPreviewClasses(targetRoot);
+            return;
+        }
+        if (htmlMode !== 'wet') return;
+        const src = (sourceRoot instanceof Element) ? sourceRoot : targetRoot;
+        const inDoc = (targetRoot instanceof Element) && document.body?.contains(targetRoot);
+        if (src === targetRoot && !inDoc) {
+            const holder = document.createElement('div');
+            holder.style.cssText = 'position:fixed; left:-9999px; top:0; visibility:hidden; pointer-events:none; z-index:-1;';
+            document.body.appendChild(holder);
+            holder.appendChild(targetRoot);
+            inlineComputedStyles(targetRoot, targetRoot);
+            holder.remove();
+        } else {
+            inlineComputedStyles(src, targetRoot);
+        }
+    };
+
+    const getPreviewSnapshot = (stripMeta, htmlMode) => {
+        if (!(preview instanceof HTMLElement)) return null;
+        const clone = preview.cloneNode(true);
+        if (clone instanceof HTMLElement) clone.removeAttribute('id');
+        if (stripMeta) stripMetaHtml(clone);
+        applyHtmlMode(clone, htmlMode, preview);
+        return clone instanceof HTMLElement ? clone.outerHTML : null;
+    };
+
+    const initCodeCopyButtons = () => {
+        if (!(preview instanceof HTMLElement)) return;
+        const blocks = Array.from(preview.querySelectorAll('pre'));
+        if (!blocks.length) return;
+        blocks.forEach((pre) => {
+            if (!(pre instanceof HTMLElement)) return;
+            if (pre.querySelector('.code-copy-btn')) return;
+            const btn = document.createElement('button');
+            const title = t('js.copy_code', 'Copy code');
+            btn.type = 'button';
+            btn.className = 'btn btn-ghost copy-btn icon-button code-copy-btn';
+            btn.title = title;
+            btn.setAttribute('aria-label', title);
+            btn.innerHTML = '<span class="btn-icon-stack"><span class="pi pi-copy copy-icon"></span><span class="pi pi-checkmark copy-check"></span></span>';
+            btn.addEventListener('click', async () => {
+                const codeEl = pre.querySelector('code');
+                const text = codeEl ? codeEl.textContent : pre.textContent;
+                btn.disabled = true;
+                try {
+                    const ok = await copyTextToClipboard(String(text || ''));
+                    if (!ok) throw new Error('Copy failed');
+                    flashCopyFeedback(btn, '', 1200);
+                } catch (e) {
+                    console.error('Copy failed', e);
+                    alert(t('js.copy_failed', 'Copy failed. Check the console for details.'));
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+            pre.appendChild(btn);
+        });
+    };
+    window.__mdwInitCodeCopyButtons = initCodeCopyButtons;
+
+    const buildPreviewWrapper = (html, stripMeta, htmlMode) => {
+        const wrapper = document.createElement(preview instanceof HTMLElement ? preview.tagName : 'div');
+        if (preview instanceof HTMLElement && preview.className) {
+            wrapper.className = preview.className;
+        } else {
+            wrapper.className = 'preview-content';
+        }
+        wrapper.innerHTML = html || '';
+        if (stripMeta) stripMetaHtml(wrapper);
+        applyHtmlMode(wrapper, htmlMode);
+        return wrapper.outerHTML;
+    };
+
+    const getServerRenderedHtml = async (markdownOverride) => {
+        if (!window.CURRENT_FILE) return preview?.innerHTML || '';
+        const content = (typeof markdownOverride === 'string')
+            ? markdownOverride
+            : (editor instanceof HTMLTextAreaElement ? editor.value : null);
+        if (content === null) return preview?.innerHTML || '';
         const fd = new FormData();
-        fd.set('content', editor.value || '');
+        fd.set('content', content);
         const res = await fetch('edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1', {
             method: 'POST',
             body: fd,
@@ -5586,15 +6231,21 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return await res.text();
     };
 
-    const buildExportHtml = async () => {
+    const buildExportHtml = async (opts = {}) => {
+        const includeMeta = opts.includeMeta !== false;
+        const stripMeta = !includeMeta;
+        const htmlMode = (opts.htmlMode === 'wet' || opts.htmlMode === 'dry' || opts.htmlMode === 'medium') ? opts.htmlMode : 'dry';
         const title = (document.querySelector('.app-title')?.textContent || '').trim() || 'Markdown export';
         const src = getBasename(window.CURRENT_FILE || 'export.md').replace(/\.md$/i, '');
         const filename = `${src || 'export'}.html`;
-
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = await getServerRenderedHtml();
-        rewriteInternalMdLinksForExport(wrapper);
-        stripAllClassesForExport(wrapper);
+        let bodyHtml = getPreviewSnapshot(stripMeta, htmlMode);
+        if (!bodyHtml) {
+            const markdown = getMarkdownSource();
+            const rendered = (typeof markdown === 'string')
+                ? await getServerRenderedHtml(markdown)
+                : await getServerRenderedHtml();
+            bodyHtml = buildPreviewWrapper(rendered, stripMeta, htmlMode);
+        }
 
         const html = `<!doctype html>
 <html lang="en">
@@ -5604,7 +6255,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
   <title>${escapeHtml(title)}</title>
 </head>
 <body>
-${wrapper.innerHTML}
+${bodyHtml}
 </body>
 </html>`;
 
@@ -5650,45 +6301,79 @@ ${wrapper.innerHTML}
         }
     };
 
-    const flashBtnLabel = (buttonEl, nextLabel, ms) => {
-        const labelEl = buttonEl?.querySelector('.btn-label');
-        if (!labelEl) return;
-        const old = labelEl.textContent;
-        labelEl.textContent = nextLabel;
-        window.setTimeout(() => { labelEl.textContent = old; }, ms || 1200);
+    const flashCopyFeedback = (buttonEl, nextLabel, ms) => {
+        if (!(buttonEl instanceof HTMLElement)) return;
+        const labelEl = buttonEl.querySelector('.btn-label');
+        const old = labelEl ? labelEl.textContent : '';
+        if (labelEl && nextLabel) labelEl.textContent = nextLabel;
+        buttonEl.classList.add('is-copied');
+        if (buttonEl.__copyTimer) clearTimeout(buttonEl.__copyTimer);
+        buttonEl.__copyTimer = window.setTimeout(() => {
+            if (labelEl) labelEl.textContent = old;
+            buttonEl.classList.remove('is-copied');
+        }, ms || 1200);
     };
 
-    if (btn) {
-        btn.addEventListener('click', async () => {
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
             if (!window.CURRENT_FILE) return;
-            btn.disabled = true;
+            exportBtn.disabled = true;
             try {
-                const { filename, html } = await buildExportHtml();
+                const includeMeta = readCopyIncludeMetaSetting();
+                const htmlMode = readCopyHtmlModeSetting();
+                const { filename, html } = await buildExportHtml({ includeMeta, htmlMode });
                 downloadTextFile(filename, html, 'text/html;charset=utf-8');
             } catch (e) {
                 console.error('Export failed', e);
                 alert(t('js.export_failed', 'Export failed. Check the console for details.'));
             } finally {
-                btn.disabled = false;
+                exportBtn.disabled = false;
             }
         });
     }
 
-    if (copyBtn) {
-        copyBtn.addEventListener('click', async () => {
+    if (copyHtmlBtn) {
+        copyHtmlBtn.addEventListener('click', async () => {
             if (!window.CURRENT_FILE) return;
-            copyBtn.disabled = true;
+            copyHtmlBtn.disabled = true;
             try {
-                const { html } = await buildExportHtml();
+                const includeMeta = readCopyIncludeMetaSetting();
+                const htmlMode = readCopyHtmlModeSetting();
+                const { html } = await buildExportHtml({ includeMeta, htmlMode });
                 const ok = await copyTextToClipboard(html);
                 if (!ok) throw new Error('Copy failed');
-                flashBtnLabel(copyBtn, t('js.copied', 'Copied'), 1200);
+                flashCopyFeedback(copyHtmlBtn, t('js.copied', 'Copied'), 1200);
             } catch (e) {
                 console.error('Copy failed', e);
                 alert(t('js.copy_failed', 'Copy failed. Check the console for details.'));
             } finally {
-                copyBtn.disabled = false;
+                copyHtmlBtn.disabled = false;
             }
         });
     }
+
+    if (copyMdBtn) {
+        copyMdBtn.addEventListener('click', async () => {
+            if (!window.CURRENT_FILE) return;
+            copyMdBtn.disabled = true;
+            try {
+                const includeMeta = readCopyIncludeMetaSetting();
+                let markdown = getMarkdownSource();
+                if (typeof markdown !== 'string') markdown = '';
+                if (!includeMeta) {
+                    markdown = stripHiddenMeta(markdown).replace(/^\n+/, '');
+                }
+                const ok = await copyTextToClipboard(markdown);
+                if (!ok) throw new Error('Copy failed');
+                flashCopyFeedback(copyMdBtn, t('js.copied', 'Copied'), 1200);
+            } catch (e) {
+                console.error('Copy failed', e);
+                alert(t('js.copy_failed', 'Copy failed. Check the console for details.'));
+            } finally {
+                copyMdBtn.disabled = false;
+            }
+        });
+    }
+
+    initCodeCopyButtons();
 })();

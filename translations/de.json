@@ -87,7 +87,7 @@
   "theme": {
     "settings_title": "Einstellungen",
     "title": "Einstellungen",
-    "preset": "Voreinstellung",
+    "preset": "Thema",
     "default": "Standard",
     "applies_hint": "Gilt nur für den Markdown-Editor + die HTML-Vorschau.",
     "default_preview": "Standard-Theme (verwendet eingebaute Stile)",
@@ -95,6 +95,9 @@
     "swatch": {
       "primary": "Primär",
       "secondary": "Sekundär"
+    },
+    "ui": {
+      "title": "Benutzeroberfläche"
     },
     "kbd_modifier": {
       "label": "Tastenkürzel-System",
@@ -132,15 +135,47 @@
       "saved": "Gespeichert",
       "save_failed": "Speichern fehlgeschlagen"
     },
+    "copy": {
+      "title": "Kopier-Schaltflächen",
+      "show_buttons": "Kopier-Schaltflächen in der Vorschau anzeigen",
+      "include_meta": "Metadaten beim Kopieren einschließen",
+      "html_mode_label": "HTML-Kopiermodus",
+      "html_mode_dry": "Trockenes HTML (ohne Klassen/Stile)",
+      "html_mode_medium": "Mitteltrockenes HTML (nur Klassen)",
+      "html_mode_wet": "Nasses HTML (Inline-Stile)",
+      "hint": "Für alle Benutzer gespeichert.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
+    "post_date_format": {
+      "label": "Beitragsdatum-Format",
+      "option_mdy_short": "Nov. 20, 2025",
+      "option_dmy_long": "16. Dezember 2025",
+      "hint": "Für alle Benutzer gespeichert.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
+    "post_date_align": {
+      "label": "Ausrichtung des Beitragsdatums",
+      "option_left": "Links",
+      "option_center": "Zentriert",
+      "option_right": "Rechts",
+      "hint": "Für alle Benutzer gespeichert.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
     "overrides": {
-      "summary": "Überschreibungen (optional)",
-      "saved_auto": "Überschreibungen werden in Ihrem Browser (localStorage) automatisch gespeichert, während Sie tippen.",
+      "summary": "Thema-Anpassungen (optional)",
+      "saved_auto": "Thema-Anpassungen werden in Ihrem Browser (localStorage) automatisch gespeichert, während Sie tippen.",
       "preview_section": "HTML-Vorschau",
       "editor_section": "Markdown-Editor",
-      "save_title": "Überschreibungen jetzt speichern",
-      "save_btn": "Überschreibungen speichern",
-      "reset_title": "Überschreibungen löschen",
-      "reset_btn": "Überschreibungen zurücksetzen",
+      "save_title": "Thema-Anpassungen jetzt speichern",
+      "save_btn": "Thema-Anpassungen speichern",
+      "reset_title": "Thema-Anpassungen löschen",
+      "reset_btn": "Thema-Anpassungen zurücksetzen",
       "saved": "Gespeichert",
       "cleared": "Geleert",
       "placeholders": {
@@ -168,6 +203,20 @@
       "saving": "Speichern…",
       "saved": "Gespeichert",
       "save_failed": "Speichern fehlgeschlagen"
+    },
+    "settings_io": {
+      "title": "Einstellungen importieren/exportieren",
+      "export_label": "Exportieren",
+      "export_btn": "Einstellungen exportieren",
+      "import_label": "Importieren",
+      "import_btn": "Einstellungen importieren",
+      "import_missing": "Wählen Sie eine JSON-Datei.",
+      "import_invalid": "Ungültige Einstellungsdatei.",
+      "importing": "Importieren…",
+      "imported": "Importiert. Neu laden…",
+      "exported": "Exportiert.",
+      "export_failed": "Export fehlgeschlagen",
+      "import_failed": "Import fehlgeschlagen"
     },
     "publisher": {
       "title": "WPM (Website-Publikationsmodus)",
@@ -253,6 +302,7 @@
     "export_failed": "Export fehlgeschlagen. Details in der Konsole prüfen.",
     "copy_failed": "Kopieren fehlgeschlagen. Details in der Konsole prüfen.",
     "copied": "Kopiert",
+    "copy_code": "Code kopieren",
     "new_md": {
       "enter_title": "Bitte einen Titel für den Dateinamen eingeben.",
       "no_trailing_slash": "Der Dateiname darf nicht mit einem Schrägstrich enden.",

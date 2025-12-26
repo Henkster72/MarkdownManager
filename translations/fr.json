@@ -87,7 +87,7 @@
   "theme": {
     "settings_title": "Paramètres",
     "title": "Paramètres",
-    "preset": "Préréglage",
+    "preset": "Thème",
     "default": "Par défaut",
     "applies_hint": "S'applique uniquement à l'éditeur Markdown + aperçu HTML.",
     "default_preview": "Thème par défaut (utilise les styles intégrés)",
@@ -95,6 +95,9 @@
     "swatch": {
       "primary": "Primaire",
       "secondary": "Secondaire"
+    },
+    "ui": {
+      "title": "Interface utilisateur"
     },
     "kbd_modifier": {
       "label": "Système de raccourcis",
@@ -132,15 +135,47 @@
       "saved": "Enregistré",
       "save_failed": "Échec de l'enregistrement"
     },
+    "copy": {
+      "title": "Boutons de copie",
+      "show_buttons": "Afficher les boutons de copie dans l’aperçu",
+      "include_meta": "Inclure les métadonnées dans la copie",
+      "html_mode_label": "Mode de copie HTML",
+      "html_mode_dry": "HTML sec (sans classes/styles)",
+      "html_mode_medium": "HTML semi-sec (classes uniquement)",
+      "html_mode_wet": "HTML humide (styles en ligne)",
+      "hint": "Enregistré pour tous les utilisateurs.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
+    "post_date_format": {
+      "label": "Format de date de publication",
+      "option_mdy_short": "nov. 20, 2025",
+      "option_dmy_long": "16 décembre 2025",
+      "hint": "Enregistré pour tous les utilisateurs.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
+    "post_date_align": {
+      "label": "Alignement de la date de publication",
+      "option_left": "Gauche",
+      "option_center": "Centré",
+      "option_right": "Droite",
+      "hint": "Enregistré pour tous les utilisateurs.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
     "overrides": {
-      "summary": "Surcharges (optionnel)",
-      "saved_auto": "Les surcharges sont enregistrées dans votre navigateur (localStorage) automatiquement pendant la saisie.",
+      "summary": "Ajustements du thème (optionnel)",
+      "saved_auto": "Les ajustements du thème sont enregistrés dans votre navigateur (localStorage) automatiquement pendant la saisie.",
       "preview_section": "Aperçu HTML",
       "editor_section": "Éditeur Markdown",
-      "save_title": "Enregistrer les surcharges maintenant",
-      "save_btn": "Enregistrer les surcharges",
-      "reset_title": "Effacer les surcharges",
-      "reset_btn": "Réinitialiser les surcharges",
+      "save_title": "Enregistrer les ajustements du thème maintenant",
+      "save_btn": "Enregistrer les ajustements du thème",
+      "reset_title": "Effacer les ajustements du thème",
+      "reset_btn": "Réinitialiser les ajustements du thème",
       "saved": "Enregistré",
       "cleared": "Effacé",
       "placeholders": {
@@ -168,6 +203,20 @@
       "saving": "Enregistrement…",
       "saved": "Enregistré",
       "save_failed": "Échec de l'enregistrement"
+    },
+    "settings_io": {
+      "title": "Import/export des paramètres",
+      "export_label": "Exporter",
+      "export_btn": "Exporter les paramètres",
+      "import_label": "Importer",
+      "import_btn": "Importer les paramètres",
+      "import_missing": "Choisissez un fichier JSON.",
+      "import_invalid": "Fichier de paramètres invalide.",
+      "importing": "Importation…",
+      "imported": "Importé. Rechargement…",
+      "exported": "Exporté.",
+      "export_failed": "Échec de l'exportation",
+      "import_failed": "Échec de l'importation"
     },
     "publisher": {
       "title": "WPM (mode de publication de site web)",
@@ -253,6 +302,7 @@
     "export_failed": "Échec de l'export. Vérifiez la console pour plus de détails.",
     "copy_failed": "Échec de la copie. Vérifiez la console pour plus de détails.",
     "copied": "Copié",
+    "copy_code": "Copier le code",
     "new_md": {
       "enter_title": "Veuillez saisir un titre pour le nom de fichier.",
       "no_trailing_slash": "Le nom de fichier ne peut pas se terminer par une barre oblique.",

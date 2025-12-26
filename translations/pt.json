@@ -87,7 +87,7 @@
   "theme": {
     "settings_title": "Definições",
     "title": "Definições",
-    "preset": "Predefinição",
+    "preset": "Tema",
     "default": "Predefinido",
     "applies_hint": "Aplica-se apenas ao editor Markdown + pré-visualização HTML.",
     "default_preview": "Tema predefinido (usa estilos incorporados)",
@@ -95,6 +95,9 @@
     "swatch": {
       "primary": "Primário",
       "secondary": "Secundário"
+    },
+    "ui": {
+      "title": "Interface do utilizador"
     },
     "kbd_modifier": {
       "label": "Sistema de atalhos",
@@ -132,15 +135,47 @@
       "saved": "Guardado",
       "save_failed": "Falha ao guardar"
     },
+    "copy": {
+      "title": "Botões de cópia",
+      "show_buttons": "Mostrar botões de cópia na pré-visualização",
+      "include_meta": "Incluir metadados na cópia",
+      "html_mode_label": "Modo de cópia HTML",
+      "html_mode_dry": "HTML seco (sem classes/estilos)",
+      "html_mode_medium": "HTML meio seco (apenas classes)",
+      "html_mode_wet": "HTML húmido (estilos em linha)",
+      "hint": "Guardado para todos os utilizadores.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
+    "post_date_format": {
+      "label": "Formato da data de publicação",
+      "option_mdy_short": "nov. 20, 2025",
+      "option_dmy_long": "16 dezembro 2025",
+      "hint": "Guardado para todos os utilizadores.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
+    "post_date_align": {
+      "label": "Alinhamento da data de publicação",
+      "option_left": "Esquerda",
+      "option_center": "Centro",
+      "option_right": "Direita",
+      "hint": "Guardado para todos os utilizadores.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
     "overrides": {
-      "summary": "Substituições (opcional)",
-      "saved_auto": "As substituições são guardadas automaticamente no seu navegador (localStorage) enquanto escreve.",
+      "summary": "Ajustes do tema (opcional)",
+      "saved_auto": "Os ajustes do tema são guardados automaticamente no seu navegador (localStorage) enquanto escreve.",
       "preview_section": "Pré-visualização HTML",
       "editor_section": "Editor Markdown",
-      "save_title": "Guardar substituições agora",
-      "save_btn": "Guardar substituições",
-      "reset_title": "Limpar substituições",
-      "reset_btn": "Repor substituições",
+      "save_title": "Guardar ajustes do tema agora",
+      "save_btn": "Guardar ajustes do tema",
+      "reset_title": "Limpar ajustes do tema",
+      "reset_btn": "Repor ajustes do tema",
       "saved": "Guardado",
       "cleared": "Limpo",
       "placeholders": {
@@ -168,6 +203,20 @@
       "saving": "A guardar…",
       "saved": "Guardado",
       "save_failed": "Falha ao guardar"
+    },
+    "settings_io": {
+      "title": "Importar/exportar definições",
+      "export_label": "Exportar",
+      "export_btn": "Exportar definições",
+      "import_label": "Importar",
+      "import_btn": "Importar definições",
+      "import_missing": "Escolha um ficheiro JSON.",
+      "import_invalid": "Ficheiro de definições inválido.",
+      "importing": "A importar…",
+      "imported": "Importado. A recarregar…",
+      "exported": "Exportado.",
+      "export_failed": "Falha ao exportar",
+      "import_failed": "Falha ao importar"
     },
     "publisher": {
       "title": "WPM (modo de publicação de websites)",
@@ -253,6 +302,7 @@
     "export_failed": "Falha na exportação. Consulte a consola para mais detalhes.",
     "copy_failed": "Falha na cópia. Consulte a consola para mais detalhes.",
     "copied": "Copiado",
+    "copy_code": "Copiar código",
     "new_md": {
       "enter_title": "Introduza um título para o nome do ficheiro.",
       "no_trailing_slash": "O nome do ficheiro não pode terminar com uma barra.",

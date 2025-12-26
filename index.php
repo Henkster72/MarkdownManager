@@ -168,6 +168,14 @@ $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
 $MDW_SETTINGS = (isset($META_CFG['_settings']) && is_array($META_CFG['_settings'])) ? $META_CFG['_settings'] : [];
 $MDW_PUBLISHER_MODE = !empty($MDW_SETTINGS['publisher_mode']);
+$copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_buttons_enabled']);
+$copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
+$copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
+if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+$postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
+if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
+$postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
+if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -1181,10 +1189,34 @@ window.mermaid = mermaid;
 <!-- Article view -->
 <script>
 window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_next], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+<?php if ($mode === 'view' && $requested && isset($raw)): ?>
+window.CURRENT_FILE = <?= json_encode($requested, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
+<?php endif; ?>
 </script>
-<article class="preview-container preview-content">
-<?=$article_html?>
-</article>
+<div class="preview-container">
+    <?php if ($mode === 'view' && $requested): ?>
+        <div class="preview-copy-toolbar" data-copy-buttons="1" <?= $copyButtonsEnabled ? '' : 'hidden' ?>>
+            <button type="button" id="copyMdBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_md_title','Copy Markdown to clipboard'))?>">
+                <span class="btn-icon-stack">
+                    <span class="pi pi-copy copy-icon"></span>
+                    <span class="pi pi-checkmark copy-check"></span>
+                </span>
+                <span class="btn-label"><?=h(mdw_t('index.preview.copy_md_btn','Copy MD'))?></span>
+            </button>
+            <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>">
+                <span class="btn-icon-stack">
+                    <span class="pi pi-copy copy-icon"></span>
+                    <span class="pi pi-checkmark copy-check"></span>
+                </span>
+                <span class="btn-label"><?=h(mdw_t('index.preview.copy_html_btn','Copy HTML'))?></span>
+            </button>
+        </div>
+    <?php endif; ?>
+    <article id="preview" class="preview-content">
+    <?=$article_html?>
+    </article>
+</div>
 
 <?php endif; ?>
 
@@ -1269,8 +1301,8 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 			</div>
 		</div>
 
-		<div class="modal-overlay" id="themeModalOverlay" hidden></div>
-			<div class="modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
+		<div class="modal-overlay no-blur" id="themeModalOverlay" hidden></div>
+			<div class="modal theme-modal" id="themeModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" hidden>
 			    <div class="modal-header">
 			        <div class="modal-title" id="themeModalTitle"><?=h(mdw_t('theme.title','Settings'))?></div>
 			        <button type="button" class="btn btn-ghost icon-button" id="themeModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
@@ -1278,8 +1310,127 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 			        </button>
 			    </div>
 			    <div class="modal-body">
+			        <details style="margin-bottom: 0.8rem;">
+			            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.ui.title','User interface'))?></summary>
+			            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+			                <div class="modal-field">
+			                    <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
+			                    <div class="modal-row" style="gap: 1rem; margin: 0;">
+			                        <label class="radio">
+			                            <input type="radio" name="kbdShortcutMod" id="kbdShortcutModOption" value="option">
+			                        <span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
+			                    </label>
+			                    <label class="radio">
+			                        <input type="radio" name="kbdShortcutMod" id="kbdShortcutModCommand" value="command">
+			                        <span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
+			                    </label>
+			                </div>
+			                <div class="status-text">
+			                    <?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field">
+			                <label class="modal-label" for="langSelect"><?=h(mdw_t('theme.language.label','Language'))?></label>
+			                <select id="langSelect" class="input" style="width: 100%;">
+			                    <?php foreach ($MDW_LANGS as $l): ?>
+			                        <?php
+			                            $code = (string)($l['code'] ?? '');
+			                            $label = (string)($l['native'] ?? ($l['label'] ?? $code));
+			                        ?>
+			                        <option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
+			                    <?php endforeach; ?>
+			                </select>
+			                <div class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.language.hint','Choose UI language (auto-detected from translations/*.json).'))?>
+				            </div>
+			            </div>
+
+			            <div class="modal-field">
+			                <div class="modal-label"><?=h(mdw_t('theme.delete_after.label','After deleting a note'))?></div>
+			                <div class="modal-row" style="gap: 1rem; margin: 0;">
+			                    <label class="radio">
+			                        <input type="radio" name="deleteAfter" id="deleteAfterOverview" value="overview">
+			                        <span><?=h(mdw_t('theme.delete_after.overview','Back to overview'))?></span>
+			                    </label>
+			                    <label class="radio">
+			                        <input type="radio" name="deleteAfter" id="deleteAfterNext" value="next">
+			                        <span><?=h(mdw_t('theme.delete_after.next','Open next note'))?></span>
+			                    </label>
+			                </div>
+			                <div class="status-text">
+			                    <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
+			                <label class="modal-label" for="appTitleInput"><?=h(mdw_t('theme.app_title.label','App title'))?></label>
+			                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+			                    <input id="appTitleInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.app_title.placeholder','Markdown Manager'))?>" value="<?=h($APP_TITLE_OVERRIDE)?>" data-auth-superuser-enable="1">
+			                    <button type="button" class="btn btn-ghost btn-small" id="appTitleSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.app_title.save','Save title'))?></button>
+			                </div>
+			                <div id="appTitleStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.app_title.hint','Leave blank to use the default.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
+			                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
+			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                    <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
+			                </label>
+			                <div id="allowUserDeleteStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.permissions.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
+			                <div class="modal-label"><?=h(mdw_t('theme.copy.title','Copy buttons'))?></div>
+			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                    <input id="copyButtonsToggle" type="checkbox" <?= $copyButtonsEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                    <span class="status-text"><?=h(mdw_t('theme.copy.show_buttons','Show preview copy buttons'))?></span>
+			                </label>
+			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                    <input id="copyIncludeMetaToggle" type="checkbox" <?= $copyIncludeMeta ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                    <span class="status-text"><?=h(mdw_t('theme.copy.include_meta','Include metadata in copy'))?></span>
+			                </label>
+			                <label class="modal-label" for="copyHtmlModeSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.html_mode_label','HTML copy mode'))?></label>
+			                <select id="copyHtmlModeSelect" class="input" data-auth-superuser-enable="1">
+			                    <option value="dry" <?= $copyHtmlMode === 'dry' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_dry','Dry HTML (no classes/styles)'))?></option>
+			                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
+			                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
+			                </select>
+			                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
+			                <label class="modal-label" for="postDateFormatSelect"><?=h(mdw_t('theme.post_date_format.label','Post date format'))?></label>
+			                <select id="postDateFormatSelect" class="input" data-auth-superuser-enable="1">
+			                    <option value="mdy_short" <?= $postDateFormat === 'mdy_short' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_mdy_short','Nov 20, 2025'))?></option>
+			                    <option value="dmy_long" <?= $postDateFormat === 'dmy_long' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_dmy_long','16 December 2025'))?></option>
+			                </select>
+			                <div id="postDateFormatStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.post_date_format.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+			            <div class="modal-field" data-auth-superuser="1">
+			                <label class="modal-label" for="postDateAlignSelect"><?=h(mdw_t('theme.post_date_align.label','Post date alignment'))?></label>
+			                <select id="postDateAlignSelect" class="input" data-auth-superuser-enable="1">
+			                    <option value="left" <?= $postDateAlign === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_left','Left'))?></option>
+			                    <option value="center" <?= $postDateAlign === 'center' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_center','Center'))?></option>
+			                    <option value="right" <?= $postDateAlign === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_right','Right'))?></option>
+			                </select>
+			                <div id="postDateAlignStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.post_date_align.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+			        </div>
+			    </details>
 			        <div class="modal-field">
-			            <label class="modal-label" for="themePreset"><?=h(mdw_t('theme.preset','Preset'))?></label>
+			            <label class="modal-label" for="themePreset"><?=h(mdw_t('theme.preset','Theme'))?></label>
 		            <div style="display:flex; align-items:center; gap:0.6rem;">
 			            <select id="themePreset" class="input" style="flex: 1 1 auto;">
 		                <option value="default"><?=h(mdw_t('theme.default','Default'))?></option>
@@ -1296,17 +1447,16 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 			                <span id="themeSwatchSecondary" style="width: 1rem; height: 1rem; border-radius: 0.35rem; border:1px solid var(--border-soft);"></span>
 			            </div>
 		            </div>
-		            <div id="themePresetPreview" style="margin-top: 0.5rem; padding: 0.55rem 0.65rem; border-radius: 0.75rem; border: 1px solid var(--border-soft);"></div>
 				            <div class="status-text" style="margin-top: 0.4rem;">
 				                <?=h(mdw_t('theme.applies_hint','Applies only to the Markdown editor + HTML preview.'))?>
 				            </div>
 				        </div>
 
 			        <details style="margin-top: 0.8rem;">
-			            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.overrides.summary','Overrides (optional)'))?></summary>
+			            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.overrides.summary','Theme adjustments (optional)'))?></summary>
 			            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 		                <div class="status-text">
-		                    <?=h(mdw_t('theme.overrides.saved_auto','Overrides are saved in your browser (localStorage) automatically as you type.'))?>
+		                    <?=h(mdw_t('theme.overrides.saved_auto','Theme adjustments are saved in your browser (localStorage) automatically as you type.'))?>
 		                    <span id="themeOverridesStatus" style="margin-left: 0.35rem;"></span>
 		                </div>
 		                <div class="modal-field">
@@ -1333,83 +1483,11 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 		                </div>
 
 		                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
-		                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save overrides now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save overrides'))?></button>
-		                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear overrides'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset overrides'))?></button>
+		                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save theme adjustments now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save theme adjustments'))?></button>
+		                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear theme adjustments'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset theme adjustments'))?></button>
 		                </div>
 		            </div>
 		        </details>
-
-				        <div class="modal-field">
-				            <div class="modal-label"><?=h(mdw_t('theme.kbd_modifier.label','Keyboard shortcuts system'))?></div>
-				            <div class="modal-row" style="gap: 1rem; margin: 0;">
-				                <label class="radio">
-				                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModOption" value="option">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.option','Windows / Linux (Ctrl + Alt)'))?></span>
-			                </label>
-			                <label class="radio">
-			                    <input type="radio" name="kbdShortcutMod" id="kbdShortcutModCommand" value="command">
-			                    <span><?=h(mdw_t('theme.kbd_modifier.command','Mac (Ctrl + Command)'))?></span>
-			                </label>
-			            </div>
-			            <div class="status-text">
-			                <?=h(mdw_t('theme.kbd_modifier.tip','Choose the system your shortcuts should follow (saved in this browser).'))?>
-			            </div>
-			        </div>
-
-			        <div class="modal-field">
-			            <label class="modal-label" for="langSelect"><?=h(mdw_t('theme.language.label','Language'))?></label>
-			            <select id="langSelect" class="input" style="width: 100%;">
-			                <?php foreach ($MDW_LANGS as $l): ?>
-			                    <?php
-			                        $code = (string)($l['code'] ?? '');
-			                        $label = (string)($l['native'] ?? ($l['label'] ?? $code));
-			                    ?>
-			                    <option value="<?=h($code)?>" <?= $MDW_LANG === $code ? 'selected' : '' ?>><?=h($label)?></option>
-			                <?php endforeach; ?>
-			            </select>
-			            <div class="status-text" style="margin-top: 0.35rem;">
-			                <?=h(mdw_t('theme.language.hint','Choose UI language (auto-detected from translations/*.json).'))?>
-				            </div>
-			        </div>
-
-			        <div class="modal-field">
-			            <div class="modal-label"><?=h(mdw_t('theme.delete_after.label','After deleting a note'))?></div>
-			            <div class="modal-row" style="gap: 1rem; margin: 0;">
-			                <label class="radio">
-			                    <input type="radio" name="deleteAfter" id="deleteAfterOverview" value="overview">
-			                    <span><?=h(mdw_t('theme.delete_after.overview','Back to overview'))?></span>
-			                </label>
-			                <label class="radio">
-			                    <input type="radio" name="deleteAfter" id="deleteAfterNext" value="next">
-			                    <span><?=h(mdw_t('theme.delete_after.next','Open next note'))?></span>
-			                </label>
-			            </div>
-			            <div class="status-text">
-			                <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
-			            </div>
-			        </div>
-
-			        <div class="modal-field" data-auth-superuser="1">
-			            <label class="modal-label" for="appTitleInput"><?=h(mdw_t('theme.app_title.label','App title'))?></label>
-			            <div class="modal-row" style="gap: 0.6rem; margin: 0;">
-			                <input id="appTitleInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.app_title.placeholder','Markdown Manager'))?>" value="<?=h($APP_TITLE_OVERRIDE)?>" data-auth-superuser-enable="1">
-			                <button type="button" class="btn btn-ghost btn-small" id="appTitleSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.app_title.save','Save title'))?></button>
-			            </div>
-			            <div id="appTitleStatus" class="status-text" style="margin-top: 0.35rem;">
-			                <?=h(mdw_t('theme.app_title.hint','Leave blank to use the default.'))?>
-			            </div>
-			        </div>
-
-			        <div class="modal-field" data-auth-superuser="1">
-			            <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
-			            <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
-			                <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
-			                <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
-			            </label>
-			            <div id="allowUserDeleteStatus" class="status-text" style="margin-top: 0.35rem;">
-			                <?=h(mdw_t('theme.permissions.hint','Saved for all users.'))?>
-			            </div>
-			        </div>
 
 				        <details style="margin-top: 0.8rem;">
 				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.metadata.title','Metadata'))?></summary>
@@ -1487,6 +1565,25 @@ window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_nex
 				                    <span id="metaSettingsStatus" class="status-text"></span>
 				                    <button type="button" class="btn btn-ghost btn-small" id="metaSettingsSaveBtn"><?=h(mdw_t('theme.metadata.save','Save metadata settings'))?></button>
 				                </div>
+				            </div>
+				        </details>
+				        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
+				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.settings_io.title','Settings import/export'))?></summary>
+				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+				                <div class="settings-io-grid">
+				                    <div class="modal-field" style="margin: 0;">
+				                        <div class="modal-label"><?=h(mdw_t('theme.settings_io.export_label','Export'))?></div>
+				                        <button type="button" id="settingsExportBtn" class="btn btn-ghost btn-small" data-auth-superuser-enable="1"><?=h(mdw_t('theme.settings_io.export_btn','Export settings'))?></button>
+				                    </div>
+				                    <div class="modal-field" style="margin: 0;">
+				                        <label class="modal-label" for="settingsImportFile"><?=h(mdw_t('theme.settings_io.import_label','Import'))?></label>
+				                        <div style="display:flex; align-items:center; gap: 0.6rem; flex-wrap:wrap;">
+				                            <input id="settingsImportFile" type="file" class="input" accept="application/json" data-auth-superuser-enable="1">
+				                            <button type="button" id="settingsImportBtn" class="btn btn-ghost btn-small" data-auth-superuser-enable="1"><?=h(mdw_t('theme.settings_io.import_btn','Import settings'))?></button>
+				                        </div>
+				                    </div>
+				                </div>
+				                <div id="settingsImportExportStatus" class="status-text"></div>
 				            </div>
 				        </details>
 		    </div>

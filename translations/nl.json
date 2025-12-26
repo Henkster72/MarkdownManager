@@ -87,7 +87,7 @@
   "theme": {
     "settings_title": "Instellingen",
     "title": "Instellingen",
-    "preset": "Preset",
+    "preset": "Thema",
     "default": "Standaard",
     "applies_hint": "Geldt alleen voor de Markdown editor + HTML-voorbeeld.",
     "default_preview": "Standaard thema (gebruikt ingebouwde stijlen)",
@@ -95,6 +95,9 @@
     "swatch": {
       "primary": "Primair",
       "secondary": "Secundair"
+    },
+    "ui": {
+      "title": "Gebruikersinterface"
     },
     "kbd_modifier": {
       "label": "Sneltoets-systeem",
@@ -132,15 +135,47 @@
       "saved": "Opgeslagen",
       "save_failed": "Opslaan mislukt"
     },
+    "copy": {
+      "title": "Kopieerknoppen",
+      "show_buttons": "Toon kopieerknoppen in voorbeeld",
+      "include_meta": "Metagegevens opnemen in kopie",
+      "html_mode_label": "HTML-kopieermodus",
+      "html_mode_dry": "Droge HTML (zonder klassen/stijlen)",
+      "html_mode_medium": "Medium droge HTML (alleen klassen)",
+      "html_mode_wet": "Natte HTML (inline stijlen)",
+      "hint": "Opgeslagen voor alle gebruikers.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
+    "post_date_format": {
+      "label": "Postdatumformaat",
+      "option_mdy_short": "nov 20, 2025",
+      "option_dmy_long": "16 december 2025",
+      "hint": "Opgeslagen voor alle gebruikers.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
+    "post_date_align": {
+      "label": "Postdatum uitlijning",
+      "option_left": "Links",
+      "option_center": "Midden",
+      "option_right": "Rechts",
+      "hint": "Opgeslagen voor alle gebruikers.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
     "overrides": {
-      "summary": "Aanpassingen (optioneel)",
-      "saved_auto": "Aanpassingen worden in je browser (localStorage) automatisch opgeslagen terwijl je typt.",
+      "summary": "Thema-aanpassingen (optioneel)",
+      "saved_auto": "Thema-aanpassingen worden in je browser (localStorage) automatisch opgeslagen terwijl je typt.",
       "preview_section": "HTML-voorbeeld",
       "editor_section": "Markdown-editor",
-      "save_title": "Aanpassingen nu opslaan",
-      "save_btn": "Aanpassingen opslaan",
-      "reset_title": "Aanpassingen wissen",
-      "reset_btn": "Aanpassingen resetten",
+      "save_title": "Thema-aanpassingen nu opslaan",
+      "save_btn": "Thema-aanpassingen opslaan",
+      "reset_title": "Thema-aanpassingen wissen",
+      "reset_btn": "Thema-aanpassingen resetten",
       "saved": "Opgeslagen",
       "cleared": "Gewist",
       "placeholders": {
@@ -168,6 +203,20 @@
       "saving": "Opslaan…",
       "saved": "Opgeslagen",
       "save_failed": "Opslaan mislukt"
+    },
+    "settings_io": {
+      "title": "Instellingen importeren/exporteren",
+      "export_label": "Exporteren",
+      "export_btn": "Instellingen exporteren",
+      "import_label": "Importeren",
+      "import_btn": "Instellingen importeren",
+      "import_missing": "Kies een JSON-bestand.",
+      "import_invalid": "Ongeldig instellingenbestand.",
+      "importing": "Importeren…",
+      "imported": "Geïmporteerd. Herladen…",
+      "exported": "Geëxporteerd.",
+      "export_failed": "Exporteren mislukt",
+      "import_failed": "Importeren mislukt"
     },
     "publisher": {
       "title": "WPM (Website publicatiemodus)",
@@ -253,6 +302,7 @@
     "export_failed": "Export mislukt. Controleer de console voor details.",
     "copy_failed": "Kopiëren mislukt. Controleer de console voor details.",
     "copied": "Gekopieerd",
+    "copy_code": "Kopieer code",
     "new_md": {
       "enter_title": "Geef een titel op voor de bestandsnaam.",
       "no_trailing_slash": "De bestandsnaam mag niet eindigen met een slash.",

@@ -34,8 +34,8 @@ if (!hash_equals((string)$_SESSION['csrf_token'], $csrf)) {
     exit;
 }
 
-$cfg = isset($data['config']) ? $data['config'] : null; // base fields map
-$publisherCfgIn = isset($data['publisher_config']) ? $data['publisher_config'] : null; // publisher fields map
+$cfg = isset($data['config']) ? $data['config'] : null; // base fields map or config object
+$publisherCfgIn = isset($data['publisher_config']) ? $data['publisher_config'] : null; // publisher fields map or config object
 $settingsIn = isset($data['settings']) ? $data['settings'] : null;
 $authIn = isset($data['auth']) ? $data['auth'] : null;
 
@@ -46,6 +46,10 @@ if ($cfg === [] && !is_array($settingsIn)) {
     echo json_encode(['ok' => false, 'error' => 'invalid_config']);
     exit;
 }
+
+$cfgFields = (isset($cfg['fields']) && is_array($cfg['fields'])) ? $cfg['fields'] : $cfg;
+$publisherFieldsIn = (isset($publisherCfgIn['fields']) && is_array($publisherCfgIn['fields'])) ? $publisherCfgIn['fields'] : $publisherCfgIn;
+$publisherHtmlMapIn = (isset($publisherCfgIn['html_map']) && is_array($publisherCfgIn['html_map'])) ? $publisherCfgIn['html_map'] : null;
 
 $authRole = '';
 $authToken = '';
@@ -64,14 +68,20 @@ if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
 
 $current = mdw_metadata_load_config();
 $fields = isset($current['fields']) && is_array($current['fields']) ? $current['fields'] : [];
-
-foreach ($fields as $k => $v) {
-    $in = isset($cfg[$k]) && is_array($cfg[$k]) ? $cfg[$k] : [];
-    $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
-    $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+foreach ($cfgFields as $k => $in) {
+    if (!is_string($k) || trim($k) === '') continue;
+    if (!is_array($in)) $in = [];
+    $cur = (isset($fields[$k]) && is_array($fields[$k])) ? $fields[$k] : [];
+    $label = isset($in['label']) ? trim((string)$in['label']) : trim((string)($cur['label'] ?? $k));
+    if ($label === '') $label = $k;
+    $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
+    $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
     if (!$mdVis) $htmlVis = false;
-    $fields[$k]['markdown_visible'] = $mdVis;
-    $fields[$k]['html_visible'] = $htmlVis;
+    $fields[$k] = [
+        'label' => $label,
+        'markdown_visible' => $mdVis,
+        'html_visible' => $htmlVis,
+    ];
 }
 
 $out = $current;
@@ -86,6 +96,24 @@ if (is_array($settingsIn)) {
     $allowUserDelete = array_key_exists('allow_user_delete', $settingsIn)
         ? (bool)$settingsIn['allow_user_delete']
         : (!array_key_exists('allow_user_delete', $curSettings) ? true : (bool)$curSettings['allow_user_delete']);
+    $copyButtonsEnabled = array_key_exists('copy_buttons_enabled', $settingsIn)
+        ? (bool)$settingsIn['copy_buttons_enabled']
+        : (!array_key_exists('copy_buttons_enabled', $curSettings) ? true : (bool)$curSettings['copy_buttons_enabled']);
+    $copyIncludeMeta = array_key_exists('copy_include_meta', $settingsIn)
+        ? (bool)$settingsIn['copy_include_meta']
+        : (!array_key_exists('copy_include_meta', $curSettings) ? true : (bool)$curSettings['copy_include_meta']);
+    $copyHtmlMode = array_key_exists('copy_html_mode', $settingsIn)
+        ? trim((string)($settingsIn['copy_html_mode'] ?? ''))
+        : trim((string)($curSettings['copy_html_mode'] ?? 'dry'));
+    if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+    $postDateFormat = array_key_exists('post_date_format', $settingsIn)
+        ? trim((string)($settingsIn['post_date_format'] ?? ''))
+        : trim((string)($curSettings['post_date_format'] ?? 'mdy_short'));
+    if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
+    $postDateAlign = array_key_exists('post_date_align', $settingsIn)
+        ? trim((string)($settingsIn['post_date_align'] ?? ''))
+        : trim((string)($curSettings['post_date_align'] ?? 'left'));
+    if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -118,6 +146,11 @@ if (is_array($settingsIn)) {
         'publisher_default_author' => $defaultAuthor,
         'publisher_require_h2' => (bool)$requireH2,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
+        'copy_include_meta' => (bool)$copyIncludeMeta,
+        'copy_html_mode' => $copyHtmlMode,
+        'post_date_format' => $postDateFormat,
+        'post_date_align' => $postDateAlign,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
@@ -135,16 +168,26 @@ if (!$ok) {
 // Publisher config (separate file)
 $currentPub = mdw_metadata_load_publisher_config();
 $pubFields = isset($currentPub['fields']) && is_array($currentPub['fields']) ? $currentPub['fields'] : [];
-foreach ($pubFields as $k => $v) {
-    $in = isset($publisherCfgIn[$k]) && is_array($publisherCfgIn[$k]) ? $publisherCfgIn[$k] : [];
-    $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
-    $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+foreach ($publisherFieldsIn as $k => $in) {
+    if (!is_string($k) || trim($k) === '') continue;
+    if (!is_array($in)) $in = [];
+    $cur = (isset($pubFields[$k]) && is_array($pubFields[$k])) ? $pubFields[$k] : [];
+    $label = isset($in['label']) ? trim((string)$in['label']) : trim((string)($cur['label'] ?? $k));
+    if ($label === '') $label = $k;
+    $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
+    $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
     if (!$mdVis) $htmlVis = false;
-    $pubFields[$k]['markdown_visible'] = $mdVis;
-    $pubFields[$k]['html_visible'] = $htmlVis;
+    $pubFields[$k] = [
+        'label' => $label,
+        'markdown_visible' => $mdVis,
+        'html_visible' => $htmlVis,
+    ];
 }
 $outPub = $currentPub;
 $outPub['fields'] = $pubFields;
+if (is_array($publisherHtmlMapIn)) {
+    $outPub['html_map'] = $publisherHtmlMapIn;
+}
 [$ok2, $msg2] = mdw_metadata_save_publisher_config($outPub);
 if (!$ok2) {
     http_response_code(500);

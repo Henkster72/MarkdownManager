@@ -1,4 +1,4 @@
-# MarkdownManager v0.3.1.1
+# MarkdownManager v0.3.1.2
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,13 @@ MarkdownManager is a small, fast app that turns a folder of plain text notes int
 Sharpen your thinking.
 
 New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
+
+## What's new in 0.3.1.2
+
+- Settings modal cleanup: UI settings grouped under a collapsible section, theme label clarified, import/export in two columns on large screens, and no background blur.
+- Copy workflow upgrades: preview copy buttons + per-code-block copy buttons with checkmark feedback, HTML copy modes (dry/medium/wet), and metadata include toggle.
+- HTML preview polish: post date formatting + alignment options with translations, and clearer separation between preview rendering and export/copy output.
+- Settings portability: JSON import/export (excluding author) including metadata/fields and theme settings.
 
 ## What's new in 0.3.1.1
 
@@ -407,6 +414,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.3.1.2: Settings modal cleanup, copy workflow upgrades (preview + code blocks), HTML copy modes, post date formatting/alignment, and JSON settings import/export.
 - 0.3.1.1: WPM bugfixes for title-first MD creation with slug validation, date prefix default behavior, and superuser-only slug changes.
 - 0.3.1: Major translation effort (DE/FR/PT UI + localized tutorials), language-aware onboarding in WPM, HTML preview upgrades (caret footnotes, inline HTML, strikethrough, themed buttons, stronger link parsing), AJAX save + replace modal, and complementary secondary accent.
 - 0.3: Website publication mode with metadata-driven publish states, author/subtitle requirements, server-saved settings, and UI enhancements (explorer sorting, date display, mobile layout refinements, app title override, settings cleanup).
