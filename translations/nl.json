@@ -364,6 +364,10 @@
     "language_label": "UI-taal",
     "author_required": "Vul je auteurnaam in.",
     "save": "Opslaan",
-    "switch_user": "Wissel gebruiker"
+    "switch_user": "Wissel gebruiker",
+    "search_title": "Zoeken",
+    "search_placeholder": "Zoek {site}",
+    "search_aria": "Zoek op Google",
+    "search_button_title": "Zoek op Google"
   }
 }

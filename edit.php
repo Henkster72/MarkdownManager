@@ -38,6 +38,41 @@ function mdw_substr($s, $len) {
     return function_exists('mb_substr') ? mb_substr($s, 0, $len) : substr($s, 0, $len);
 }
 
+function mdw_wpm_base_info() {
+    $raw = env_str('WPM_BASE_URL', '');
+    if (!is_string($raw)) $raw = '';
+    $trimmed = trim($raw);
+    if ($trimmed === '') return [null, null];
+    $clean = preg_replace('~^https?://~i', '', $trimmed);
+    $clean = rtrim($clean, '/');
+    if ($clean === '') return [null, null];
+    if (preg_match('~^https?://~i', $trimmed)) {
+        $siteBase = rtrim($trimmed, '/');
+    } else {
+        $siteBase = 'https://' . $clean;
+    }
+    return [$clean, $siteBase];
+}
+
+function mdw_wpm_public_url($path, $siteBase) {
+    if (!is_string($path) || $path === '') return null;
+    if (!is_string($siteBase) || $siteBase === '') return null;
+    $path = preg_replace('/\\.md$/i', '', $path);
+    $parts = explode('/', $path);
+    $parts = array_map('rawurlencode', $parts);
+    $safePath = implode('/', $parts);
+    return rtrim($siteBase, '/') . '/' . ltrim($safePath, '/');
+}
+
+[$WPM_BASE_DOMAIN, $WPM_SITE_BASE] = mdw_wpm_base_info();
+$WPM_PLUGIN_ACTIVE = false;
+if ($WPM_BASE_DOMAIN !== null) {
+    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+    if (is_file(rtrim($pluginsDir, "/\\") . '/google_search_plugin.php')) {
+        $WPM_PLUGIN_ACTIVE = true;
+    }
+}
+
 function sanitize_folder_name($folder) {
     if (!is_string($folder)) return null;
     $folder = trim($folder);
@@ -849,6 +884,14 @@ window.mermaid = mermaid;
 	                <div class="app-header-text">
 	                    <div class="app-title-row">
 	                        <div class="app-title"><?=h($current_title)?></div>
+                            <?php if ($requested && $WPM_PLUGIN_ACTIVE): ?>
+                                <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
+                                <?php if ($wpm_public_url): ?>
+                                    <a class="btn btn-ghost icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
+                                        <span class="pi pi-externallink"></span>
+                                    </a>
+                                <?php endif; ?>
+                            <?php endif; ?>
 	                        <span id="dirtyStar" class="dirty-star" style="display:none;" title="<?=h(mdw_t('edit.unsaved_title','Unsaved changes'))?>">*</span>
 	                    </div>
 	                    <div class="app-breadcrumb">

@@ -238,8 +238,6 @@ a:hover {
   gap: 0.5rem;
   flex: 0 0 auto;
   padding: 0.25rem 0.45rem;
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
 }
 
 .btn.mobile-nav-toggle,
@@ -1373,7 +1371,7 @@ a:hover {
 .icon-button {
   width: 1.4rem;
   height: 1.4rem;
-  padding: 0;
+  padding: 0 0.25rem;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,4 @@
-# MarkdownManager v0.3.1.2
+# MarkdownManager v0.3.2
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,12 @@ MarkdownManager is a small, fast app that turns a folder of plain text notes int
 Sharpen your thinking.
 
 New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
+
+## What's new in 0.3.2
+
+- Google site search plugin (WPM): optional search box that scopes queries to `WPM_BASE_URL`.
+- Public page link in the header (WPM): shows a pi-externallink next to the app title for the current note.
+- WPM search UI strings are translated (EN/NL/FR/DE/PT).
 
 ## What's new in 0.3.1.2
 
@@ -77,6 +83,15 @@ In the overview/explorer, notes are labeled and color-coded by state so you can 
 - Requires a subtitle line starting with `##` (configurable in Settings).
 - Disables secret notes.
 - Persists theme + language + publisher settings to `metadata_config.json` so the UI stays consistent across devices.
+
+### WPM_BASE_URL (public site integration)
+
+Set `WPM_BASE_URL` to your public site domain (for example `ntg.nu` or `https://ntg.nu`). When this is set and the plugin file exists, two WPM extras are enabled:
+
+- **Google site search**: a search input appears in the overview page. Queries are sent to Google with `site:your-domain` applied.
+- **Public link in the app header**: when a note is open, a pi-externallink button appears next to the app title. It opens the public URL derived from the current note path (URL-safe, `.md` stripped).
+
+The search and header link are only shown when `plugins/google_search_plugin.php` is present and `WPM_BASE_URL` is configured.
 
 ### Why it's useful
 
@@ -180,6 +195,7 @@ When the Markdown textarea is focused:
 - Optional shortcuts list via `links.csv`.
 - "Secret notes" list (`secret_mds.txt`) protected by a simple session password gate.
 - Math typesetting via MathJax (loaded from a CDN by default).
+- WPM extras: Google site search and public header links when `WPM_BASE_URL` is set.
 - Superuser settings for publisher mode, app title, theme presets, and metadata visibility.
 
 ## Project layout
@@ -192,6 +208,8 @@ When the Markdown textarea is focused:
 |-- html_preview.php    # shared Markdown->HTML rendering + URL resolution
 |-- image_manager.php   # upload/list endpoint for the image manager modal
 |-- themes_lib.php      # theme discovery (meta + fonts + available CSS)
+|-- plugins/            # optional plugins (header + folder sections)
+|   |-- google_search_plugin.php  # WPM Google site search + header public link
 |-- static/             # reserved system folder (not shown in overview)
 |   |-- base.js         # client-side behavior (filtering, preview, resizers, shortcuts)
 |   |-- ui.css          # application layout + UI components

@@ -364,6 +364,10 @@
     "language_label": "UI-Sprache",
     "author_required": "Bitte geben Sie Ihren Autorennamen ein.",
     "save": "Speichern",
-    "switch_user": "Benutzer wechseln"
+    "switch_user": "Benutzer wechseln",
+    "search_title": "Suche",
+    "search_placeholder": "Suche {site}",
+    "search_aria": "Bei Google suchen",
+    "search_button_title": "Bei Google suchen"
   }
 }
