@@ -291,7 +291,16 @@
     "missing_csrf": "Missing CSRF token. Reload the page.",
     "uploading": "Uploading…",
     "upload_failed": "Upload failed.",
-    "uploaded": "Uploaded."
+    "uploaded": "Uploaded.",
+    "error_csrf": "Your session expired. Reload and try again.",
+    "error_missing_upload": "No image file was received. Try again.",
+    "error_invalid_upload": "The upload did not look like a valid file.",
+    "error_not_writable": "We cannot write to the images folder ({dir}). Check IMAGES_DIR in .env or folder permissions.",
+    "error_type_detect": "We could not detect the file type.",
+    "error_type_unsupported": "That image type is not supported.",
+    "error_process_failed": "We could not process that image.",
+    "error_save_failed": "We could not save the processed image.",
+    "error_store_failed": "We could not store the uploaded image."
   },
   "rename_modal": {
     "title": "Rename file",
@@ -382,6 +391,9 @@
     "secret_marked_locked": "This path is marked as secret. Unlock first via the viewer.",
     "folder_not_exist_prefix": "Folder does not exist:",
     "file_exists_prefix": "File already exists:",
+    "file_moved_prefix": "Moved:",
+    "file_move_failed": "Could not move file.",
+    "file_move_no_change": "File already in that folder.",
     "file_create_failed": "Could not create file.",
     "publisher_requires_subtitle": "{app} requires a subtitle line starting with \"##\".",
     "publisher_author_required": "{app} requires an author name.",

@@ -291,7 +291,16 @@
     "missing_csrf": "Token CSRF em falta. Recarregue a página.",
     "uploading": "A enviar…",
     "upload_failed": "Falha no envio.",
-    "uploaded": "Enviado."
+    "uploaded": "Enviado.",
+    "error_csrf": "A sua sessão expirou. Recarregue e tente novamente.",
+    "error_missing_upload": "Nenhum ficheiro de imagem foi recebido. Tente novamente.",
+    "error_invalid_upload": "O upload não parece ser um ficheiro válido.",
+    "error_not_writable": "Não conseguimos escrever na pasta de imagens ({dir}). Verifique IMAGES_DIR em .env ou as permissões.",
+    "error_type_detect": "Não foi possível detetar o tipo de ficheiro.",
+    "error_type_unsupported": "Este tipo de imagem não é suportado.",
+    "error_process_failed": "Não foi possível processar essa imagem.",
+    "error_save_failed": "Não foi possível guardar a imagem processada.",
+    "error_store_failed": "Não foi possível guardar a imagem enviada."
   },
   "rename_modal": {
     "title": "Renomear ficheiro",
@@ -382,6 +391,9 @@
     "secret_marked_locked": "Este caminho está marcado como secreto. Desbloqueie primeiro no visualizador.",
     "folder_not_exist_prefix": "A pasta não existe:",
     "file_exists_prefix": "O ficheiro já existe:",
+    "file_moved_prefix": "Movido:",
+    "file_move_failed": "Não foi possível mover o ficheiro.",
+    "file_move_no_change": "O ficheiro já está nessa pasta.",
     "file_create_failed": "Não foi possível criar o ficheiro.",
     "publisher_requires_subtitle": "{app} requer uma linha de subtítulo a começar com \"##\".",
     "publisher_author_required": "{app} requer um nome de autor.",

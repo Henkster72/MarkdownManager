@@ -738,6 +738,76 @@ function try_secret_login($passwordInput) {
 
         header('Location: ' . $redirect);
         exit;
+	    } else if ($_POST['action'] === 'move_file') {
+                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+                $authRequired = function_exists('mdw_auth_has_role')
+                    ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
+                    : false;
+                if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
+                    header('Location: index.php');
+                    exit;
+                }
+
+                $fileRaw = isset($_POST['file']) ? (string)$_POST['file'] : '';
+                $targetRaw = isset($_POST['target_folder']) ? (string)$_POST['target_folder'] : '';
+                $san = sanitize_md_path($fileRaw);
+                $targetTrim = trim($targetRaw);
+                $targetFolder = ($targetTrim === '' || $targetTrim === 'root') ? 'root' : sanitize_folder_name($targetTrim);
+                $returnFilter = sanitize_folder_name($_POST['return_filter'] ?? '') ?? null;
+
+                if (!$san) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                } else if (is_secret_file($san) && !is_secret_authenticated()) {
+                    $_SESSION['flash_error'] = mdw_t('flash.secret_locked', 'Secret note is locked. Unlock first via the viewer.');
+                } else if (!$targetFolder) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
+                } else if ($targetFolder !== 'root' && mdw_folder_is_reserved($targetFolder)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.reserved_folder_name', 'This folder name is reserved.');
+                } else if (!empty($MDW_PUBLISHER_MODE) && $targetFolder !== 'root' && strpos($targetFolder, '/') !== false) {
+                    $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
+                } else if (!empty($MDW_PUBLISHER_MODE) && $targetFolder !== 'root' && preg_match('/\\p{So}/u', $targetFolder)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
+                } else {
+                    $targetFolder = $targetFolder === 'root' ? '' : $targetFolder;
+                    if ($targetFolder !== '') {
+                        $targetFull = mdw_safe_full_path($targetFolder, true);
+                        if (!$targetFull || !is_dir($targetFull)) {
+                            $_SESSION['flash_error'] = mdw_t('flash.folder_not_exist_prefix', 'Folder does not exist:') . ' ' . $targetFolder;
+                        }
+                    }
+                }
+
+                if (empty($_SESSION['flash_error'])) {
+                    $base = basename($san);
+                    $dest = $targetFolder ? ($targetFolder . '/' . $base) : $base;
+                    if ($dest === $san) {
+                        $_SESSION['flash_error'] = mdw_t('flash.file_move_no_change', 'File already in that folder.');
+                    } else {
+                        $oldFull = mdw_safe_full_path($san, true);
+                        $newFull = mdw_safe_full_path($dest, false);
+                        $existingFull = mdw_safe_full_path($dest, true);
+                        if (!$oldFull || !is_file($oldFull) || !$newFull) {
+                            $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                        } else if ($existingFull && is_file($existingFull)) {
+                            $_SESSION['flash_error'] = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $dest;
+                        } else if (!$existingFull && file_exists($newFull)) {
+                            $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                        } else if (@rename($oldFull, $newFull)) {
+                            $_SESSION['flash_ok'] = mdw_t('flash.file_moved_prefix', 'Moved:') . ' ' . $san . ' -> ' . $dest;
+                        } else {
+                            $err = error_get_last();
+                            $msg = mdw_t('flash.file_move_failed', 'Could not move file.');
+                            if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
+                            $_SESSION['flash_error'] = $msg;
+                        }
+                    }
+                }
+
+                $redirect = 'index.php';
+                if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                header('Location: ' . $redirect);
+                exit;
 		    } else if ($_POST['action'] === 'rename_folder') {
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
                 $authRequired = function_exists('mdw_auth_has_role')
@@ -765,6 +835,8 @@ function try_secret_login($passwordInput) {
                     $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
                 } else if ($folder === $newFolder) {
                     $_SESSION['flash_error'] = mdw_t('flash.folder_rename_no_change', 'Folder name did not change.');
+                } else if (str_starts_with($newFolder, $folder . '/')) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
                 } else {
                     $full = mdw_safe_full_path($folder, true);
                     if (!$full || !is_dir($full)) {

@@ -1,4 +1,4 @@
-# MarkdownManager v0.3.3
+# MarkdownManager v0.4
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -11,6 +11,14 @@ New and exciting: thanks to user input, Mermaid diagram support is now built in.
 ## Security warning (read this)
 
 MarkdownManager is not safe to expose to the public internet. It has no accounts, no MFA, no rate limiting, and only lightweight protection for "secret" notes. WPM mode adds some workflow safeguards (required author, required subtitle, publish states, and stricter metadata rules), but it does not make the app safe for public exposure. If you put this on a public server without a strong access layer (VPN, reverse proxy auth, IP allowlist), you are asking for trouble. Run it on localhost or a trusted private network only.
+
+## What's new in 0.4
+
+- Explorer drag-and-drop: move markdown notes between folders (superuser-only) with mouse or touch.
+- Folder UX polish: in-place rename, drag-and-drop folder reordering, and a cleaner tree view with folder/file icons.
+- Focused folder view now includes subfolders so nested notes stay visible when filtering.
+- Example content now lives under `example-notes/` (safe to delete after install).
+- Image manager reliability: localized, friendlier error messages plus clearer `IMAGES_DIR` guidance (and better permission handling on upload).
 
 ## What's new in 0.3.3
 
@@ -255,10 +263,22 @@ When the Markdown textarea is focused:
 |   `-- ...
 |-- images/             # reserved system folder for uploads (not shown in overview)
 |-- tools/              # reserved system folder for helper scripts (not shown in overview)
+|-- example-notes/      # sample notes (safe to delete after install)
+|   |-- demos/
+|   |-- finance/
+|   |-- health/
+|   |-- linux/
+|   |-- politics/
+|   |-- travel/
+|   |-- tutorials/
+|   |-- uncategorized/
+|   `-- webdev/
 |-- links.csv           # optional shortcuts (CSV)
 |-- secret_mds.txt      # optional list of \"secret\" markdown paths
 `-- <folders>/*.md      # your notes
 ```
+
+Note: `example-notes/` is optional sample content and can be deleted after install.
 
 ## Requirements
 
@@ -293,7 +313,7 @@ It supports a practical subset:
 ### Images and relative paths
 
 - Relative image URLs are resolved from the directory of the current `.md` file.
-  - Example: `linux/note.md` with `![x](pic.png)` resolves to `linux/pic.png`.
+  - Example: `example-notes/linux/note.md` with `![x](pic.png)` resolves to `example-notes/linux/pic.png`.
 - `..` path segments are allowed but won't resolve outside the project root.
 
 ## Configuration
@@ -430,7 +450,7 @@ Notes:
 `secret_mds.txt` is a newline-separated list of relative markdown paths to protect:
 
 ```text
-finance/private.md
+example-notes/finance/private.md
 research/25-01-01-secret-note.md
 ```
 
@@ -462,6 +482,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.4: Explorer drag-and-drop for notes + folders, in-place folder rename, improved tree view (icons + focused view), example-notes moved under `example-notes/`, and localized/friendlier image manager errors with clearer `IMAGES_DIR` guidance.
 - 0.3.3: Security hardening, smarter errors/offline awareness, {TOC} + HTML preview upgrades, metadata delimiter migration, two-level folders with WPM migration rules, and superuser folder management.
 - 0.3.1.2: Settings modal cleanup, copy workflow upgrades (preview + code blocks), HTML copy modes, post date formatting/alignment, and JSON settings import/export.
 - 0.3.1.1: WPM bugfixes for title-first MD creation with slug validation, date prefix default behavior, and superuser-only slug changes.
@@ -475,7 +496,7 @@ GitHub,https://github.com/
 
 ## TODO (Roadmap)
 
-- [ ] Add functionality for the explorer to drag and drop md files to other folders.
+- [x] Add functionality for the explorer to drag and drop md files to other folders.
 - [ ] Tagging (frontmatter or inline `#tags`) + tag browser.
 - [ ] Improve Markdown parser edge cases (nested lists, tables, better code fences).
 - [ ] Syntax highlighting in preview (server-side or client-side).

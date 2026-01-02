@@ -291,7 +291,16 @@
     "missing_csrf": "CSRF-Token fehlt. Seite neu laden.",
     "uploading": "Hochladen…",
     "upload_failed": "Upload fehlgeschlagen.",
-    "uploaded": "Hochgeladen."
+    "uploaded": "Hochgeladen.",
+    "error_csrf": "Ihre Sitzung ist abgelaufen. Bitte neu laden und erneut versuchen.",
+    "error_missing_upload": "Es wurde keine Bilddatei empfangen. Bitte erneut versuchen.",
+    "error_invalid_upload": "Der Upload sah nicht wie eine gültige Datei aus.",
+    "error_not_writable": "Wir können nicht in den Bilder-Ordner ({dir}) schreiben. IMAGES_DIR in .env oder die Berechtigungen prüfen.",
+    "error_type_detect": "Der Dateityp konnte nicht erkannt werden.",
+    "error_type_unsupported": "Dieser Bildtyp wird nicht unterstützt.",
+    "error_process_failed": "Das Bild konnte nicht verarbeitet werden.",
+    "error_save_failed": "Das verarbeitete Bild konnte nicht gespeichert werden.",
+    "error_store_failed": "Das hochgeladene Bild konnte nicht gespeichert werden."
   },
   "rename_modal": {
     "title": "Datei umbenennen",
@@ -382,6 +391,9 @@
     "secret_marked_locked": "Dieser Pfad ist als geheim markiert. Zuerst über den Viewer entsperren.",
     "folder_not_exist_prefix": "Ordner existiert nicht:",
     "file_exists_prefix": "Datei existiert bereits:",
+    "file_moved_prefix": "Verschoben:",
+    "file_move_failed": "Datei konnte nicht verschoben werden.",
+    "file_move_no_change": "Datei ist bereits in diesem Ordner.",
     "file_create_failed": "Datei konnte nicht erstellt werden.",
     "publisher_requires_subtitle": "{app} erfordert eine Untertitelzeile, die mit \"##\" beginnt.",
     "publisher_author_required": "{app} erfordert einen Autorennamen.",

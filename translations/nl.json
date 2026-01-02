@@ -291,7 +291,16 @@
     "missing_csrf": "CSRF-token ontbreekt. Herlaad de pagina.",
     "uploading": "Uploaden…",
     "upload_failed": "Upload mislukt.",
-    "uploaded": "Geupload."
+    "uploaded": "Geupload.",
+    "error_csrf": "Je sessie is verlopen. Herlaad en probeer opnieuw.",
+    "error_missing_upload": "Er is geen afbeeldingsbestand ontvangen. Probeer opnieuw.",
+    "error_invalid_upload": "De upload lijkt geen geldig bestand.",
+    "error_not_writable": "We kunnen niet schrijven naar de afbeeldingenmap ({dir}). Controleer IMAGES_DIR in .env of de rechten.",
+    "error_type_detect": "We konden het bestandstype niet bepalen.",
+    "error_type_unsupported": "Dit afbeeldingstype wordt niet ondersteund.",
+    "error_process_failed": "We konden die afbeelding niet verwerken.",
+    "error_save_failed": "We konden de verwerkte afbeelding niet opslaan.",
+    "error_store_failed": "We konden de geüploade afbeelding niet bewaren."
   },
   "rename_modal": {
     "title": "Bestand hernoemen",
@@ -382,6 +391,9 @@
     "secret_marked_locked": "Dit pad staat als geheim gemarkeerd. Ontgrendel eerst via de viewer.",
     "folder_not_exist_prefix": "Map bestaat niet:",
     "file_exists_prefix": "Bestand bestaat al:",
+    "file_moved_prefix": "Verplaatst:",
+    "file_move_failed": "Kon bestand niet verplaatsen.",
+    "file_move_no_change": "Bestand staat al in die map.",
     "file_create_failed": "Kon bestand niet aanmaken.",
     "publisher_requires_subtitle": "{app} vereist een subtitelregel die begint met \"##\".",
     "publisher_author_required": "{app} vereist een auteurnaam.",

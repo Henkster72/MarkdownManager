@@ -335,7 +335,13 @@ function explorer_view_render_tree($opts) {
         } else {
             $rootList = [];
             $allowedPluginFolders = [];
-            $dirMap = isset($dirMap[$folder_filter]) ? [$folder_filter => $dirMap[$folder_filter]] : [];
+            $filtered = [];
+            foreach ($dirMap as $dir => $list) {
+                if ($dir === $folder_filter || str_starts_with($dir, $folder_filter . '/')) {
+                    $filtered[$dir] = $list;
+                }
+            }
+            $dirMap = $filtered;
         }
     }
 
@@ -364,6 +370,205 @@ function explorer_view_render_tree($opts) {
     if (!empty($pluginCtx['back_href'])) {
         $backHrefAttr = ' data-back-href="' . explorer_view_escape($pluginCtx['back_href']) . '"';
     }
+    $current_folder = $current_file ? explorer_view_folder_from_path($current_file) : null;
+
+    $renderNotes = function($list, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token) {
+    ?>
+        <ul class="notes-list">
+        <?php foreach($list as $entry):
+            $p   = $entry['path'];
+            $info = explorer_view_extract_md_title_and_meta_from_file(
+                __DIR__ . '/' . $p,
+                $entry['basename'],
+                ['publishstate', 'page_title', 'post_date', 'published_date']
+            );
+            $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
+            $t   = $publisher_mode
+                ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
+                : (string)($info['title'] ?? $entry['basename']);
+            $publishState = null;
+            if ($publisher_mode) {
+                $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
+                $publishState = function_exists('mdw_publisher_normalize_publishstate')
+                    ? mdw_publisher_normalize_publishstate($rawState)
+                    : ($rawState !== '' ? $rawState : 'Concept');
+                if ($publishState === '') $publishState = 'Concept';
+            }
+            $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
+            if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+            [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
+                $rawDate,
+                $entry['yy'] ?? null,
+                $entry['mm'] ?? null,
+                $entry['dd'] ?? null
+            );
+            $isSecret = isset($secretMap[$p]);
+            $isCurrent = ($current_file !== null && $current_file === $p);
+            $publishClass = '';
+            if ($publisher_mode) {
+                $s = strtolower((string)$publishState);
+                if ($s === 'published') $publishClass = 'publish-published';
+                else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
+                else $publishClass = 'publish-concept';
+            }
+        ?>
+        <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
+            <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>" draggable="true">
+                <span class="note-leading">
+                    <span class="note-caret-spacer" aria-hidden="true"></span>
+                    <span class="note-icon pi pi-document" aria-hidden="true"></span>
+                </span>
+                <span class="note-text">
+                    <span class="note-title">
+                        <span><?=explorer_view_escape($t)?></span>
+                        <span class="note-badges">
+                            <?php if ($publisher_mode): ?>
+                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
+                            <?php endif; ?>
+                            <?php if ($isSecret): ?>
+                                <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
+                            <?php endif; ?>
+                        </span>
+                    </span>
+                    <span class="nav-item-path">
+                        <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
+                        <?php if ($dateLabel !== ''): ?>
+                            <span class="nav-item-date"><?=explorer_view_escape($dateLabel)?></span>
+                        <?php endif; ?>
+                    </span>
+                </span>
+            </a>
+            <?php if ($show_actions && $csrf_token): ?>
+            <div class="note-actions">
+                <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">
+                    <span class="pi pi-edit"></span>
+                </a>
+                <form method="post" class="deleteForm" data-file="<?=explorer_view_escape($p)?>">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="file" value="<?=explorer_view_escape($p)?>">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
+                        <span class="pi pi-bin"></span>
+                    </button>
+                </form>
+            </div>
+            <?php endif; ?>
+        </li>
+        <?php endforeach; ?>
+        <?php if (empty($list) && $showEmpty): ?>
+            <li class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.no_notes_yet','No notes yet.'))?></li>
+        <?php endif; ?>
+        </ul>
+    <?php
+    };
+
+    $dirTree = [];
+    foreach ($dirMap as $dirname => $list) {
+        if (!is_string($dirname) || $dirname === '') continue;
+        $parts = explode('/', $dirname, 2);
+        $parent = $parts[0];
+        if ($parent === '') continue;
+        if (!isset($dirTree[$parent])) {
+            $dirTree[$parent] = [
+                'path' => $parent,
+                'label' => $parent,
+                'list' => [],
+                'children' => [],
+            ];
+        }
+        if (count($parts) === 1) {
+            $dirTree[$parent]['list'] = $list;
+        } else {
+            $childName = $parts[1];
+            if ($childName === '') continue;
+            $childPath = $parent . '/' . $childName;
+            $dirTree[$parent]['children'][$childPath] = [
+                'path' => $childPath,
+                'label' => $childName,
+                'list' => $list,
+                'children' => [],
+            ];
+        }
+    }
+    if (!empty($dirTree)) {
+        ksort($dirTree, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($dirTree as &$node) {
+            if (!empty($node['children'])) {
+                ksort($node['children'], SORT_NATURAL | SORT_FLAG_CASE);
+            }
+        }
+        unset($node);
+    }
+
+    $renderFolder = function($node, $depth = 0) use (&$renderFolder, $folder_filter, $current_folder, $folderLink, $renderNotes, $pluginCtx, $show_actions, $csrf_token) {
+        $dirname = $node['path'] ?? '';
+        if ($dirname === '') return;
+        $label = $node['label'] ?? $dirname;
+        $list = $node['list'] ?? [];
+        $children = $node['children'] ?? [];
+        if (!empty($children)) {
+            uasort($children, function($a, $b) {
+                return strnatcasecmp((string)($a['label'] ?? ''), (string)($b['label'] ?? ''));
+            });
+        }
+        $hasChildren = !empty($children);
+        $dir_children_id = 'folder-children-' . substr(sha1('md:' . $dirname), 0, 10);
+        $defaultOpen = ($folder_filter !== null && ($folder_filter === $dirname || str_starts_with($folder_filter, $dirname . '/')))
+            || ($current_folder && ($current_folder === $dirname || str_starts_with($current_folder, $dirname . '/')));
+        $sectionClass = 'nav-section' . ($depth > 0 ? ' nested-folder' : '');
+        $isFocusedRoot = ($depth === 0 && $folder_filter && ($folder_filter === $dirname || str_starts_with($folder_filter, $dirname . '/')));
+    ?>
+	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id($dirname))?>" class="<?=explorer_view_escape($sectionClass)?>" data-folder-section="<?=explorer_view_escape($dirname)?>" data-depth="<?= (int)$depth ?>" data-default-open="<?= $defaultOpen ? '1' : '0' ?>">
+        <h2 class="note-group-title">
+            <?php if ($folder_filter && $depth === 0 && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
+                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="<?=explorer_view_escape(explorer_view_t('common.back','Back'))?>">
+                    <span class="pi pi-leftcaret"></span>
+                </a>
+            <?php endif; ?>
+            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $defaultOpen ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($dir_children_id)?>" title="<?= $defaultOpen ? explorer_view_escape(explorer_view_t('nav.collapse_folder','Collapse folder')) : explorer_view_escape(explorer_view_t('nav.expand_folder','Expand folder')) ?>">
+                <?php if (!$isFocusedRoot): ?>
+                <span class="pi <?= $defaultOpen ? 'pi-downcaret' : 'pi-rightcaret' ?> folder-caret"></span>
+                <?php endif; ?>
+                <span class="pi <?= $defaultOpen ? 'pi-openfolder' : 'pi-folder' ?> folder-icon<?= $isFocusedRoot ? ' folder-icon-focused' : '' ?>"></span>
+            </button>
+            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink($dirname))?>"><?=explorer_view_escape($label)?></a>
+            <?php if ($show_actions && $csrf_token): ?>
+            <div class="note-actions folder-actions" data-auth-superuser="1">
+                <form method="post" class="renameFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="action" value="rename_folder">
+                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="new_folder" value="">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="button" class="btn btn-ghost icon-button folder-rename-btn" title="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>">
+                        <span class="pi pi-edit"></span>
+                    </button>
+                </form>
+                <form method="post" class="deleteFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="action" value="delete_folder">
+                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
+                        <span class="pi pi-bin"></span>
+                    </button>
+                </form>
+            </div>
+            <?php endif; ?>
+        </h2>
+
+    <div id="<?=explorer_view_escape($dir_children_id)?>" class="folder-children" <?= $defaultOpen ? '' : 'hidden' ?>>
+        <?php $renderNotes($list, !$hasChildren); ?>
+        <?php if ($hasChildren): ?>
+        <div class="folder-tree">
+            <?php foreach ($children as $child): ?>
+                <?php $renderFolder($child, $depth + 1); ?>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    </section>
+    <?php
+    };
+
     ?>
     <div id="contentList" class="content-list"<?=$backHrefAttr?>>
     <div class="nav-sort-row">
@@ -389,87 +594,13 @@ function explorer_view_render_tree($opts) {
                 </a>
             <?php endif; ?>
             <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $root_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($root_children_id)?>" title="<?= $root_default_open ? explorer_view_escape(explorer_view_t('nav.collapse_folder','Collapse folder')) : explorer_view_escape(explorer_view_t('nav.expand_folder','Expand folder')) ?>">
-                <span class="pi <?= $root_default_open ? 'pi-openfolder' : 'pi-folder' ?>"></span>
+                <span class="pi <?= $root_default_open ? 'pi-downcaret' : 'pi-rightcaret' ?> folder-caret"></span>
+                <span class="pi <?= $root_default_open ? 'pi-openfolder' : 'pi-folder' ?> folder-icon"></span>
             </button>
             <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink('root'))?>"><?=explorer_view_escape(explorer_view_t('common.root','Root'))?></a>
         </h2>
     <div id="<?=explorer_view_escape($root_children_id)?>" class="folder-children" <?= $root_default_open ? '' : 'hidden' ?>>
-    <ul class="notes-list">
-    <?php foreach($rootList as $entry):
-        $p   = $entry['path'];
-        $info = explorer_view_extract_md_title_and_meta_from_file(
-            __DIR__ . '/' . $p,
-            $entry['basename'],
-            ['publishstate', 'page_title', 'post_date', 'published_date']
-        );
-        $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
-        $t   = $publisher_mode
-            ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
-            : (string)($info['title'] ?? $entry['basename']);
-        $publishState = null;
-        if ($publisher_mode) {
-            $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
-            $publishState = function_exists('mdw_publisher_normalize_publishstate')
-                ? mdw_publisher_normalize_publishstate($rawState)
-                : ($rawState !== '' ? $rawState : 'Concept');
-            if ($publishState === '') $publishState = 'Concept';
-        }
-        $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
-        if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
-        [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
-            $rawDate,
-            $entry['yy'] ?? null,
-            $entry['mm'] ?? null,
-            $entry['dd'] ?? null
-        );
-        $isSecret = isset($secretMap[$p]);
-        $isCurrent = ($current_file !== null && $current_file === $p);
-        $publishClass = '';
-        if ($publisher_mode) {
-            $s = strtolower((string)$publishState);
-            if ($s === 'published') $publishClass = 'publish-published';
-            else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
-            else $publishClass = 'publish-concept';
-        }
-    ?>
-    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
-        <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>">
-            <div class="note-title" style="justify-content: space-between;">
-                <span><?=explorer_view_escape($t)?></span>
-                <span class="note-badges" style="display:inline-flex; align-items:center; gap:0.35rem;">
-                    <?php if ($publisher_mode): ?>
-                        <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
-                    <?php endif; ?>
-                    <?php if ($isSecret): ?>
-                        <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
-                    <?php endif; ?>
-                </span>
-            </div>
-            <div class="nav-item-path">
-                <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
-                <?php if ($dateLabel !== ''): ?>
-                    <span class="nav-item-date"><?=explorer_view_escape($dateLabel)?></span>
-                <?php endif; ?>
-            </div>
-        </a>
-        <?php if ($show_actions && $csrf_token): ?>
-        <div class="note-actions">
-            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">
-                <span class="pi pi-edit"></span>
-            </a>
-            <form method="post" class="deleteForm" data-file="<?=explorer_view_escape($p)?>">
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="file" value="<?=explorer_view_escape($p)?>">
-                <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
-                    <span class="pi pi-bin"></span>
-                </button>
-            </form>
-        </div>
-        <?php endif; ?>
-    </li>
-    <?php endforeach; ?>
-    </ul>
+        <?php $renderNotes($rootList, true); ?>
     </div>
     </section>
     <?php endif; ?>
@@ -479,128 +610,8 @@ function explorer_view_render_tree($opts) {
     ?>
 
     <!-- Subdirectory groups -->
-    <?php foreach($dirMap as $dirname=>$list): ?>
-    <?php
-        $dir_children_id = 'folder-children-' . substr(sha1('md:' . $dirname), 0, 10);
-        $dir_default_open = ($folder_filter !== null && $folder_filter === $dirname)
-            || ($current_file && explorer_view_folder_from_path($current_file) === $dirname);
-    ?>
-	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id($dirname))?>" class="nav-section" data-folder-section="<?=explorer_view_escape($dirname)?>" data-default-open="<?= $dir_default_open ? '1' : '0' ?>">
-        <h2 class="note-group-title">
-            <?php if ($folder_filter && isset($pluginCtx['back_href']) && $pluginCtx['back_href']): ?>
-                <a class="icon-button folder-back" href="<?=explorer_view_escape($pluginCtx['back_href'])?>" title="<?=explorer_view_escape(explorer_view_t('common.back','Back'))?>">
-                    <span class="pi pi-leftcaret"></span>
-                </a>
-            <?php endif; ?>
-            <button type="button" class="icon-button folder-toggle" aria-expanded="<?= $dir_default_open ? 'true' : 'false' ?>" aria-controls="<?=explorer_view_escape($dir_children_id)?>" title="<?= $dir_default_open ? explorer_view_escape(explorer_view_t('nav.collapse_folder','Collapse folder')) : explorer_view_escape(explorer_view_t('nav.expand_folder','Expand folder')) ?>">
-                <span class="pi <?= $dir_default_open ? 'pi-openfolder' : 'pi-folder' ?>"></span>
-            </button>
-            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink($dirname))?>"><?=explorer_view_escape($dirname)?></a>
-            <?php if ($show_actions && $csrf_token): ?>
-            <div class="note-actions folder-actions" data-auth-superuser="1">
-                <form method="post" class="renameFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
-                    <input type="hidden" name="action" value="rename_folder">
-                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
-                    <input type="hidden" name="new_folder" value="">
-                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                    <button type="button" class="btn btn-ghost icon-button folder-rename-btn" title="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>">
-                        <span class="pi pi-edit"></span>
-                    </button>
-                </form>
-                <form method="post" class="deleteFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
-                    <input type="hidden" name="action" value="delete_folder">
-                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
-                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                    <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
-                        <span class="pi pi-bin"></span>
-                    </button>
-                </form>
-            </div>
-            <?php endif; ?>
-        </h2>
-
-    <div id="<?=explorer_view_escape($dir_children_id)?>" class="folder-children" <?= $dir_default_open ? '' : 'hidden' ?>>
-    <ul class="notes-list">
-    <?php foreach($list as $entry):
-        $p   = $entry['path'];
-        $info = explorer_view_extract_md_title_and_meta_from_file(
-            __DIR__ . '/' . $p,
-            $entry['basename'],
-            ['publishstate', 'page_title', 'post_date', 'published_date']
-        );
-        $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
-        $t   = $publisher_mode
-            ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
-            : (string)($info['title'] ?? $entry['basename']);
-        $publishState = null;
-        if ($publisher_mode) {
-            $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
-            $publishState = function_exists('mdw_publisher_normalize_publishstate')
-                ? mdw_publisher_normalize_publishstate($rawState)
-                : ($rawState !== '' ? $rawState : 'Concept');
-            if ($publishState === '') $publishState = 'Concept';
-        }
-        $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
-        if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
-        [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
-            $rawDate,
-            $entry['yy'] ?? null,
-            $entry['mm'] ?? null,
-            $entry['dd'] ?? null
-        );
-        $isSecret = isset($secretMap[$p]);
-        $isCurrent = ($current_file !== null && $current_file === $p);
-        $publishClass = '';
-        if ($publisher_mode) {
-            $s = strtolower((string)$publishState);
-            if ($s === 'published') $publishClass = 'publish-published';
-            else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
-            else $publishClass = 'publish-concept';
-        }
-    ?>
-    <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
-        <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>">
-            <div class="note-title" style="justify-content: space-between;">
-                <span><?=explorer_view_escape($t)?></span>
-                <span class="note-badges" style="display:inline-flex; align-items:center; gap:0.35rem;">
-                    <?php if ($publisher_mode): ?>
-                        <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
-                    <?php endif; ?>
-                    <?php if ($isSecret): ?>
-                        <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
-                    <?php endif; ?>
-                </span>
-            </div>
-            <div class="nav-item-path">
-                <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
-                <?php if ($dateLabel !== ''): ?>
-                    <span class="nav-item-date"><?=explorer_view_escape($dateLabel)?></span>
-                <?php endif; ?>
-            </div>
-        </a>
-        <?php if ($show_actions && $csrf_token): ?>
-        <div class="note-actions">
-            <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">
-                <span class="pi pi-edit"></span>
-            </a>
-            <form method="post" class="deleteForm" data-file="<?=explorer_view_escape($p)?>">
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="file" value="<?=explorer_view_escape($p)?>">
-                <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
-                    <span class="pi pi-bin"></span>
-                </button>
-            </form>
-        </div>
-        <?php endif; ?>
-    </li>
-    <?php endforeach; ?>
-    <?php if (empty($list)): ?>
-        <li class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.no_notes_yet','No notes yet.'))?></li>
-    <?php endif; ?>
-    </ul>
-    </div>
-    </section>
+    <?php foreach($dirTree as $node): ?>
+        <?php $renderFolder($node, 0); ?>
     <?php endforeach; ?>
 
     <?php if (empty($rootList) && empty($dirMap) && empty($anyPluginFoldersRendered)): ?>

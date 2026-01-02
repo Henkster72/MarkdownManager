@@ -35,6 +35,20 @@ function image_manager_json($payload, $status = 200) {
     exit;
 }
 
+function image_manager_error($code, $status = 400, $extra = []) {
+    $payload = [
+        'ok' => false,
+        'error_code' => (string)$code,
+        'error' => (string)$code,
+    ];
+    if (is_array($extra) && $extra) {
+        foreach ($extra as $k => $v) {
+            $payload[$k] = $v;
+        }
+    }
+    image_manager_json($payload, $status);
+}
+
 function image_manager_guess_alt($filename) {
     $name = preg_replace('/\\.[a-z0-9]+$/i', '', (string)$filename);
     $name = str_replace(['_', '-'], ' ', $name);
@@ -70,6 +84,12 @@ if (!str_starts_with($imagesFsDir, '/')) {
 }
 if (!is_dir($imagesFsDir)) {
     @mkdir($imagesFsDir, 0755, true);
+}
+if (is_dir($imagesFsDir) && !is_writable($imagesFsDir)) {
+    @chmod($imagesFsDir, 0775);
+    if (!is_writable($imagesFsDir)) {
+        @chmod($imagesFsDir, 0777);
+    }
 }
 
 if (empty($_SESSION['csrf_token'])) {
@@ -122,34 +142,34 @@ if ($action === 'list') {
 }
 
 if ($action !== 'upload') {
-    image_manager_json(['ok' => false, 'error' => 'Unknown action.'], 400);
+    image_manager_error('unknown_action', 400);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    image_manager_json(['ok' => false, 'error' => 'POST required.'], 405);
+    image_manager_error('post_required', 405);
 }
 
 $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
 if (!hash_equals($CSRF_TOKEN, $csrf)) {
-    image_manager_json(['ok' => false, 'error' => 'Invalid session (CSRF). Reload and try again.'], 403);
+    image_manager_error('csrf', 403);
 }
 
 if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {
-    image_manager_json(['ok' => false, 'error' => 'Missing upload.'], 400);
+    image_manager_error('missing_upload', 400);
 }
 
 $file = $_FILES['image'];
 if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-    image_manager_json(['ok' => false, 'error' => 'Upload failed.'], 400);
+    image_manager_error('upload_failed', 400);
 }
 
 $tmp = (string)($file['tmp_name'] ?? '');
 if ($tmp === '' || !is_uploaded_file($tmp)) {
-    image_manager_json(['ok' => false, 'error' => 'Invalid upload.'], 400);
+    image_manager_error('invalid_upload', 400);
 }
 
 if (!is_dir($imagesFsDir) || !is_writable($imagesFsDir)) {
-    image_manager_json(['ok' => false, 'error' => 'Images directory is not writable.'], 500);
+    image_manager_error('images_dir_not_writable', 500, ['images_dir' => $IMAGES_DIR]);
 }
 
 $validMimes = [
@@ -169,10 +189,10 @@ if (function_exists('finfo_open')) {
     }
 }
 if (!is_string($mime) || $mime === '') {
-    image_manager_json(['ok' => false, 'error' => 'Could not detect file type.'], 400);
+    image_manager_error('type_detect_failed', 400);
 }
 if (!array_key_exists($mime, $validMimes)) {
-    image_manager_json(['ok' => false, 'error' => 'Unsupported image type.'], 400);
+    image_manager_error('type_unsupported', 400);
 }
 
 $originalBase = pathinfo((string)($file['name'] ?? 'image'), PATHINFO_FILENAME);
@@ -202,7 +222,7 @@ if ($canConvertToWebp) {
         case 'image/webp': $src = @imagecreatefromwebp($tmp); break;
     }
     if (!$src) {
-        image_manager_json(['ok' => false, 'error' => 'Could not process image.'], 415);
+        image_manager_error('process_failed', 415);
     }
 
     $width = imagesx($src);
@@ -224,12 +244,12 @@ if ($canConvertToWebp) {
 
     if (!@imagewebp($src, $targetPath, 82)) {
         imagedestroy($src);
-        image_manager_json(['ok' => false, 'error' => 'Failed to save image.'], 500);
+        image_manager_error('save_failed', 500);
     }
     imagedestroy($src);
 } else {
     if (!@move_uploaded_file($tmp, $targetPath)) {
-        image_manager_json(['ok' => false, 'error' => 'Failed to store image.'], 500);
+        image_manager_error('store_failed', 500);
     }
 }
 

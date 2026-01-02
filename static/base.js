@@ -267,8 +267,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     };
 
     const isSuperuser = () => {
-        const { role } = getStoredAuth();
-        return role === 'superuser';
+        const { role, token } = getStoredAuth();
+        return role === 'superuser' && !!token;
     };
 
     window.__mdwAuthState = getStoredAuth;
@@ -2779,6 +2779,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         let inMeta = true;
         let seenMeta = false;
         for (const line of lines) {
+            const normalized = String(line ?? '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/[\u200B\uFEFF]/g, '');
             if (inMeta) {
             const parsed = parseMetaLine(line);
             if (parsed) {
@@ -3065,7 +3068,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const hasAuth = !!(meta.has_user || meta.has_superuser);
         if (!hasAuth) return true;
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
-        return !!(auth && auth.role === 'superuser');
+        return !!(auth && auth.role === 'superuser' && auth.token);
     };
 
     const ensureInput = (form, name, value) => {
@@ -3077,6 +3080,22 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             form.appendChild(input);
         }
         input.value = String(value || '');
+    };
+    const ensureAuthInputs = (form) => {
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (!auth || !auth.role || !auth.token) return;
+        ensureInput(form, 'auth_role', auth.role);
+        ensureInput(form, 'auth_token', auth.token);
+    };
+    const submitForm = (form) => {
+        if (!(form instanceof HTMLFormElement)) return;
+        if (typeof form.requestSubmit === 'function') {
+            try {
+                form.requestSubmit();
+                return;
+            } catch {}
+        }
+        form.submit();
     };
 
     const readFolderFilter = () => {
@@ -3108,28 +3127,388 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (filter) ensureInput(form, 'return_filter', filter);
     }, true);
 
+    const startInlineRename = (section, form) => {
+        if (!(section instanceof HTMLElement) || !(form instanceof HTMLFormElement)) return;
+        if (!canManageFolders()) {
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+        const header = section.querySelector('.note-group-title');
+        const label = header?.querySelector('.breadcrumb-link');
+        if (!(header instanceof HTMLElement) || !(label instanceof HTMLElement)) return;
+        if (header.classList.contains('folder-rename-active')) return;
+        const folder = String(form.dataset.folder || form.querySelector('input[name="folder"]')?.value || '').trim();
+        if (!folder) return;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'input folder-rename-input';
+        input.value = folder;
+        input.setAttribute('aria-label', t('common.rename', 'Rename'));
+        header.classList.add('folder-rename-active');
+        header.appendChild(input);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        const cancel = () => {
+            header.classList.remove('folder-rename-active');
+            input.remove();
+        };
+        const submit = () => {
+            const value = String(input.value || '').trim();
+            if (!value || value === folder) {
+                cancel();
+                return;
+            }
+            ensureInput(form, 'new_folder', value);
+            const filter = readFolderFilter();
+            if (filter) ensureInput(form, 'return_filter', filter);
+            ensureAuthInputs(form);
+            submitForm(form);
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            } else if (e.key === 'Escape' || e.key === 'Esc') {
+                e.preventDefault();
+                cancel();
+            }
+        });
+        input.addEventListener('blur', () => {
+            cancel();
+        });
+    };
+
     document.addEventListener('click', (e) => {
         const target = e.target;
         const btn = target instanceof Element ? target.closest('.folder-rename-btn') : null;
         if (!(btn instanceof HTMLButtonElement)) return;
         const form = btn.closest('form.renameFolderForm');
         if (!(form instanceof HTMLFormElement)) return;
+        const section = btn.closest('.nav-section[data-folder-section]');
+        startInlineRename(section, form);
+    });
+
+    const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    const basename = (p) => {
+        const parts = normalizePath(p).split('/');
+        return parts[parts.length - 1] || '';
+    };
+    const isDescendant = (src, target) => {
+        if (!src || !target) return false;
+        return target === src || target.startsWith(src + '/');
+    };
+    const moveFolder = (srcPath, targetPath) => {
+        const src = normalizePath(srcPath);
+        const target = normalizePath(targetPath);
+        if (!src || !target) return;
+        if (target !== 'root' && isDescendant(src, target)) return;
+        const leaf = basename(src);
+        if (!leaf) return;
+        const dest = (target === 'root') ? leaf : `${target}/${leaf}`;
+        if (dest === src) return;
+        let section = null;
+        document.querySelectorAll('.nav-section[data-folder-section]').forEach((el) => {
+            if (section) return;
+            if (String(el.getAttribute('data-folder-section') || '') === src) section = el;
+        });
+        const form = section?.querySelector('form.renameFolderForm');
+        if (!(form instanceof HTMLFormElement)) return;
+        ensureInput(form, 'new_folder', dest);
+        const filter = readFolderFilter();
+        if (filter) ensureInput(form, 'return_filter', filter);
+        ensureAuthInputs(form);
+        submitForm(form);
+    };
+
+    const clearDropTargets = () => {
+        document.querySelectorAll('.folder-drop-target').forEach((el) => {
+            el.classList.remove('folder-drop-target');
+        });
+    };
+
+    document.querySelectorAll('.nav-section[data-folder-section]').forEach((section) => {
+        const header = section.querySelector('.note-group-title');
+        if (!(header instanceof HTMLElement)) return;
+        const path = String(section.dataset.folderSection || '');
+        if (path && path !== 'root') {
+            header.setAttribute('draggable', 'true');
+        }
+        header.dataset.folderPath = path;
+    });
+
+    let dragSrcPath = '';
+    let dragSrcSection = null;
+
+    document.addEventListener('dragstart', (e) => {
+        const header = e.target instanceof Element ? e.target.closest('.note-group-title') : null;
+        if (!(header instanceof HTMLElement)) return;
+        const path = String(header.dataset.folderPath || '').trim();
+        if (!path || path === 'root') return;
+        if (!canManageFolders()) {
+            e.preventDefault();
+            return;
+        }
+        dragSrcPath = path;
+        dragSrcSection = header.closest('.nav-section[data-folder-section]');
+        dragSrcSection?.classList.add('folder-dragging');
+        try {
+            e.dataTransfer?.setData('text/plain', path);
+            e.dataTransfer.effectAllowed = 'move';
+        } catch {}
+    });
+
+    document.addEventListener('dragover', (e) => {
+        if (!dragSrcPath) return;
+        const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
+        const header = section?.querySelector('.note-group-title');
+        if (!(header instanceof HTMLElement)) return;
+        const targetPath = String(header.dataset.folderPath || '').trim();
+        if (!targetPath || targetPath === dragSrcPath || targetPath.startsWith(dragSrcPath + '/')) return;
+        e.preventDefault();
+        clearDropTargets();
+        header.classList.add('folder-drop-target');
+    });
+
+    document.addEventListener('drop', (e) => {
+        if (!dragSrcPath) return;
+        const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
+        const header = section?.querySelector('.note-group-title');
+        const targetPath = header instanceof HTMLElement ? String(header.dataset.folderPath || '').trim() : '';
+        e.preventDefault();
+        clearDropTargets();
+        dragSrcSection?.classList.remove('folder-dragging');
+        if (targetPath) moveFolder(dragSrcPath, targetPath);
+        dragSrcPath = '';
+        dragSrcSection = null;
+    });
+
+    document.addEventListener('dragend', () => {
+        clearDropTargets();
+        dragSrcSection?.classList.remove('folder-dragging');
+        dragSrcSection = null;
+        dragSrcPath = '';
+    });
+
+    let touchDrag = null;
+    document.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const header = e.target instanceof Element ? e.target.closest('.note-group-title') : null;
+        if (!(header instanceof HTMLElement)) return;
+        const path = String(header.dataset.folderPath || '').trim();
+        if (!path || path === 'root') return;
+        if (!canManageFolders()) return;
+        touchDrag = {
+            path,
+            header,
+            startX: e.clientX,
+            startY: e.clientY,
+            dragging: false,
+        };
+    }, { passive: true });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!touchDrag || e.pointerType !== 'touch') return;
+        const dx = e.clientX - touchDrag.startX;
+        const dy = e.clientY - touchDrag.startY;
+        if (!touchDrag.dragging) {
+            if (Math.hypot(dx, dy) < 8) return;
+            touchDrag.dragging = true;
+            touchDrag.header?.classList.add('folder-dragging');
+        }
+        if (touchDrag.dragging) {
+            e.preventDefault();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSection = el instanceof Element ? el.closest('.nav-section[data-folder-section]') : null;
+            const targetHeader = targetSection?.querySelector('.note-group-title');
+            clearDropTargets();
+            if (targetHeader instanceof HTMLElement) {
+                const targetPath = String(targetHeader.dataset.folderPath || '').trim();
+                if (targetPath && targetPath !== touchDrag.path && !targetPath.startsWith(touchDrag.path + '/')) {
+                    targetHeader.classList.add('folder-drop-target');
+                }
+            }
+        }
+    }, { passive: false });
+
+    document.addEventListener('pointerup', (e) => {
+        if (!touchDrag || e.pointerType !== 'touch') return;
+        if (touchDrag.dragging) {
+            e.preventDefault();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSection = el instanceof Element ? el.closest('.nav-section[data-folder-section]') : null;
+            const targetHeader = targetSection?.querySelector('.note-group-title');
+            const targetPath = targetHeader instanceof HTMLElement ? String(targetHeader.dataset.folderPath || '').trim() : '';
+            if (targetPath) moveFolder(touchDrag.path, targetPath);
+        }
+        touchDrag?.header?.classList.remove('folder-dragging');
+        clearDropTargets();
+        touchDrag = null;
+    }, { passive: false });
+
+    const folderFromFile = (p) => {
+        const clean = normalizePath(p);
+        const idx = clean.lastIndexOf('/');
+        return idx === -1 ? 'root' : clean.slice(0, idx);
+    };
+    const normalizeFolder = (p) => {
+        const clean = normalizePath(p);
+        return clean === '' ? 'root' : clean;
+    };
+    const getFilePathFromRow = (row) => {
+        if (!(row instanceof HTMLElement)) return '';
+        return String(row.dataset.file || row.getAttribute('data-file') || '').trim();
+    };
+    const moveFile = (filePath, targetFolder) => {
+        if (!filePath) return;
+        const target = normalizeFolder(targetFolder);
+        const currentFolder = folderFromFile(filePath);
+        if (!target || target === currentFolder) return;
         if (!canManageFolders()) {
             if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
             return;
         }
-        const folder = String(form.dataset.folder || form.querySelector('input[name="folder"]')?.value || '').trim();
-        if (!folder) return;
-        const promptMsg = t('js.prompt_rename_folder', 'Rename folder "{folder}" to:', { folder });
-        const nextName = window.prompt(promptMsg, folder);
-        if (nextName === null) return;
-        const value = String(nextName || '').trim();
-        if (!value) return;
-        ensureInput(form, 'new_folder', value);
+        const csrf = String(window.MDW_CSRF || '');
+        if (!csrf) {
+            alert(t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.'));
+            return;
+        }
+        let form = document.getElementById('moveFileForm');
+        if (!(form instanceof HTMLFormElement)) {
+            form = document.createElement('form');
+            form.id = 'moveFileForm';
+            form.method = 'post';
+            form.action = 'index.php';
+            form.style.display = 'none';
+            document.body.appendChild(form);
+        }
+        ensureInput(form, 'action', 'move_file');
+        ensureInput(form, 'file', filePath);
+        ensureInput(form, 'target_folder', target);
+        ensureInput(form, 'csrf', csrf);
         const filter = readFolderFilter();
         if (filter) ensureInput(form, 'return_filter', filter);
-        form.submit();
+        ensureAuthInputs(form);
+        submitForm(form);
+    };
+
+    let fileDragSrc = '';
+    let fileDragRow = null;
+
+    document.addEventListener('dragstart', (e) => {
+        const link = e.target instanceof Element ? e.target.closest('.note-link') : null;
+        const row = link?.closest('.note-item[data-kind="md"]');
+        if (!(row instanceof HTMLElement)) return;
+        const file = getFilePathFromRow(row);
+        if (!file) return;
+        if (!canManageFolders()) {
+            e.preventDefault();
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+        fileDragSrc = file;
+        fileDragRow = row;
+        row.classList.add('note-dragging');
+        try {
+            e.dataTransfer?.setData('text/plain', file);
+            e.dataTransfer?.setData('text/mdw-file', file);
+            e.dataTransfer.effectAllowed = 'move';
+        } catch {}
     });
+
+    document.addEventListener('dragover', (e) => {
+        if (!fileDragSrc) return;
+        const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
+        const header = section?.querySelector('.note-group-title');
+        if (!(header instanceof HTMLElement)) return;
+        const targetPath = normalizeFolder(header.dataset.folderPath || section?.dataset.folderSection || '');
+        if (!targetPath) return;
+        const currentFolder = folderFromFile(fileDragSrc);
+        if (targetPath === currentFolder) return;
+        e.preventDefault();
+        clearDropTargets();
+        header.classList.add('folder-drop-target');
+    });
+
+    document.addEventListener('drop', (e) => {
+        if (!fileDragSrc) return;
+        const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
+        const header = section?.querySelector('.note-group-title');
+        const targetPath = header instanceof HTMLElement ? String(header.dataset.folderPath || '').trim() : '';
+        e.preventDefault();
+        clearDropTargets();
+        fileDragRow?.classList.remove('note-dragging');
+        if (targetPath) moveFile(fileDragSrc, targetPath);
+        fileDragSrc = '';
+        fileDragRow = null;
+    });
+
+    document.addEventListener('dragend', () => {
+        clearDropTargets();
+        fileDragRow?.classList.remove('note-dragging');
+        fileDragRow = null;
+        fileDragSrc = '';
+    });
+
+    let fileTouchDrag = null;
+    document.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const link = e.target instanceof Element ? e.target.closest('.note-link') : null;
+        const row = link?.closest('.note-item[data-kind="md"]');
+        if (!(row instanceof HTMLElement)) return;
+        const file = getFilePathFromRow(row);
+        if (!file) return;
+        if (!canManageFolders()) return;
+        fileTouchDrag = {
+            file,
+            row,
+            startX: e.clientX,
+            startY: e.clientY,
+            dragging: false,
+        };
+    }, { passive: true });
+
+    document.addEventListener('pointermove', (e) => {
+        if (!fileTouchDrag || e.pointerType !== 'touch') return;
+        const dx = e.clientX - fileTouchDrag.startX;
+        const dy = e.clientY - fileTouchDrag.startY;
+        if (!fileTouchDrag.dragging) {
+            if (Math.hypot(dx, dy) < 8) return;
+            fileTouchDrag.dragging = true;
+            fileTouchDrag.row?.classList.add('note-dragging');
+        }
+        if (fileTouchDrag.dragging) {
+            e.preventDefault();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSection = el instanceof Element ? el.closest('.nav-section[data-folder-section]') : null;
+            const targetHeader = targetSection?.querySelector('.note-group-title');
+            clearDropTargets();
+            if (targetHeader instanceof HTMLElement) {
+                const targetPath = normalizeFolder(targetHeader.dataset.folderPath || '');
+                const currentFolder = folderFromFile(fileTouchDrag.file);
+                if (targetPath && targetPath !== currentFolder) {
+                    targetHeader.classList.add('folder-drop-target');
+                }
+            }
+        }
+    }, { passive: false });
+
+    document.addEventListener('pointerup', (e) => {
+        if (!fileTouchDrag || e.pointerType !== 'touch') return;
+        if (fileTouchDrag.dragging) {
+            e.preventDefault();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const targetSection = el instanceof Element ? el.closest('.nav-section[data-folder-section]') : null;
+            const targetHeader = targetSection?.querySelector('.note-group-title');
+            const targetPath = targetHeader instanceof HTMLElement ? String(targetHeader.dataset.folderPath || '').trim() : '';
+            if (targetPath) moveFile(fileTouchDrag.file, targetPath);
+        }
+        fileTouchDrag?.row?.classList.remove('note-dragging');
+        clearDropTargets();
+        fileTouchDrag = null;
+    }, { passive: false });
 })();
 
 // +MD panel toggle (index.php + edit.php)
@@ -3910,10 +4289,22 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             ? t('nav.collapse_folder', 'Collapse folder')
             : t('nav.expand_folder', 'Expand folder');
 
-        const icon = btn.querySelector('.pi');
-        if (icon) {
-            icon.classList.toggle('pi-openfolder', open);
-            icon.classList.toggle('pi-folder', !open);
+        const caret = btn.querySelector('.folder-caret');
+        const folderIcon = btn.querySelector('.folder-icon');
+        if (caret) {
+            caret.classList.toggle('pi-downcaret', open);
+            caret.classList.toggle('pi-rightcaret', !open);
+        }
+        if (folderIcon) {
+            folderIcon.classList.toggle('pi-openfolder', open);
+            folderIcon.classList.toggle('pi-folder', !open);
+        }
+        if (!caret && !folderIcon) {
+            const icon = btn.querySelector('.pi');
+            if (icon) {
+                icon.classList.toggle('pi-openfolder', open);
+                icon.classList.toggle('pi-folder', !open);
+            }
         }
     };
 
@@ -4793,6 +5184,55 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         pickLabel.textContent = next || pickLabelDefault;
     };
 
+    const normalizeImageErrorCode = (data) => {
+        if (!data) return '';
+        const code = String(data.error_code || data.error || '').trim();
+        if (!code) return '';
+        const legacy = {
+            'Unknown action.': 'unknown_action',
+            'POST required.': 'post_required',
+            'Invalid session (CSRF). Reload and try again.': 'csrf',
+            'Missing upload.': 'missing_upload',
+            'Upload failed.': 'upload_failed',
+            'Invalid upload.': 'invalid_upload',
+            'Images directory is not writable.': 'images_dir_not_writable',
+            'Could not detect file type.': 'type_detect_failed',
+            'Unsupported image type.': 'type_unsupported',
+            'Could not process image.': 'process_failed',
+            'Failed to save image.': 'save_failed',
+            'Failed to store image.': 'store_failed',
+        };
+        return legacy[code] || code;
+    };
+
+    const imageErrorMessage = (code, data) => {
+        const dir = String((data && data.images_dir) || 'images');
+        switch (code) {
+            case 'csrf':
+                return t('image_modal.error_csrf', 'Your session expired. Reload and try again.');
+            case 'missing_upload':
+                return t('image_modal.error_missing_upload', 'No image file was received. Try again.');
+            case 'upload_failed':
+                return t('image_modal.upload_failed', 'Upload failed.');
+            case 'invalid_upload':
+                return t('image_modal.error_invalid_upload', 'The upload did not look like a valid file.');
+            case 'images_dir_not_writable':
+                return t('image_modal.error_not_writable', 'We cannot write to the images folder ({dir}). Check permissions and try again.', { dir });
+            case 'type_detect_failed':
+                return t('image_modal.error_type_detect', 'We could not detect the file type.');
+            case 'type_unsupported':
+                return t('image_modal.error_type_unsupported', 'That image type is not supported.');
+            case 'process_failed':
+                return t('image_modal.error_process_failed', 'We could not process that image.');
+            case 'save_failed':
+                return t('image_modal.error_save_failed', 'We could not save the processed image.');
+            case 'store_failed':
+                return t('image_modal.error_store_failed', 'We could not store the uploaded image.');
+            default:
+                return '';
+        }
+    };
+
     const loadCache = () => {
         try {
             const raw = mdwStorageGet(CACHE_KEY);
@@ -4895,7 +5335,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             const res = await fetch(`${apiUrl}?action=list`, { headers: { 'Accept': 'application/json' } });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data || data.ok !== true) {
-                throw new Error((data && data.error) ? data.error : t('image_modal.load_failed', 'Failed to load images.'));
+                const code = normalizeImageErrorCode(data);
+                const friendly = imageErrorMessage(code, data) || ((data && data.error) ? data.error : '');
+                throw new Error(friendly || t('image_modal.load_failed', 'Failed to load images.'));
             }
             items = Array.isArray(data.images) ? data.images : [];
             saveCache();
@@ -4997,7 +5439,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             const res = await fetch(apiUrl, { method: 'POST', body: fd });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data || data.ok !== true) {
-                throw new Error((data && data.error) ? data.error : t('image_modal.upload_failed', 'Upload failed.'));
+                const code = normalizeImageErrorCode(data);
+                const friendly = imageErrorMessage(code, data) || ((data && data.error) ? data.error : '');
+                throw new Error(friendly || t('image_modal.upload_failed', 'Upload failed.'));
             }
 
             const path = String(data.path || '');

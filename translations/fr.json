@@ -291,7 +291,16 @@
     "missing_csrf": "Jeton CSRF manquant. Rechargez la page.",
     "uploading": "Téléversement…",
     "upload_failed": "Échec du téléversement.",
-    "uploaded": "Téléversé."
+    "uploaded": "Téléversé.",
+    "error_csrf": "Votre session a expiré. Rechargez et réessayez.",
+    "error_missing_upload": "Aucun fichier image n’a été reçu. Réessayez.",
+    "error_invalid_upload": "Le téléversement ne semble pas être un fichier valide.",
+    "error_not_writable": "Nous ne pouvons pas écrire dans le dossier des images ({dir}). Vérifiez IMAGES_DIR dans .env ou les permissions.",
+    "error_type_detect": "Impossible de détecter le type de fichier.",
+    "error_type_unsupported": "Ce type d'image n'est pas pris en charge.",
+    "error_process_failed": "Impossible de traiter cette image.",
+    "error_save_failed": "Impossible d'enregistrer l'image traitée.",
+    "error_store_failed": "Impossible de stocker l'image téléversée."
   },
   "rename_modal": {
     "title": "Renommer le fichier",
@@ -382,6 +391,9 @@
     "secret_marked_locked": "Ce chemin est marqué comme secret. Déverrouillez d'abord via la visionneuse.",
     "folder_not_exist_prefix": "Le dossier n'existe pas :",
     "file_exists_prefix": "Le fichier existe déjà :",
+    "file_moved_prefix": "Déplacé :",
+    "file_move_failed": "Impossible de déplacer le fichier.",
+    "file_move_no_change": "Le fichier est déjà dans ce dossier.",
     "file_create_failed": "Impossible de créer le fichier.",
     "publisher_requires_subtitle": "{app} nécessite une ligne de sous-titre commençant par \"##\".",
     "publisher_author_required": "{app} nécessite un nom d'auteur.",
