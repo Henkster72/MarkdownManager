@@ -249,6 +249,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const setupUser = document.getElementById('authSetupUserPassword');
     const setupSuper = document.getElementById('authSetupSuperPassword');
     const loginPassword = document.getElementById('authLoginPassword');
+    const loginPasswordToggle = document.getElementById('authLoginPasswordToggle');
     const submitBtn = document.getElementById('authSubmitBtn');
     const authForm = document.getElementById('authForm');
     const statusEl = document.getElementById('authStatus');
@@ -342,6 +343,15 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return raw || DEFAULT_APP_TITLE;
     };
 
+    const setLoginVisibility = (show) => {
+        if (loginPassword instanceof HTMLInputElement) {
+            loginPassword.type = show ? 'text' : 'password';
+        }
+        if (loginPasswordToggle instanceof HTMLInputElement) {
+            loginPasswordToggle.checked = !!show;
+        }
+    };
+
     const applyAuthTitle = () => {
         if (!titleEl) return;
         const modeLabel = authMode === 'setup'
@@ -356,6 +366,10 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         applyAuthTitle();
         if (setupFields) setupFields.hidden = mode !== 'setup';
         if (loginFields) loginFields.hidden = mode !== 'login';
+        const showLoginPassword = mode === 'login'
+            && loginPasswordToggle instanceof HTMLInputElement
+            && loginPasswordToggle.checked;
+        setLoginVisibility(showLoginPassword);
         if (submitBtn instanceof HTMLButtonElement) {
             const label = submitBtn.querySelector('.btn-label');
             if (label instanceof HTMLElement) {
@@ -397,6 +411,13 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             }
             if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
             if (loginPassword instanceof HTMLInputElement) loginPassword.disabled = false;
+            setStatus('', 'info');
+            if (loginPassword instanceof HTMLInputElement && loginFields && !loginFields.hidden && (!overlay || !overlay.hidden)) {
+                try {
+                    loginPassword.focus();
+                    loginPassword.select();
+                } catch {}
+            }
             return false;
         }
         const remaining = until - Date.now();
@@ -534,6 +555,17 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     loginPassword?.addEventListener('keydown', authEnterHandler);
     setupUser?.addEventListener('keydown', authEnterHandler);
     setupSuper?.addEventListener('keydown', authEnterHandler);
+
+    loginPasswordToggle?.addEventListener('change', () => {
+        if (!(loginPasswordToggle instanceof HTMLInputElement)) return;
+        setLoginVisibility(loginPasswordToggle.checked);
+        if (loginPasswordToggle.checked && loginPassword instanceof HTMLInputElement) {
+            try {
+                loginPassword.focus();
+                loginPassword.select();
+            } catch {}
+        }
+    });
 
     authBtn?.addEventListener('click', () => {
         const { role, token } = getStoredAuth();
@@ -1031,7 +1063,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         setTheme(next);
         // Persist across devices only when publisher mode is enabled.
         if (isPublisherMode() && typeof window.__mdwSaveSettingsToServer === 'function' && (!window.__mdwIsSuperuser || window.__mdwIsSuperuser())) {
-            window.__mdwSaveSettingsToServer({ ui_theme: next }).catch(() => {});
+            window.__mdwSaveSettingsToServer({ ui_theme: next }).then((result) => {
+                if (!result.ok) {
+                    console.warn('ui theme save failed', result);
+                }
+            });
         }
     });
 
@@ -1059,27 +1095,64 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return !!(s && s.publisher_mode);
     };
 
+    const settingsErrorMessage = (code, serverMsg) => {
+        if (serverMsg) return serverMsg;
+        if (code === 'auth_required') return t('auth.superuser_required', 'Superuser login required.');
+        if (code === 'csrf' || code === 'no_session') {
+            return t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.');
+        }
+        if (code === 'publisher_author_required') {
+            return t('theme.publisher.author_required', 'Please enter an author name to enable WPM.');
+        }
+        if (code === 'invalid_json' || code === 'invalid_config') {
+            return t('theme.settings.invalid', 'Invalid settings data.');
+        }
+        if (code === 'network') return t('theme.settings.network_error', 'Network error. Try again.');
+        return t('theme.settings.save_failed', 'Save failed');
+    };
+
     const saveSettingsToServer = async (partial) => {
         const csrf = String(window.MDW_CSRF || '');
-        if (!csrf) return false;
+        if (!csrf) {
+            return { ok: false, error: 'csrf', message: settingsErrorMessage('csrf') };
+        }
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const cur = (cfg && cfg._settings && typeof cfg._settings === 'object') ? cfg._settings : {};
         const settings = { ...(cur || {}), ...(partial || {}) };
         const authMeta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object') ? window.MDW_AUTH_META : { has_user: false, has_superuser: false };
         const authRequired = !!(authMeta.has_user || authMeta.has_superuser);
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
-        if (authRequired && (!auth || auth.role !== 'superuser' || !auth.token)) return false;
+        if (authRequired && (!auth || auth.role !== 'superuser' || !auth.token)) {
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return { ok: false, error: 'auth_required', message: settingsErrorMessage('auth_required') };
+        }
 
-        const res = await fetch('metadata_config_save.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf, settings, auth: authRequired ? { role: auth.role, token: auth.token } : null }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || !data || data.ok !== true) return false;
+        let res = null;
+        let data = null;
+        try {
+            res = await fetch('metadata_config_save.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csrf, settings, auth: authRequired ? { role: auth.role, token: auth.token } : null }),
+            });
+            data = await res.json().catch(() => null);
+        } catch (err) {
+            if (typeof window.__mdwReportNetworkError === 'function') {
+                window.__mdwReportNetworkError(err);
+            }
+            return { ok: false, error: 'network', message: settingsErrorMessage('network') };
+        }
+        if (!res || !res.ok || !data || data.ok !== true) {
+            const code = (data && data.error) ? String(data.error) : 'save_failed';
+            const msg = settingsErrorMessage(code, data && data.message ? String(data.message) : '');
+            return { ok: false, error: code, message: msg };
+        }
         if (data.config) window.MDW_META_CONFIG = data.config;
         if (data.publisher_config) window.MDW_META_PUBLISHER_CONFIG = data.publisher_config;
-        return true;
+        if (typeof window.__mdwMarkOnline === 'function') {
+            window.__mdwMarkOnline();
+        }
+        return { ok: true };
     };
     window.__mdwSaveSettingsToServer = saveSettingsToServer;
 
@@ -1357,6 +1430,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const appTitleStatus = document.getElementById('appTitleStatus');
     const deleteAfterOverview = document.getElementById('deleteAfterOverview');
     const deleteAfterNext = document.getElementById('deleteAfterNext');
+    const offlineDelaySelect = document.getElementById('offlineDelaySelect');
     const allowUserDeleteToggle = document.getElementById('allowUserDeleteToggle');
     const allowUserDeleteStatus = document.getElementById('allowUserDeleteStatus');
     const copyButtonsToggle = document.getElementById('copyButtonsToggle');
@@ -1478,6 +1552,13 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const readUiLanguageSetting = () => {
         const s = getSettings();
         return s && typeof s.ui_language === 'string' ? s.ui_language.trim() : '';
+    };
+
+    const readOfflineDelaySetting = () => {
+        if (typeof window.__mdwReadOfflineDelay === 'function') {
+            return window.__mdwReadOfflineDelay();
+        }
+        return 3;
     };
 
     const applyAppTitleUi = (title) => {
@@ -1656,6 +1737,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             const uiLang = readUiLanguageSetting();
             if (uiLang) langSelect.value = uiLang;
         }
+        if (offlineDelaySelect instanceof HTMLSelectElement) {
+            const desired = String(readOfflineDelaySetting());
+            const hasOption = Array.from(offlineDelaySelect.options).some((opt) => opt.value === desired);
+            offlineDelaySelect.value = hasOption ? desired : '30';
+        }
         setAppTitleStatus(t('theme.app_title.hint', 'Leave blank to use the default.'), 'info');
         syncDeleteAfterUi();
         setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
@@ -1728,8 +1814,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
                 return false;
             }
-            const ok = await saveSettingsToServer({ app_title: nextTitle });
-            if (!ok) throw new Error(t('theme.app_title.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ app_title: nextTitle });
+            if (!result.ok) throw new Error(result.message || t('theme.app_title.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.app_title = nextTitle;
@@ -1758,8 +1844,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
                 return false;
             }
-            const ok = await saveSettingsToServer({ allow_user_delete: nextValue });
-            if (!ok) throw new Error(t('theme.permissions.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ allow_user_delete: nextValue });
+            if (!result.ok) throw new Error(result.message || t('theme.permissions.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.allow_user_delete = nextValue;
@@ -1787,8 +1873,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
                 return false;
             }
-            const ok = await saveSettingsToServer({ copy_buttons_enabled: nextValue });
-            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ copy_buttons_enabled: nextValue });
+            if (!result.ok) throw new Error(result.message || t('theme.copy.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.copy_buttons_enabled = nextValue;
@@ -1814,8 +1900,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
                 return false;
             }
-            const ok = await saveSettingsToServer({ copy_include_meta: nextValue });
-            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ copy_include_meta: nextValue });
+            if (!result.ok) throw new Error(result.message || t('theme.copy.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.copy_include_meta = nextValue;
@@ -1841,8 +1927,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 return false;
             }
             const value = (nextValue === 'wet' || nextValue === 'dry' || nextValue === 'medium') ? nextValue : 'dry';
-            const ok = await saveSettingsToServer({ copy_html_mode: value });
-            if (!ok) throw new Error(t('theme.copy.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ copy_html_mode: value });
+            if (!result.ok) throw new Error(result.message || t('theme.copy.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.copy_html_mode = value;
@@ -1875,8 +1961,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 return false;
             }
             const value = (nextValue === 'mdy_short' || nextValue === 'dmy_long') ? nextValue : 'mdy_short';
-            const ok = await saveSettingsToServer({ post_date_format: value });
-            if (!ok) throw new Error(t('theme.post_date_format.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ post_date_format: value });
+            if (!result.ok) throw new Error(result.message || t('theme.post_date_format.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.post_date_format = value;
@@ -1903,8 +1989,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 return false;
             }
             const value = (nextValue === 'left' || nextValue === 'center' || nextValue === 'right') ? nextValue : 'left';
-            const ok = await saveSettingsToServer({ post_date_align: value });
-            if (!ok) throw new Error(t('theme.post_date_align.save_failed', 'Save failed'));
+            const result = await saveSettingsToServer({ post_date_align: value });
+            if (!result.ok) throw new Error(result.message || t('theme.post_date_align.save_failed', 'Save failed'));
             if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                 window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                 window.MDW_META_CONFIG._settings.post_date_align = value;
@@ -2010,6 +2096,14 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         };
         deleteAfterOverview?.addEventListener('change', onDeleteAfterChange);
         deleteAfterNext?.addEventListener('change', onDeleteAfterChange);
+
+        offlineDelaySelect?.addEventListener('change', () => {
+            if (!(offlineDelaySelect instanceof HTMLSelectElement)) return;
+            const next = parseInt(String(offlineDelaySelect.value || '0'), 10);
+            if (typeof window.__mdwWriteOfflineDelay === 'function') {
+                window.__mdwWriteOfflineDelay(next);
+            }
+        });
 
         allowUserDeleteToggle?.addEventListener('change', async () => {
             if (!(allowUserDeleteToggle instanceof HTMLInputElement)) return;
@@ -2148,8 +2242,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 const isSuperuser = (typeof window.__mdwIsSuperuser === 'function') ? window.__mdwIsSuperuser() : false;
                 if (isSuperuser) {
                     try {
-                        const ok = await saveSettingsToServer({ ui_language: v });
-                        if (ok && window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                        const result = await saveSettingsToServer({ ui_language: v });
+                        if (result.ok && window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
                             window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
                             window.MDW_META_CONFIG._settings.ui_language = v;
                         }
@@ -2322,8 +2416,59 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             return false;
         };
 
+        const buildWpmMigrationNotice = (migration) => {
+            if (!migration || typeof migration !== 'object') return null;
+            const renamed = Array.isArray(migration.renamed) ? migration.renamed : [];
+            const moved = Array.isArray(migration.moved) ? migration.moved : [];
+            const errors = Array.isArray(migration.errors) ? migration.errors : [];
+            if (!renamed.length && !moved.length && !errors.length) return null;
+
+            const summary = [];
+            if (renamed.length) summary.push(t('theme.publisher.migration_renamed', 'Renamed folders: {n}', { n: renamed.length }));
+            if (moved.length) summary.push(t('theme.publisher.migration_moved', 'Moved subfolders to root: {n}', { n: moved.length }));
+            if (errors.length) summary.push(t('theme.publisher.migration_errors', 'Migration errors: {n}', { n: errors.length }));
+
+            const detailLines = [];
+            renamed.forEach((item) => {
+                const from = item && item.from ? String(item.from) : '';
+                const to = item && item.to ? String(item.to) : '';
+                if (from && to) detailLines.push(`${from} -> ${to}`);
+            });
+            moved.forEach((item) => {
+                const from = item && item.from ? String(item.from) : '';
+                const to = item && item.to ? String(item.to) : '';
+                if (from && to) detailLines.push(`${from} -> ${to}`);
+            });
+            errors.forEach((item) => {
+                const from = item && item.from ? String(item.from) : '';
+                const to = item && item.to ? String(item.to) : '';
+                const err = item && item.error ? String(item.error) : '';
+                if (from || to || err) {
+                    const parts = [from || '?', '->', to || '?'];
+                    if (err) parts.push(`(${err})`);
+                    detailLines.push(parts.join(' '));
+                }
+            });
+
+            const details = summary.concat(detailLines.length ? [''].concat(detailLines) : []).join('\n').trim();
+            return {
+                message: t('theme.publisher.migration_title', 'WPM updated your folder structure.'),
+                details,
+            };
+        };
+
+        const showWpmMigrationNotice = (migration) => {
+            const notice = buildWpmMigrationNotice(migration);
+            if (!notice) return;
+            if (typeof window.__mdwShowErrorModal === 'function') {
+                window.__mdwShowErrorModal(notice.message, notice.details);
+            } else {
+                const msg = notice.details ? `${notice.message}\n\n${notice.details}` : notice.message;
+                alert(msg);
+            }
+        };
+
         const saveMetadataSettings = async () => {
-            setMetaStatus(t('theme.metadata.saving', 'Saving…'), 'info');
             try {
                 if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
                     setMetaStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
@@ -2336,6 +2481,22 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                     try { publisherAuthorInput?.focus?.(); } catch {}
                     return false;
                 }
+                const currentSettings = getSettings() || {};
+                const enablingWpm = !currentSettings.publisher_mode && !!publisherSettings.publisher_mode;
+                if (enablingWpm) {
+                    const confirmMsg = t(
+                        'theme.publisher.enable_confirm',
+                        'Enabling WPM will sanitize folder names (emoji removed) and move subfolders to the top level. Continue?'
+                    );
+                    if (!confirm(confirmMsg)) {
+                        if (publisherModeToggle instanceof HTMLInputElement) {
+                            publisherModeToggle.checked = false;
+                            publisherModeToggle.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        return false;
+                    }
+                }
+                setMetaStatus(t('theme.metadata.saving', 'Saving…'), 'info');
                 // Also persist UI theme + theme preset to disk so publisher mode is consistent across devices.
                 try {
                     const uiTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
@@ -2381,6 +2542,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 window.MDW_META_CONFIG = data.config;
                 if (data.publisher_config) window.MDW_META_PUBLISHER_CONFIG = data.publisher_config;
                 setMetaStatus(t('theme.metadata.saved', 'Saved'), 'ok');
+                if (data && data.wpm_migration) {
+                    showWpmMigrationNotice(data.wpm_migration);
+                }
                 if (typeof window.__mdwApplyMetaVisibility === 'function') {
                     window.__mdwApplyMetaVisibility();
                 }
@@ -2465,7 +2629,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                         cfg._settings.theme_preset = nextPreset;
                     }
                 } catch {}
-                saveSettingsToServer({ theme_preset: nextPreset }).catch(() => {});
+                saveSettingsToServer({ theme_preset: nextPreset }).then((result) => {
+                    if (!result.ok) {
+                        console.warn('theme preset save failed', result);
+                    }
+                });
             }
             updateThemeUi();
             applyTheme();
@@ -2496,7 +2664,19 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
-    const metaLineRe = /^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u;
+    const parseMetaLine = (line) => {
+        const normalized = String(line ?? '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/[\u200B\uFEFF]/g, '');
+        let m = normalized.match(/^\s*\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*$/u);
+        if (!m) {
+            m = normalized.match(/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u);
+        }
+        if (!m) return null;
+        const key = String(m[1] || '').trim().toLowerCase();
+        if (!key) return null;
+        return { key, value: String(m[2] || '').trim() };
+    };
 
     const getBaseCfg = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
@@ -2595,18 +2775,33 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const meta = {};
         const bodyLines = [];
         const { known } = getKnownKeysAndOrder();
+        const bufferedLeading = [];
+        let inMeta = true;
+        let seenMeta = false;
         for (const line of lines) {
-            const normalized = String(line).replace(/\u00a0/g, ' ').replace(/[\u200B\uFEFF]/g, '');
-            const m = normalized.match(metaLineRe);
-            if (m) {
-                const key = String(m[1] || '').trim().toLowerCase();
-                const val = String(m[2] || '').trim();
-                if (known.has(key)) {
-                    meta[key] = val;
+            if (inMeta) {
+            const parsed = parseMetaLine(line);
+            if (parsed) {
+                if (known.has(parsed.key)) {
+                    meta[parsed.key] = parsed.value;
+                    seenMeta = true;
                     continue;
                 }
             }
+                if (!seenMeta && normalized.trim() === '') {
+                    bufferedLeading.push(line);
+                    continue;
+                }
+                inMeta = false;
+                if (bufferedLeading.length) {
+                    bodyLines.push(...bufferedLeading);
+                    bufferedLeading.length = 0;
+                }
+            }
             bodyLines.push(line);
+        }
+        if (inMeta && bufferedLeading.length) {
+            bodyLines.push(...bufferedLeading);
         }
         return { meta, body: bodyLines.join('\n') };
     };
@@ -2618,7 +2813,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (!includeKeys.includes(k)) continue;
             const v = String(meta?.[k] ?? '').trim();
             if (!v) continue;
-            out.push(`_${k}: ${v}_`);
+            out.push(`{${k}: ${v}}`);
         }
         return out.join('\n');
     };
@@ -2860,6 +3055,83 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     }, true);
 })();
 
+// Folder rename/delete (index.php)
+(function(){
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    const canManageFolders = () => {
+        const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object')
+            ? window.MDW_AUTH_META
+            : { has_user: false, has_superuser: false };
+        const hasAuth = !!(meta.has_user || meta.has_superuser);
+        if (!hasAuth) return true;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        return !!(auth && auth.role === 'superuser');
+    };
+
+    const ensureInput = (form, name, value) => {
+        let input = form.querySelector(`input[name="${name}"]`);
+        if (!(input instanceof HTMLInputElement)) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            form.appendChild(input);
+        }
+        input.value = String(value || '');
+    };
+
+    const readFolderFilter = () => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            return String(params.get('folder') || '');
+        } catch {
+            return '';
+        }
+    };
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (!form.classList.contains('deleteFolderForm')) return;
+        if (!canManageFolders()) {
+            e.preventDefault();
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+        const folder = String(form.dataset.folder || form.querySelector('input[name="folder"]')?.value || '').trim();
+        if (!folder) return;
+        const msg = t('js.confirm_delete_folder', 'Delete folder "{folder}" and its notes?', { folder });
+        if (!confirm(msg)) {
+            e.preventDefault();
+            return;
+        }
+        const filter = readFolderFilter();
+        if (filter) ensureInput(form, 'return_filter', filter);
+    }, true);
+
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        const btn = target instanceof Element ? target.closest('.folder-rename-btn') : null;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        const form = btn.closest('form.renameFolderForm');
+        if (!(form instanceof HTMLFormElement)) return;
+        if (!canManageFolders()) {
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+        const folder = String(form.dataset.folder || form.querySelector('input[name="folder"]')?.value || '').trim();
+        if (!folder) return;
+        const promptMsg = t('js.prompt_rename_folder', 'Rename folder "{folder}" to:', { folder });
+        const nextName = window.prompt(promptMsg, folder);
+        if (nextName === null) return;
+        const value = String(nextName || '').trim();
+        if (!value) return;
+        ensureInput(form, 'new_folder', value);
+        const filter = readFolderFilter();
+        if (filter) ensureInput(form, 'return_filter', filter);
+        form.submit();
+    });
+})();
+
 // +MD panel toggle (index.php + edit.php)
 (function(){
     const newMdToggle = document.getElementById('newMdToggle');
@@ -2935,6 +3207,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const slugMax = Number(newMdSlug?.dataset?.slugMax || 80);
 
     const isSuperuser = () => (typeof window.__mdwIsSuperuser === 'function') ? window.__mdwIsSuperuser() : false;
+    const isPublisherMode = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(settings && settings.publisher_mode);
+    };
 
     const setHint = (el, msg, variant) => {
         if (!(el instanceof HTMLElement)) return;
@@ -3159,14 +3436,30 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }
         if (!(newFolderForm instanceof HTMLFormElement)) return;
         if (!(newFolderName instanceof HTMLInputElement)) return;
-        const name = window.prompt(t('js.prompt_new_folder', 'New folder name (no slashes):'), '');
+        const name = window.prompt(t('js.prompt_new_folder', 'New folder name (use / for a subfolder):'), '');
         if (name === null) return;
-        const folder = name.trim();
-        if (!folder) return;
-        if (folder.includes('/') || folder.includes('\\') || folder.includes('..')) {
+        const raw = name.trim();
+        if (!raw) return;
+        if (raw.includes('\\') || raw.includes('..')) {
             alert(t('js.invalid_folder_alert', 'Invalid folder name.'));
             return;
         }
+        const parts = raw.split('/');
+        if (parts.length > 2 || parts.some(p => p === '' || p === '.' || p === '..')) {
+            alert(t('js.invalid_folder_alert', 'Invalid folder name.'));
+            return;
+        }
+        if (isPublisherMode()) {
+            if (parts.length > 1) {
+                alert(t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.'));
+                return;
+            }
+            if (emojiRe && emojiRe.test(raw)) {
+                alert(t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.'));
+                return;
+            }
+        }
+        const folder = parts.join('/');
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
         if (auth && auth.role && auth.token) {
             const ensureInput = (name, value) => {
@@ -3905,9 +4198,22 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
                 window.location.href = `index.php?file=${encodeURIComponent(file)}`;
                 return;
             }
-            if (!response.ok) throw new Error('Network response was not ok');
-            
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data || data.ok === false || data.error) {
+                const errCode = data && data.error ? String(data.error) : '';
+                const msg = data && data.message ? String(data.message) : '';
+                if (errCode === 'not_found') {
+                    throw new Error(t('js.load_not_found', 'File not found.'));
+                }
+                if (errCode === 'forbidden') {
+                    throw new Error(t('js.load_forbidden', 'Access denied.'));
+                }
+                const httpMsg = t('js.load_failed_http', 'Failed to load file (HTTP {code}).', { code: response.status });
+                throw new Error(msg || errCode || httpMsg);
+            }
+            if (typeof window.__mdwMarkOnline === 'function') {
+                window.__mdwMarkOnline();
+            }
 
             // Update globale variabelen
             window.CURRENT_FILE = data.file;
@@ -3937,6 +4243,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
             editorTextarea.value = normalizeNewlines(data.content);
             preview.innerHTML = data.html;
+            if (typeof window.__mdwApplyTocHotKeyword === 'function') {
+                window.__mdwApplyTocHotKeyword(preview, data.content);
+            }
             fileInput.value = data.file;
 
             const deleteFileInput = document.getElementById('deleteFileInput');
@@ -3967,7 +4276,15 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
         } catch (error) {
             console.error('Failed to load document:', error);
-            document.getElementById('liveStatus').textContent = 'Error loading file.';
+            const statusEl = document.getElementById('liveStatus');
+            const msg = (error && error.message) ? String(error.message) : t('js.load_failed', 'Error loading file.');
+            if (statusEl) statusEl.textContent = msg;
+            if (typeof window.__mdwShowErrorModal === 'function') {
+                window.__mdwShowErrorModal(msg, '');
+            }
+            if (typeof window.__mdwReportNetworkError === 'function') {
+                window.__mdwReportNetworkError(error);
+            }
         }
     }
 
@@ -4903,6 +5220,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const invalidCharsRe = supportsUnicodeProps
         ? /[^\p{L}\p{N}._-]+/gu
         : /[^A-Za-z0-9._-]+/g;
+    const emojiRe = supportsUnicodeProps ? /\p{So}/u : null;
     const whitespaceRe = /\s+/g;
 
     const setStatus = (msg, kind = 'info') => {
@@ -4999,9 +5317,245 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     });
 })();
 
+// Error modal (edit.php)
+(function(){
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    const modal = document.getElementById('errorModal');
+    const overlay = document.getElementById('errorModalOverlay');
+    const closeBtn = document.getElementById('errorModalClose');
+    const okBtn = document.getElementById('errorModalOk');
+    const msgEl = document.getElementById('errorModalMessage');
+    const detailsWrap = document.getElementById('errorModalDetailsWrap');
+    const detailsEl = document.getElementById('errorModalDetails');
+    if (!modal || !overlay) return;
+
+    const open = (message, details) => {
+        const fallback = t('js.error_generic', 'Something went wrong.');
+        if (msgEl) msgEl.textContent = String(message || fallback);
+        const detailText = details ? String(details) : '';
+        if (detailsEl) detailsEl.textContent = detailText;
+        if (detailsWrap) detailsWrap.hidden = !detailText;
+        overlay.hidden = false;
+        modal.hidden = false;
+        document.documentElement.classList.add('modal-open');
+        setTimeout(() => {
+            try { (okBtn || closeBtn)?.focus?.(); } catch {}
+        }, 0);
+    };
+
+    const close = () => {
+        overlay.hidden = true;
+        modal.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+        if (msgEl) msgEl.textContent = '';
+        if (detailsEl) detailsEl.textContent = '';
+        if (detailsWrap) detailsWrap.hidden = true;
+    };
+
+    window.__mdwShowErrorModal = open;
+    window.__mdwCloseErrorModal = close;
+
+    closeBtn?.addEventListener('click', close);
+    okBtn?.addEventListener('click', close);
+    overlay.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => {
+        if (modal.hidden) return;
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        e.preventDefault();
+        close();
+    });
+})();
+
+// Offline indicator (index.php + edit.php)
+(function(){
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    const indicator = document.getElementById('offlineIndicator');
+    if (!indicator) return;
+
+    const STORAGE_KEY = 'mdw_offline_delay_min';
+    const DELAY_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60];
+    const normalizeDelay = (value) => {
+        const n = parseInt(String(value || ''), 10);
+        if (!Number.isFinite(n)) return 30;
+        let best = DELAY_OPTIONS[0];
+        let bestDiff = Math.abs(n - best);
+        for (const opt of DELAY_OPTIONS) {
+            const diff = Math.abs(n - opt);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = opt;
+            }
+        }
+        return best;
+    };
+    const readDelay = () => {
+        try {
+            return normalizeDelay(mdwStorageGet(STORAGE_KEY));
+        } catch {
+            return 30;
+        }
+    };
+    const writeDelay = (value) => {
+        const v = normalizeDelay(value);
+        try { mdwStorageSet(STORAGE_KEY, String(v)); } catch {}
+        return v;
+    };
+
+    const FAIL_WINDOW_MS = 90 * 1000;
+    let offlineDelayMin = readDelay();
+    let offlineDelayMs = offlineDelayMin * 60 * 1000;
+    let offlineCandidateAt = 0;
+    let lastSuccessAt = Date.now();
+    let failCount = 0;
+    let firstFailAt = 0;
+    let verifiedOffline = false;
+    let offlineTimer = null;
+
+    const scheduleTimer = () => {
+        if (offlineTimer) {
+            clearTimeout(offlineTimer);
+            offlineTimer = null;
+        }
+        if (!offlineCandidateAt) return;
+        const now = Date.now();
+        const wait = Math.max(0, offlineCandidateAt + offlineDelayMs - now);
+        offlineTimer = setTimeout(() => {
+            offlineTimer = null;
+            update();
+        }, wait);
+    };
+
+    const update = () => {
+        const now = Date.now();
+        const offlineByCandidate = offlineCandidateAt
+            && (now - offlineCandidateAt >= offlineDelayMs)
+            && lastSuccessAt < offlineCandidateAt;
+        const offline = !!(offlineByCandidate && verifiedOffline);
+        indicator.hidden = !offline;
+        if (offline) {
+            indicator.textContent = t('common.offline', 'Offline');
+            const hint = t('common.offline_hint', 'Offline: saves may fail until you are back online.');
+            indicator.title = hint;
+            indicator.setAttribute('aria-label', hint);
+        } else {
+            indicator.title = '';
+            indicator.removeAttribute('aria-label');
+        }
+        if (offlineByCandidate && !verifiedOffline) {
+            probeConnectivity();
+        }
+        if (!offline && offlineCandidateAt) scheduleTimer();
+    };
+
+    const markCandidate = () => {
+        if (!offlineCandidateAt) {
+            offlineCandidateAt = Date.now();
+        }
+        verifiedOffline = false;
+        scheduleTimer();
+        update();
+    };
+
+    const clearCandidate = () => {
+        offlineCandidateAt = 0;
+        lastSuccessAt = Date.now();
+        failCount = 0;
+        firstFailAt = 0;
+        verifiedOffline = false;
+        if (offlineTimer) {
+            clearTimeout(offlineTimer);
+            offlineTimer = null;
+        }
+        update();
+    };
+
+    const isNetworkError = (err) => {
+        if (!err) return false;
+        const name = String(err.name || '');
+        const msg = String(err.message || '');
+        if (name === 'AbortError') return false;
+        if (name === 'TypeError') return true;
+        return /NetworkError|Failed to fetch/i.test(msg);
+    };
+
+    const noteFailure = (err) => {
+        if (!isNetworkError(err)) return;
+        const now = Date.now();
+        if (!firstFailAt || (now - firstFailAt > FAIL_WINDOW_MS)) {
+            firstFailAt = now;
+            failCount = 0;
+        }
+        failCount += 1;
+        if (!navigator.onLine) {
+            markCandidate();
+            return;
+        }
+        if (failCount >= 3) {
+            markCandidate();
+        }
+    };
+
+    let probeInFlight = false;
+    let lastProbeAt = 0;
+    const PROBE_COOLDOWN_MS = 30 * 1000;
+    const probeConnectivity = async () => {
+        const now = Date.now();
+        if (probeInFlight) return;
+        if (lastProbeAt && (now - lastProbeAt) < PROBE_COOLDOWN_MS) return;
+        probeInFlight = true;
+        lastProbeAt = now;
+        try {
+            const res = await fetch(window.location.href, { method: 'HEAD', cache: 'no-store' });
+            if (res) {
+                clearCandidate();
+                return;
+            }
+            verifiedOffline = true;
+            update();
+        } catch {
+            verifiedOffline = true;
+            update();
+        } finally {
+            probeInFlight = false;
+        }
+    };
+
+    window.__mdwSetOffline = (state) => {
+        if (state) {
+            markCandidate();
+        } else {
+            clearCandidate();
+        }
+    };
+    window.__mdwMarkOnline = () => {
+        clearCandidate();
+    };
+    window.__mdwReportNetworkError = (err) => {
+        noteFailure(err);
+    };
+    window.__mdwReadOfflineDelay = () => offlineDelayMin;
+    window.__mdwWriteOfflineDelay = (value) => {
+        offlineDelayMin = writeDelay(value);
+        offlineDelayMs = offlineDelayMin * 60 * 1000;
+        scheduleTimer();
+        update();
+        return offlineDelayMin;
+    };
+
+    window.addEventListener('online', () => {
+        clearCandidate();
+    });
+    if (navigator.onLine) {
+        clearCandidate();
+    }
+    update();
+})();
+
 // LINE NUMBERS + LIVE PREVIEW
 (function(){
     const normalizeNewlines = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
+
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const ta = document.getElementById('editor');
     const ln = document.getElementById('lineNumbers');
@@ -5013,6 +5567,20 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const dirtyStar = document.getElementById('dirtyStar');
 
     if (!ta || !ln || !prev) return;
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const showPreviewError = (message, details) => {
+        const msg = message || t('js.preview_failed', 'Preview failed.');
+        if (status) status.textContent = msg;
+        const detailHtml = details ? `<div class="status-text" style="margin-top:0.35rem;">${escapeHtml(details)}</div>` : '';
+        prev.innerHTML = `<div class="status-text" style="padding:0.75rem;">${escapeHtml(msg)}${detailHtml}</div>`;
+    };
 
     const WRAP_MARK = '↩';
     const getTabSize = () => {
@@ -5098,10 +5666,15 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }, 1800);
     };
     const showSaveError = (message, details) => {
-        if (saveErrorMessage) saveErrorMessage.textContent = message || 'Save failed.';
+        if (saveErrorMessage) saveErrorMessage.textContent = message || t('js.save_failed', 'Save failed.');
         if (saveErrorDetails) saveErrorDetails.textContent = details || '';
         if (saveErrorDetailsWrap) saveErrorDetailsWrap.hidden = !details;
         if (saveErrorPanel) saveErrorPanel.hidden = false;
+    };
+    const showErrorModal = (message, details) => {
+        if (typeof window.__mdwShowErrorModal === 'function') {
+            window.__mdwShowErrorModal(message, details);
+        }
     };
     const clearSaveError = () => {
         if (saveErrorPanel) saveErrorPanel.hidden = true;
@@ -5135,7 +5708,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             }
         }
 
-        if (status) status.textContent = 'Saving…';
+        if (status) status.textContent = t('js.save_saving', 'Saving…');
         clearSaveError();
         try {
             const res = await fetch(action, {
@@ -5145,21 +5718,31 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data || data.ok !== true) {
-                const msg = (data && data.error) ? String(data.error) : 'Save failed.';
+                const msg = (data && data.error) ? String(data.error) : t('js.save_failed', 'Save failed.');
+                const details = (data && data.details) ? String(data.details) : '';
                 if (status) status.textContent = msg;
-                showSaveError(msg, data && data.details ? String(data.details) : '');
+                showSaveError(msg, details);
+                showErrorModal(msg, details);
                 clearIgnoreBeforeUnload();
                 return;
+            }
+            if (typeof window.__mdwMarkOnline === 'function') {
+                window.__mdwMarkOnline();
             }
             if (typeof window.__mdwResetDirty === 'function') {
                 window.__mdwResetDirty();
             }
-            if (status) status.textContent = 'Saved';
+            if (status) status.textContent = t('common.saved', 'Saved');
             showSaveChip();
             clearSaveError();
         } catch (err) {
-            if (status) status.textContent = 'Save failed.';
-            showSaveError('Save failed.', '');
+            if (typeof window.__mdwReportNetworkError === 'function') {
+                window.__mdwReportNetworkError(err);
+            }
+            if (status) status.textContent = t('js.save_failed', 'Save failed.');
+            const detail = err && err.message ? String(err.message) : '';
+            showSaveError(t('js.save_failed', 'Save failed.'), detail);
+            showErrorModal(t('js.save_failed', 'Save failed.'), detail);
         } finally {
             clearIgnoreBeforeUnload();
         }
@@ -5245,35 +5828,123 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!window.CURRENT_FILE) return;
         clearTimeout(previewTimer);
         previewTimer = setTimeout(sendPreview, 350);
-        status.textContent = 'Updating preview…';
+        if (status) status.textContent = t('js.preview_updating', 'Updating preview…');
     }
 
-    function sendPreview() {
+    const applyTocHotKeyword = (previewEl, rawText) => {
+        if (!(previewEl instanceof HTMLElement)) return;
+        const text = String(rawText || '');
+        if (!/(^|\\n)\\s*\\{TOC\\}\\s*(\\n|$)/i.test(text)) return;
+        if (previewEl.querySelector('[data-mdw-toc="1"]')) return;
+
+        const placeholder = (() => {
+            const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_ELEMENT, {
+                acceptNode(node) {
+                    if (!(node instanceof HTMLElement)) return NodeFilter.FILTER_SKIP;
+                    if (node.closest('pre, code')) return NodeFilter.FILTER_SKIP;
+                    const txt = (node.textContent || '').trim();
+                    if (txt === '{TOC}') return NodeFilter.FILTER_ACCEPT;
+                    return NodeFilter.FILTER_SKIP;
+                }
+            });
+            return walker.nextNode();
+        })();
+        if (!placeholder) return;
+
+        const isAfter = (el, ref) => {
+            const pos = ref.compareDocumentPosition(el);
+            return (pos & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+        };
+
+        const headings = Array.from(previewEl.querySelectorAll('h3'))
+            .filter((el) => !(el.closest('pre, code')))
+            .filter((el) => isAfter(el, placeholder));
+        if (!headings.length) {
+            placeholder.remove();
+            return;
+        }
+
+        const used = new Set();
+        let nextId = 1;
+        const items = headings.map((el) => {
+            let id = String(el.getAttribute('id') || '').trim();
+            if (id.startsWith('#')) id = id.slice(1);
+            if (!id || used.has(id)) {
+                while (used.has(String(nextId))) nextId++;
+                id = String(nextId);
+                el.setAttribute('id', id);
+                nextId += 1;
+            }
+            used.add(id);
+            return { id, label: (el.textContent || '').trim() };
+        });
+
+        const wrap = document.createElement('div');
+        wrap.className = 'md-toc-wrap';
+        wrap.dataset.mdwToc = '1';
+
+        wrap.appendChild(document.createComment(' Table of contents '));
+        const list = document.createElement('ul');
+        list.className = 'md-list md-toc';
+        items.forEach((item) => {
+            const li = document.createElement('li');
+            li.className = 'md-li md-toc-item';
+            const a = document.createElement('a');
+            a.href = `#${item.id}`;
+            a.textContent = item.label || item.id;
+            li.appendChild(a);
+            list.appendChild(li);
+        });
+        wrap.appendChild(list);
+
+        placeholder.replaceWith(wrap);
+    };
+    window.__mdwApplyTocHotKeyword = applyTocHotKeyword;
+
+    async function sendPreview() {
         const body = 'content=' + encodeURIComponent(ta.value);
-        fetch('edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: body
-        })
-        .then(r => r.text())
-        .then(html => {
+        try {
+            const res = await fetch('edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: body
+            });
+            if (!res.ok) {
+                const detail = res.status ? t('js.http_status', 'HTTP {code}', { code: res.status }) : '';
+                showPreviewError(t('js.preview_failed', 'Preview failed.'), detail);
+                return;
+            }
+            const html = await res.text();
+            if (typeof window.__mdwMarkOnline === 'function') {
+                window.__mdwMarkOnline();
+            }
             prev.innerHTML = html;
+            applyTocHotKeyword(prev, ta.value);
             if (window.MathJax?.typesetPromise) {
-                window.MathJax.typesetPromise([prev]).catch(() => {});
+                window.MathJax.typesetPromise([prev]).catch((err) => {
+                    if (status) status.textContent = t('js.preview_render_errors', 'Preview updated with render errors.');
+                    console.warn('MathJax render failed', err);
+                });
             }
             if (typeof window.__mdwRenderMermaid === 'function') {
-                window.__mdwRenderMermaid(prev).catch(() => {});
+                window.__mdwRenderMermaid(prev).catch((err) => {
+                    if (status) status.textContent = t('js.preview_render_errors', 'Preview updated with render errors.');
+                    console.warn('Mermaid render failed', err);
+                });
             }
             if (typeof window.__mdwInitCodeCopyButtons === 'function') {
                 window.__mdwInitCodeCopyButtons();
             }
-            status.textContent = 'Preview up to date';
-        })
-        .catch(() => {
-            status.textContent = 'Preview error';
-        });
+            if (status) status.textContent = t('js.preview_up_to_date', 'Preview up to date');
+        } catch (err) {
+            const detail = err && err.message ? String(err.message) : '';
+            if (typeof window.__mdwReportNetworkError === 'function') {
+                window.__mdwReportNetworkError(err);
+            }
+            showPreviewError(t('js.preview_failed', 'Preview failed.'), detail);
+        }
     }
 
     ta.addEventListener('input', function(){
@@ -6039,24 +6710,48 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     };
 
     const stripHiddenMeta = (raw) => {
-        const metaLineRe = /^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u;
+        const parseMetaLine = (line) => {
+            const normalized = String(line ?? '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/[\u200B\uFEFF]/g, '');
+            let m = normalized.match(/^\s*\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*$/u);
+            if (!m) {
+                m = normalized.match(/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u);
+            }
+            if (!m) return null;
+            const key = String(m[1] || '').trim().toLowerCase();
+            if (!key) return null;
+            return { key, value: String(m[2] || '').trim() };
+        };
         const allowed = collectAllowedMetaKeys();
         const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
         if (!lines.length) return '';
         if (lines[0]) lines[0] = lines[0].replace(/^\uFEFF/, '');
         const out = [];
+        const bufferedLeading = [];
+        let inMeta = true;
+        let seenMeta = false;
         for (const line of lines) {
-            const normalized = String(line)
-                .replace(/\u00a0/g, ' ')
-                .replace(/[\u200B\uFEFF]/g, '');
-            const match = normalized.match(metaLineRe);
-            if (match) {
-                const key = String(match[1] || '').trim().toLowerCase();
-                if (key && allowed.has(key)) {
+            if (inMeta) {
+                const parsed = parseMetaLine(line);
+                if (parsed && allowed.has(parsed.key)) {
+                    seenMeta = true;
                     continue;
+                }
+                if (!seenMeta && String(line ?? '').trim() === '') {
+                    bufferedLeading.push(line);
+                    continue;
+                }
+                inMeta = false;
+                if (bufferedLeading.length) {
+                    out.push(...bufferedLeading);
+                    bufferedLeading.length = 0;
                 }
             }
             out.push(line);
+        }
+        if (inMeta && bufferedLeading.length) {
+            out.push(...bufferedLeading);
         }
         return out.join('\n');
     };

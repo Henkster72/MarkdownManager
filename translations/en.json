@@ -18,7 +18,9 @@
     "item_count_one": "{n} item",
     "item_count_other": "{n} items",
     "total_items": "{n} total items",
-    "details": "Details"
+    "details": "Details",
+    "offline": "Offline",
+    "offline_hint": "Offline: saves may fail until you are back online."
   },
   "index": {
     "contents": "Overview",
@@ -87,6 +89,11 @@
   "theme": {
     "settings_title": "Settings",
     "title": "Settings",
+    "settings": {
+      "save_failed": "Save failed",
+      "invalid": "Invalid settings data.",
+      "network_error": "Network error. Try again."
+    },
     "preset": "Theme",
     "default": "Default",
     "applies_hint": "Applies only to the Markdown editor + HTML preview.",
@@ -108,6 +115,11 @@
     "language": {
       "label": "Language",
       "hint": "Choose UI language (auto-detected from translations/*.json)."
+    },
+    "offline_delay": {
+      "label": "Offline indicator delay",
+      "hint": "Wait before showing Offline after network errors.",
+      "option_minutes": "{n} min"
     },
     "app_title": {
       "label": "App title",
@@ -225,7 +237,12 @@
       "author_label": "Author name",
       "author_placeholder": "Your name",
       "author_required": "Please enter an author name to enable WPM.",
-      "require_subtitle": "Require subtitle (##)"
+      "require_subtitle": "Require subtitle (##)",
+      "enable_confirm": "Enabling WPM will sanitize folder names (emoji removed) and move subfolders to the top level. Continue?",
+      "migration_title": "WPM updated your folder structure.",
+      "migration_renamed": "Renamed folders: {n}",
+      "migration_moved": "Moved subfolders to root: {n}",
+      "migration_errors": "Migration errors: {n}"
     }
   },
   "auth": {
@@ -236,6 +253,7 @@
     "setup_submit": "Save passwords",
     "wrong_password": "Wrong password.",
     "missing_password": "Enter a password.",
+    "show_password": "Show password",
     "signing_in": "Signing in...",
     "saving": "Saving...",
     "set_passwords": "Set both passwords.",
@@ -283,6 +301,9 @@
     "confirm": "Rename",
     "cancel": "Cancel"
   },
+  "error_modal": {
+    "title": "Something went wrong"
+  },
   "nav": {
     "collapse_folder": "Collapse folder",
     "expand_folder": "Expand folder",
@@ -296,13 +317,27 @@
   "js": {
     "confirm_delete": "Delete \"{file}\"?",
     "this_file": "this file",
-    "prompt_new_folder": "New folder name (no slashes):",
+    "prompt_new_folder": "New folder name (use / for a subfolder):",
+    "prompt_rename_folder": "Rename folder \"{folder}\" to:",
+    "confirm_delete_folder": "Delete folder \"{folder}\" and its notes?",
     "invalid_folder_alert": "Invalid folder name.",
     "unsaved_confirm": "You have unsaved changes. Discard them and continue?",
     "export_failed": "Export failed. Check the console for details.",
     "copy_failed": "Copy failed. Check the console for details.",
     "copied": "Copied",
     "copy_code": "Copy code",
+    "error_generic": "Something went wrong.",
+    "save_saving": "Saving…",
+    "save_failed": "Save failed.",
+    "preview_updating": "Updating preview…",
+    "preview_failed": "Preview failed.",
+    "preview_up_to_date": "Preview up to date",
+    "preview_render_errors": "Preview updated with render errors.",
+    "load_failed": "Error loading file.",
+    "load_not_found": "File not found.",
+    "load_forbidden": "Access denied.",
+    "load_failed_http": "Failed to load file (HTTP {code}).",
+    "http_status": "HTTP {code}",
     "new_md": {
       "enter_title": "Please enter a title for the filename.",
       "no_trailing_slash": "The filename cannot end with a slash.",
@@ -326,10 +361,18 @@
     "no_write_permissions": "no write permissions",
     "invalid_folder_name": "Invalid folder name.",
     "reserved_folder_name": "This folder name is reserved.",
+    "nested_folder_not_allowed": "Nested folders are disabled in WPM mode.",
+    "folder_emoji_not_allowed": "Emoji are not allowed in folder names when WPM is enabled.",
     "folder_exists_prefix": "Folder already exists:",
     "path_exists_not_folder_prefix": "Path already exists (not a folder):",
     "folder_create_failed": "Could not create folder.",
     "folder_created_prefix": "Folder created:",
+    "folder_renamed_prefix": "Folder renamed:",
+    "folder_rename_failed": "Could not rename folder.",
+    "folder_rename_no_change": "Folder name did not change.",
+    "folder_deleted_prefix": "Folder deleted:",
+    "folder_delete_failed": "Could not delete folder.",
+    "folder_delete_non_md": "Folder contains non-markdown files. Delete manually.",
     "invalid_filename_hint": "Invalid filename. Adjust the title (spaces become hyphens) and try again.",
     "title_too_short": "Title is too short (min {min}).",
     "title_too_long": "Title is too long (max {max}).",

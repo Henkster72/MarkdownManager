@@ -80,8 +80,14 @@ function sanitize_folder_name($folder) {
     if (strpos($folder, '..') !== false) return null;
     $folder = str_replace("\\", "/", $folder);
     $folder = trim($folder, "/");
-    if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $folder)) return null;
-    return $folder;
+    if ($folder === '') return null;
+    $parts = explode('/', $folder);
+    if (count($parts) > 2) return null;
+    foreach ($parts as $p) {
+        if ($p === '' || $p === '.' || $p === '..') return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
+    }
+    return implode('/', $parts);
 }
 
 function folder_from_path($path) {
@@ -92,21 +98,67 @@ function folder_from_path($path) {
 }
 
 /* SECURITY / PATH CLEAN */
+function mdw_path_normalize($path) {
+    return str_replace("\\", "/", (string)$path);
+}
+
+function mdw_project_root() {
+    static $root = null;
+    if ($root === null) {
+        $root = realpath(__DIR__);
+        if ($root === false) $root = __DIR__;
+    }
+    return $root;
+}
+
+function mdw_path_within_root($path, $root = null) {
+    $root = $root ?? mdw_project_root();
+    if (!is_string($root) || $root === '') return false;
+    $rootNorm = rtrim(mdw_path_normalize($root), '/');
+    $pathNorm = mdw_path_normalize($path);
+    if ($pathNorm === $rootNorm) return true;
+    return str_starts_with($pathNorm, $rootNorm . '/');
+}
+
+function mdw_safe_full_path($relativePath, $requireExists = true) {
+    if (!is_string($relativePath) || $relativePath === '') return null;
+    $root = mdw_project_root();
+    if (!is_string($root) || $root === '') return null;
+    $clean = mdw_path_normalize($relativePath);
+    $clean = ltrim($clean, "/");
+    if ($clean === '') return null;
+    $full = rtrim($root, "/\\") . '/' . $clean;
+
+    if ($requireExists) {
+        $resolved = realpath($full);
+        if ($resolved === false) return null;
+        if (!mdw_path_within_root($resolved, $root)) return null;
+        return $full;
+    }
+
+    $parent = dirname($full);
+    $parentResolved = realpath($parent);
+    if ($parentResolved === false) return null;
+    if (!mdw_path_within_root($parentResolved, $root)) return null;
+    return $full;
+}
+
 function sanitize_md_path($path) {
     if (!$path) return null;
     if (strpos($path, '..') !== false) return null;
 
     $parts = explode('/', $path);
+    if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
         // allow unicode letters/numbers plus . _ -
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
     }
 
     if (!preg_match('/\.md$/i', end($parts))) return null;
 
-    $full = __DIR__ . '/' . $path;
-    if (!is_file($full)) return null;
+    $full = mdw_safe_full_path($path, true);
+    if (!$full || !is_file($full)) return null;
 
     return $path;
 }
@@ -275,11 +327,13 @@ function list_md_by_subdir_sorted(){
     $imagesDir = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
     $themesDir = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
     $translationsDir = function_exists('mdw_i18n_dir') ? mdw_i18n_dir() : 'translations';
+    $toolsDir = 'tools';
     $exclude = [
         'root' => true,
         'HTML' => true,
         'PDF' => true,
         basename($pluginsDir) => true,
+        $toolsDir => true,
         $staticDir => true,
         $imagesDir => true,
         $themesDir => true,
@@ -292,28 +346,39 @@ function list_md_by_subdir_sorted(){
 
     sort($dirs, SORT_NATURAL | SORT_FLAG_CASE);
 
-    $map=[];
-    foreach($dirs as $dir){
+    $map = [];
+    foreach ($dirs as $dir) {
         if (isset($exclude[$dir])) continue;
-        $mds = glob($dir.'/*.md');
 
-        $tmp=[];
-        if ($mds) {
-            foreach($mds as $path){
-                $base = basename($path);
-                [$yy,$mm,$dd] = parse_ymd_from_filename($base);
-                $tmp[] = [
-                    'path'     => $path,
-                    'basename' => $base,
-                    'yy'       => $yy,
-                    'mm'       => $mm,
-                    'dd'       => $dd,
-                ];
-            }
+        $targets = [$dir];
+        $subdirs = array_filter(glob($dir . '/*'), function($f){
+            return is_dir($f) && basename($f)[0] !== '.';
+        });
+        sort($subdirs, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($subdirs as $sub) {
+            $subBase = basename($sub);
+            $targets[] = $dir . '/' . $subBase;
         }
 
-        usort($tmp, 'compare_entries_desc_date');
-        $map[$dir]=$tmp;
+        foreach ($targets as $target) {
+            $mds = glob($target . '/*.md');
+            $tmp = [];
+            if ($mds) {
+                foreach ($mds as $path) {
+                    $base = basename($path);
+                    [$yy,$mm,$dd] = parse_ymd_from_filename($base);
+                    $tmp[] = [
+                        'path'     => $path,
+                        'basename' => $base,
+                        'yy'       => $yy,
+                        'mm'       => $mm,
+                        'dd'       => $dd,
+                    ];
+                }
+            }
+            usort($tmp, 'compare_entries_desc_date');
+            $map[$target] = $tmp;
+        }
     }
     return $map;
 }
@@ -415,7 +480,13 @@ $can_view_json = $requested && (!$is_secret_req_json || ($is_secret_req_json && 
 if (isset($_GET['json']) && $_GET['json'] === '1') {
     if ($can_view_json) {
         header('Content-Type: application/json; charset=utf-8');
-        $raw_content = file_get_contents(__DIR__ . '/' . $requested);
+        $full = mdw_safe_full_path($requested, true);
+        if (!$full || !is_file($full)) {
+            http_response_code(404);
+            echo json_encode(['error' => 'not_found']);
+            exit;
+        }
+        $raw_content = file_get_contents($full);
 
         echo json_encode([
             'file'    => $requested,
@@ -473,12 +544,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $newPath = $dir ? ($dir . '/' . $newBase) : $newBase;
                     if ($newPath === $san) {
                         $save_error = mdw_t('flash.rename_no_change', 'Filename did not change.');
-                    } else if (is_file(__DIR__ . '/' . $newPath)) {
-                        $save_error = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $newPath;
                     } else {
-                        $oldFull = __DIR__ . '/' . $san;
-                        $newFull = __DIR__ . '/' . $newPath;
-                        if (!@rename($oldFull, $newFull)) {
+                        $oldFull = mdw_safe_full_path($san, true);
+                        $newFull = mdw_safe_full_path($newPath, false);
+                        $existingFull = mdw_safe_full_path($newPath, true);
+                        if (!$oldFull || !is_file($oldFull) || !$newFull) {
+                            $save_error = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                        } else if ($existingFull && is_file($existingFull)) {
+                            $save_error = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $newPath;
+                        } else if (!$existingFull && file_exists($newFull)) {
+                            $save_error = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                        } else if (!@rename($oldFull, $newFull)) {
                             $err = error_get_last();
                             $save_error = mdw_t('flash.rename_failed', 'Could not rename file.');
                             if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
@@ -516,131 +592,151 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             header('Location: index.php?file='.rawurlencode($san));
             exit;
         }
-	        $full = __DIR__ . '/' . $san;
-            $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
-            $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
-            $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
-            $authIsSuperuser = function_exists('mdw_auth_verify_token')
-                ? mdw_auth_verify_token('superuser', $authToken)
-                : false;
-            $authIsUser = function_exists('mdw_auth_verify_token')
-                ? mdw_auth_verify_token('user', $authToken)
-                : false;
-            $postedAuthor = isset($_POST['publisher_author']) ? trim((string)$_POST['publisher_author']) : '';
-	        // Normalize line endings so the editor doesn't appear "dirty" after save.
-	        $content = str_replace(["\r\n", "\r"], "\n", $content);
-	        $submittedMeta = [];
-	        mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
-            $publishAction = isset($_POST['publish_action']) ? trim((string)$_POST['publish_action']) : '';
-            $publishStateInput = isset($_POST['publish_state']) ? trim((string)$_POST['publish_state']) : '';
-            $existingMeta = [];
-            if (is_file($full)) {
-                mdw_hidden_meta_extract_and_remove_all((string)@file_get_contents($full), $existingMeta);
-            }
-            $existingState = mdw_publisher_normalize_publishstate($existingMeta['publishstate'] ?? '');
-            if ($existingState === '') $existingState = 'Concept';
-            $desiredPublishState = null;
-            $allowedPublishStates = ['Concept', 'Processing', 'Published'];
+            $full = mdw_safe_full_path($san, true);
+            if (!$full || !is_file($full)) {
+                $save_error = 'Invalid file path.';
+            } else {
+                $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
+                $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
+                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+                $authIsSuperuser = function_exists('mdw_auth_verify_token')
+                    ? mdw_auth_verify_token('superuser', $authToken)
+                    : false;
+                $authIsUser = function_exists('mdw_auth_verify_token')
+                    ? mdw_auth_verify_token('user', $authToken)
+                    : false;
+                $postedAuthor = isset($_POST['publisher_author']) ? trim((string)$_POST['publisher_author']) : '';
+                // Normalize line endings so the editor doesn't appear "dirty" after save.
+                $content = str_replace(["\r\n", "\r"], "\n", $content);
+                $submittedMeta = [];
+                mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
+                $publishAction = isset($_POST['publish_action']) ? trim((string)$_POST['publish_action']) : '';
+                $publishStateInput = isset($_POST['publish_state']) ? trim((string)$_POST['publish_state']) : '';
+                $existingMeta = [];
+                if (is_file($full)) {
+                    mdw_hidden_meta_extract_and_remove_all((string)@file_get_contents($full), $existingMeta);
+                }
+                $existingState = mdw_publisher_normalize_publishstate($existingMeta['publishstate'] ?? '');
+                if ($existingState === '') $existingState = 'Concept';
+                $desiredPublishState = null;
+                $allowedPublishStates = ['Concept', 'Processing', 'Published'];
+                    if (!empty($MDW_PUBLISHER_MODE)) {
+                        if ($authIsSuperuser) {
+                            if ($publishStateInput !== '') {
+                                $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
+                                if (in_array($candidate, $allowedPublishStates, true)) {
+                                    $desiredPublishState = $candidate;
+                                }
+                            }
+                        } else {
+                            $desiredPublishState = $existingState !== '' ? $existingState : 'Concept';
+                        }
+                    }
+                $author = '';
                 if (!empty($MDW_PUBLISHER_MODE)) {
-                    if ($authIsSuperuser) {
-                        if ($publishStateInput !== '') {
-                            $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
-                            if (in_array($candidate, $allowedPublishStates, true)) {
-                                $desiredPublishState = $candidate;
+                    $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
+                    if ($authIsUser && $author === '') {
+                    $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
+                    } else if ($author === '') {
+                    $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
+                    } else {
+                        $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
+                        if ($pageTitle === '') {
+                        $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
+                        } else {
+                            $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
+                            if ($pagePicture === '') {
+                            $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
                             }
                         }
-                    } else {
-                        $desiredPublishState = $existingState !== '' ? $existingState : 'Concept';
                     }
-                }
-	        $author = '';
-	        if (!empty($MDW_PUBLISHER_MODE)) {
-	            $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
-	            if ($authIsUser && $author === '') {
-                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
-	            } else if ($author === '') {
-                $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
-	            } else {
-	                $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
-	                if ($pageTitle === '') {
-                    $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
-	                } else {
-	                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
-	                    if ($pagePicture === '') {
-                        $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
-	                    }
-	                }
-	            }
-	            if ($save_error === null) {
-	                $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
-	                if ($requireH2 && !mdw_md_has_h2($content)) {
+                    if ($save_error === null) {
+                        $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
+                        if ($requireH2 && !mdw_md_has_h2($content)) {
                     $save_error = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
-	                }
-	            }
-	        }
-
-	        if ($save_error === null) {
-                $metaOverrides = [];
-                $fieldCfg = function_exists('mdw_metadata_all_field_configs')
-                    ? mdw_metadata_all_field_configs(!empty($MDW_PUBLISHER_MODE))
-                    : [];
-                foreach ($fieldCfg as $k => $f) {
-                    $kk = strtolower((string)$k);
-                    $mdVis = isset($f['markdown_visible']) ? (bool)$f['markdown_visible'] : true;
-                    if ($mdVis) continue;
-                    $hasExisting = array_key_exists($kk, $existingMeta);
-                    $hasSubmitted = array_key_exists($kk, $submittedMeta);
-                    if ($hasExisting) {
-                        $metaOverrides[$kk] = (string)$existingMeta[$kk];
-                    } else if ($hasSubmitted) {
-                        $metaOverrides[$kk] = '';
+                        }
                     }
                 }
 
-                if ($desiredPublishState !== null) {
-                    $metaOverrides['publishstate'] = $desiredPublishState;
-                }
-	            // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
-	            $opts = !empty($metaOverrides) ? ['set' => $metaOverrides] : [];
-	            if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
-	                $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
-	                $settingsOverride['publisher_default_author'] = $author;
-	                $opts['settings'] = $settingsOverride;
-	            }
-		            $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
+                if ($save_error === null) {
+                    $metaOverrides = [];
+                    $fieldCfg = function_exists('mdw_metadata_all_field_configs')
+                        ? mdw_metadata_all_field_configs(!empty($MDW_PUBLISHER_MODE))
+                        : [];
+                    foreach ($fieldCfg as $k => $f) {
+                        $kk = strtolower((string)$k);
+                        $mdVis = isset($f['markdown_visible']) ? (bool)$f['markdown_visible'] : true;
+                        if ($mdVis) continue;
+                        $hasExisting = array_key_exists($kk, $existingMeta);
+                        $hasSubmitted = array_key_exists($kk, $submittedMeta);
+                        if ($hasExisting) {
+                            $metaOverrides[$kk] = (string)$existingMeta[$kk];
+                        } else if ($hasSubmitted) {
+                            $metaOverrides[$kk] = '';
+                        }
+                    }
 
-                    $parentDir = dirname($full);
-                    $dirWritable = is_dir($parentDir) && is_writable($parentDir);
-                    $fileWritable = is_writable($full);
-                    if (!$dirWritable && !$fileWritable) {
-                        $save_error = mdw_t('flash.no_write_permissions', 'no write permissions') . ': ' . $parentDir;
-                        $save_error .= ' ' . mdw_t(
-                            'flash.permissions_hint',
-                            'Fix by making this directory writable for the web server/PHP user (chown/chmod; on SELinux also set the right context).'
-                        );
-                        $diag = mdw_perm_diag($full);
-                        if ($diag !== '') $save_error_details = $diag;
-                    } else if ($dirWritable) {
-                        $tmp = $full . '.tmp';
-                        if (file_put_contents($tmp, $content) === false) {
-                            $err = error_get_last();
-                            if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
-                                if ($isAjax) {
-                                    header('Content-Type: application/json; charset=utf-8');
-                                    echo json_encode(['ok' => true]);
-                                    exit;
-                                }
-                                header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                                exit;
-                            }
-                            $save_error = 'Kon tijdelijke file niet schrijven.';
-                            if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                    if ($desiredPublishState !== null) {
+                        $metaOverrides['publishstate'] = $desiredPublishState;
+                    }
+                    // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
+                    $opts = !empty($metaOverrides) ? ['set' => $metaOverrides] : [];
+                    if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
+                        $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
+                        $settingsOverride['publisher_default_author'] = $author;
+                        $opts['settings'] = $settingsOverride;
+                    }
+                        $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
+
+                        $parentDir = dirname($full);
+                        $dirWritable = is_dir($parentDir) && is_writable($parentDir);
+                        $fileWritable = is_writable($full);
+                        if (!$dirWritable && !$fileWritable) {
+                            $save_error = mdw_t('flash.no_write_permissions', 'no write permissions') . ': ' . $parentDir;
+                            $save_error .= ' ' . mdw_t(
+                                'flash.permissions_hint',
+                                'Fix by making this directory writable for the web server/PHP user (chown/chmod; on SELinux also set the right context).'
+                            );
                             $diag = mdw_perm_diag($full);
                             if ($diag !== '') $save_error_details = $diag;
-                        } else {
-                            if (!rename($tmp, $full)) {
+                        } else if ($dirWritable) {
+                            $tmp = $full . '.tmp';
+                            if (file_put_contents($tmp, $content) === false) {
                                 $err = error_get_last();
-                                $save_error = 'Kon originele file niet overschrijven.';
+                                if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
+                                    if ($isAjax) {
+                                        header('Content-Type: application/json; charset=utf-8');
+                                        echo json_encode(['ok' => true]);
+                                        exit;
+                                    }
+                                    header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                    exit;
+                                }
+                                $save_error = 'Kon tijdelijke file niet schrijven.';
+                                if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                                $diag = mdw_perm_diag($full);
+                                if ($diag !== '') $save_error_details = $diag;
+                            } else {
+                                if (!rename($tmp, $full)) {
+                                    $err = error_get_last();
+                                    $save_error = 'Kon originele file niet overschrijven.';
+                                    if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
+                                    $diag = mdw_perm_diag($full);
+                                    if ($diag !== '') $save_error_details = $diag;
+                                } else {
+                                    if ($isAjax) {
+                                        header('Content-Type: application/json; charset=utf-8');
+                                        echo json_encode(['ok' => true]);
+                                        exit;
+                                    }
+                                    header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                    exit;
+                                }
+                            }
+                        } else {
+                            if (file_put_contents($full, $content, LOCK_EX) === false) {
+                                $err = error_get_last();
+                                $save_error = 'Kon bestand niet schrijven.';
                                 if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
                                 $diag = mdw_perm_diag($full);
                                 if ($diag !== '') $save_error_details = $diag;
@@ -654,28 +750,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 exit;
                             }
                         }
-                    } else {
-                        if (file_put_contents($full, $content, LOCK_EX) === false) {
-                            $err = error_get_last();
-                            $save_error = 'Kon bestand niet schrijven.';
-                            if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
-                            $diag = mdw_perm_diag($full);
-                            if ($diag !== '') $save_error_details = $diag;
-                        } else {
-                            if ($isAjax) {
-                                header('Content-Type: application/json; charset=utf-8');
-                                echo json_encode(['ok' => true]);
-                                exit;
-                            }
-                            header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                            exit;
-                        }
-                    }
-	        }
-        $requested = $san;
-        if ($save_error !== null) {
-            $use_posted_content = true;
-            $posted_content_for_render = $content;
+                }
+            $requested = $san;
+            if ($save_error !== null) {
+                $use_posted_content = true;
+                $posted_content_for_render = $content;
+            }
         }
     }
     if ($isAjax) {
@@ -702,13 +782,13 @@ if ($requested) {
         exit;
     }
 
-	$full = __DIR__ . '/' . $requested;
+	$full = mdw_safe_full_path($requested, true);
 	if ($use_posted_content && $posted_content_for_render !== '') {
 	    $raw             = $posted_content_for_render;
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
 	    $current_html    = md_to_html($raw, $requested);
-	} else if (is_file($full)) {
+	} else if ($full && is_file($full)) {
 	    $raw             = file_get_contents($full);
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
@@ -910,6 +990,7 @@ window.mermaid = mermaid;
 	                </div>
 	            </div>
             <div class="app-header-actions">
+                <span id="offlineIndicator" class="chip offline-chip" hidden aria-live="polite" title="<?=h(mdw_t('common.offline_hint','Offline: changes are stored locally until you are back online.'))?>"><?=h(mdw_t('common.offline','Offline'))?></span>
                 <div id="saveStatusChip" class="chip" style="background-color: #166534; color: white; <?= ($saved_flag && !$save_error) ? '' : 'display:none;' ?>"><?=h(mdw_t('common.saved','Saved'))?></div>
                 <?php if ($save_error): ?>
                     <div class="chip" style="background-color: var(--danger); color: white;"<?= $save_error_details ? ' title="' . h($save_error_details) . '"' : '' ?>><?=h($save_error)?></div>
@@ -1152,6 +1233,26 @@ window.mermaid = mermaid;
                     <button type="submit" class="btn btn-primary" id="renameModalConfirm"><?=h(mdw_t('rename_modal.confirm','Rename'))?></button>
                 </div>
             </form>
+        </div>
+
+        <div class="modal-overlay" id="errorModalOverlay" hidden></div>
+        <div class="modal modal-small" id="errorModal" role="dialog" aria-modal="true" aria-labelledby="errorModalTitle" hidden>
+            <div class="modal-header">
+                <div class="modal-title" id="errorModalTitle"><?=h(mdw_t('error_modal.title','Something went wrong'))?></div>
+                <button type="button" class="btn btn-ghost icon-button" id="errorModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
+                    <span class="pi pi-cross"></span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="errorModalMessage" class="status-text" style="color: var(--text); font-size: 0.95rem;"></div>
+                <details id="errorModalDetailsWrap" class="save-error-details" hidden>
+                    <summary><?=h(mdw_t('common.details','Details'))?></summary>
+                    <code id="errorModalDetails"></code>
+                </details>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="errorModalOk"><?=h(mdw_t('common.close','Close'))?></button>
+            </div>
         </div>
 
 		<div class="modal-overlay" id="linkModalOverlay" hidden></div>
@@ -1400,6 +1501,10 @@ window.mermaid = mermaid;
 							<div class="modal-field">
 								<label class="modal-label" for="authLoginPassword">Password</label>
 								<input id="authLoginPassword" type="password" class="input" autocomplete="current-password">
+								<label class="status-text" for="authLoginPasswordToggle" style="margin-top: 0.35rem; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+									<input id="authLoginPasswordToggle" type="checkbox">
+									<span><?=h(mdw_t('auth.show_password','Show password'))?></span>
+								</label>
 							</div>
 						</div>
 						<div id="authStatus" class="status-text" style="margin-top: 0.5rem;"></div>
@@ -1486,6 +1591,18 @@ window.mermaid = mermaid;
 				                </div>
 				                <div class="status-text">
 				                    <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
+				                </div>
+				            </div>
+
+				            <div class="modal-field">
+				                <label class="modal-label" for="offlineDelaySelect"><?=h(mdw_t('theme.offline_delay.label','Offline indicator delay'))?></label>
+				                <select id="offlineDelaySelect" class="input" style="width: 100%;">
+				                    <?php foreach ([1, 2, 3, 5, 10, 15, 20, 30, 45, 60] as $i): ?>
+				                        <option value="<?= $i ?>"><?=h(mdw_t('theme.offline_delay.option_minutes','{n} min', ['n' => $i]))?></option>
+				                    <?php endforeach; ?>
+				                </select>
+				                <div class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.offline_delay.hint','Wait before showing Offline after network errors.'))?>
 				                </div>
 				            </div>
 

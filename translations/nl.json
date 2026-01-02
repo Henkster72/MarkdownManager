@@ -18,7 +18,9 @@
     "item_count_one": "{n} item",
     "item_count_other": "{n} items",
     "total_items": "{n} items totaal",
-    "details": "Details"
+    "details": "Details",
+    "offline": "Offline",
+    "offline_hint": "Offline: opslaan kan mislukken totdat je weer online bent."
   },
   "index": {
     "contents": "Overzicht",
@@ -87,6 +89,11 @@
   "theme": {
     "settings_title": "Instellingen",
     "title": "Instellingen",
+    "settings": {
+      "save_failed": "Opslaan mislukt",
+      "invalid": "Ongeldige instellingen.",
+      "network_error": "Netwerkfout. Probeer opnieuw."
+    },
     "preset": "Thema",
     "default": "Standaard",
     "applies_hint": "Geldt alleen voor de Markdown editor + HTML-voorbeeld.",
@@ -108,6 +115,11 @@
     "language": {
       "label": "Taal",
       "hint": "Kies de UI-taal (automatisch gevonden via translations/*.json)."
+    },
+    "offline_delay": {
+      "label": "Offline-indicator vertraging",
+      "hint": "Wacht even voordat Offline wordt getoond na netwerkfouten.",
+      "option_minutes": "{n} min"
     },
     "app_title": {
       "label": "App-titel",
@@ -225,7 +237,12 @@
       "author_label": "Auteurnaam",
       "author_placeholder": "Jouw naam",
       "author_required": "Vul een auteurnaam in om WPM in te schakelen.",
-      "require_subtitle": "Subtitel (##) vereisen"
+      "require_subtitle": "Subtitel (##) vereisen",
+      "enable_confirm": "WPM inschakelen zal mapnamen opschonen (emoji verwijderd) en submappen naar de root verplaatsen. Doorgaan?",
+      "migration_title": "WPM heeft je mapstructuur bijgewerkt.",
+      "migration_renamed": "Hernoemde mappen: {n}",
+      "migration_moved": "Submappen naar root verplaatst: {n}",
+      "migration_errors": "Migratiefouten: {n}"
     }
   },
   "auth": {
@@ -236,6 +253,7 @@
     "setup_submit": "Wachtwoorden opslaan",
     "wrong_password": "Onjuist wachtwoord.",
     "missing_password": "Vul een wachtwoord in.",
+    "show_password": "Wachtwoord tonen",
     "signing_in": "Bezig met inloggen...",
     "saving": "Opslaan...",
     "set_passwords": "Vul beide wachtwoorden in.",
@@ -283,6 +301,9 @@
     "confirm": "Hernoem",
     "cancel": "Annuleren"
   },
+  "error_modal": {
+    "title": "Er is iets misgegaan"
+  },
   "nav": {
     "collapse_folder": "Map inklappen",
     "expand_folder": "Map uitklappen",
@@ -296,13 +317,27 @@
   "js": {
     "confirm_delete": "\"{file}\" verwijderen?",
     "this_file": "dit bestand",
-    "prompt_new_folder": "Nieuwe mapnaam (geen slashes):",
+    "prompt_new_folder": "Nieuwe mapnaam (gebruik / voor een submap):",
+    "prompt_rename_folder": "Map \"{folder}\" hernoemen naar:",
+    "confirm_delete_folder": "Map \"{folder}\" en alle notities verwijderen?",
     "invalid_folder_alert": "Ongeldige mapnaam.",
     "unsaved_confirm": "Je hebt niet-opgeslagen wijzigingen. Weggooien en doorgaan?",
     "export_failed": "Export mislukt. Controleer de console voor details.",
     "copy_failed": "Kopiëren mislukt. Controleer de console voor details.",
     "copied": "Gekopieerd",
     "copy_code": "Kopieer code",
+    "error_generic": "Er is iets misgegaan.",
+    "save_saving": "Opslaan…",
+    "save_failed": "Opslaan mislukt.",
+    "preview_updating": "Voorbeeld wordt bijgewerkt…",
+    "preview_failed": "Voorbeeld mislukt.",
+    "preview_up_to_date": "Voorbeeld is up-to-date",
+    "preview_render_errors": "Voorbeeld bijgewerkt, maar met renderfouten.",
+    "load_failed": "Fout bij laden van bestand.",
+    "load_not_found": "Bestand niet gevonden.",
+    "load_forbidden": "Toegang geweigerd.",
+    "load_failed_http": "Bestand kon niet worden geladen (HTTP {code}).",
+    "http_status": "HTTP {code}",
     "new_md": {
       "enter_title": "Geef een titel op voor de bestandsnaam.",
       "no_trailing_slash": "De bestandsnaam mag niet eindigen met een slash.",
@@ -326,10 +361,18 @@
     "no_write_permissions": "geen schrijfrechten",
     "invalid_folder_name": "Ongeldige mapnaam.",
     "reserved_folder_name": "Deze mapnaam is gereserveerd.",
+    "nested_folder_not_allowed": "Geneste mappen zijn uitgeschakeld in WPM-modus.",
+    "folder_emoji_not_allowed": "Emoji zijn niet toegestaan in mapnamen wanneer WPM is ingeschakeld.",
     "folder_exists_prefix": "Map bestaat al:",
     "path_exists_not_folder_prefix": "Pad bestaat al (geen map):",
     "folder_create_failed": "Kon map niet aanmaken.",
     "folder_created_prefix": "Map aangemaakt:",
+    "folder_renamed_prefix": "Map hernoemd:",
+    "folder_rename_failed": "Kon map niet hernoemen.",
+    "folder_rename_no_change": "Mapnaam is niet veranderd.",
+    "folder_deleted_prefix": "Map verwijderd:",
+    "folder_delete_failed": "Kon map niet verwijderen.",
+    "folder_delete_non_md": "Map bevat niet-Markdownbestanden. Verwijder handmatig.",
     "invalid_filename_hint": "Bestandsnaam bevat ongeldige tekens. Pas de titel aan (spaties worden koppeltekens) en probeer opnieuw.",
     "title_too_short": "Titel is te kort (min {min}).",
     "title_too_long": "Titel is te lang (max {max}).",

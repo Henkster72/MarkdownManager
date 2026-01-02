@@ -18,7 +18,9 @@
     "item_count_one": "{n} élément",
     "item_count_other": "{n} éléments",
     "total_items": "{n} éléments au total",
-    "details": "Détails"
+    "details": "Détails",
+    "offline": "Hors ligne",
+    "offline_hint": "Hors ligne : les enregistrements peuvent échouer jusqu’à votre reconnexion."
   },
   "index": {
     "contents": "Aperçu",
@@ -87,6 +89,11 @@
   "theme": {
     "settings_title": "Paramètres",
     "title": "Paramètres",
+    "settings": {
+      "save_failed": "Échec de l'enregistrement",
+      "invalid": "Données de configuration invalides.",
+      "network_error": "Erreur réseau. Réessayez."
+    },
     "preset": "Thème",
     "default": "Par défaut",
     "applies_hint": "S'applique uniquement à l'éditeur Markdown + aperçu HTML.",
@@ -108,6 +115,11 @@
     "language": {
       "label": "Langue",
       "hint": "Choisissez la langue de l'UI (détectée automatiquement depuis translations/*.json)."
+    },
+    "offline_delay": {
+      "label": "Délai d’indication hors ligne",
+      "hint": "Attendre avant d’afficher Hors ligne après des erreurs réseau.",
+      "option_minutes": "{n} min"
     },
     "app_title": {
       "label": "Titre de l'application",
@@ -225,7 +237,12 @@
       "author_label": "Nom de l'auteur",
       "author_placeholder": "Votre nom",
       "author_required": "Veuillez saisir un nom d'auteur pour activer WPM.",
-      "require_subtitle": "Exiger un sous-titre (##)"
+      "require_subtitle": "Exiger un sous-titre (##)",
+      "enable_confirm": "Activer le WPM nettoiera les noms de dossiers (emoji supprimés) et déplacera les sous-dossiers au niveau racine. Continuer ?",
+      "migration_title": "Le WPM a mis à jour votre structure de dossiers.",
+      "migration_renamed": "Dossiers renommés : {n}",
+      "migration_moved": "Sous-dossiers déplacés à la racine : {n}",
+      "migration_errors": "Erreurs de migration : {n}"
     }
   },
   "auth": {
@@ -236,6 +253,7 @@
     "setup_submit": "Enregistrer les mots de passe",
     "wrong_password": "Mot de passe incorrect.",
     "missing_password": "Entrez un mot de passe.",
+    "show_password": "Afficher le mot de passe",
     "signing_in": "Connexion...",
     "saving": "Enregistrement...",
     "set_passwords": "Définissez les deux mots de passe.",
@@ -283,6 +301,9 @@
     "confirm": "Renommer",
     "cancel": "Annuler"
   },
+  "error_modal": {
+    "title": "Un problème est survenu"
+  },
   "nav": {
     "collapse_folder": "Réduire le dossier",
     "expand_folder": "Développer le dossier",
@@ -296,13 +317,27 @@
   "js": {
     "confirm_delete": "Supprimer \"{file}\" ?",
     "this_file": "ce fichier",
-    "prompt_new_folder": "Nom du nouveau dossier (sans barres obliques) :",
+    "prompt_new_folder": "Nom du nouveau dossier (utilisez / pour un sous-dossier) :",
+    "prompt_rename_folder": "Renommer le dossier \"{folder}\" en :",
+    "confirm_delete_folder": "Supprimer le dossier \"{folder}\" et toutes les notes ?",
     "invalid_folder_alert": "Nom de dossier invalide.",
     "unsaved_confirm": "Vous avez des modifications non enregistrées. Les abandonner et continuer ?",
     "export_failed": "Échec de l'export. Vérifiez la console pour plus de détails.",
     "copy_failed": "Échec de la copie. Vérifiez la console pour plus de détails.",
     "copied": "Copié",
     "copy_code": "Copier le code",
+    "error_generic": "Un problème est survenu.",
+    "save_saving": "Enregistrement…",
+    "save_failed": "Échec de l'enregistrement.",
+    "preview_updating": "Mise à jour de l’aperçu…",
+    "preview_failed": "Échec de l’aperçu.",
+    "preview_up_to_date": "Aperçu à jour",
+    "preview_render_errors": "Aperçu mis à jour, mais avec des erreurs de rendu.",
+    "load_failed": "Erreur lors du chargement du fichier.",
+    "load_not_found": "Fichier introuvable.",
+    "load_forbidden": "Accès refusé.",
+    "load_failed_http": "Impossible de charger le fichier (HTTP {code}).",
+    "http_status": "HTTP {code}",
     "new_md": {
       "enter_title": "Veuillez saisir un titre pour le nom de fichier.",
       "no_trailing_slash": "Le nom de fichier ne peut pas se terminer par une barre oblique.",
@@ -326,10 +361,18 @@
     "no_write_permissions": "pas d'autorisations d'écriture",
     "invalid_folder_name": "Nom de dossier invalide.",
     "reserved_folder_name": "Ce nom de dossier est réservé.",
+    "nested_folder_not_allowed": "Les dossiers imbriqués sont désactivés en mode WPM.",
+    "folder_emoji_not_allowed": "Les emojis ne sont pas autorisés dans les noms de dossiers lorsque le WPM est activé.",
     "folder_exists_prefix": "Le dossier existe déjà :",
     "path_exists_not_folder_prefix": "Le chemin existe déjà (pas un dossier) :",
     "folder_create_failed": "Impossible de créer le dossier.",
     "folder_created_prefix": "Dossier créé :",
+    "folder_renamed_prefix": "Dossier renommé :",
+    "folder_rename_failed": "Impossible de renommer le dossier.",
+    "folder_rename_no_change": "Le nom du dossier n'a pas changé.",
+    "folder_deleted_prefix": "Dossier supprimé :",
+    "folder_delete_failed": "Impossible de supprimer le dossier.",
+    "folder_delete_non_md": "Le dossier contient des fichiers non Markdown. Supprimez-les manuellement.",
     "invalid_filename_hint": "Nom de fichier invalide. Ajustez le titre (les espaces deviennent des tirets) et réessayez.",
     "title_too_short": "Le titre est trop court (min {min}).",
     "title_too_long": "Le titre est trop long (max {max}).",

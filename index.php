@@ -92,21 +92,67 @@ if ($WPM_BASE_DOMAIN !== null) {
 
 
 /* SECURITY / PATH CLEAN */
+function mdw_path_normalize($path) {
+    return str_replace("\\", "/", (string)$path);
+}
+
+function mdw_project_root() {
+    static $root = null;
+    if ($root === null) {
+        $root = realpath(__DIR__);
+        if ($root === false) $root = __DIR__;
+    }
+    return $root;
+}
+
+function mdw_path_within_root($path, $root = null) {
+    $root = $root ?? mdw_project_root();
+    if (!is_string($root) || $root === '') return false;
+    $rootNorm = rtrim(mdw_path_normalize($root), '/');
+    $pathNorm = mdw_path_normalize($path);
+    if ($pathNorm === $rootNorm) return true;
+    return str_starts_with($pathNorm, $rootNorm . '/');
+}
+
+function mdw_safe_full_path($relativePath, $requireExists = true) {
+    if (!is_string($relativePath) || $relativePath === '') return null;
+    $root = mdw_project_root();
+    if (!is_string($root) || $root === '') return null;
+    $clean = mdw_path_normalize($relativePath);
+    $clean = ltrim($clean, "/");
+    if ($clean === '') return null;
+    $full = rtrim($root, "/\\") . '/' . $clean;
+
+    if ($requireExists) {
+        $resolved = realpath($full);
+        if ($resolved === false) return null;
+        if (!mdw_path_within_root($resolved, $root)) return null;
+        return $full;
+    }
+
+    $parent = dirname($full);
+    $parentResolved = realpath($parent);
+    if ($parentResolved === false) return null;
+    if (!mdw_path_within_root($parentResolved, $root)) return null;
+    return $full;
+}
+
 function sanitize_md_path($path) {
     if (!$path) return null;
     if (strpos($path, '..') !== false) return null;
 
     $parts = explode('/', $path);
+    if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
         // allow unicode letters/numbers plus . _ -
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
     }
 
     if (!preg_match('/\.md$/i', end($parts))) return null;
 
-    $full = __DIR__ . '/' . $path;
-    if (!is_file($full)) return null;
+    $full = mdw_safe_full_path($path, true);
+    if (!$full || !is_file($full)) return null;
 
     return $path;
 }
@@ -119,9 +165,10 @@ function sanitize_md_path_like($path) {
     $path = str_replace("\\", "/", $path);
     $path = trim($path, "/");
     $parts = explode('/', $path);
+    if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
     }
     if (!preg_match('/\.md$/i', end($parts))) return null;
     return $path;
@@ -140,11 +187,12 @@ function sanitize_new_md_path($path) {
     if (!$hasMd) $path .= '.md';
 
     $parts = explode('/', $path);
+    if (count($parts) > 3) return null;
     $cleanParts = [];
     foreach ($parts as $p) {
         if ($p === '') return null;
         $p = preg_replace('/\\s+/u', '-', $p);
-        $p = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $p);
+        $p = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}\\p{So}]+/u', '', $p);
         $p = preg_replace('/-+/', '-', $p);
         $p = trim($p, '-');
         if ($p === '' || $p === '.' || $p === '..') return null;
@@ -178,8 +226,14 @@ function sanitize_folder_name($folder) {
     if (strpos($folder, '..') !== false) return null;
     $folder = str_replace("\\", "/", $folder);
     $folder = trim($folder, "/");
-    if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $folder)) return null;
-    return $folder;
+    if ($folder === '') return null;
+    $parts = explode('/', $folder);
+    if (count($parts) > 2) return null;
+    foreach ($parts as $p) {
+        if ($p === '' || $p === '.' || $p === '..') return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
+    }
+    return implode('/', $parts);
 }
 
 function folder_from_path($path) {
@@ -198,6 +252,7 @@ require_once __DIR__ . '/themes_lib.php';
 $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
 $IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
 $THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+$TOOLS_DIR = 'tools';
 $themesList = list_available_themes($THEMES_DIR);
 $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
@@ -223,6 +278,31 @@ if (is_array($META_CFG_CLIENT) && array_key_exists('_auth', $META_CFG_CLIENT)) {
     unset($META_CFG_CLIENT['_auth']);
 }
 
+function mdw_reserved_folder_names() {
+    global $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR;
+    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+    return [
+        'root' => true,
+        'HTML' => true,
+        'PDF' => true,
+        basename($pluginsDir) => true,
+        $TOOLS_DIR => true,
+        $STATIC_DIR => true,
+        $IMAGES_DIR => true,
+        $THEMES_DIR => true,
+        $TRANSLATIONS_DIR => true,
+    ];
+}
+
+function mdw_folder_is_reserved($folder) {
+    if (!is_string($folder) || $folder === '') return false;
+    $parts = explode('/', $folder);
+    $first = $parts[0] ?? '';
+    if ($first === '') return false;
+    $reserved = mdw_reserved_folder_names();
+    return isset($reserved[$first]);
+}
+
 function extract_title_from_file($fullPath, $fallbackBasename) {
     if (!is_string($fullPath) || $fullPath === '' || !is_file($fullPath)) return $fallbackBasename;
     $h = @fopen($fullPath, 'rb');
@@ -230,14 +310,25 @@ function extract_title_from_file($fullPath, $fallbackBasename) {
 
     $firstNonEmpty = null;
     $maxLines = 200;
+    $inMeta = true;
+    $seenMeta = false;
     while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
         $line = rtrim($line, "\r\n");
         if (preg_match('/^#\s+(.*)$/', $line, $m)) {
             fclose($h);
             return trim($m[1]);
         }
-        $k = null; $v = null;
-        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) continue;
+        if ($inMeta) {
+            $k = null; $v = null;
+            if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+                $seenMeta = true;
+                continue;
+            }
+            if (!$seenMeta && trim((string)$line) === '') {
+                continue;
+            }
+            $inMeta = false;
+        }
         if ($firstNonEmpty === null && trim($line) !== '') {
             $firstNonEmpty = $line;
         }
@@ -335,11 +426,13 @@ function list_md_by_subdir_sorted(){
     $imagesDir = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
     $themesDir = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
     $translationsDir = function_exists('mdw_i18n_dir') ? mdw_i18n_dir() : 'translations';
+    $toolsDir = 'tools';
     $exclude = [
         'root' => true,
         'HTML' => true,
         'PDF' => true,
         basename($pluginsDir) => true,
+        $toolsDir => true,
         $staticDir => true,
         $imagesDir => true,
         $themesDir => true,
@@ -352,28 +445,39 @@ function list_md_by_subdir_sorted(){
 
     sort($dirs, SORT_NATURAL | SORT_FLAG_CASE); // folders A→Z
 
-    $map=[];
-    foreach($dirs as $dir){
+    $map = [];
+    foreach ($dirs as $dir) {
         if (isset($exclude[$dir])) continue;
-        $mds = glob($dir.'/*.md');
 
-        $tmp=[];
-        if ($mds) {
-            foreach($mds as $path){
-                $base = basename($path);
-                [$yy,$mm,$dd] = parse_ymd_from_filename($base);
-                $tmp[] = [
-                    'path'     => $path,
-                    'basename' => $base,
-                    'yy'       => $yy,
-                    'mm'       => $mm,
-                    'dd'       => $dd,
-                ];
-            }
+        $targets = [$dir];
+        $subdirs = array_filter(glob($dir . '/*'), function($f){
+            return is_dir($f) && basename($f)[0] !== '.';
+        });
+        sort($subdirs, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($subdirs as $sub) {
+            $subBase = basename($sub);
+            $targets[] = $dir . '/' . $subBase;
         }
 
-        usort($tmp, 'compare_entries_desc_date');
-        $map[$dir]=$tmp;
+        foreach ($targets as $target) {
+            $mds = glob($target . '/*.md');
+            $tmp = [];
+            if ($mds) {
+                foreach ($mds as $path) {
+                    $base = basename($path);
+                    [$yy,$mm,$dd] = parse_ymd_from_filename($base);
+                    $tmp[] = [
+                        'path'     => $path,
+                        'basename' => $base,
+                        'yy'       => $yy,
+                        'mm'       => $mm,
+                        'dd'       => $dd,
+                    ];
+                }
+            }
+            usort($tmp, 'compare_entries_desc_date');
+            $map[$target] = $tmp;
+        }
     }
     return $map;
 }
@@ -394,7 +498,58 @@ function list_existing_folders_sorted($excludeNames = []) {
     });
 
     sort($dirs, SORT_NATURAL | SORT_FLAG_CASE);
-    return array_values($dirs);
+
+    $out = [];
+    foreach ($dirs as $dir) {
+        $out[] = $dir;
+        $subdirs = array_filter(glob($dir . '/*'), function($f) use ($exclude){
+            if (!is_dir($f)) return false;
+            $base = basename($f);
+            if ($base === '' || $base[0] === '.') return false;
+            return true;
+        });
+        sort($subdirs, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($subdirs as $sub) {
+            $out[] = $dir . '/' . basename($sub);
+        }
+    }
+
+    return $out;
+}
+
+function mdw_delete_md_folder($full, &$error) {
+    $error = '';
+    if (!is_string($full) || $full === '' || !is_dir($full)) {
+        $error = 'not_a_folder';
+        return false;
+    }
+    try {
+        $iter = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($full, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    foreach ($iter as $item) {
+        if ($item->isDir()) {
+            @rmdir($item->getPathname());
+        } else if (!@unlink($item->getPathname())) {
+            $err = error_get_last();
+            $error = $err && !empty($err['message']) ? $err['message'] : 'delete_failed';
+            return false;
+        }
+    }
+
+    if (!@rmdir($full)) {
+        $err = error_get_last();
+        $error = $err && !empty($err['message']) ? $err['message'] : 'delete_failed';
+        return false;
+    }
+
+    return true;
 }
 
 /* LINKS FROM CSV (shortcuts at top) */
@@ -468,7 +623,7 @@ function try_secret_login($passwordInput) {
 
 		if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 		    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
-		    if (!hash_equals($CSRF_TOKEN, $csrf)) {
+	    if (!hash_equals($CSRF_TOKEN, $csrf)) {
 	        $_SESSION['flash_error'] = mdw_t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.');
 	        header('Location: index.php');
 	        exit;
@@ -536,8 +691,10 @@ function try_secret_login($passwordInput) {
         } else if (is_secret_file($san) && !is_secret_authenticated()) {
             $_SESSION['flash_error'] = mdw_t('flash.secret_locked', 'Secret note is locked. Unlock first via the viewer.');
         } else {
-            $full = __DIR__ . '/' . $san;
-            if (@unlink($full)) {
+            $full = mdw_safe_full_path($san, true);
+            if (!$full || !is_file($full)) {
+                $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+            } else if (@unlink($full)) {
                 $_SESSION['flash_ok'] = mdw_t('flash.deleted_prefix', 'Deleted:') . ' ' . $san;
             } else {
                 $err = error_get_last();
@@ -579,8 +736,111 @@ function try_secret_login($passwordInput) {
             }
         }
 
-	        header('Location: ' . $redirect);
-	        exit;
+        header('Location: ' . $redirect);
+        exit;
+		    } else if ($_POST['action'] === 'rename_folder') {
+                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+                $authRequired = function_exists('mdw_auth_has_role')
+                    ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
+                    : false;
+                if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
+                    header('Location: index.php');
+                    exit;
+                }
+
+                $folderRaw = isset($_POST['folder']) ? (string)$_POST['folder'] : '';
+                $newRaw = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
+                $folder = sanitize_folder_name($folderRaw);
+                $newFolder = sanitize_folder_name($newRaw);
+                $returnFilter = sanitize_folder_name($_POST['return_filter'] ?? '') ?? null;
+
+                if (!$folder || !$newFolder) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
+                } else if ($folder === 'root' || $newFolder === 'root' || mdw_folder_is_reserved($folder) || mdw_folder_is_reserved($newFolder)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.reserved_folder_name', 'This folder name is reserved.');
+                } else if (!empty($MDW_PUBLISHER_MODE) && strpos($newFolder, '/') !== false) {
+                    $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
+                } else if (!empty($MDW_PUBLISHER_MODE) && preg_match('/\\p{So}/u', $newFolder)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
+                } else if ($folder === $newFolder) {
+                    $_SESSION['flash_error'] = mdw_t('flash.folder_rename_no_change', 'Folder name did not change.');
+                } else {
+                    $full = mdw_safe_full_path($folder, true);
+                    if (!$full || !is_dir($full)) {
+                        $_SESSION['flash_error'] = mdw_t('flash.folder_not_exist_prefix', 'Folder does not exist:') . ' ' . $folder;
+                    } else {
+                        $dest = mdw_safe_full_path($newFolder, false);
+                        if (!$dest) {
+                            $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
+                        } else if (file_exists($dest)) {
+                            $_SESSION['flash_error'] = mdw_t('flash.folder_exists_prefix', 'Folder already exists:') . ' ' . $newFolder;
+                        } else if (@rename($full, $dest)) {
+                            $_SESSION['flash_ok'] = mdw_t('flash.folder_renamed_prefix', 'Folder renamed:') . ' ' . $folder . ' -> ' . $newFolder;
+                            if ($returnFilter) {
+                                if ($returnFilter === $folder) {
+                                    $returnFilter = $newFolder;
+                                } else if (str_starts_with($returnFilter, $folder . '/')) {
+                                    $returnFilter = $newFolder . substr($returnFilter, strlen($folder));
+                                }
+                            }
+                        } else {
+                            $err = error_get_last();
+                            $msg = mdw_t('flash.folder_rename_failed', 'Could not rename folder.');
+                            if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
+                            $_SESSION['flash_error'] = $msg;
+                        }
+                    }
+                }
+
+                $redirect = 'index.php';
+                if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                header('Location: ' . $redirect);
+                exit;
+		    } else if ($_POST['action'] === 'delete_folder') {
+                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
+                $authRequired = function_exists('mdw_auth_has_role')
+                    ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
+                    : false;
+                if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
+                    header('Location: index.php');
+                    exit;
+                }
+
+                $folderRaw = isset($_POST['folder']) ? (string)$_POST['folder'] : '';
+                $folder = sanitize_folder_name($folderRaw);
+                $returnFilter = sanitize_folder_name($_POST['return_filter'] ?? '') ?? null;
+
+                if (!$folder) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
+                } else if ($folder === 'root' || mdw_folder_is_reserved($folder)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.reserved_folder_name', 'This folder name is reserved.');
+                } else {
+                    $full = mdw_safe_full_path($folder, true);
+                    if (!$full || !is_dir($full)) {
+                        $_SESSION['flash_error'] = mdw_t('flash.folder_not_exist_prefix', 'Folder does not exist:') . ' ' . $folder;
+                    } else {
+                        $err = '';
+                        if (mdw_delete_md_folder($full, $err)) {
+                            $_SESSION['flash_ok'] = mdw_t('flash.folder_deleted_prefix', 'Folder deleted:') . ' ' . $folder;
+                            if ($returnFilter) {
+                                if ($returnFilter === $folder || str_starts_with($returnFilter, $folder . '/')) {
+                                    $returnFilter = null;
+                                }
+                            }
+                        } else {
+                            $msg = mdw_t('flash.folder_delete_failed', 'Could not delete folder.');
+                            if ($err !== '') $msg .= ' (' . $err . ')';
+                            $_SESSION['flash_error'] = $msg;
+                        }
+                    }
+                }
+
+                $redirect = 'index.php';
+                if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
+                header('Location: ' . $redirect);
+                exit;
 		    } else if ($_POST['action'] === 'create_folder') {
                 $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
@@ -600,19 +860,33 @@ function try_secret_login($passwordInput) {
 		            header('Location: index.php');
 		            exit;
 		        }
+		        $segments = explode('/', $name);
+		        $isNested = count($segments) > 1;
+		        if (!empty($MDW_PUBLISHER_MODE) && $isNested) {
+		            $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
+		            header('Location: index.php');
+		            exit;
+		        }
+		        if (!empty($MDW_PUBLISHER_MODE) && preg_match('/\\p{So}/u', $name)) {
+		            $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
+		            header('Location: index.php');
+		            exit;
+		        }
 
 		        $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-			        $reserved = [
-			            'root' => true,
-			            'HTML' => true,
-			            'PDF' => true,
-			            basename($pluginsDir) => true,
-			            $STATIC_DIR => true,
-			            $IMAGES_DIR => true,
-			            $THEMES_DIR => true,
-			            $TRANSLATIONS_DIR => true,
-			        ];
-		        if (isset($reserved[$name])) {
+		        $reserved = [
+		            'root' => true,
+		            'HTML' => true,
+		            'PDF' => true,
+		            basename($pluginsDir) => true,
+		            $TOOLS_DIR => true,
+		            $STATIC_DIR => true,
+		            $IMAGES_DIR => true,
+		            $THEMES_DIR => true,
+		            $TRANSLATIONS_DIR => true,
+		        ];
+		        $reservedHit = isset($reserved[$segments[0] ?? '']);
+		        if ($reservedHit) {
 		            $_SESSION['flash_error'] = mdw_t('flash.reserved_folder_name', 'This folder name is reserved.');
 		            header('Location: index.php');
 		            exit;
@@ -677,6 +951,13 @@ function try_secret_login($passwordInput) {
             if (trim($postedPath) === '') {
                 $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
             $folder = sanitize_folder_name($folder) ?? 'root';
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    if ($folder !== 'root' && strpos($folder, '/') !== false) {
+                        $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
+                    } else if ($folder !== 'root' && preg_match('/\\p{So}/u', $folder)) {
+                        $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
+                    }
+                }
             $slugInput = trim((string)($draftSlug ?? ''));
             if (!$authIsSuperuser || $slugInput === '') $slugInput = $titleInput;
             $slug = sanitize_new_md_slug($slugInput);
@@ -704,6 +985,9 @@ function try_secret_login($passwordInput) {
                     }
                 }
             }
+                if (!empty($_SESSION['flash_error'])) {
+                    $postedPath = '';
+                }
         } else if ($prefixDate) {
             $tmp = trim(str_replace("\\", "/", $postedPath));
             $tmp = ltrim($tmp, "/");
@@ -715,22 +999,42 @@ function try_secret_login($passwordInput) {
             $postedPath = ($d === '.' || $d === '') ? $b : ($d . '/' . $b);
         }
 
-		        $sanNew = $postedPath ? sanitize_new_md_path($postedPath) : null;
+                if (!empty($MDW_PUBLISHER_MODE) && empty($_SESSION['flash_error'])) {
+                    $tmpPath = trim(str_replace("\\", "/", $postedPath));
+                    $tmpDir = dirname($tmpPath);
+                    if ($tmpDir !== '.' && $tmpDir !== '') {
+                        if (strpos($tmpDir, '/') !== false) {
+                            $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
+                        } else if (preg_match('/\\p{So}/u', $tmpDir)) {
+                            $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
+                        }
+                    }
+                }
+
+		        $sanNew = ($postedPath && empty($_SESSION['flash_error'])) ? sanitize_new_md_path($postedPath) : null;
 		        $open_new_panel = true;
 		        if (!$sanNew) {
 		            if (!isset($_SESSION['flash_error']) || $_SESSION['flash_error'] === '') {
 		                $_SESSION['flash_error'] = mdw_t('flash.invalid_filename_hint', 'Invalid filename. Adjust the title (spaces become hyphens) and try again.');
 		            }
-		        } else if (is_secret_file($sanNew) && !is_secret_authenticated()) {
-		            $_SESSION['flash_error'] = mdw_t('flash.secret_marked_locked', 'This path is marked as secret. Unlock first via the viewer.');
-		        } else {
+        } else if (is_secret_file($sanNew) && !is_secret_authenticated()) {
+            $_SESSION['flash_error'] = mdw_t('flash.secret_marked_locked', 'This path is marked as secret. Unlock first via the viewer.');
+        } else {
             $dir = dirname($sanNew);
-            if ($dir !== '.' && !is_dir(__DIR__ . '/' . $dir)) {
+            $dirFull = ($dir === '.' || $dir === '') ? mdw_project_root() : mdw_safe_full_path($dir, true);
+            if ($dir !== '.' && $dir !== '' && (!$dirFull || !is_dir($dirFull))) {
                 $_SESSION['flash_error'] = mdw_t('flash.folder_not_exist_prefix', 'Folder does not exist:') . ' ' . $dir;
-		            } else if (is_file(__DIR__ . '/' . $sanNew)) {
-		                $_SESSION['flash_error'] = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $sanNew;
-		            } else {
-		                $content = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
+            } else {
+                $full = mdw_safe_full_path($sanNew, false);
+                $existingFull = mdw_safe_full_path($sanNew, true);
+                if (!$full) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                } else if ($existingFull && is_file($existingFull)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $sanNew;
+                } else if (!$existingFull && file_exists($full)) {
+                    $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
+                } else {
+                $content = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
 		                if (trim($content) === '') {
 		                    $baseTitle = trim((string)($titleInput ?? ''));
                         if ($baseTitle === '') {
@@ -784,7 +1088,6 @@ function try_secret_login($passwordInput) {
 		                    $opts['settings'] = $settingsOverride;
 		                }
 		                $content = mdw_hidden_meta_ensure_block($content, $sanNew, $opts);
-		                $full = __DIR__ . '/' . $sanNew;
 	                $parentDir = dirname($full);
 	                if (!is_dir($parentDir) || !is_writable($parentDir)) {
 	                    $msg = mdw_t('flash.file_create_failed', 'Could not create file.');
@@ -804,6 +1107,7 @@ function try_secret_login($passwordInput) {
 	                    exit;
 	                }
 		            }
+                }
 			    }
 
             // Preserve the form input so the user can adjust it after an error.
@@ -841,8 +1145,8 @@ if (isset($_GET['file'])) {
     $view_next = null;
 
 if ($requested) {
-    $full = __DIR__.'/'.$requested;
-	    if (is_file($full)) {
+    $full = mdw_safe_full_path($requested, true);
+	    if ($full && is_file($full)) {
 
         // secret file? eerst wachtwoord checken
         if ($requested_is_secret && !is_secret_authenticated()) {
@@ -903,7 +1207,7 @@ if ($requested) {
 		$today_prefix = date('y-m-d-');
 			if ($mode === 'index') {
 			    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-				    $exclude = [basename($pluginsDir), 'HTML', 'PDF', $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+			    $exclude = [basename($pluginsDir), 'HTML', 'PDF', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
 				    $existingFolders = list_existing_folders_sorted($exclude);
 			    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
 			        $default_new_folder = $folder_filter;
@@ -1057,6 +1361,7 @@ window.mermaid = mermaid;
 	            </div>
 	        </div>
 	        <div class="app-header-actions">
+	            <span id="offlineIndicator" class="chip offline-chip" hidden aria-live="polite" title="<?=h(mdw_t('common.offline_hint','Offline: changes are stored locally until you are back online.'))?>"><?=h(mdw_t('common.offline','Offline'))?></span>
 	            <?php if ($mode==='index'): ?>
 	            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
 	            <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=h(mdw_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
@@ -1331,6 +1636,10 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 						<div class="modal-field">
 							<label class="modal-label" for="authLoginPassword">Password</label>
 							<input id="authLoginPassword" type="password" class="input" autocomplete="current-password">
+							<label class="status-text" for="authLoginPasswordToggle" style="margin-top: 0.35rem; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+								<input id="authLoginPasswordToggle" type="checkbox">
+								<span><?=h(mdw_t('auth.show_password','Show password'))?></span>
+							</label>
 						</div>
 					</div>
 					<div id="authStatus" class="status-text" style="margin-top: 0.5rem;"></div>
@@ -1403,6 +1712,18 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 			                </div>
 			                <div class="status-text">
 			                    <?=h(mdw_t('theme.delete_after.hint','Saved in this browser.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field">
+			                <label class="modal-label" for="offlineDelaySelect"><?=h(mdw_t('theme.offline_delay.label','Offline indicator delay'))?></label>
+			                <select id="offlineDelaySelect" class="input" style="width: 100%;">
+			                    <?php foreach ([1, 2, 3, 5, 10, 15, 20, 30, 45, 60] as $i): ?>
+			                        <option value="<?= $i ?>"><?=h(mdw_t('theme.offline_delay.option_minutes','{n} min', ['n' => $i]))?></option>
+			                    <?php endforeach; ?>
+			                </select>
+			                <div class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.offline_delay.hint','Wait before showing Offline after network errors.'))?>
 			                </div>
 			            </div>
 

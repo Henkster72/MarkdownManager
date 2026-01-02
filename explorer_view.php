@@ -49,14 +49,25 @@ function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) 
 
     $firstNonEmpty = null;
     $maxLines = 200;
+    $inMeta = true;
+    $seenMeta = false;
     while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
         $line = rtrim($line, "\r\n");
         if (preg_match('/^#\\s+(.*)$/', $line, $m)) {
             fclose($h);
             return trim($m[1]);
         }
-        $k = null; $v = null;
-        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) continue;
+        if ($inMeta) {
+            $k = null; $v = null;
+            if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+                $seenMeta = true;
+                continue;
+            }
+            if (!$seenMeta && trim((string)$line) === '') {
+                continue;
+            }
+            $inMeta = false;
+        }
         if ($firstNonEmpty === null && trim($line) !== '') {
             $firstNonEmpty = $line;
         }
@@ -87,24 +98,36 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
     $title = null;
     $meta = [];
     $maxLines = 260;
+    $inMeta = true;
+    $seenMeta = false;
     while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
         $line = rtrim($line, "\r\n");
-
-        $k = null; $v = null;
-        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
-            if ($k !== null && isset($want[$k])) {
-                $meta[$k] = $v;
+        if ($inMeta) {
+            $k = null; $v = null;
+            if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+                if ($k !== null && isset($want[$k])) {
+                    $meta[$k] = $v;
+                }
+                $seenMeta = true;
+                continue;
             }
-            continue;
-        }
-        if (!empty($want)) {
-            if (preg_match('/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u', $line, $m)) {
-                $key = strtolower(trim((string)($m[1] ?? '')));
-                if ($key !== '' && isset($want[$key])) {
-                    $meta[$key] = trim((string)($m[2] ?? ''));
-                    continue;
+            if (!empty($want)) {
+                if (preg_match('/^\s*(?:_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*|\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*)$/u', $line, $m)) {
+                    $key = strtolower(trim((string)($m[1] ?? $m[3] ?? '')));
+                    $val = trim((string)($m[2] ?? $m[4] ?? ''));
+                    if ($key !== '') {
+                        if (isset($want[$key])) {
+                            $meta[$key] = $val;
+                        }
+                        $seenMeta = true;
+                        continue;
+                    }
                 }
             }
+            if (!$seenMeta && trim((string)$line) === '') {
+                continue;
+            }
+            $inMeta = false;
         }
 
         if ($title === null && preg_match('/^#\\s+(.*)$/', $line, $m)) {
@@ -473,6 +496,27 @@ function explorer_view_render_tree($opts) {
                 <span class="pi <?= $dir_default_open ? 'pi-openfolder' : 'pi-folder' ?>"></span>
             </button>
             <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink($dirname))?>"><?=explorer_view_escape($dirname)?></a>
+            <?php if ($show_actions && $csrf_token): ?>
+            <div class="note-actions folder-actions" data-auth-superuser="1">
+                <form method="post" class="renameFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="action" value="rename_folder">
+                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="new_folder" value="">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="button" class="btn btn-ghost icon-button folder-rename-btn" title="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>">
+                        <span class="pi pi-edit"></span>
+                    </button>
+                </form>
+                <form method="post" class="deleteFolderForm" data-folder="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="action" value="delete_folder">
+                    <input type="hidden" name="folder" value="<?=explorer_view_escape($dirname)?>">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="submit" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>">
+                        <span class="pi pi-bin"></span>
+                    </button>
+                </form>
+            </div>
+            <?php endif; ?>
         </h2>
 
     <div id="<?=explorer_view_escape($dir_children_id)?>" class="folder-children" <?= $dir_default_open ? '' : 'hidden' ?>>

@@ -8,6 +8,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -829,6 +833,22 @@ a:hover {
   gap: 0.3rem;
 }
 
+.note-group-title .folder-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.note-group-title .folder-actions form {
+  margin: 0;
+}
+
+.note-group-title .folder-actions .icon-button {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
 .nav-section {
   scroll-margin-top: calc(var(--app-header-height) + 1rem);
 }
@@ -1351,6 +1371,11 @@ a:hover {
   background: var(--chip-bg);
   font-size: 0.6rem;
   color: #e5e7eb;
+}
+
+.offline-chip {
+  background: var(--danger);
+  color: #fff;
 }
 
 /* Overrides voor editor-specifieke elementen */

@@ -18,7 +18,9 @@
     "item_count_one": "{n} item",
     "item_count_other": "{n} itens",
     "total_items": "{n} itens no total",
-    "details": "Detalhes"
+    "details": "Detalhes",
+    "offline": "Offline",
+    "offline_hint": "Offline: as gravações podem falhar até estar novamente online."
   },
   "index": {
     "contents": "Visão geral",
@@ -87,6 +89,11 @@
   "theme": {
     "settings_title": "Definições",
     "title": "Definições",
+    "settings": {
+      "save_failed": "Falha ao guardar",
+      "invalid": "Dados de configuração inválidos.",
+      "network_error": "Erro de rede. Tente novamente."
+    },
     "preset": "Tema",
     "default": "Predefinido",
     "applies_hint": "Aplica-se apenas ao editor Markdown + pré-visualização HTML.",
@@ -108,6 +115,11 @@
     "language": {
       "label": "Idioma",
       "hint": "Escolha o idioma da UI (detetado automaticamente a partir de translations/*.json)."
+    },
+    "offline_delay": {
+      "label": "Atraso do indicador offline",
+      "hint": "Aguarde antes de mostrar Offline após erros de rede.",
+      "option_minutes": "{n} min"
     },
     "app_title": {
       "label": "Título da app",
@@ -225,7 +237,12 @@
       "author_label": "Nome do autor",
       "author_placeholder": "O seu nome",
       "author_required": "Introduza um nome de autor para ativar o WPM.",
-      "require_subtitle": "Exigir subtítulo (##)"
+      "require_subtitle": "Exigir subtítulo (##)",
+      "enable_confirm": "Ativar o WPM irá limpar os nomes das pastas (emoji removidos) e mover subpastas para a raiz. Continuar?",
+      "migration_title": "O WPM atualizou a estrutura de pastas.",
+      "migration_renamed": "Pastas renomeadas: {n}",
+      "migration_moved": "Subpastas movidas para a raiz: {n}",
+      "migration_errors": "Erros de migração: {n}"
     }
   },
   "auth": {
@@ -236,6 +253,7 @@
     "setup_submit": "Guardar palavras-passe",
     "wrong_password": "Palavra-passe incorreta.",
     "missing_password": "Introduza uma palavra-passe.",
+    "show_password": "Mostrar palavra-passe",
     "signing_in": "A iniciar sessão...",
     "saving": "A guardar...",
     "set_passwords": "Defina ambas as palavras-passe.",
@@ -283,6 +301,9 @@
     "confirm": "Renomear",
     "cancel": "Cancelar"
   },
+  "error_modal": {
+    "title": "Algo correu mal"
+  },
   "nav": {
     "collapse_folder": "Recolher pasta",
     "expand_folder": "Expandir pasta",
@@ -296,13 +317,27 @@
   "js": {
     "confirm_delete": "Eliminar \"{file}\"?",
     "this_file": "este ficheiro",
-    "prompt_new_folder": "Nome da nova pasta (sem barras):",
+    "prompt_new_folder": "Nome da nova pasta (use / para uma subpasta):",
+    "prompt_rename_folder": "Renomear a pasta \"{folder}\" para:",
+    "confirm_delete_folder": "Eliminar a pasta \"{folder}\" e todas as notas?",
     "invalid_folder_alert": "Nome de pasta inválido.",
     "unsaved_confirm": "Tem alterações não guardadas. Descartar e continuar?",
     "export_failed": "Falha na exportação. Consulte a consola para mais detalhes.",
     "copy_failed": "Falha na cópia. Consulte a consola para mais detalhes.",
     "copied": "Copiado",
     "copy_code": "Copiar código",
+    "error_generic": "Algo correu mal.",
+    "save_saving": "A guardar…",
+    "save_failed": "Falha ao guardar.",
+    "preview_updating": "A atualizar pré-visualização…",
+    "preview_failed": "Falha na pré-visualização.",
+    "preview_up_to_date": "Pré-visualização atualizada",
+    "preview_render_errors": "Pré-visualização atualizada, mas com erros de renderização.",
+    "load_failed": "Erro ao carregar o ficheiro.",
+    "load_not_found": "Ficheiro não encontrado.",
+    "load_forbidden": "Acesso negado.",
+    "load_failed_http": "Não foi possível carregar o ficheiro (HTTP {code}).",
+    "http_status": "HTTP {code}",
     "new_md": {
       "enter_title": "Introduza um título para o nome do ficheiro.",
       "no_trailing_slash": "O nome do ficheiro não pode terminar com uma barra.",
@@ -326,10 +361,18 @@
     "no_write_permissions": "sem permissões de escrita",
     "invalid_folder_name": "Nome de pasta inválido.",
     "reserved_folder_name": "Este nome de pasta está reservado.",
+    "nested_folder_not_allowed": "Pastas aninhadas estão desativadas no modo WPM.",
+    "folder_emoji_not_allowed": "Emojis não são permitidos em nomes de pastas quando o WPM está ativado.",
     "folder_exists_prefix": "A pasta já existe:",
     "path_exists_not_folder_prefix": "O caminho já existe (não é uma pasta):",
     "folder_create_failed": "Não foi possível criar a pasta.",
     "folder_created_prefix": "Pasta criada:",
+    "folder_renamed_prefix": "Pasta renomeada:",
+    "folder_rename_failed": "Não foi possível renomear a pasta.",
+    "folder_rename_no_change": "O nome da pasta não mudou.",
+    "folder_deleted_prefix": "Pasta eliminada:",
+    "folder_delete_failed": "Não foi possível eliminar a pasta.",
+    "folder_delete_non_md": "A pasta contém ficheiros não Markdown. Elimine manualmente.",
     "invalid_filename_hint": "Nome de ficheiro inválido. Ajuste o título (os espaços tornam-se hífens) e tente novamente.",
     "title_too_short": "O título é demasiado curto (mín {min}).",
     "title_too_long": "O título é demasiado longo (máx {max}).",

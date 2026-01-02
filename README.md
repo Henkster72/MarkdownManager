@@ -1,4 +1,4 @@
-# MarkdownManager v0.3.2
+# MarkdownManager v0.3.3
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,21 @@ MarkdownManager is a small, fast app that turns a folder of plain text notes int
 Sharpen your thinking.
 
 New and exciting: thanks to user input, Mermaid diagram support is now built in. It is still rare to see Mermaid in a lightweight PHP notes app, so this feels like a big win for visual thinkers.
+
+## Security warning (read this)
+
+MarkdownManager is not safe to expose to the public internet. It has no accounts, no MFA, no rate limiting, and only lightweight protection for "secret" notes. WPM mode adds some workflow safeguards (required author, required subtitle, publish states, and stricter metadata rules), but it does not make the app safe for public exposure. If you put this on a public server without a strong access layer (VPN, reverse proxy auth, IP allowlist), you are asking for trouble. Run it on localhost or a trusted private network only.
+
+## What's new in 0.3.3
+
+- Security hardening: stronger path sanitization (directory traversal protection) for file and folder operations, plus a formal `SECURITY.md` disclosure policy.
+- Metadata cleanup: `{key: value}` is the canonical hidden meta delimiter, legacy `_key: value_` is normalized on save, and `tools/convert_meta_delimiter.py` can migrate existing notes.
+- WPM metadata bugfix: normal mode no longer injects WPM-only fields; WPM keeps its stricter metadata rules.
+- Table of contents hot keyword: `{TOC}` generates an in-place H3 table of contents with stable IDs (handles existing `<h3 id="...">` blocks and avoids duplicates).
+- HTML preview improvements: inline HTML blocks in Markdown now render correctly in the preview, with safer handling.
+- Error handling + offline awareness: friendly error modal for failed requests, smarter offline indicator with configurable delay, and automatic reset after successful saves/loads.
+- Folder structure upgrades: explorer supports two-level folders; nested folder creation is disabled in WPM, emoji folder names are allowed in normal mode, and enabling WPM sanitizes emoji and flattens subfolders with a clear warning.
+- Folder management: superusers can rename and delete folders (including all notes inside) directly from the explorer; normal users cannot.
 
 ## What's new in 0.3.2
 
@@ -54,16 +69,16 @@ When enabled, MarkdownManager expects a hidden metadata block at the top of each
 Example (hidden metadata block):
 
 ```text
-_page_title: Example page title_
-_page_subtitle: Optional subtitle_
-_post_date: 2025-11-23_
-_published_date: 2025-11-30_
-_publishstate: Published_
-_author: Jane Doe_
+{page_title: Example page title}
+{page_subtitle: Optional subtitle}
+{post_date: 2025-11-23}
+{published_date: 2025-11-30}
+{publishstate: Published}
+{author: Jane Doe}
 ```
 
 Notes:
-- Each metadata line uses the format `_key: value_` (leading/trailing underscores are tolerated).
+- Each metadata line uses the format `{key: value}`. Legacy `_key: value_` is still accepted and will be normalized on save.
 - `published_date` overrides `post_date` when present.
 - If no date metadata exists, the explorer falls back to a date prefix in the filename (`yy-mm-dd-`).
 
@@ -83,6 +98,7 @@ In the overview/explorer, notes are labeled and color-coded by state so you can 
 - Requires a subtitle line starting with `##` (configurable in Settings).
 - Disables secret notes.
 - Persists theme + language + publisher settings to `metadata_config.json` so the UI stays consistent across devices.
+- When you enable WPM, folder names are sanitized for URL safety (emoji removed) and any subfolders are moved to the top level.
 
 ### WPM_BASE_URL (public site integration)
 
@@ -142,6 +158,12 @@ Open `http://127.0.0.1:8000/index.php`.
 
 MarkdownManager is meant for personal/self-hosted use. It does not provide user accounts or strong encryption. Don't expose it publicly without putting proper access controls in front of it (HTTP auth, VPN, or similar).
 
+## Error handling and offline behavior
+
+- Error handling: save, load, and settings actions surface clear messages in the UI (status text plus an error modal) instead of failing silently.
+- Offline indicator: when the browser is offline, a red "Offline" chip appears in the header so users know saves will not reach the server.
+- Offline behavior: the app is not a PWA. It won't load new pages offline, and preview/save/file loads still require the server. Once a page is loaded, you can keep typing, and some UI settings remain in localStorage, but saves will fail until you're back online.
+
 ## The technical stuff
 
 - `index.php` is the viewer (browse + read).
@@ -184,7 +206,8 @@ When the Markdown textarea is focused:
 - Fast browsing:
   - Root notes and per-folder notes.
   - Sorting: date/title/filename with metadata-aware dates.
-  - Folder grouping: subfolders are listed A->Z.
+  - Folder grouping: folders plus one subfolder level (max depth 2); nested folder creation is disabled in WPM mode.
+  - Folder names can include emoji in normal mode if your filesystem/locale supports UTF-8 (most Linux setups do); WPM forbids emoji for URI safety and flattens subfolders on enable.
   - Client-side filtering.
 - Editor UX:
   - Live HTML preview (server-rendered).
@@ -209,6 +232,9 @@ When the Markdown textarea is focused:
 |-- image_manager.php   # upload/list endpoint for the image manager modal
 |-- themes_lib.php      # theme discovery (meta + fonts + available CSS)
 |-- plugins/            # optional plugins (header + folder sections)
+|   |-- links_plugin.php          # shortcuts section from links.csv
+|   |-- html_plugin.php           # HTML/ folder section (lists .html/.htm)
+|   |-- pdfs_plugin.php           # PDF/ folder section (lists .pdf)
 |   |-- google_search_plugin.php  # WPM Google site search + header public link
 |-- static/             # reserved system folder (not shown in overview)
 |   |-- base.js         # client-side behavior (filtering, preview, resizers, shortcuts)
@@ -228,6 +254,7 @@ When the Markdown textarea is focused:
 |   |-- nl.json
 |   `-- ...
 |-- images/             # reserved system folder for uploads (not shown in overview)
+|-- tools/              # reserved system folder for helper scripts (not shown in overview)
 |-- links.csv           # optional shortcuts (CSV)
 |-- secret_mds.txt      # optional list of \"secret\" markdown paths
 `-- <folders>/*.md      # your notes
@@ -244,6 +271,9 @@ When the Markdown textarea is focused:
 ## Markdown rendering
 
 Rendering is implemented in PHP (a small custom parser) and is used by both `index.php` and `edit.php`.
+
+Hot keywords:
+- `{TOC}` inserts a table of contents for `###` headings and links them with numbered anchors (`#1`, `#2`, ...).
 
 It supports a practical subset:
 
@@ -432,6 +462,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.3.3: Security hardening, smarter errors/offline awareness, {TOC} + HTML preview upgrades, metadata delimiter migration, two-level folders with WPM migration rules, and superuser folder management.
 - 0.3.1.2: Settings modal cleanup, copy workflow upgrades (preview + code blocks), HTML copy modes, post date formatting/alignment, and JSON settings import/export.
 - 0.3.1.1: WPM bugfixes for title-first MD creation with slug validation, date prefix default behavior, and superuser-only slug changes.
 - 0.3.1: Major translation effort (DE/FR/PT UI + localized tutorials), language-aware onboarding in WPM, HTML preview upgrades (caret footnotes, inline HTML, strikethrough, themed buttons, stronger link parsing), AJAX save + replace modal, and complementary secondary accent.

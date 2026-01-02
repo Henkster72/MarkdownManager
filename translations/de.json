@@ -18,7 +18,9 @@
     "item_count_one": "{n} Element",
     "item_count_other": "{n} Elemente",
     "total_items": "{n} Elemente insgesamt",
-    "details": "Details"
+    "details": "Details",
+    "offline": "Offline",
+    "offline_hint": "Offline: Speichern kann fehlschlagen, bis Sie wieder online sind."
   },
   "index": {
     "contents": "Übersicht",
@@ -87,6 +89,11 @@
   "theme": {
     "settings_title": "Einstellungen",
     "title": "Einstellungen",
+    "settings": {
+      "save_failed": "Speichern fehlgeschlagen",
+      "invalid": "Ungültige Einstellungsdaten.",
+      "network_error": "Netzwerkfehler. Bitte erneut versuchen."
+    },
     "preset": "Thema",
     "default": "Standard",
     "applies_hint": "Gilt nur für den Markdown-Editor + die HTML-Vorschau.",
@@ -108,6 +115,11 @@
     "language": {
       "label": "Sprache",
       "hint": "UI-Sprache wählen (automatisch erkannt aus translations/*.json)."
+    },
+    "offline_delay": {
+      "label": "Offline-Anzeige verzögern",
+      "hint": "Wartezeit, bevor Offline nach Netzwerkfehlern angezeigt wird.",
+      "option_minutes": "{n} Min"
     },
     "app_title": {
       "label": "App-Titel",
@@ -225,7 +237,12 @@
       "author_label": "Autorenname",
       "author_placeholder": "Ihr Name",
       "author_required": "Bitte geben Sie einen Autorennamen ein, um WPM zu aktivieren.",
-      "require_subtitle": "Untertitel (##) erforderlich"
+      "require_subtitle": "Untertitel (##) erforderlich",
+      "enable_confirm": "Das Aktivieren von WPM bereinigt Ordnernamen (Emoji entfernt) und verschiebt Unterordner in die oberste Ebene. Fortfahren?",
+      "migration_title": "WPM hat deine Ordnerstruktur aktualisiert.",
+      "migration_renamed": "Umbenannte Ordner: {n}",
+      "migration_moved": "Unterordner in die Root verschoben: {n}",
+      "migration_errors": "Migrationsfehler: {n}"
     }
   },
   "auth": {
@@ -236,6 +253,7 @@
     "setup_submit": "Passwörter speichern",
     "wrong_password": "Falsches Passwort.",
     "missing_password": "Passwort eingeben.",
+    "show_password": "Passwort anzeigen",
     "signing_in": "Anmelden...",
     "saving": "Speichern...",
     "set_passwords": "Beide Passwörter festlegen.",
@@ -283,6 +301,9 @@
     "confirm": "Umbenennen",
     "cancel": "Abbrechen"
   },
+  "error_modal": {
+    "title": "Etwas ist schiefgelaufen"
+  },
   "nav": {
     "collapse_folder": "Ordner einklappen",
     "expand_folder": "Ordner ausklappen",
@@ -296,13 +317,27 @@
   "js": {
     "confirm_delete": "\"{file}\" löschen?",
     "this_file": "diese Datei",
-    "prompt_new_folder": "Neuer Ordnername (keine Schrägstriche):",
+    "prompt_new_folder": "Neuer Ordnername ( / für Unterordner):",
+    "prompt_rename_folder": "Ordner \"{folder}\" umbenennen in:",
+    "confirm_delete_folder": "Ordner \"{folder}\" und alle Notizen löschen?",
     "invalid_folder_alert": "Ungültiger Ordnername.",
     "unsaved_confirm": "Sie haben nicht gespeicherte Änderungen. Verwerfen und fortfahren?",
     "export_failed": "Export fehlgeschlagen. Details in der Konsole prüfen.",
     "copy_failed": "Kopieren fehlgeschlagen. Details in der Konsole prüfen.",
     "copied": "Kopiert",
     "copy_code": "Code kopieren",
+    "error_generic": "Etwas ist schiefgelaufen.",
+    "save_saving": "Speichern…",
+    "save_failed": "Speichern fehlgeschlagen.",
+    "preview_updating": "Vorschau wird aktualisiert…",
+    "preview_failed": "Vorschau fehlgeschlagen.",
+    "preview_up_to_date": "Vorschau ist aktuell",
+    "preview_render_errors": "Vorschau aktualisiert, aber mit Render-Fehlern.",
+    "load_failed": "Fehler beim Laden der Datei.",
+    "load_not_found": "Datei nicht gefunden.",
+    "load_forbidden": "Zugriff verweigert.",
+    "load_failed_http": "Datei konnte nicht geladen werden (HTTP {code}).",
+    "http_status": "HTTP {code}",
     "new_md": {
       "enter_title": "Bitte einen Titel für den Dateinamen eingeben.",
       "no_trailing_slash": "Der Dateiname darf nicht mit einem Schrägstrich enden.",
@@ -326,10 +361,18 @@
     "no_write_permissions": "keine Schreibrechte",
     "invalid_folder_name": "Ungültiger Ordnername.",
     "reserved_folder_name": "Dieser Ordnername ist reserviert.",
+    "nested_folder_not_allowed": "Verschachtelte Ordner sind im WPM-Modus deaktiviert.",
+    "folder_emoji_not_allowed": "Emoji sind in Ordnernamen nicht erlaubt, wenn WPM aktiviert ist.",
     "folder_exists_prefix": "Ordner existiert bereits:",
     "path_exists_not_folder_prefix": "Pfad existiert bereits (kein Ordner):",
     "folder_create_failed": "Ordner konnte nicht erstellt werden.",
     "folder_created_prefix": "Ordner erstellt:",
+    "folder_renamed_prefix": "Ordner umbenannt:",
+    "folder_rename_failed": "Ordner konnte nicht umbenannt werden.",
+    "folder_rename_no_change": "Ordnername wurde nicht geändert.",
+    "folder_deleted_prefix": "Ordner gelöscht:",
+    "folder_delete_failed": "Ordner konnte nicht gelöscht werden.",
+    "folder_delete_non_md": "Ordner enthält Dateien, die keine Markdown-Dateien sind. Bitte manuell löschen.",
     "invalid_filename_hint": "Ungültiger Dateiname. Passen Sie den Titel an (Leerzeichen werden zu Bindestrichen) und versuchen Sie es erneut.",
     "title_too_short": "Titel ist zu kurz (min {min}).",
     "title_too_long": "Titel ist zu lang (max {max}).",

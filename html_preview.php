@@ -715,8 +715,15 @@ function mdw_hidden_meta_match($line, &$keyOut = null, &$valueOut = null) {
     $line = str_replace("\xC2\xA0", ' ', $line); // NBSP
     $line = preg_replace('/[\x{200B}\x{FEFF}]/u', '', $line); // ZWSP/BOM
 
-    // Match `_key: value_` but tolerate missing trailing underscores or extra underscores.
-    if (!preg_match('/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u', $line, $m)) return false;
+    // Match `{key: value}` or legacy `_key: value_`, tolerate extra delimiters.
+    $m = null;
+    if (preg_match('/^\s*\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*$/u', $line, $mm)) {
+        $m = $mm;
+    } else if (preg_match('/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u', $line, $mm)) {
+        $m = $mm;
+    } else {
+        return false;
+    }
 
     $key = strtolower(trim((string)($m[1] ?? '')));
     if ($key === '') return false;
@@ -739,20 +746,43 @@ function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null) {
     }
 
     $meta = [];
+    $out = [];
+    $bufferedLeading = [];
+    $inMeta = true;
+    $seenMeta = false;
 
     // Strip BOM on the very first line if present.
     if (isset($lines[0])) {
         $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
     }
-
-    $out = [];
     foreach ($lines as $line) {
-        $k = null; $v = null;
-        if (mdw_hidden_meta_match($line, $k, $v)) {
-            $meta[$k] = $v;
-            continue;
+        if ($inMeta) {
+            $k = null;
+            $v = null;
+            if (mdw_hidden_meta_match($line, $k, $v)) {
+                $meta[$k] = $v;
+                $seenMeta = true;
+                continue;
+            }
+            if (!$seenMeta && trim((string)$line) === '') {
+                $bufferedLeading[] = $line;
+                continue;
+            }
+            $inMeta = false;
+            if (!empty($bufferedLeading)) {
+                foreach ($bufferedLeading as $buffered) {
+                    $out[] = $buffered;
+                }
+                $bufferedLeading = [];
+            }
         }
         $out[] = $line;
+    }
+
+    if ($inMeta && !empty($bufferedLeading)) {
+        foreach ($bufferedLeading as $buffered) {
+            $out[] = $buffered;
+        }
     }
 
     $metaOut = $meta;
@@ -763,7 +793,223 @@ function mdw_hidden_meta_render_line($key, $value) {
     $key = (string)$key;
     $value = trim((string)$value);
     if ($value === '') return null;
-    return '_' . $key . ': ' . $value . '_';
+    return '{' . $key . ': ' . $value . '}';
+}
+
+function mdw_toc_is_token_line($line) {
+    $line = str_replace("\xC2\xA0", ' ', (string)$line);
+    $line = preg_replace('/[\x{200B}\x{FEFF}]/u', '', $line);
+    $trim = trim($line);
+    if ($trim === '') return false;
+    return strtoupper($trim) === '{TOC}';
+}
+
+function mdw_toc_normalize_id($id) {
+    $id = trim((string)$id);
+    if ($id === '') return '';
+    $id = ltrim($id, '#');
+    $id = preg_replace('/\s+/', '-', $id);
+    return $id;
+}
+
+function mdw_toc_extract_id_attr($attrs) {
+    $attrs = (string)$attrs;
+    if ($attrs === '') return '';
+    if (!preg_match('/\bid\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $m)) return '';
+    $id = '';
+    if (isset($m[1]) && $m[1] !== '') $id = $m[1];
+    else if (isset($m[2]) && $m[2] !== '') $id = $m[2];
+    else if (isset($m[3]) && $m[3] !== '') $id = $m[3];
+    return mdw_toc_normalize_id($id);
+}
+
+function mdw_toc_collect_h3($text) {
+    $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", (string)$text));
+    $items = [];
+    $inFence = false;
+    $tocActive = false;
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*```/', $line)) {
+            $inFence = !$inFence;
+            continue;
+        }
+        if ($inFence) continue;
+        if (mdw_toc_is_token_line($line)) {
+            $tocActive = true;
+            continue;
+        }
+        if (!$tocActive) continue;
+
+        if (preg_match('/^\s*<h([1-6])\b([^>]*)>(.*?)<\/h\\1>\s*$/i', $line, $m)) {
+            $level = (int)$m[1];
+            if ($level === 3) {
+                $id = mdw_toc_extract_id_attr($m[2] ?? '');
+                $label = trim(strip_tags((string)($m[3] ?? '')));
+                $items[] = ['text' => $label, 'id' => $id];
+            }
+            continue;
+        }
+
+        if (preg_match('/^(#{1,6})\s+(.*)$/', $line, $m)) {
+            if (strlen($m[1]) === 3) {
+                $items[] = ['text' => trim((string)$m[2]), 'id' => ''];
+            }
+        }
+    }
+    return $items;
+}
+
+function mdw_toc_has_token($text) {
+    $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", (string)$text));
+    $inFence = false;
+    foreach ($lines as $line) {
+        if (preg_match('/^\s*```/', $line)) {
+            $inFence = !$inFence;
+            continue;
+        }
+        if ($inFence) continue;
+        if (mdw_toc_is_token_line($line)) return true;
+    }
+    return false;
+}
+
+function mdw_toc_assign_ids($items) {
+    $used = [];
+    $out = [];
+    foreach ($items as $item) {
+        $id = mdw_toc_normalize_id($item['id'] ?? '');
+        if ($id !== '' && !isset($used[$id])) {
+            $used[$id] = true;
+            $item['id'] = $id;
+        } else {
+            $item['id'] = '';
+        }
+        $out[] = $item;
+    }
+
+    $next = 1;
+    foreach ($out as &$item) {
+        if ($item['id'] !== '') continue;
+        while (isset($used[(string)$next])) $next++;
+        $item['id'] = (string)$next;
+        $used[$item['id']] = true;
+        $next++;
+    }
+    unset($item);
+
+    return $out;
+}
+
+function mdw_html_is_allowed_tag($tag) {
+    $tag = strtolower((string)$tag);
+    if ($tag === '') return false;
+    static $allowed = null;
+    if ($allowed === null) {
+        $allowed = [
+            'div' => true, 'section' => true, 'article' => true, 'aside' => true, 'header' => true, 'footer' => true,
+            'nav' => true, 'p' => true, 'ul' => true, 'ol' => true, 'li' => true, 'blockquote' => true,
+            'table' => true, 'thead' => true, 'tbody' => true, 'tfoot' => true, 'tr' => true, 'td' => true,
+            'th' => true, 'figure' => true, 'figcaption' => true, 'img' => true, 'a' => true, 'span' => true,
+            'strong' => true, 'em' => true, 'br' => true, 'hr' => true, 'pre' => true, 'code' => true,
+            'details' => true, 'summary' => true,
+            'h1' => true, 'h2' => true, 'h3' => true, 'h4' => true, 'h5' => true, 'h6' => true,
+        ];
+    }
+    return isset($allowed[$tag]);
+}
+
+function mdw_html_is_self_closing_tag($tag) {
+    $tag = strtolower((string)$tag);
+    return in_array($tag, ['img','br','hr','meta','link','input'], true);
+}
+
+function mdw_html_block_tag_from_line($line) {
+    $trim = trim((string)$line);
+    if ($trim === '') return '';
+    if (!preg_match('/^<([A-Za-z][A-Za-z0-9:-]*)\\b[^>]*>/i', $trim, $m)) return '';
+    if (preg_match('/^<\\//', $trim)) return '';
+    $tag = strtolower((string)$m[1]);
+    if (!mdw_html_is_allowed_tag($tag)) return '';
+    if (preg_match('/^h[1-6]$/', $tag)) return '';
+    return $tag;
+}
+
+function mdw_html_tag_balance_delta($line, $tag) {
+    if ($tag === '') return 0;
+    $tag = preg_quote((string)$tag, '/');
+    $open = preg_match_all('/<'.$tag.'\\b(?![^>]*\\/\\s*>)/i', (string)$line, $m);
+    $close = preg_match_all('/<\\/'.$tag.'\\b/i', (string)$line, $m2);
+    return (int)$open - (int)$close;
+}
+
+function mdw_html_set_attr($attrs, $name, $value) {
+    $attrs = trim((string)$attrs);
+    $name = preg_quote((string)$name, '/');
+    $attrs = preg_replace('/\\s+'.$name.'\\s*=\\s*(\"[^\"]*\"|\\\'[^\\\']*\\\'|[^\\s>]+)/i', '', $attrs);
+    $attrs = trim($attrs);
+    $safeValue = htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    $attrs .= ($attrs !== '' ? ' ' : '') . preg_replace('/\\\\/', '', $name) . '="' . $safeValue . '"';
+    return trim($attrs);
+}
+
+function mdw_html_add_class($attrs, $class) {
+    $class = trim((string)$class);
+    if ($class === '') return trim((string)$attrs);
+    $attrs = (string)$attrs;
+    $existing = '';
+    if (preg_match('/\\bclass\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s>]+))/i', $attrs, $m)) {
+        $existing = (string)($m[2] ?? $m[3] ?? $m[4] ?? '');
+    }
+    $classes = preg_split('/\\s+/', trim($existing)) ?: [];
+    if (!in_array($class, $classes, true)) {
+        $classes[] = $class;
+    }
+    $new = trim(implode(' ', array_filter($classes)));
+    return mdw_html_set_attr($attrs, 'class', $new);
+}
+
+function mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, &$tocIndex) {
+    if (!preg_match('/^\\s*<h([1-6])\\b([^>]*)>(.*?)<\\/h\\1>\\s*$/i', (string)$line, $m)) return null;
+    $level = (int)$m[1];
+    $attrs = (string)($m[2] ?? '');
+    $content = (string)($m[3] ?? '');
+
+    $p = md_render_profile($profile);
+    $clsMap = $p['heading_classes'] ?? [];
+    $cls = $clsMap[$level] ?? ($profile === 'view' ? "font-bold mt-4 mb-2" : "md-heading");
+    $attrs = mdw_html_add_class($attrs, $cls);
+
+    if ($tocRequested && $tocActive && $level === 3 && isset($tocItems[$tocIndex])) {
+        $attrs = mdw_html_set_attr($attrs, 'id', (string)$tocItems[$tocIndex]['id']);
+        $tocIndex++;
+    }
+
+    $attrs = trim($attrs);
+    $attrs = $attrs !== '' ? ' ' . $attrs : '';
+    return '<h' . $level . $attrs . '>' . inline_md($content, $mdPath, $profile, $context) . '</h' . $level . '>';
+}
+
+function mdw_toc_render_html($items, $profile, $context, $mdPath = null) {
+    $p = md_render_profile($profile);
+    $ulClass = md_join_classes($p['ul_class'] ?? '', 'md-toc');
+    $liClass = md_join_classes($p['li_class'] ?? '', 'md-toc-item');
+    $ulAttr = $ulClass ? ' class="'.htmlspecialchars($ulClass, ENT_QUOTES, 'UTF-8').'"' : '';
+    $liAttr = $liClass ? ' class="'.htmlspecialchars($liClass, ENT_QUOTES, 'UTF-8').'"' : '';
+
+    $out = [];
+    $out[] = '<!-- Table of contents -->';
+    $out[] = '<div class="md-toc-wrap" data-mdw-toc="1">';
+    $out[] = '<ul'.$ulAttr.'>';
+    foreach ($items as $item) {
+        $label = strip_tags((string)($item['text'] ?? ''));
+        $label = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        $id = htmlspecialchars((string)($item['id'] ?? ''), ENT_QUOTES, 'UTF-8');
+        if ($id === '') continue;
+        $out[] = '<li'.$liAttr.'><a href="#'.$id.'">'.$label.'</a></li>';
+    }
+    $out[] = '</ul>';
+    $out[] = '</div>';
+    return implode("\n", $out);
 }
 
 function mdw_metadata_config_path() {
@@ -1298,10 +1544,20 @@ function mdw_md_has_h2($raw) {
     $raw = str_replace(["\r\n", "\r"], "\n", (string)$raw);
     $lines = explode("\n", $raw);
     $inFence = false;
+    $inMeta = true;
+    $seenMeta = false;
     foreach ($lines as $line) {
-        // Ignore metadata lines.
-        $k = null; $v = null;
-        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) continue;
+        if ($inMeta) {
+            $k = null; $v = null;
+            if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+                $seenMeta = true;
+                continue;
+            }
+            if (!$seenMeta && trim((string)$line) === '') {
+                continue;
+            }
+            $inMeta = false;
+        }
 
         if (preg_match('/^\s*```/', $line)) {
             $inFence = !$inFence;
@@ -1480,6 +1736,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if (!isset($footnotes[$k])) $footnotes[$k] = $v;
     }
     $context['footnotes'] = $footnotes;
+
+    $tocRequested = mdw_toc_has_token($text);
+    $tocItems = $tocRequested ? mdw_toc_assign_ids(mdw_toc_collect_h3($text)) : [];
+    $tocIndex = 0;
+    $tocActive = false;
+
     $lines = explode("\n",$text);
     $footnoteInfo = mdw_collect_footnote_refs($text);
     $footnoteRefs = (is_array($footnoteInfo) && isset($footnoteInfo['order']) && is_array($footnoteInfo['order']))
@@ -1493,6 +1755,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $in_codeblock = false;
     $codeblock_type = null;
     $listStack = [];
+    $inHtmlBlock = false;
+    $htmlBlockTag = '';
+    $htmlBlockDepth = 0;
 
     // Render metadata block (optional, based on config).
     $baseFields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
@@ -1719,6 +1984,60 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             continue;
         }
 
+        if ($tocRequested && mdw_toc_is_token_line($line)) {
+            $closeAllLists();
+            $html[] = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+            $tocActive = true;
+            continue;
+        }
+
+        if ($inHtmlBlock) {
+            $headingHtml = mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, $tocIndex);
+            if ($headingHtml !== null) {
+                $html[] = $headingHtml;
+            } else {
+                $html[] = $line;
+            }
+            $htmlBlockDepth += mdw_html_tag_balance_delta($line, $htmlBlockTag);
+            if ($htmlBlockDepth <= 0) {
+                $inHtmlBlock = false;
+                $htmlBlockTag = '';
+                $htmlBlockDepth = 0;
+            }
+            continue;
+        }
+
+        $headingHtml = mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, $tocIndex);
+        if ($headingHtml !== null) {
+            $closeAllLists();
+            $html[] = $headingHtml;
+            continue;
+        }
+
+        $blockTag = mdw_html_block_tag_from_line($line);
+        if ($blockTag !== '') {
+            $closeAllLists();
+            $html[] = $line;
+            if (!mdw_html_is_self_closing_tag($blockTag)) {
+                $delta = mdw_html_tag_balance_delta($line, $blockTag);
+                if ($delta > 0) {
+                    $inHtmlBlock = true;
+                    $htmlBlockTag = $blockTag;
+                    $htmlBlockDepth = $delta;
+                }
+            }
+            continue;
+        }
+
+        if (preg_match('/^\s*<\/([A-Za-z][A-Za-z0-9:-]*)\b[^>]*>\s*$/', $line, $m)) {
+            $tag = strtolower((string)$m[1]);
+            if (mdw_html_is_allowed_tag($tag)) {
+                $closeAllLists();
+                $html[] = $line;
+                continue;
+            }
+        }
+
         // MathJax display blocks: \[ ... \] on their own lines (allow indentation, incl. inside list items)
         if (is_mathjax_display_open_line($line)) {
             $closeIndex = null;
@@ -1846,7 +2165,13 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $cls = $clsMap[$level] ?? ($profile === 'view' ? "font-bold mt-4 mb-2" : "md-heading");
             $clsAttr = $cls ? ' class="'.htmlspecialchars($cls, ENT_QUOTES, 'UTF-8').'"' : '';
 
-            $html[] = "<$tag$clsAttr>".inline_md($content, $mdPath, $profile, $context)."</$tag>";
+            $idAttr = '';
+            if ($tocRequested && $tocActive && $level === 3 && isset($tocItems[$tocIndex])) {
+                $idAttr = ' id="' . htmlspecialchars((string)$tocItems[$tocIndex]['id'], ENT_QUOTES, 'UTF-8') . '"';
+                $tocIndex++;
+            }
+
+            $html[] = "<$tag$idAttr$clsAttr>".inline_md($content, $mdPath, $profile, $context)."</$tag>";
             continue;
         }
 
@@ -1961,9 +2286,20 @@ function extract_title($raw){
     foreach (explode("\n",$raw) as $l){
         if (preg_match('/^#\s+(.*)$/',$l,$m)) return trim($m[1]);
     }
+    $inMeta = true;
+    $seenMeta = false;
     foreach (explode("\n",$raw) as $l){
-        $k = null; $v = null;
-        if (mdw_hidden_meta_match($l, $k, $v)) continue;
+        if ($inMeta) {
+            $k = null; $v = null;
+            if (mdw_hidden_meta_match($l, $k, $v)) {
+                $seenMeta = true;
+                continue;
+            }
+            if (!$seenMeta && trim((string)$l) === '') {
+                continue;
+            }
+            $inMeta = false;
+        }
         if (trim($l)!=='') return trim($l);
     }
     return "Untitled";

@@ -66,6 +66,150 @@ if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
     exit;
 }
 
+function mdw_wpm_sanitize_folder_name($folder) {
+    if (!is_string($folder)) return null;
+    $folder = trim($folder);
+    if ($folder === '') return null;
+    if (strpos($folder, '..') !== false) return null;
+    $folder = str_replace("\\", "/", $folder);
+    $folder = trim($folder, "/");
+    if ($folder === '') return null;
+    $parts = explode('/', $folder);
+    if (count($parts) > 2) return null;
+    foreach ($parts as $p) {
+        if ($p === '' || $p === '.' || $p === '..') return null;
+        if (!preg_match('/^[A-Za-z0-9._\\-\\p{L}\\p{N}\\p{So}]+$/u', $p)) return null;
+    }
+    return implode('/', $parts);
+}
+
+function mdw_wpm_reserved_names() {
+    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+    $staticDir = mdw_wpm_sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
+    $imagesDir = mdw_wpm_sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
+    $themesDir = mdw_wpm_sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+    $translationsDir = trim((string)env_str('TRANSLATIONS_DIR', 'translations'));
+    if ($translationsDir === '') $translationsDir = 'translations';
+    $toolsDir = 'tools';
+    return [
+        'root' => true,
+        'HTML' => true,
+        'PDF' => true,
+        basename($pluginsDir) => true,
+        $toolsDir => true,
+        $staticDir => true,
+        $imagesDir => true,
+        $themesDir => true,
+        $translationsDir => true,
+    ];
+}
+
+function mdw_wpm_clean_folder_name($name) {
+    $name = (string)$name;
+    $name = preg_replace('/\\p{So}+/u', '', $name);
+    $name = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $name);
+    $name = preg_replace('/-+/', '-', $name);
+    $name = trim($name, '-.');
+    if ($name === '' || $name === '.' || $name === '..') {
+        $name = 'folder';
+    }
+    return $name;
+}
+
+function mdw_wpm_unique_name($root, $base, $used) {
+    $base = (string)$base;
+    $root = rtrim((string)$root, "/\\");
+    $candidate = $base;
+    $i = 2;
+    while (isset($used[$candidate]) || file_exists($root . '/' . $candidate)) {
+        $candidate = $base . '-' . $i;
+        $i++;
+    }
+    return $candidate;
+}
+
+function mdw_wpm_migrate_folders($root) {
+    $warnings = [
+        'renamed' => [],
+        'moved' => [],
+        'errors' => [],
+    ];
+    $root = rtrim((string)$root, "/\\");
+    $reserved = mdw_wpm_reserved_names();
+
+    $entries = @scandir($root);
+    if (!is_array($entries)) {
+        return $warnings;
+    }
+
+    $used = [];
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') continue;
+        if (is_dir($root . '/' . $entry)) {
+            $used[$entry] = true;
+        }
+    }
+    foreach ($reserved as $name => $_v) {
+        $used[$name] = true;
+    }
+
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') continue;
+        if ($entry === '' || $entry[0] === '.') continue;
+        if (isset($reserved[$entry])) continue;
+        $path = $root . '/' . $entry;
+        if (!is_dir($path)) continue;
+
+        $newTop = mdw_wpm_clean_folder_name($entry);
+        if ($newTop !== $entry) {
+            $newTop = mdw_wpm_unique_name($root, $newTop, $used);
+            $target = $root . '/' . $newTop;
+            if (@rename($path, $target)) {
+                unset($used[$entry]);
+                $used[$newTop] = true;
+                $warnings['renamed'][] = ['from' => $entry, 'to' => $newTop];
+                $entry = $newTop;
+                $path = $target;
+            } else {
+                $err = error_get_last();
+                $warnings['errors'][] = [
+                    'from' => $entry,
+                    'to' => $newTop,
+                    'error' => $err && !empty($err['message']) ? $err['message'] : 'rename_failed',
+                ];
+            }
+        }
+
+        $subdirs = @scandir($path);
+        if (!is_array($subdirs)) continue;
+        foreach ($subdirs as $sub) {
+            if ($sub === '.' || $sub === '..') continue;
+            if ($sub === '' || $sub[0] === '.') continue;
+            $subPath = $path . '/' . $sub;
+            if (!is_dir($subPath)) continue;
+            $clean = mdw_wpm_clean_folder_name($sub);
+            $targetName = mdw_wpm_unique_name($root, $clean, $used);
+            $targetPath = $root . '/' . $targetName;
+            if (@rename($subPath, $targetPath)) {
+                $used[$targetName] = true;
+                $warnings['moved'][] = [
+                    'from' => $entry . '/' . $sub,
+                    'to' => $targetName,
+                ];
+            } else {
+                $err = error_get_last();
+                $warnings['errors'][] = [
+                    'from' => $entry . '/' . $sub,
+                    'to' => $targetName,
+                    'error' => $err && !empty($err['message']) ? $err['message'] : 'move_failed',
+                ];
+            }
+        }
+    }
+
+    return $warnings;
+}
+
 $current = mdw_metadata_load_config();
 $fields = isset($current['fields']) && is_array($current['fields']) ? $current['fields'] : [];
 foreach ($cfgFields as $k => $in) {
@@ -90,6 +234,7 @@ $out['fields'] = $fields;
 if (is_array($settingsIn)) {
     $curSettings = isset($out['_settings']) && is_array($out['_settings']) ? $out['_settings'] : [];
 
+    $wasPublisherMode = !empty($curSettings['publisher_mode']);
     $publisherMode = array_key_exists('publisher_mode', $settingsIn) ? !empty($settingsIn['publisher_mode']) : !empty($curSettings['publisher_mode']);
     $defaultAuthor = array_key_exists('publisher_default_author', $settingsIn) ? trim((string)($settingsIn['publisher_default_author'] ?? '')) : trim((string)($curSettings['publisher_default_author'] ?? ''));
     $requireH2 = array_key_exists('publisher_require_h2', $settingsIn) ? (bool)$settingsIn['publisher_require_h2'] : (!array_key_exists('publisher_require_h2', $curSettings) ? true : (bool)$curSettings['publisher_require_h2']);
@@ -139,6 +284,11 @@ if (is_array($settingsIn)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'publisher_author_required']);
         exit;
+    }
+
+    $wpmMigration = null;
+    if ($publisherMode && !$wasPublisherMode) {
+        $wpmMigration = mdw_wpm_migrate_folders(__DIR__);
     }
 
     $out['_settings'] = array_merge($curSettings, [
@@ -203,4 +353,5 @@ echo json_encode([
     'ok' => true,
     'config' => $cfgOut,
     'publisher_config' => mdw_metadata_normalize_publisher_config($outPub),
+    'wpm_migration' => isset($wpmMigration) ? $wpmMigration : null,
 ]);
