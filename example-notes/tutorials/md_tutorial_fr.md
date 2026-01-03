@@ -5,6 +5,41 @@ Markdown est un langage de balisage simple utilisé pour formater du texte. Pour
 
 Vous pouvez maintenant **exactement** voir à quoi cela ressemblera sur le site.
 
+## Bases de MarkdownManager (apres installation)
+
+- Creer une note : cliquez sur `+MD` dans la barre du haut, choisissez un dossier, entrez un titre/slug, enregistrez.
+- Ouvrir des notes : utilisez l'explorateur a gauche ; filtrez, triez et cliquez sur une note.
+- Enregistrer : bouton Enregistrer ou raccourci.
+- Apercu : l'apercu HTML se met a jour apres l'enregistrement.
+- Mise en forme : utilisez la barre d'outils pour titres, gras/italique/souligne, listes, citation, tableau et alignement. L'alignement ajoute `{: class="left|center|right" }`.
+- Renommer/supprimer : superuser uniquement, boutons au-dessus de l'explorateur pour la note courante.
+- Mode WPM : Publier passe Concept -> Traitement ; le selecteur d'etat est superuser uniquement.
+- Export/copie HTML : superuser uniquement si active dans les reglages.
+- Reglages : roue dentee pour theme, metadonnees, options WPM et modificateur de raccourcis.
+
+## Raccourcis clavier
+
+Le modificateur est configurable dans Reglages → Raccourcis clavier.
+`Mod` = Ctrl+Alt (Windows/Linux) ou Ctrl+Command (Mac).
+
+- Mod+S : Enregistrer
+- Mod+H : Remplacer
+- Mod+B : Gras
+- Mod+I : Italique
+- Mod+X : Barre
+- Mod+` : Code inline
+- Mod+L ou Mod+K : Lien
+- Mod+M : Image
+- Mod+Q : Citation
+- Mod+U : Liste a puces
+- Mod+O : Bloc de code
+- Mod+/ : Commentaire
+- Mod+PageUp : Majuscules
+- Mod+PageDown : Minuscules
+- Mod++ : Augmenter le niveau de titre
+- Mod+- : Diminuer le niveau de titre
+- Mod+1..6 : Definir le niveau de titre
+
 Ci-dessous se trouve un aperçu des options de mise en forme Markdown courantes, avec du code d'exemple et le nom de chaque format :
 
 #### 1. Titres
@@ -123,7 +158,7 @@ Les images ressemblent aux liens mais commencent par un point d'exclamation `!`.
 (*Voir le markdown pour le formatage*).
 
 > **Astuces spéciales**
-> 1. Si vous sélectionnez des mots dans le markdown et que vous faites <kbd>ctrl-shift- +</kbd>, ils deviennent EN MAJUSCULES, et <kbd>ctrl-shift- -</kbd> les met en minuscules. Idéal pour les textes de ChatGPT (qui a tendance à utiliser trop de majuscules dans sa réponse).
+> 1. Selectionnez des mots et utilisez <kbd>Mod+PageUp</kbd> pour EN MAJUSCULES, ou <kbd>Mod+PageDown</kbd> pour les minuscules. Ideal pour les textes de ChatGPT (qui a tendance a utiliser trop de majuscules dans sa reponse).
 > 2. Vous pouvez utiliser <kbd>Tab</kbd> après une balise HTML pour produire la balise HTML complète, par ex. `span` puis <kbd>Tab</kbd> donne `<span></span>`.
 > 3. Dupliquez cet onglet dans le navigateur et revenez à cet exemple pour voir comment formater certains textes avec Markdown <span style="padding: 0.3rem; border: 2px solid #e5e7eb;border-radius: 5px;">MD</span>;).
 

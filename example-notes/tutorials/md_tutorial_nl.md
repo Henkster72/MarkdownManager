@@ -5,6 +5,41 @@ Markdown is een makkelijke opmaaktaal die gebruikt wordt om tekst te formatteren
 
 Je kunt nu **precies** zien hoe het op de site er uitgaat zien.
 
+## MarkdownManager basis (na installatie)
+
+- Maak een notitie: klik `+MD` in de bovenbalk, kies een map, voer een titel/slug in, sla op.
+- Notities openen: gebruik links de verkenner; filter, sorteer en klik op een notitie.
+- Opslaan: gebruik de Opslaan-knop of de sneltoets hieronder.
+- Voorbeeld: het HTML-voorbeeld ververst na opslaan.
+- Opmaak: gebruik de knoppen voor koppen, vet/cursief/onderstreep, lijsten, citaat, tabel en uitlijning. Uitlijning voegt `{: class="left|center|right" }` toe.
+- Hernoemen/verwijderen: alleen superuser, knoppen boven de verkenner voor de huidige notitie.
+- WPM-modus: Publiceer zet Concept -> Verwerking; de statuskeuze is alleen voor superuser.
+- HTML export/kopie: alleen superuser wanneer ingeschakeld in Instellingen.
+- Instellingen: gebruik het tandwiel voor thema, metadata, WPM-opties en sneltoets-modifier.
+
+## Sneltoetsen
+
+Sneltoets-modifier is instelbaar in Instellingen → Sneltoetsen.
+`Mod` = Ctrl+Alt (Windows/Linux) of Ctrl+Command (Mac).
+
+- Mod+S: Opslaan
+- Mod+H: Vervang-venster
+- Mod+B: Vet
+- Mod+I: Cursief
+- Mod+X: Doorhalen
+- Mod+`: Inline code
+- Mod+L of Mod+K: Link-venster
+- Mod+M: Afbeelding-venster
+- Mod+Q: Citaatblok
+- Mod+U: Ongenummerde lijst
+- Mod+O: Codeblok
+- Mod+/: Commentaar
+- Mod+PageUp: Hoofdletters
+- Mod+PageDown: Kleine letters
+- Mod++: Kopniveau omhoog
+- Mod+-: Kopniveau omlaag
+- Mod+1..6: Kopniveau instellen
+
 Hieronder volgt een overzicht van de gangbare Markdown-opmaakopties, compleet met voorbeeldcode en de naam van elk formaat:
 
 #### 1. Koppen
@@ -123,7 +158,7 @@ Afbeeldingen lijken op links maar beginnen met een uitroepteken `!`.
 (*Zie de markdown voor opmaak*).
 
 > **Speciale truukjes** 
-> 1. Als je woorden selecteert in de markdown en je doet dan <kbd>ctrl-shift- +</kbd>, worden dit HOOFDLETTERS, en <kbd>ctrl-shift- -</kbd>, maken het kleine letters. Ideaal voor teksten van ChatGPT (die de neiging heeft om overbodig veel hoofdletters te gebruiken in zijn response).
+> 1. Selecteer woorden en gebruik <kbd>Mod+PageUp</kbd> voor HOOFDLETTERS, of <kbd>Mod+PageDown</kbd> voor kleine letters. Ideaal voor teksten van ChatGPT (die de neiging heeft om overbodig veel hoofdletters te gebruiken in zijn response).
 > 2. Je kunt met <kbd>Tab</kbd> achter een HTML tag, meteen de hele html tag produceren zoals `span` en dan <kbd>Tab</kbd>, geeft `<span></span>`.
 > 3. Dupliceer dit tabblad in de browser en kom naar dit voorbeeld terug om te kijken hoe je bepaalde tekst formatteert met Markdown <span style="padding: 0.3rem; border: 2px solid #e5e7eb;border-radius: 5px;">MD</span>;).
 
@@ -179,4 +214,3 @@ of je kunt een relatieve kleine button maken met
 
 Gebruik de backslash `\` om speciale Markdown-tekens te escapen.
 \*Deze tekst is niet cursief\* (waarschijnlijk is het zelden nodig).
-

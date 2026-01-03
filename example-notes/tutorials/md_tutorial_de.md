@@ -5,6 +5,41 @@ Markdown ist eine einfache Auszeichnungssprache, die zum Formatieren von Text ve
 
 Du kannst jetzt **genau** sehen, wie es auf der Website aussehen wird.
 
+## MarkdownManager Grundlagen (nach der Installation)
+
+- Notiz erstellen: `+MD` oben anklicken, Ordner wählen, Titel/Slug eingeben, speichern.
+- Notizen öffnen: linken Explorer nutzen; filtern, sortieren, anklicken.
+- Speichern: Speichern-Button oder Shortcut.
+- Vorschau: HTML-Vorschau aktualisiert nach dem Speichern.
+- Formatierung: Toolbar-Buttons für Überschriften, fett/kursiv/unterstrichen, Listen, Zitat, Tabelle und Ausrichtung. Ausrichtung fügt `{: class="left|center|right" }` hinzu.
+- Umbenennen/Löschen: nur Superuser, Buttons über dem Explorer für die aktuelle Notiz.
+- WPM-Modus: Publish setzt Konzept -> Verarbeitung; Statusauswahl nur Superuser.
+- HTML-Export/Kopie: nur Superuser, wenn in Einstellungen aktiviert.
+- Einstellungen: Zahnrad für Theme, Metadaten, WPM-Optionen und Shortcut-Modifier.
+
+## Tastenkürzel
+
+Shortcut-Modifier ist in Einstellungen → Tastenkürzel konfigurierbar.
+`Mod` = Ctrl+Alt (Windows/Linux) oder Ctrl+Command (Mac).
+
+- Mod+S: Speichern
+- Mod+H: Ersetzen-Dialog
+- Mod+B: Fett
+- Mod+I: Kursiv
+- Mod+X: Durchstreichen
+- Mod+`: Inline-Code
+- Mod+L oder Mod+K: Link-Dialog
+- Mod+M: Bild-Dialog
+- Mod+Q: Blockzitat
+- Mod+U: Aufzählung
+- Mod+O: Codeblock
+- Mod+/: Kommentar
+- Mod+PageUp: Grossbuchstaben
+- Mod+PageDown: Kleinbuchstaben
+- Mod++: Überschriftenebene erhöhen
+- Mod+-: Überschriftenebene verringern
+- Mod+1..6: Überschriftenebene setzen
+
 Unten findest du einen Überblick über die gängigen Markdown-Formatierungsoptionen, komplett mit Beispielcode und dem Namen jedes Formats:
 
 #### 1. Überschriften
@@ -123,7 +158,7 @@ Bilder sehen aus wie Links, beginnen aber mit einem Ausrufezeichen `!`.
 (*Siehe das Markdown für die Formatierung*).
 
 > **Spezielle Tricks**
-> 1. Wenn du im Markdown Wörter auswählst und dann <kbd>ctrl-shift- +</kbd> drückst, werden sie ALLES GROSS, und <kbd>ctrl-shift- -</kbd> macht sie klein. Ideal für Texte von ChatGPT (das dazu neigt, in seiner Antwort zu viele Großbuchstaben zu verwenden).
+> 1. Wähle Wörter aus und nutze <kbd>Mod+PageUp</kbd> für GROSSBUCHSTABEN oder <kbd>Mod+PageDown</kbd> für Kleinbuchstaben. Ideal für Texte von ChatGPT (das dazu neigt, in seiner Antwort zu viele Großbuchstaben zu verwenden).
 > 2. Du kannst <kbd>Tab</kbd> nach einem HTML-Tag verwenden, um das ganze HTML-Tag zu erzeugen, z. B. `span` und dann <kbd>Tab</kbd> ergibt `<span></span>`.
 > 3. Dupliziere diesen Tab im Browser und komme zu diesem Beispiel zurück, um zu sehen, wie man bestimmten Text mit Markdown formatiert <span style="padding: 0.3rem; border: 2px solid #e5e7eb;border-radius: 5px;">MD</span>;).
 

@@ -5,6 +5,41 @@ Markdown é uma linguagem de marcação fácil usada para formatar texto. Para u
 
 Agora você pode **exatamente** ver como ficará no site.
 
+## Fundamentos do MarkdownManager (apos a instalacao)
+
+- Criar uma nota: clique em `+MD` na barra superior, escolha uma pasta, informe titulo/slug, salve.
+- Abrir notas: use o explorador a esquerda; filtre, ordene e clique em uma nota.
+- Salvar: botao Salvar ou atalho.
+- Preview: o preview HTML atualiza apos salvar.
+- Formatacao: use os botoes para titulos, negrito/italico/sublinhado, listas, citacao, tabela e alinhamento. O alinhamento adiciona `{: class="left|center|right" }`.
+- Renomear/excluir: apenas superusuario, botoes acima do explorador para a nota atual.
+- Modo WPM: Publicar muda Concept -> Processing; seletor de estado apenas superusuario.
+- Exportar/copiar HTML: apenas superusuario quando ativado nas configuracoes.
+- Configuracoes: engrenagem para tema, metadados, opcoes WPM e modificador de atalhos.
+
+## Atalhos de teclado
+
+O modificador pode ser configurado em Configuracoes → Atalhos.
+`Mod` = Ctrl+Alt (Windows/Linux) ou Ctrl+Command (Mac).
+
+- Mod+S: Salvar
+- Mod+H: Substituir
+- Mod+B: Negrito
+- Mod+I: Italico
+- Mod+X: Tachado
+- Mod+`: Codigo inline
+- Mod+L ou Mod+K: Link
+- Mod+M: Imagem
+- Mod+Q: Citacao
+- Mod+U: Lista com marcadores
+- Mod+O: Bloco de codigo
+- Mod+/: Comentario
+- Mod+PageUp: Maiusculas
+- Mod+PageDown: Minusculas
+- Mod++: Aumentar nivel de titulo
+- Mod+-: Diminuir nivel de titulo
+- Mod+1..6: Definir nivel de titulo
+
 Abaixo está uma visão geral das opções comuns de formatação Markdown, completa com código de exemplo e o nome de cada formato:
 
 #### 1. Títulos
@@ -123,7 +158,7 @@ As imagens parecem links, mas começam com um ponto de exclamação `!`.
 (*Veja o markdown para a formatação*).
 
 > **Truques especiais**
-> 1. Se você selecionar palavras no markdown e depois fizer <kbd>ctrl-shift- +</kbd>, elas viram TODAS EM MAIÚSCULAS, e <kbd>ctrl-shift- -</kbd> as deixam em minúsculas. Ideal para textos do ChatGPT (que tende a usar muitas letras maiúsculas na resposta).
+> 1. Selecione palavras e use <kbd>Mod+PageUp</kbd> para MAIUSCULAS ou <kbd>Mod+PageDown</kbd> para minusculas. Ideal para textos do ChatGPT (que tende a usar muitas letras maiusculas na resposta).
 > 2. Você pode usar <kbd>Tab</kbd> após uma tag HTML para gerar a tag HTML inteira, por exemplo `span` e depois <kbd>Tab</kbd> gera `<span></span>`.
 > 3. Duplique esta aba no navegador e volte a este exemplo para ver como formatar certo texto com Markdown <span style="padding: 0.3rem; border: 2px solid #e5e7eb;border-radius: 5px;">MD</span>;).
 
