@@ -238,6 +238,9 @@ if (is_array($settingsIn)) {
     $publisherMode = array_key_exists('publisher_mode', $settingsIn) ? !empty($settingsIn['publisher_mode']) : !empty($curSettings['publisher_mode']);
     $defaultAuthor = array_key_exists('publisher_default_author', $settingsIn) ? trim((string)($settingsIn['publisher_default_author'] ?? '')) : trim((string)($curSettings['publisher_default_author'] ?? ''));
     $requireH2 = array_key_exists('publisher_require_h2', $settingsIn) ? (bool)$settingsIn['publisher_require_h2'] : (!array_key_exists('publisher_require_h2', $curSettings) ? true : (bool)$curSettings['publisher_require_h2']);
+    $allowUserPublish = array_key_exists('allow_user_publish', $settingsIn)
+        ? (bool)$settingsIn['allow_user_publish']
+        : (!array_key_exists('allow_user_publish', $curSettings) ? false : (bool)$curSettings['allow_user_publish']);
     $allowUserDelete = array_key_exists('allow_user_delete', $settingsIn)
         ? (bool)$settingsIn['allow_user_delete']
         : (!array_key_exists('allow_user_delete', $curSettings) ? true : (bool)$curSettings['allow_user_delete']);
@@ -259,6 +262,10 @@ if (is_array($settingsIn)) {
         ? trim((string)($settingsIn['post_date_align'] ?? ''))
         : trim((string)($curSettings['post_date_align'] ?? 'left'));
     if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
+    $folderIconStyle = array_key_exists('folder_icon_style', $settingsIn)
+        ? strtolower(trim((string)($settingsIn['folder_icon_style'] ?? '')))
+        : strtolower(trim((string)($curSettings['folder_icon_style'] ?? 'folder')));
+    if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -271,6 +278,13 @@ if (is_array($settingsIn)) {
 
     $themePreset = array_key_exists('theme_preset', $settingsIn) ? trim((string)($settingsIn['theme_preset'] ?? '')) : trim((string)($curSettings['theme_preset'] ?? ''));
     if ($themePreset === '') $themePreset = 'default';
+
+    $themeOverrides = array_key_exists('theme_overrides', $settingsIn)
+        ? mdw_theme_overrides_normalize($settingsIn['theme_overrides'])
+        : mdw_theme_overrides_normalize($curSettings['theme_overrides'] ?? []);
+    $customCss = array_key_exists('custom_css', $settingsIn)
+        ? mdw_sanitize_custom_css($settingsIn['custom_css'] ?? '')
+        : mdw_sanitize_custom_css($curSettings['custom_css'] ?? '');
 
     $appTitle = array_key_exists('app_title', $settingsIn)
         ? trim((string)($settingsIn['app_title'] ?? ''))
@@ -295,15 +309,19 @@ if (is_array($settingsIn)) {
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $defaultAuthor,
         'publisher_require_h2' => (bool)$requireH2,
+        'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
+        'folder_icon_style' => $folderIconStyle,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
+        'theme_overrides' => $themeOverrides,
+        'custom_css' => $customCss,
         'app_title' => $appTitle,
     ]);
 }

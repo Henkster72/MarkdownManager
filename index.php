@@ -266,6 +266,9 @@ $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_S
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
 if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
+$folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
+if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
+$folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -1152,7 +1155,7 @@ function try_secret_login($passwordInput) {
 		                        exit;
 		                    }
 		                }
-		                // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
+		                // Ensure hidden metadata block at top (creationdate/changedate/date/published_date/publishstate).
 		                $opts = [];
 		                if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
 		                    $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
@@ -1381,7 +1384,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body index-page">
+<body class="app-body index-page <?=h($folderIconClass)?>">
 
 	<header class="app-header">
 	    <div class="app-header-inner">
@@ -1624,7 +1627,7 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
                 </span>
                 <span class="btn-label"><?=h(mdw_t('index.preview.copy_md_btn','Copy MD'))?></span>
             </button>
-            <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>">
+            <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>" data-auth-superuser="1">
                 <span class="btn-icon-stack">
                     <span class="pi pi-copy copy-icon"></span>
                     <span class="pi pi-checkmark copy-check"></span>
@@ -1811,7 +1814,22 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 			            </div>
 
 			            <div class="modal-field" data-auth-superuser="1">
+			                <label class="modal-label" for="folderIconStyleSelect"><?=h(mdw_t('theme.folder_icons.label','Folder icons'))?></label>
+			                <select id="folderIconStyleSelect" class="input" data-auth-superuser-enable="1">
+			                    <option value="folder" <?= $folderIconStyle === 'folder' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_folder','Folder'))?></option>
+			                    <option value="caret" <?= $folderIconStyle === 'caret' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_caret','Caret'))?></option>
+			                </select>
+			                <div id="folderIconStyleStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.folder_icons.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
 			                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
+			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                    <input id="allowUserPublishToggle" type="checkbox" <?= !empty($MDW_SETTINGS['allow_user_publish']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_publish','Allow users to publish'))?></span>
+			                </label>
 			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 			                    <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
 			                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
@@ -1909,19 +1927,26 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 		                    </div>
 		                </div>
 
-		                <div class="modal-field">
-		                    <div class="modal-label" style="margin-bottom: 0.35rem;"><?=h(mdw_t('theme.overrides.editor_section','Markdown editor'))?></div>
-		                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
-		                        <input id="themeEditorFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font','Font family (e.g. Playfair Display)'))?>">
-		                        <input id="themeEditorFontSize" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font_size','Font size (e.g. 15px)'))?>">
-		                        <input id="themeEditorAccent" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_accent','Accent color (e.g. rgb(229,33,157))'))?>">
-		                    </div>
-		                </div>
+				                <div class="modal-field">
+				                    <div class="modal-label" style="margin-bottom: 0.35rem;"><?=h(mdw_t('theme.overrides.editor_section','Markdown editor'))?></div>
+				                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+				                        <input id="themeEditorFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font','Font family (e.g. Playfair Display)'))?>">
+				                        <input id="themeEditorFontSize" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font_size','Font size (e.g. 15px)'))?>">
+				                        <input id="themeEditorAccent" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_accent','Accent color (e.g. rgb(229,33,157))'))?>">
+				                    </div>
+				                </div>
+				                <div class="modal-field">
+				                    <label class="modal-label" for="themeCustomCss"><?=h(mdw_t('theme.overrides.custom_css_label','Custom CSS'))?></label>
+				                    <textarea id="themeCustomCss" class="input" rows="6" placeholder="<?=h(mdw_t('theme.overrides.custom_css_placeholder','e.g. .callout { padding: 12px; border-radius: 10px; }'))?>"></textarea>
+				                    <div class="status-text" style="margin-top: 0.35rem;">
+				                        <?=h(mdw_t('theme.overrides.custom_css_hint','Applies to the HTML preview and wet HTML export.'))?>
+				                    </div>
+				                </div>
 
-		                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
-		                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save theme adjustments now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save theme adjustments'))?></button>
-		                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear theme adjustments'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset theme adjustments'))?></button>
-		                </div>
+				                <div style="display:flex; gap: 0.6rem; align-items:center; justify-content:flex-end;">
+					                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save theme adjustments now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save theme adjustments'))?></button>
+					                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear theme adjustments'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset theme adjustments'))?></button>
+				                </div>
 		            </div>
 		        </details>
 

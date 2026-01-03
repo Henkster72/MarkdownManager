@@ -141,6 +141,7 @@
     },
     "permissions": {
       "title": "Autorisations",
+      "allow_user_publish": "Autoriser les utilisateurs à publier",
       "allow_user_delete": "Autoriser les utilisateurs à supprimer des notes",
       "hint": "Enregistré pour tous les utilisateurs.",
       "saving": "Enregistrement…",
@@ -181,14 +182,19 @@
     },
     "overrides": {
       "summary": "Ajustements du thème (optionnel)",
-      "saved_auto": "Les ajustements du thème sont enregistrés dans votre navigateur (localStorage) automatiquement pendant la saisie.",
+      "saved_auto": "Les ajustements du thème sont enregistrés dans les paramètres (JSON) pendant la saisie.",
       "preview_section": "Aperçu HTML",
       "editor_section": "Éditeur Markdown",
+      "custom_css_label": "CSS personnalisé",
+      "custom_css_placeholder": "ex. .callout { padding: 12px; border-radius: 10px; }",
+      "custom_css_hint": "S'applique à l'aperçu HTML et à l'export HTML wet.",
       "save_title": "Enregistrer les ajustements du thème maintenant",
       "save_btn": "Enregistrer les ajustements du thème",
       "reset_title": "Effacer les ajustements du thème",
       "reset_btn": "Réinitialiser les ajustements du thème",
+      "saving": "Enregistrement…",
       "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement",
       "cleared": "Effacé",
       "placeholders": {
         "preview_bg": "Arrière-plan (ex. #ffffff)",

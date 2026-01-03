@@ -18,6 +18,11 @@
       "markdown_visible": true,
       "html_visible": false
     },
+    "published_date": {
+      "label": "Published date",
+      "markdown_visible": true,
+      "html_visible": false
+    },
     "publishstate": {
       "label": "Publish state",
       "markdown_visible": true,

@@ -121,6 +121,15 @@
       "hint": "Wait before showing Offline after network errors.",
       "option_minutes": "{n} min"
     },
+    "folder_icons": {
+      "label": "Folder icons",
+      "option_folder": "Folder",
+      "option_caret": "Caret",
+      "hint": "Saved for all users.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
     "app_title": {
       "label": "App title",
       "placeholder": "Markdown Manager",
@@ -141,6 +150,7 @@
     },
     "permissions": {
       "title": "Permissions",
+      "allow_user_publish": "Allow users to publish",
       "allow_user_delete": "Allow users to delete notes",
       "hint": "Saved for all users.",
       "saving": "Saving…",
@@ -181,14 +191,19 @@
     },
     "overrides": {
       "summary": "Theme adjustments (optional)",
-      "saved_auto": "Theme adjustments are saved in your browser (localStorage) automatically as you type.",
+      "saved_auto": "Theme adjustments are saved to settings (JSON) as you type.",
       "preview_section": "HTML preview",
       "editor_section": "Markdown editor",
+      "custom_css_label": "Custom CSS",
+      "custom_css_placeholder": "e.g. .callout { padding: 12px; border-radius: 10px; }",
+      "custom_css_hint": "Applies to the HTML preview and wet HTML export.",
       "save_title": "Save theme adjustments now",
       "save_btn": "Save theme adjustments",
       "reset_title": "Clear theme adjustments",
       "reset_btn": "Reset theme adjustments",
+      "saving": "Saving…",
       "saved": "Saved",
+      "save_failed": "Save failed",
       "cleared": "Cleared",
       "placeholders": {
         "preview_bg": "Background (e.g. #ffffff)",

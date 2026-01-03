@@ -307,6 +307,17 @@
 .preview-content .align-center { text-align: center; }
 .preview-content .align-right { text-align: right; }
 
+.preview-content .left,
+.preview-content .center,
+.preview-content .right {
+    display: block;
+    width: 100%;
+}
+
+.preview-content .left { text-align: left; }
+.preview-content .center { text-align: center; }
+.preview-content .right { text-align: right; }
+
 .preview-content blockquote {
     margin: 0.5rem 0;
     padding: 0.35rem 0.75rem;

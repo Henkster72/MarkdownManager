@@ -1,4 +1,4 @@
-# MarkdownManager v0.4
+# MarkdownManager v0.4.1
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -11,6 +11,26 @@ New and exciting: thanks to user input, Mermaid diagram support is now built in.
 ## Security warning (read this)
 
 MarkdownManager is not safe to expose to the public internet. It has no accounts, no MFA, no rate limiting, and only lightweight protection for "secret" notes. WPM mode adds some workflow safeguards (required author, required subtitle, publish states, and stricter metadata rules), but it does not make the app safe for public exposure. If you put this on a public server without a strong access layer (VPN, reverse proxy auth, IP allowlist), you are asking for trouble. Run it on localhost or a trusted private network only.
+
+## What's new in 0.4.1
+
+- Publishing workflow coherence: saving a changed note forces `publishstate` back to Concept, updates the badge, and re-enables the Publish button; processing/published stay disabled until state changes.
+- Superuser guardrails: `publishStateSelect` always remains superuser-only; normal users can only press Publish when enabled.
+- Publish state sync: changing publish state updates the metadata immediately, updates the note badge instantly, and triggers `published_date` when switching to Published.
+- Date fields normalized: `creationdate` and `changedate` are now selectable in metadata settings; `changedate` updates on save in WPM; `published_date` is auto-set on Published transitions.
+- Theme overrides are stored in JSON: preview theme overrides + custom CSS are persisted in `metadata_config.json` (no longer transient).
+- Custom CSS input: new field in Settings; CSS is applied to the live preview and exported with wet/semidry HTML.
+- Export hygiene: wet export injects CSS once at the top, not inline-per-node; semidry export includes custom CSS and class selectors.
+- Class discipline: semidry/wet export only keep classes explicitly declared via `{: class="..."}` in Markdown; default `md-*` classes are stripped.
+- CSS sanitization: export CSS removes `.preview-content` prefixes and ignores selectors that only apply to preview-only classes.
+- HTML export access: HTML copy/download buttons are hidden for non-superusers.
+- Mobile split-resizer: the Markdown/preview split is now touch-resizable on mobile, stored in localStorage, and defaults to 50/50 height.
+- Mobile header stability: header show/hide is suppressed during resize to avoid layout jumps.
+- Markdown toolbar overhaul: new formatting toolbar (Save → Heading select → B/I/U → align → quote → lists → table → Revert), icon-first, no labels on narrow panes.
+- Alignment helpers: Align button inserts `{ : class="left|center|right" }` and preview honors these classes.
+- Table button icon: replaced the “T” with a 2x2 grid icon for clarity.
+- Explorer actions: rename/delete moved above the explorer; delete is superuser-only and hidden for normal users; rename is hidden for normal users.
+- Translations updated: publish badges and new UI strings are localized across EN/NL/DE/FR/PT.
 
 ## What's new in 0.4
 
@@ -482,6 +502,7 @@ GitHub,https://github.com/
 
 ## Changelog
 
+- 0.4.1: WPM publish-state logic fixes, publish-date automation, metadata date field exposure, export/copy cleanup, custom CSS + theme override persistence, mobile resizer + toolbar overhaul, and tighter superuser-only actions.
 - 0.4: Explorer drag-and-drop for notes + folders, in-place folder rename, improved tree view (icons + focused view), example-notes moved under `example-notes/`, and localized/friendlier image manager errors with clearer `IMAGES_DIR` guidance.
 - 0.3.3: Security hardening, smarter errors/offline awareness, {TOC} + HTML preview upgrades, metadata delimiter migration, two-level folders with WPM migration rules, and superuser folder management.
 - 0.3.1.2: Settings modal cleanup, copy workflow upgrades (preview + code blocks), HTML copy modes, post date formatting/alignment, and JSON settings import/export.

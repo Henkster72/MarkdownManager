@@ -141,6 +141,7 @@
     },
     "permissions": {
       "title": "Permissões",
+      "allow_user_publish": "Permitir que os utilizadores publiquem",
       "allow_user_delete": "Permitir que os utilizadores eliminem notas",
       "hint": "Guardado para todos os utilizadores.",
       "saving": "A guardar…",
@@ -181,14 +182,19 @@
     },
     "overrides": {
       "summary": "Ajustes do tema (opcional)",
-      "saved_auto": "Os ajustes do tema são guardados automaticamente no seu navegador (localStorage) enquanto escreve.",
+      "saved_auto": "Os ajustes do tema são guardados nas definições (JSON) enquanto escreve.",
       "preview_section": "Pré-visualização HTML",
       "editor_section": "Editor Markdown",
+      "custom_css_label": "CSS personalizado",
+      "custom_css_placeholder": "p. ex. .callout { padding: 12px; border-radius: 10px; }",
+      "custom_css_hint": "Aplica-se à pré-visualização HTML e à exportação HTML wet.",
       "save_title": "Guardar ajustes do tema agora",
       "save_btn": "Guardar ajustes do tema",
       "reset_title": "Limpar ajustes do tema",
       "reset_btn": "Repor ajustes do tema",
+      "saving": "A guardar…",
       "saved": "Guardado",
+      "save_failed": "Falha ao guardar",
       "cleared": "Limpo",
       "placeholders": {
         "preview_bg": "Fundo (p. ex. #ffffff)",

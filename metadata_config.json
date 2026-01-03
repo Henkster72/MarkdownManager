@@ -14,6 +14,12 @@
     "ui_language": "",
     "ui_theme": "",
     "theme_preset": "default",
+    "theme_overrides": {
+      "preview": {},
+      "editor": {}
+    },
+    "custom_css": "",
+    "folder_icon_style": "folder",
     "app_title": ""
   },
   "fields": {

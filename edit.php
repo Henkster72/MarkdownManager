@@ -254,6 +254,9 @@ $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_S
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
 if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
+$folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
+if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
+$folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -487,6 +490,13 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
             exit;
         }
         $raw_content = file_get_contents($full);
+        $publishState = '';
+        if (!empty($MDW_PUBLISHER_MODE)) {
+            $meta = [];
+            mdw_hidden_meta_extract_and_remove_all($raw_content, $meta);
+            $publishState = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
+            if ($publishState === '') $publishState = 'Concept';
+        }
 
         echo json_encode([
             'file'    => $requested,
@@ -495,6 +505,7 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
             'html'    => md_to_html($raw_content, $requested),
             'is_secret' => (bool)$is_secret_req_json,
             'secret_authenticated' => is_secret_authenticated(),
+            'publish_state' => $publishState,
         ]);
         exit;
     } else {
@@ -609,29 +620,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // Normalize line endings so the editor doesn't appear "dirty" after save.
                 $content = str_replace(["\r\n", "\r"], "\n", $content);
                 $submittedMeta = [];
-                mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
+                $submittedBody = mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
                 $publishAction = isset($_POST['publish_action']) ? trim((string)$_POST['publish_action']) : '';
                 $publishStateInput = isset($_POST['publish_state']) ? trim((string)$_POST['publish_state']) : '';
+                $publishStateOverride = isset($_POST['publish_state_override']) ? trim((string)$_POST['publish_state_override']) : '';
+                $publishStateOverride = ($publishStateOverride === '1' || $publishStateOverride === 'true');
                 $existingMeta = [];
+                $existingRaw = '';
                 if (is_file($full)) {
-                    mdw_hidden_meta_extract_and_remove_all((string)@file_get_contents($full), $existingMeta);
+                    $existingRaw = (string)@file_get_contents($full);
+                    mdw_hidden_meta_extract_and_remove_all($existingRaw, $existingMeta);
                 }
-                $existingState = mdw_publisher_normalize_publishstate($existingMeta['publishstate'] ?? '');
-                if ($existingState === '') $existingState = 'Concept';
+                $contentChanged = false;
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $existingNormalized = str_replace(["\r\n", "\r"], "\n", $existingRaw);
+                    $contentChanged = ($existingNormalized !== $content);
+                }
+                $existingPublishState = null;
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $existingPublishState = mdw_publisher_normalize_publishstate($existingMeta['publishstate'] ?? '');
+                    if ($existingPublishState === '') $existingPublishState = 'Concept';
+                }
                 $desiredPublishState = null;
                 $allowedPublishStates = ['Concept', 'Processing', 'Published'];
-                    if (!empty($MDW_PUBLISHER_MODE)) {
-                        if ($authIsSuperuser) {
-                            if ($publishStateInput !== '') {
-                                $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
-                                if (in_array($candidate, $allowedPublishStates, true)) {
-                                    $desiredPublishState = $candidate;
-                                }
-                            }
-                        } else {
-                            $desiredPublishState = $existingState !== '' ? $existingState : 'Concept';
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $authRequired = function_exists('mdw_auth_has_role')
+                        ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
+                        : false;
+                    $allowUserPublish = !array_key_exists('allow_user_publish', $MDW_SETTINGS) ? false : !empty($MDW_SETTINGS['allow_user_publish']);
+                    $canPublish = !$authRequired || $authIsSuperuser || ($authIsUser && $allowUserPublish);
+
+                    if ($canPublish && $publishAction === 'publish') {
+                        $desiredPublishState = 'Processing';
+                    } else if ($authIsSuperuser && $publishStateOverride && $publishStateInput !== '') {
+                        $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
+                        if (in_array($candidate, $allowedPublishStates, true)) {
+                            $desiredPublishState = $candidate;
                         }
                     }
+
+                    if ($desiredPublishState === null) {
+                        $desiredPublishState = 'Concept';
+                    }
+                }
+                $finalPublishState = null;
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $finalPublishState = $desiredPublishState;
+                }
+
                 $author = '';
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
@@ -676,10 +712,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         }
                     }
 
+                    $publishStateChanged = false;
+                    if (!empty($MDW_PUBLISHER_MODE) && $desiredPublishState !== null && $existingPublishState !== null) {
+                        $publishStateChanged = $desiredPublishState !== $existingPublishState;
+                    }
+                    $publishedDateWillChange = false;
                     if ($desiredPublishState !== null) {
                         $metaOverrides['publishstate'] = $desiredPublishState;
                     }
-                    // Ensure hidden metadata block at top (creationdate/changedate/date/publishstate).
+                    if ($desiredPublishState === 'Published' && $existingPublishState !== 'Published') {
+                        $submittedPublishedDate = trim((string)($submittedMeta['published_date'] ?? ''));
+                        if ($submittedPublishedDate === '') {
+                            $metaOverrides['published_date'] = date('Y-m-d');
+                            $publishedDateWillChange = true;
+                        }
+                    }
+                    if (!empty($MDW_PUBLISHER_MODE) && ($contentChanged || $publishStateChanged || $publishedDateWillChange)) {
+                        $metaOverrides['changedate'] = date('Y-m-d H:i');
+                    }
+                    // Ensure hidden metadata block at top (creationdate/changedate/date/published_date/publishstate).
                     $opts = !empty($metaOverrides) ? ['set' => $metaOverrides] : [];
                     if (!empty($MDW_PUBLISHER_MODE) && $author !== '') {
                         $settingsOverride = is_array($MDW_SETTINGS) ? $MDW_SETTINGS : [];
@@ -706,7 +757,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
                                     if ($isAjax) {
                                         header('Content-Type: application/json; charset=utf-8');
-                                        echo json_encode(['ok' => true]);
+                                        echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
                                         exit;
                                     }
                                     header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
@@ -726,7 +777,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 } else {
                                     if ($isAjax) {
                                         header('Content-Type: application/json; charset=utf-8');
-                                        echo json_encode(['ok' => true]);
+                                        echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
                                         exit;
                                     }
                                     header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
@@ -743,7 +794,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             } else {
                                 if ($isAjax) {
                                     header('Content-Type: application/json; charset=utf-8');
-                                    echo json_encode(['ok' => true]);
+                                    echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
                                     exit;
                                 }
                                 header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
@@ -943,7 +994,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body edit-page">
+<body class="app-body edit-page <?=h($folderIconClass)?>">
     <header class="app-header">
         <div class="app-header-inner">
 	            <div class="app-header-main">
@@ -1022,10 +1073,10 @@ window.mermaid = mermaid;
                 <div class="editor-pane-inner">
                     <header class="pane-header">
                         <div class="pane-title-row">
-                            <div class="pane-title">
-                                <span class="pi pi-notebook"></span>
-                                <span><?=h(mdw_t('common.notes','Notes'))?></span>
-                            </div>
+	                            <div class="pane-title">
+	                                <span class="pi pi-notebook"></span>
+	                                <span><?=h(mdw_t('common.notes','Notes'))?></span>
+	                            </div>
 	                                <div class="pane-title-actions">
 	                                <button type="button" id="explorerCollapseToggle" class="btn btn-ghost icon-button" title="<?=h(mdw_t('edit.nav.collapse_overview','Collapse overview'))?>" aria-label="<?=h(mdw_t('edit.nav.collapse_overview','Collapse overview'))?>">
 	                                    <span class="pi pi-leftcaret"></span>
@@ -1035,7 +1086,24 @@ window.mermaid = mermaid;
 	                                    <span class="pi pi-cross"></span>
 	                                </button>
 	                            </div>
-                        </div>
+	                        </div>
+                            <?php if ($requested): ?>
+                            <div class="nav-file-actions">
+                                <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" data-auth-superuser="1" <?= $requested ? '' : 'disabled' ?>>
+                                    <span class="pi pi-edit"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.rename','Rename'))?></span>
+                                </button>
+                                <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=h($requested ?? '')?>" data-auth-superuser="1">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="file" id="deleteFileInput" value="<?=h($requested ?? '')?>">
+                                    <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+                                    <button type="submit" class="btn btn-ghost btn-small" <?= $requested ? '' : 'disabled' ?>>
+                                        <span class="pi pi-bin"></span>
+                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.delete','Delete'))?></span>
+                                    </button>
+                                </form>
+                            </div>
+                            <?php endif; ?>
 	                        <div class="nav-filter-row">
 	                            <input id="filterInput" class="input" type="text" placeholder="<?=h(mdw_t('common.filter_placeholder','Filter…'))?>">
 	                        </div>
@@ -1069,26 +1137,14 @@ window.mermaid = mermaid;
             <section class="editor-pane" id="paneMarkdown">
                 <div class="editor-pane-inner">
                     <header class="pane-header editor-header">
-                        <div class="pane-title-row">
-                            <div class="pane-title">
-                                <span class="icon-text-logo">MD</span>
-                                <span><?=h(mdw_t('common.markdown','Markdown'))?></span>
-                            </div>
+	                        <div class="pane-title-row">
+	                            <div class="pane-title">
+	                                <span class="icon-text-logo">MD</span>
+	                                <span><?=h(mdw_t('common.markdown','Markdown'))?></span>
+	                            </div>
 			                            <div class="pane-header-actions">
-			                                <button type="button" id="addLinkBtn" class="btn btn-ghost" title="<?=h(mdw_t('link_modal.title','Add link'))?>">
-			                                    <span class="pi pi-linkchain"></span>
-			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
-			                                </button>
-			                                <button type="button" id="addImageBtn" class="btn btn-ghost" title="<?=h(mdw_t('image_modal.title','Insert image'))?>">
-			                                    <span class="pi pi-image"></span>
-			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
-			                                </button>
-		                                <button type="submit" form="editor-form" class="btn btn-ghost">
-			                                    <span class="pi pi-floppydisk"></span>
-			                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
-			                                </button>
 			                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
-                                    <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-superuser="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
+                                    <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-publish="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
 			                                        <span class="pi pi-upload"></span>
 			                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
 			                                    </button>
@@ -1106,23 +1162,6 @@ window.mermaid = mermaid;
 			                                        <?php endforeach; ?>
 			                                    </select>
 			                                <?php endif; ?>
-                                        <button type="button" id="renameFileBtn" class="btn btn-ghost" data-auth-superuser="1" <?= $requested ? '' : 'disabled' ?>>
-                                            <span class="pi pi-edit"></span>
-                                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.rename','Rename'))?></span>
-                                        </button>
-		                                <button type="button" id="btnRevert" class="btn btn-ghost">
-                                    <span class="pi pi-recycle"></span>
-                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
-                                </button>
-                                <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=h($requested ?? '')?>">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="file" id="deleteFileInput" value="<?=h($requested ?? '')?>">
-                                    <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-                                    <button type="submit" class="btn btn-ghost" <?= $requested ? '' : 'disabled' ?>>
-                                        <span class="pi pi-bin"></span>
-                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.delete','Delete'))?></span>
-                                    </button>
-                                </form>
                             </div>
                         </div>
                         <?php if ($requested): ?>
@@ -1135,6 +1174,65 @@ window.mermaid = mermaid;
                     <form method="post" class="editor-form" id="editor-form" autocomplete="off">
                         <input type="hidden" name="file" value="<?=h($requested)?>">
                         <input type="hidden" name="action" value="save">
+                        <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+                            <input type="hidden" name="publish_state_override" id="publishStateOverride" value="0">
+                        <?php endif; ?>
+
+                        <div class="editor-toolbar">
+                            <div class="editor-toolbar-left">
+                                <button type="submit" form="editor-form" class="btn btn-ghost" id="saveBtn">
+                                    <span class="pi pi-floppydisk"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
+                                </button>
+                                <select id="headingSelect" class="input editor-toolbar-select" aria-label="<?=h(mdw_t('edit.toolbar.heading','Heading'))?>">
+                                    <option value="" selected>H</option>
+                                    <option value="1">H1</option>
+                                    <option value="2">H2</option>
+                                    <option value="3">H3</option>
+                                    <option value="4">H4</option>
+                                    <option value="5">H5</option>
+                                    <option value="6">H6</option>
+                                </select>
+                                <button type="button" id="formatBoldBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.bold','Bold'))?>">
+                                    <span class="format-letter">B</span>
+                                </button>
+                                <button type="button" id="formatItalicBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.italic','Italic'))?>">
+                                    <span class="format-letter format-italic">I</span>
+                                </button>
+                                <button type="button" id="formatUnderlineBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.underline','Underline'))?>">
+                                    <span class="format-letter format-underline">U</span>
+                                </button>
+                                <select id="alignSelect" class="input editor-toolbar-select editor-align-select" aria-label="<?=h(mdw_t('edit.toolbar.align','Align'))?>">
+                                    <option value="left">L</option>
+                                    <option value="center">C</option>
+                                    <option value="right">R</option>
+                                </select>
+                                <button type="button" id="formatBlockquoteBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.blockquote','Blockquote'))?>">
+                                    <span class="pi pi-quote"></span>
+                                </button>
+                                <button type="button" id="formatOrderedListBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.ordered_list','Ordered list'))?>">
+                                    <span class="format-letter">1.</span>
+                                </button>
+                                <button type="button" id="formatUnorderedListBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.unordered_list','Unordered list'))?>">
+                                    <span class="pi pi-list"></span>
+                                </button>
+                                <button type="button" id="insertTableBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.table','Insert table'))?>">
+                                    <span class="icon-table-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+                                </button>
+                                <button type="button" id="btnRevert" class="btn btn-ghost">
+                                    <span class="pi pi-recycle"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" id="addLinkBtn" class="btn btn-ghost" hidden>
+                            <span class="pi pi-linkchain"></span>
+                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
+                        </button>
+                        <button type="button" id="addImageBtn" class="btn btn-ghost" hidden>
+                            <span class="pi pi-image"></span>
+                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
+                        </button>
 
                         <div class="editor-body">
                             <div class="editor-lines" id="lineNumbers"></div>
@@ -1171,11 +1269,11 @@ window.mermaid = mermaid;
                                 <span><?=h(mdw_t('edit.preview_title','HTML preview'))?></span>
                             </div>
                             <div class="pane-header-actions">
-                                <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.export_title','Download a plain HTML export'))?>" <?= $requested ? '' : 'disabled' ?>>
+                                <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.export_title','Download a plain HTML export'))?>" <?= $requested ? '' : 'disabled' ?> data-auth-superuser="1">
                                     <span class="pi pi-download"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.preview.export_btn','HTML download'))?></span>
                                 </button>
-                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('edit.preview.copy_title','Copy plain HTML to clipboard'))?>" <?= $requested ? '' : 'disabled' ?> data-copy-buttons="1" <?= $copyButtonsEnabled ? '' : 'hidden' ?>>
+                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('edit.preview.copy_title','Copy plain HTML to clipboard'))?>" <?= $requested ? '' : 'disabled' ?> data-copy-buttons="1" <?= $copyButtonsEnabled ? '' : 'hidden' ?> data-auth-superuser="1">
                                     <span class="btn-icon-stack">
                                         <span class="pi pi-copy copy-icon"></span>
                                         <span class="pi pi-checkmark copy-check"></span>
@@ -1618,7 +1716,22 @@ window.mermaid = mermaid;
 				            </div>
 
 				            <div class="modal-field" data-auth-superuser="1">
+				                <label class="modal-label" for="folderIconStyleSelect"><?=h(mdw_t('theme.folder_icons.label','Folder icons'))?></label>
+				                <select id="folderIconStyleSelect" class="input" data-auth-superuser-enable="1">
+				                    <option value="folder" <?= $folderIconStyle === 'folder' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_folder','Folder'))?></option>
+				                    <option value="caret" <?= $folderIconStyle === 'caret' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_caret','Caret'))?></option>
+				                </select>
+				                <div id="folderIconStyleStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.folder_icons.hint','Saved for all users.'))?>
+				                </div>
+				            </div>
+
+				            <div class="modal-field" data-auth-superuser="1">
 				                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
+				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="allowUserPublishToggle" type="checkbox" <?= !empty($MDW_SETTINGS['allow_user_publish']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_publish','Allow users to publish'))?></span>
+				                </label>
 				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                    <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
 				                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
@@ -1723,6 +1836,13 @@ window.mermaid = mermaid;
 				                        <input id="themeEditorFont" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font','Font family (e.g. Playfair Display)'))?>">
 				                        <input id="themeEditorFontSize" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_font_size','Font size (e.g. 15px)'))?>">
 				                        <input id="themeEditorAccent" type="text" class="input" placeholder="<?=h(mdw_t('theme.overrides.placeholders.editor_accent','Accent color (e.g. rgb(229,33,157))'))?>">
+				                    </div>
+				                </div>
+				                <div class="modal-field">
+				                    <label class="modal-label" for="themeCustomCss"><?=h(mdw_t('theme.overrides.custom_css_label','Custom CSS'))?></label>
+				                    <textarea id="themeCustomCss" class="input" rows="6" placeholder="<?=h(mdw_t('theme.overrides.custom_css_placeholder','e.g. .callout { padding: 12px; border-radius: 10px; }'))?>"></textarea>
+				                    <div class="status-text" style="margin-top: 0.35rem;">
+				                        <?=h(mdw_t('theme.overrides.custom_css_hint','Applies to the HTML preview and wet HTML export.'))?>
 				                    </div>
 				                </div>
 

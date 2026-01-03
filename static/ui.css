@@ -722,10 +722,22 @@ a:hover {
     .pane-header-actions .btn-label {
       display: none;
     }
+
+    #paneMarkdown .editor-toolbar .btn-label {
+      display: none;
+    }
+
+    #paneMarkdown #saveBtn {
+      padding: 0.35rem 0.45rem;
+    }
   }
 
   @container (min-width: 521px) {
     .pane-header-actions .btn-label {
+      display: inline-flex;
+    }
+
+    #paneMarkdown .editor-toolbar .btn-label {
       display: inline-flex;
     }
   }
@@ -735,6 +747,14 @@ a:hover {
   @media (max-width: 960px) {
     .edit-page .pane-header-actions .btn-label {
       display: none;
+    }
+
+    .edit-page .editor-toolbar .btn-label {
+      display: none;
+    }
+
+    .edit-page #saveBtn {
+      padding: 0.35rem 0.45rem;
     }
   }
 }
@@ -818,6 +838,14 @@ a:hover {
   margin-top: 1.5rem;
   --tree-caret-space: 0.85rem;
   --tree-icon-size: 0.95rem;
+}
+
+body.folder-icons-folder .content-list {
+  --tree-caret-space: 0;
+}
+
+body.folder-icons-caret .content-list {
+  --tree-caret-space: 0.85rem;
 }
 
 .edit-page .content-list {
@@ -921,8 +949,22 @@ a:hover {
   font-size: 0.85em;
 }
 
+.note-group-title .folder-toggle .folder-caret,
+.note-group-title .folder-toggle .folder-icon {
+  position: relative;
+  top: -0.2rem;
+}
+
 .note-group-title .folder-toggle .folder-icon.folder-icon-focused {
   margin-left: -0.25rem;
+}
+
+body.folder-icons-folder .note-group-title .folder-toggle .folder-caret {
+  display: none;
+}
+
+body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
+  display: none;
 }
 
 .note-group-title .folder-back.icon-button {
@@ -941,8 +983,8 @@ a:hover {
 }
 
 .note-group-title .folder-back:hover {
-  border-color: var(--border-soft);
-  background: var(--hover-bg);
+  border-color: transparent;
+  background: transparent;
   text-decoration: none;
 }
 
@@ -952,8 +994,8 @@ a:hover {
 }
 
 .note-group-title .folder-toggle:hover {
-  border-color: var(--border-soft);
-  background: var(--hover-bg);
+  border-color: transparent;
+  background: transparent;
 }
 
 .note-group-title .folder-toggle:focus-visible {
@@ -1138,6 +1180,18 @@ a:hover {
 
 .nav-body {
   padding: 0.25rem;
+}
+
+.nav-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.25rem;
+  flex-wrap: wrap;
+}
+
+.nav-file-actions form {
+  margin: 0;
 }
 
 .nav-filter-row {
@@ -1327,6 +1381,7 @@ a:hover {
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .editor-toolbar-left,
@@ -1340,6 +1395,52 @@ a:hover {
   font-size: 0.7rem;
   color: var(--text-muted);
   word-break: break-all;
+}
+
+.editor-toolbar-select.input {
+  min-width: 2.75rem;
+  padding: 0.25rem 0.45rem;
+  text-align: center;
+}
+
+.editor-align-select.input {
+  min-width: 2.5rem;
+}
+
+.format-btn {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.format-letter {
+  font-weight: 700;
+}
+
+.format-italic {
+  font-style: italic;
+}
+
+.format-underline {
+  text-decoration: underline;
+}
+
+.icon-table-grid {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 0.42em);
+  grid-template-rows: repeat(2, 0.42em);
+  gap: 0.12em;
+  width: 0.98em;
+  height: 0.98em;
+  align-items: center;
+  justify-items: center;
+}
+
+.icon-table-grid span {
+  width: 100%;
+  height: 100%;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+  box-sizing: border-box;
 }
 
 /* Code wrapper met line numbers */
@@ -1535,6 +1636,15 @@ a:hover {
   justify-content: center;
 }
 
+.icon-button:hover {
+  color: var(--accent);
+}
+
+.btn-ghost.icon-button:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
 /* Responsive fallback: onder 960px alleen markdown + preview */
 
 @media (max-width: 960px) {
@@ -1548,9 +1658,9 @@ a:hover {
 
   .edit-page .editor-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(320px, 50vh) minmax(260px, 45vh);
+    grid-template-rows: minmax(240px, var(--row-top, 50vh)) 12px minmax(240px, var(--row-bottom, 50vh));
     height: auto;
-    row-gap: 0.75rem;
+    row-gap: 0;
   }
 
   .edit-page #paneMarkdown,
@@ -1559,7 +1669,23 @@ a:hover {
   }
 
   .edit-page #paneMarkdown { grid-row: 1; }
-  .edit-page #panePreview { grid-row: 2; }
+  .edit-page #panePreview { grid-row: 3; }
+
+  .edit-page .editor-toolbar {
+    align-items: stretch;
+  }
+
+  .edit-page .editor-toolbar-left {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .edit-page .editor-toolbar-left > * {
+    min-width: 0;
+    width: 100%;
+  }
 
   .edit-page #links_md_overview {
     display: flex;
@@ -1577,6 +1703,40 @@ a:hover {
 
   .col-resizer {
     display: none;
+  }
+
+  .edit-page .col-resizer[data-resizer="right"] {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    cursor: row-resize;
+    height: 12px;
+    touch-action: none;
+  }
+
+  .edit-page .col-resizer[data-resizer="right"]::before {
+    top: 50%;
+    bottom: auto;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    height: 2px;
+    transform: translateY(-50%);
+  }
+
+  .edit-page #paneMarkdown .pane-title,
+  .edit-page #panePreview .pane-title,
+  .edit-page #paneMarkdown .pane-subtitle {
+    display: none;
+  }
+
+  .edit-page #paneMarkdown .pane-title-row,
+  .edit-page #panePreview .pane-title-row {
+    justify-content: flex-end;
+  }
+
+  .edit-page #paneMarkdown .pane-header {
+    margin-bottom: 0.35rem;
   }
 
   /* Mobile edit mode: default wrap on, line numbers off (toggles hidden) */

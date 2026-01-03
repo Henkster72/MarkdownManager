@@ -141,6 +141,7 @@
     },
     "permissions": {
       "title": "Rechten",
+      "allow_user_publish": "Gebruikers mogen publiceren",
       "allow_user_delete": "Gebruikers mogen notities verwijderen",
       "hint": "Opgeslagen voor alle gebruikers.",
       "saving": "Opslaan…",
@@ -181,14 +182,19 @@
     },
     "overrides": {
       "summary": "Thema-aanpassingen (optioneel)",
-      "saved_auto": "Thema-aanpassingen worden in je browser (localStorage) automatisch opgeslagen terwijl je typt.",
+      "saved_auto": "Thema-aanpassingen worden opgeslagen in de instellingen (JSON) terwijl je typt.",
       "preview_section": "HTML-voorbeeld",
       "editor_section": "Markdown-editor",
+      "custom_css_label": "Aangepaste CSS",
+      "custom_css_placeholder": "bijv. .callout { padding: 12px; border-radius: 10px; }",
+      "custom_css_hint": "Geldt voor het HTML-voorbeeld en wet HTML-export.",
       "save_title": "Thema-aanpassingen nu opslaan",
       "save_btn": "Thema-aanpassingen opslaan",
       "reset_title": "Thema-aanpassingen wissen",
       "reset_btn": "Thema-aanpassingen resetten",
+      "saving": "Opslaan…",
       "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt",
       "cleared": "Gewist",
       "placeholders": {
         "preview_bg": "Achtergrond (bijv. #ffffff)",

@@ -1033,6 +1033,7 @@ function mdw_metadata_default_config() {
             'publisher_mode' => false,
             'publisher_default_author' => '',
             'publisher_require_h2' => true,
+            'allow_user_publish' => false,
             'allow_user_delete' => true,
             'copy_buttons_enabled' => true,
             'copy_include_meta' => true,
@@ -1043,12 +1044,47 @@ function mdw_metadata_default_config() {
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
             'theme_preset' => 'default',
+            'theme_overrides' => ['preview' => [], 'editor' => []],
+            'custom_css' => '',
             'app_title' => '',
         ],
         'fields' => [
             'date' => ['label' => 'Date', 'markdown_visible' => true, 'html_visible' => false],
         ],
     ];
+}
+
+function mdw_theme_overrides_normalize($raw) {
+    $out = ['preview' => [], 'editor' => []];
+    if (!is_array($raw)) return $out;
+
+    $preview = isset($raw['preview']) && is_array($raw['preview']) ? $raw['preview'] : [];
+    $editor = isset($raw['editor']) && is_array($raw['editor']) ? $raw['editor'] : [];
+
+    foreach (['bg','text','font','fontSize','headingFont','headingColor','listColor','blockquoteTint'] as $k) {
+        if (!array_key_exists($k, $preview)) continue;
+        $val = trim((string)$preview[$k]);
+        if ($val !== '') $out['preview'][$k] = $val;
+    }
+
+    foreach (['font','fontSize','accent'] as $k) {
+        if (!array_key_exists($k, $editor)) continue;
+        $val = trim((string)$editor[$k]);
+        if ($val !== '') $out['editor'][$k] = $val;
+    }
+
+    return $out;
+}
+
+function mdw_sanitize_custom_css($css) {
+    $css = (string)$css;
+    $css = str_replace(["\r\n", "\r"], "\n", $css);
+    $css = str_replace("\0", '', $css);
+    $css = preg_replace('/<\\/?style[^>]*>/i', '', $css);
+    $css = trim($css);
+    $maxLen = 20000;
+    if (strlen($css) > $maxLen) $css = substr($css, 0, $maxLen);
+    return $css;
 }
 
 function mdw_metadata_normalize_config($cfg) {
@@ -1067,6 +1103,7 @@ function mdw_metadata_normalize_config($cfg) {
     $publisherMode = !empty($inSettings['publisher_mode']);
     $publisherDefaultAuthor = isset($inSettings['publisher_default_author']) ? trim((string)$inSettings['publisher_default_author']) : '';
     $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
+    $allowUserPublish = !array_key_exists('allow_user_publish', $inSettings) ? false : (bool)$inSettings['allow_user_publish'];
     $allowUserDelete = !array_key_exists('allow_user_delete', $inSettings) ? true : (bool)$inSettings['allow_user_delete'];
     $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $inSettings) ? true : (bool)$inSettings['copy_buttons_enabled'];
     $copyIncludeMeta = !array_key_exists('copy_include_meta', $inSettings) ? true : (bool)$inSettings['copy_include_meta'];
@@ -1082,11 +1119,14 @@ function mdw_metadata_normalize_config($cfg) {
     if ($uiTheme !== 'dark' && $uiTheme !== 'light') $uiTheme = '';
     $themePreset = isset($inSettings['theme_preset']) ? trim((string)$inSettings['theme_preset']) : 'default';
     if ($themePreset === '') $themePreset = 'default';
+    $themeOverrides = mdw_theme_overrides_normalize($inSettings['theme_overrides'] ?? []);
+    $customCss = mdw_sanitize_custom_css($inSettings['custom_css'] ?? '');
     $appTitle = isset($inSettings['app_title']) ? trim((string)$inSettings['app_title']) : '';
     $out['_settings'] = [
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $publisherDefaultAuthor,
         'publisher_require_h2' => (bool)$publisherRequireH2,
+        'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
@@ -1096,6 +1136,8 @@ function mdw_metadata_normalize_config($cfg) {
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
+        'theme_overrides' => $themeOverrides,
+        'custom_css' => $customCss,
         'app_title' => $appTitle,
     ];
 
@@ -1135,6 +1177,7 @@ function mdw_metadata_default_publisher_config() {
             'author' => ['label' => 'Author', 'markdown_visible' => true, 'html_visible' => false],
             'creationdate' => ['label' => 'Created', 'markdown_visible' => true, 'html_visible' => false],
             'changedate' => ['label' => 'Updated', 'markdown_visible' => true, 'html_visible' => false],
+            'published_date' => ['label' => 'Published date', 'markdown_visible' => true, 'html_visible' => false],
             'publishstate' => ['label' => 'Publish state', 'markdown_visible' => true, 'html_visible' => false],
 
             'extends' => ['label' => 'Extends', 'markdown_visible' => true, 'html_visible' => false],
@@ -1292,6 +1335,7 @@ function mdw_metadata_settings() {
         'publisher_mode' => !empty($s['publisher_mode']),
         'publisher_default_author' => isset($s['publisher_default_author']) ? trim((string)$s['publisher_default_author']) : '',
         'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
+        'allow_user_publish' => !array_key_exists('allow_user_publish', $s) ? false : (bool)$s['allow_user_publish'],
         'allow_user_delete' => !array_key_exists('allow_user_delete', $s) ? true : (bool)$s['allow_user_delete'],
         'copy_buttons_enabled' => !array_key_exists('copy_buttons_enabled', $s) ? true : (bool)$s['copy_buttons_enabled'],
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
@@ -1301,6 +1345,8 @@ function mdw_metadata_settings() {
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
+        'theme_overrides' => mdw_theme_overrides_normalize($s['theme_overrides'] ?? []),
+        'custom_css' => mdw_sanitize_custom_css($s['custom_css'] ?? ''),
         'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
     ];
     if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
@@ -1686,7 +1732,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         if ($k !== '' && !in_array($k, $order, true)) $order[] = $k;
     }
     // Stable publisher order.
-    $publisherOrder = ['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','publishstate'];
+    $publisherOrder = ['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'];
     foreach ($publisherOrder as $k) {
         if (!isset($pubFields[$k])) continue;
         if (!$publisherMode && !array_key_exists($k, $meta)) continue;
@@ -1766,7 +1812,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $metaShown = [];
     $order = [];
     foreach (array_keys($baseFields) as $k) $order[] = $k;
-    foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','publishstate'] as $k) {
+    foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'] as $k) {
         if (!isset($pubFields[$k])) continue;
         $order[] = $k;
     }

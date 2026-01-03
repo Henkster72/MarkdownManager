@@ -141,6 +141,7 @@
     },
     "permissions": {
       "title": "Berechtigungen",
+      "allow_user_publish": "Benutzern erlauben, zu veröffentlichen",
       "allow_user_delete": "Benutzern erlauben, Notizen zu löschen",
       "hint": "Für alle Benutzer gespeichert.",
       "saving": "Speichern…",
@@ -181,14 +182,19 @@
     },
     "overrides": {
       "summary": "Thema-Anpassungen (optional)",
-      "saved_auto": "Thema-Anpassungen werden in Ihrem Browser (localStorage) automatisch gespeichert, während Sie tippen.",
+      "saved_auto": "Thema-Anpassungen werden in den Einstellungen (JSON) gespeichert, während Sie tippen.",
       "preview_section": "HTML-Vorschau",
       "editor_section": "Markdown-Editor",
+      "custom_css_label": "Benutzerdefiniertes CSS",
+      "custom_css_placeholder": "z. B. .callout { padding: 12px; border-radius: 10px; }",
+      "custom_css_hint": "Gilt für die HTML-Vorschau und den Wet-HTML-Export.",
       "save_title": "Thema-Anpassungen jetzt speichern",
       "save_btn": "Thema-Anpassungen speichern",
       "reset_title": "Thema-Anpassungen löschen",
       "reset_btn": "Thema-Anpassungen zurücksetzen",
+      "saving": "Speichern…",
       "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen",
       "cleared": "Geleert",
       "placeholders": {
         "preview_bg": "Hintergrund (z. B. #ffffff)",

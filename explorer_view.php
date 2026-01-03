@@ -387,12 +387,14 @@ function explorer_view_render_tree($opts) {
                 ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $entry['basename']))
                 : (string)($info['title'] ?? $entry['basename']);
             $publishState = null;
+            $publishStateLabel = null;
             if ($publisher_mode) {
                 $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
                 $publishState = function_exists('mdw_publisher_normalize_publishstate')
                     ? mdw_publisher_normalize_publishstate($rawState)
                     : ($rawState !== '' ? $rawState : 'Concept');
                 if ($publishState === '') $publishState = 'Concept';
+                $publishStateLabel = $publishState;
             }
             $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
             if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
@@ -408,8 +410,16 @@ function explorer_view_render_tree($opts) {
             if ($publisher_mode) {
                 $s = strtolower((string)$publishState);
                 if ($s === 'published') $publishClass = 'publish-published';
-                else if ($s === 'processing' || $s === 'to publish') $publishClass = 'publish-processing';
+                else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
+                    $publishClass = 'publish-processing';
+                }
                 else $publishClass = 'publish-concept';
+                if ($s === 'published') $publishStateLabel = explorer_view_t('edit.publish_state.published', 'Published');
+                else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
+                    $publishStateLabel = explorer_view_t('edit.publish_state.processing', 'Processing');
+                } else if ($s === 'concept') {
+                    $publishStateLabel = explorer_view_t('edit.publish_state.concept', 'Concept');
+                }
             }
         ?>
         <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
@@ -423,7 +433,7 @@ function explorer_view_render_tree($opts) {
                         <span><?=explorer_view_escape($t)?></span>
                         <span class="note-badges">
                             <?php if ($publisher_mode): ?>
-                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishState)?></span>
+                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishStateLabel ?? $publishState ?? '')?></span>
                             <?php endif; ?>
                             <?php if ($isSecret): ?>
                                 <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
