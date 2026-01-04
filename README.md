@@ -147,6 +147,9 @@ Semidry/Wet exports only keep classes that you explicitly add via `{: class="...
 
 ## Changelog (short)
 
+See `CHANGELOG.md` for full details.
+
+- 0.4.3: Editor UX polish (custom CSS inserts, redo formatting shortcut, heading preview, overrides badge).
 - 0.4.2: Spanish/Italian translations, tutorial updates and new ES/IT tutorials.
 - 0.4.1: WPM workflow fixes, export cleanup, custom CSS persistence, toolbar overhaul.
 - 0.4: Explorer DnD, folder UX polish, image manager reliability.

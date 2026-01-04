@@ -24,6 +24,7 @@ Sneltoets-modifier is instelbaar in Instellingen → Sneltoetsen.
 
 - Mod+S: Opslaan
 - Mod+H: Vervang-venster
+- Mod+R: Laatste opmaak herhalen
 - Mod+B: Vet
 - Mod+I: Cursief
 - Mod+X: Doorhalen

@@ -18,6 +18,7 @@ Vous pouvez maintenant **exactement** voir à quoi cela ressemblera sur le site.
 - Reglages : roue dentee pour theme, metadonnees, options WPM et modificateur de raccourcis.
 
 ## Raccourcis clavier
+- Mod+R: Répéter la dernière mise en forme
 
 Le modificateur est configurable dans Reglages → Raccourcis clavier.
 `Mod` = Ctrl+Alt (Windows/Linux) ou Ctrl+Command (Mac).

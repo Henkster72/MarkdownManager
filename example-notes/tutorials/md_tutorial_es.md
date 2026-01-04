@@ -24,6 +24,7 @@ El modificador se configura en Ajustes -> Atajos de teclado.
 
 - Mod+S: Guardar
 - Mod+H: Reemplazar
+- Mod+R: Repetir el último formato
 - Mod+B: Negrita
 - Mod+I: Cursiva
 - Mod+X: Tachado

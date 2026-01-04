@@ -24,6 +24,7 @@ Shortcut-Modifier ist in Einstellungen → Tastenkürzel konfigurierbar.
 
 - Mod+S: Speichern
 - Mod+H: Ersetzen-Dialog
+- Mod+R: Letzte Formatierung wiederholen
 - Mod+B: Fett
 - Mod+I: Kursiv
 - Mod+X: Durchstreichen

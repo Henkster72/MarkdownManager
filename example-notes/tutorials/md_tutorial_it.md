@@ -24,6 +24,7 @@ Il modificatore si configura in Impostazioni -> Scorciatoie da tastiera.
 
 - Mod+S: Salva
 - Mod+H: Sostituisci
+- Mod+R: Ripeti l'ultima formattazione
 - Mod+B: Grassetto
 - Mod+I: Corsivo
 - Mod+X: Barrato

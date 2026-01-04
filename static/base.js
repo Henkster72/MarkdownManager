@@ -1581,12 +1581,35 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         customCss: document.getElementById('themeCustomCss'),
     };
 
+    let overridesStatusTimer = null;
     const setOverridesStatus = (msg, kind = 'info') => {
-        if (!overridesStatus) return;
-        overridesStatus.textContent = String(msg || '');
-        overridesStatus.style.color = kind === 'error'
-            ? 'var(--danger)'
-            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+        if (!(overridesStatus instanceof HTMLElement)) return;
+        if (overridesStatusTimer) {
+            clearTimeout(overridesStatusTimer);
+            overridesStatusTimer = null;
+        }
+        const text = String(msg || '').trim();
+        overridesStatus.classList.remove('chip-ok', 'chip-error');
+        if (!text) {
+            overridesStatus.textContent = '';
+            overridesStatus.hidden = true;
+            return;
+        }
+        overridesStatus.textContent = text;
+        overridesStatus.hidden = false;
+        if (kind === 'ok') {
+            overridesStatus.classList.add('chip-ok');
+            overridesStatusTimer = setTimeout(() => {
+                overridesStatus.textContent = '';
+                overridesStatus.hidden = true;
+                overridesStatus.classList.remove('chip-ok');
+                overridesStatusTimer = null;
+            }, 1800);
+            return;
+        }
+        if (kind === 'error') {
+            overridesStatus.classList.add('chip-error');
+        }
     };
 
     const setAppTitleStatus = (msg, kind = 'info') => {
@@ -2001,6 +2024,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             theme_overrides: ov,
             custom_css: normalizeCustomCss(customCssValue),
         }, immediate);
+        if (typeof window.__mdwRefreshCustomCssSelect === 'function') {
+            window.__mdwRefreshCustomCssSelect();
+        }
     };
 
     const saveAppTitleSetting = async (nextTitle) => {
@@ -6847,6 +6873,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const ta = document.getElementById('editor');
     if (!(ta instanceof HTMLTextAreaElement)) return;
     const editorForm = document.getElementById('editor-form');
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const wrapToggle = document.getElementById('wrapToggle');
     const lineNumbersToggle = document.getElementById('lineNumbersToggle');
@@ -7019,6 +7046,66 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         ta.setRangeText(replacement, start, end, 'preserve');
         ta.scrollTop = scrollTop;
         dispatchInput();
+    };
+
+    let lastFormatAction = null;
+    const runFormatAction = (fn) => {
+        if (typeof fn !== 'function') return;
+        lastFormatAction = fn;
+        fn();
+    };
+
+    const parseHtmlTabToken = (token) => {
+        const m = String(token || '').match(/^([A-Za-z][A-Za-z0-9_-]*)(.*)$/);
+        if (!m) return null;
+        const tag = m[1];
+        let rest = m[2] || '';
+        let id = '';
+        const classes = [];
+        while (rest) {
+            const prefix = rest[0];
+            if (prefix !== '.' && prefix !== '#') return null;
+            rest = rest.slice(1);
+            const nameMatch = rest.match(/^([A-Za-z0-9_-]+)(.*)$/);
+            if (!nameMatch) return null;
+            const name = nameMatch[1];
+            rest = nameMatch[2] || '';
+            if (prefix === '#') {
+                if (id) return null;
+                id = name;
+            } else {
+                classes.push(name);
+            }
+        }
+        return { tag, id, classes };
+    };
+
+    const findHtmlTabToken = () => {
+        const pos = ta.selectionStart ?? 0;
+        const value = ta.value;
+        const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+        const before = value.slice(lineStart, pos);
+        if (!before) return null;
+        const m = before.match(/([A-Za-z][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*)$/);
+        if (!m) return null;
+        const token = m[1];
+        const start = pos - token.length;
+        const prev = start > 0 ? value[start - 1] : '';
+        if (prev && !/[\s>({\[]/.test(prev)) return null;
+        return { token, start, end: pos };
+    };
+
+    const buildHtmlSnippet = (info) => {
+        if (!info || !info.tag) return null;
+        const attrs = [];
+        if (info.id) attrs.push(`id="${info.id}"`);
+        if (Array.isArray(info.classes) && info.classes.length) {
+            attrs.push(`class="${info.classes.join(' ')}"`);
+        }
+        const attrText = attrs.length ? ` ${attrs.join(' ')}` : '';
+        const open = `<${info.tag}${attrText}>`;
+        const close = `</${info.tag}>`;
+        return { text: open + close, caretOffset: open.length };
     };
 
     const wrapOrUnwrap = (left, right, { singleCharSafe } = {}) => {
@@ -7409,6 +7496,422 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         setSelection(caret, caret);
     };
 
+    const CUSTOM_CSS_CURSOR = '__MDW_CUSTOM_CSS_CURSOR__';
+    let customCssSnippetMap = new Map();
+    let lastCustomCssValue = null;
+
+    const readCustomCssSetting = () => {
+        const fn = window.__mdwReadCustomCssSetting;
+        if (typeof fn === 'function') {
+            return String(fn() || '').trim();
+        }
+        return '';
+    };
+
+    const splitSelectorList = (value) => {
+        const out = [];
+        let buf = '';
+        let depth = 0;
+        let bracket = 0;
+        let quote = '';
+        for (let i = 0; i < value.length; i++) {
+            const ch = value[i];
+            if (quote) {
+                buf += ch;
+                if (ch === quote && value[i - 1] !== '\\') quote = '';
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                buf += ch;
+                continue;
+            }
+            if (ch === '(') {
+                depth += 1;
+                buf += ch;
+                continue;
+            }
+            if (ch === ')') {
+                depth = Math.max(0, depth - 1);
+                buf += ch;
+                continue;
+            }
+            if (ch === '[') {
+                bracket += 1;
+                buf += ch;
+                continue;
+            }
+            if (ch === ']') {
+                bracket = Math.max(0, bracket - 1);
+                buf += ch;
+                continue;
+            }
+            if (ch === ',' && depth === 0 && bracket === 0) {
+                const trimmed = buf.trim();
+                if (trimmed) out.push(trimmed);
+                buf = '';
+                continue;
+            }
+            buf += ch;
+        }
+        const trimmed = buf.trim();
+        if (trimmed) out.push(trimmed);
+        return out;
+    };
+
+    const isIdentChar = (ch) => /[A-Za-z0-9_-]/.test(ch);
+
+    const readIdent = (value, start) => {
+        const len = value.length;
+        let i = start;
+        if (i >= len) return { name: '', end: i };
+        if (value[i] === '*') return { name: '*', end: i + 1 };
+        while (i < len && isIdentChar(value[i])) i++;
+        return { name: value.slice(start, i), end: i };
+    };
+
+    const skipPseudo = (value, start) => {
+        const len = value.length;
+        let i = start;
+        if (value[i] !== ':') return i;
+        i += 1;
+        if (value[i] === ':') i += 1;
+        while (i < len && isIdentChar(value[i])) i++;
+        if (value[i] === '(') {
+            let depth = 0;
+            while (i < len) {
+                const ch = value[i];
+                if (ch === '(') depth += 1;
+                if (ch === ')') {
+                    depth -= 1;
+                    if (depth === 0) {
+                        i += 1;
+                        break;
+                    }
+                }
+                i += 1;
+            }
+        }
+        return i;
+    };
+
+    const readAttr = (value, start) => {
+        const len = value.length;
+        let i = start + 1;
+        let quote = '';
+        while (i < len) {
+            const ch = value[i];
+            if (quote) {
+                if (ch === quote) quote = '';
+                i += 1;
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                i += 1;
+                continue;
+            }
+            if (ch === ']') break;
+            i += 1;
+        }
+        const raw = value.slice(start + 1, i).trim();
+        let name = '';
+        let attrValue = null;
+        if (raw) {
+            const match = raw.match(/^([^\s~|^$*=\]]+)\s*(?:([~|^$*]?=)\s*(.+))?$/);
+            if (match) {
+                name = match[1] || '';
+                if (match[2]) {
+                    let v = String(match[3] || '').trim();
+                    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+                        v = v.slice(1, -1);
+                    }
+                    attrValue = v;
+                }
+            }
+        }
+        const attr = name ? { name, value: attrValue } : null;
+        const end = i < len ? i + 1 : len;
+        return { attr, end };
+    };
+
+    const parseSelectorParts = (selector) => {
+        const parts = [];
+        const makePart = () => ({ tag: '', id: '', classes: [], attrs: [] });
+        let current = makePart();
+        const pushCurrent = () => {
+            if (current.tag || current.id || current.classes.length || current.attrs.length) {
+                parts.push(current);
+            }
+            current = makePart();
+        };
+        let i = 0;
+        const len = selector.length;
+        while (i < len) {
+            const ch = selector[i];
+            if (/\s/.test(ch)) {
+                while (i < len && /\s/.test(selector[i])) i++;
+                pushCurrent();
+                continue;
+            }
+            if (ch === '>' || ch === '+' || ch === '~') {
+                i += 1;
+                pushCurrent();
+                continue;
+            }
+            if (ch === ',') {
+                i += 1;
+                pushCurrent();
+                continue;
+            }
+            if (ch === ':') {
+                i = skipPseudo(selector, i);
+                continue;
+            }
+            if (ch === '[') {
+                const res = readAttr(selector, i);
+                if (res.attr) current.attrs.push(res.attr);
+                i = res.end;
+                continue;
+            }
+            if (ch === '.') {
+                const res = readIdent(selector, i + 1);
+                if (res.name) current.classes.push(res.name);
+                i = res.end;
+                continue;
+            }
+            if (ch === '#') {
+                const res = readIdent(selector, i + 1);
+                if (res.name && !current.id) current.id = res.name;
+                i = res.end;
+                continue;
+            }
+            if (ch === '*') {
+                const res = readIdent(selector, i);
+                i = res.end;
+                continue;
+            }
+            if (!current.tag) {
+                const res = readIdent(selector, i);
+                if (res.name) {
+                    current.tag = res.name.toLowerCase();
+                    i = res.end;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        pushCurrent();
+        return parts;
+    };
+
+    const cleanupSelectorParts = (parts) => {
+        const cleaned = parts.map((part) => {
+            const next = {
+                tag: part.tag || '',
+                id: part.id || '',
+                classes: Array.isArray(part.classes) ? part.classes.filter(Boolean) : [],
+                attrs: Array.isArray(part.attrs) ? part.attrs.filter((attr) => attr && attr.name) : [],
+            };
+            next.classes = next.classes.filter((cls) => cls !== 'preview-content');
+            return next;
+        }).filter((part) => part.tag || part.id || part.classes.length || part.attrs.length);
+
+        if (cleaned.length > 1 && (cleaned[0].tag === 'html' || cleaned[0].tag === 'body')) {
+            cleaned.shift();
+        }
+        return cleaned;
+    };
+
+    const resolvePartTag = (part, index, parts) => {
+        if (part.tag) return part.tag;
+        const next = parts[index + 1];
+        if (next && next.tag === 'li') return 'ul';
+        return 'div';
+    };
+
+    const shouldDropTrailingLi = (parts) => {
+        if (parts.length < 2) return false;
+        const last = parts[parts.length - 1];
+        if (last.tag !== 'li') return false;
+        if (last.id || last.classes.length || last.attrs.length) return false;
+        const prev = parts[parts.length - 2];
+        if (!(prev.tag === 'ul' || prev.tag === 'ol')) return false;
+        if (prev.id || prev.classes.length || prev.attrs.length) return false;
+        return true;
+    };
+
+    const buildLabelFromParts = (parts) => {
+        const labelParts = shouldDropTrailingLi(parts) ? parts.slice(0, -1) : parts;
+        const tokens = [];
+        labelParts.forEach((part) => {
+            if (part.tag) tokens.push(part.tag);
+            if (part.id) tokens.push(part.id);
+            if (part.classes.length) tokens.push(...part.classes);
+            if (part.attrs.length) tokens.push(...part.attrs.map((attr) => attr.name).filter(Boolean));
+        });
+        return tokens.join(' ').replace(/\s+/g, ' ').trim();
+    };
+
+    const isInsertableParts = (parts) => {
+        if (!parts.length) return false;
+        if (parts.length === 1 && (parts[0].tag === 'html' || parts[0].tag === 'body')) return false;
+        return true;
+    };
+
+    const buildSnippetFromParts = (parts) => {
+        if (!parts.length) return '';
+        if (parts.length === 1) {
+            const part = parts[0];
+            const tag = part.tag || '';
+            const classes = Array.isArray(part.classes) ? part.classes.filter(Boolean) : [];
+            const hasAttrs = Array.isArray(part.attrs) && part.attrs.length > 0;
+            if (!tag && !part.id && !hasAttrs && classes.length === 1) {
+                return `{: class="${classes[0]}" }${CUSTOM_CSS_CURSOR}`;
+            }
+        }
+        const normalized = parts.map((part) => ({
+            tag: part.tag || '',
+            id: part.id || '',
+            classes: Array.isArray(part.classes) ? [...part.classes] : [],
+            attrs: Array.isArray(part.attrs) ? part.attrs.map((attr) => ({ name: attr.name, value: attr.value })) : [],
+        }));
+        normalized.forEach((part, index) => {
+            part.tag = resolvePartTag(part, index, normalized);
+        });
+        if (normalized.length && normalized[0].tag === 'li') {
+            normalized.unshift({ tag: 'ul', id: '', classes: [], attrs: [] });
+        }
+        const last = normalized[normalized.length - 1];
+        if (last && (last.tag === 'ul' || last.tag === 'ol')) {
+            normalized.push({ tag: 'li', id: '', classes: [], attrs: [] });
+        }
+
+        const escapeAttr = (value) => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        const buildAttrs = (part) => {
+            const attrs = [];
+            if (part.id) attrs.push(`id="${escapeAttr(part.id)}"`);
+            if (part.classes.length) attrs.push(`class="${escapeAttr(part.classes.join(' '))}"`);
+            part.attrs.forEach((attr) => {
+                if (!attr || !attr.name) return;
+                if (attr.value == null || attr.value === '') {
+                    attrs.push(attr.name);
+                } else {
+                    attrs.push(`${attr.name}="${escapeAttr(attr.value)}"`);
+                }
+            });
+            return attrs.length ? ` ${attrs.join(' ')}` : '';
+        };
+        const indentLines = (text, indent) => text
+            .split('\n')
+            .map((line) => (line ? indent + line : indent))
+            .join('\n');
+
+        let content = CUSTOM_CSS_CURSOR;
+        for (let i = normalized.length - 1; i >= 0; i--) {
+            const part = normalized[i];
+            const tag = part.tag || 'div';
+            const attrs = buildAttrs(part);
+            const inner = indentLines(content, '  ');
+            content = `<${tag}${attrs}>\n${inner}\n</${tag}>`;
+        }
+        return content;
+    };
+
+    const buildCustomCssEntries = (css) => {
+        const entries = [];
+        const seen = new Set();
+        const raw = String(css || '').trim();
+        if (!raw) return entries;
+        const styleEl = document.createElement('style');
+        styleEl.media = 'not all';
+        styleEl.textContent = raw;
+        document.head.appendChild(styleEl);
+        const processRules = (rules) => {
+            if (!rules) return;
+            Array.from(rules).forEach((rule) => {
+                if (!rule) return;
+                if (rule.type === CSSRule.STYLE_RULE) {
+                    const selectorText = String(rule.selectorText || '').trim();
+                    if (!selectorText) return;
+                    splitSelectorList(selectorText).forEach((selector) => {
+                        const parts = cleanupSelectorParts(parseSelectorParts(selector));
+                        if (!isInsertableParts(parts)) return;
+                        const label = buildLabelFromParts(parts);
+                        if (!label) return;
+                        const snippet = buildSnippetFromParts(parts);
+                        if (!snippet) return;
+                        const key = `${label}|${snippet}`;
+                        if (seen.has(key)) return;
+                        seen.add(key);
+                        entries.push({ label, snippet });
+                    });
+                    return;
+                }
+                if (rule.type === CSSRule.MEDIA_RULE || rule.type === CSSRule.SUPPORTS_RULE) {
+                    processRules(rule.cssRules);
+                }
+            });
+        };
+        try {
+            processRules(styleEl.sheet?.cssRules || []);
+        } catch {}
+        styleEl.remove();
+        return entries;
+    };
+
+    const insertCustomCssSnippet = (snippet) => {
+        const raw = String(snippet || '');
+        if (!raw) return;
+        const cursorIndex = raw.indexOf(CUSTOM_CSS_CURSOR);
+        const markerIndex = cursorIndex === -1 ? raw.length : cursorIndex;
+        const block = raw.replace(CUSTOM_CSS_CURSOR, '');
+        const { start, end } = getSelection();
+        const before = ta.value.slice(0, start);
+        const after = ta.value.slice(end);
+        const needsPrefix = before && !before.endsWith('\n');
+        const needsSuffix = after && !after.startsWith('\n');
+        const insert = `${needsPrefix ? '\n' : ''}${block}${needsSuffix ? '\n' : ''}`;
+        replaceRange(start, end, insert);
+        const caret = start + (needsPrefix ? 1 : 0) + markerIndex;
+        setSelection(caret, caret);
+        try {
+            pushUndoSnapshot(snapshot(), { merge: false });
+            redoStack.length = 0;
+        } catch {}
+        ta.focus();
+    };
+
+    const refreshCustomCssSelect = (force = false) => {
+        if (!(customCssSelect instanceof HTMLSelectElement)) return;
+        const css = readCustomCssSetting();
+        if (!force && css === lastCustomCssValue) return;
+        lastCustomCssValue = css;
+        const entries = buildCustomCssEntries(css);
+        const hasCss = !!String(css || '').trim();
+        customCssSnippetMap = new Map();
+        customCssSelect.textContent = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = t('edit.toolbar.custom_css', 'Custom CSS');
+        placeholder.selected = true;
+        customCssSelect.appendChild(placeholder);
+        entries.forEach((entry, index) => {
+            const key = `custom-css-${index}`;
+            customCssSnippetMap.set(key, entry.snippet);
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = entry.label;
+            customCssSelect.appendChild(opt);
+        });
+        const hasEntries = entries.length > 0;
+        customCssSelect.hidden = !hasCss;
+        customCssSelect.disabled = !hasEntries;
+        if (!hasEntries) customCssSelect.value = '';
+    };
+
+    window.__mdwRefreshCustomCssSelect = refreshCustomCssSelect;
+
     const clickById = (id) => {
         const el = document.getElementById(id);
         if (el instanceof HTMLElement) el.click();
@@ -7423,12 +7926,14 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const orderedListBtn = document.getElementById('formatOrderedListBtn');
     const unorderedListBtn = document.getElementById('formatUnorderedListBtn');
     const insertTableBtn = document.getElementById('insertTableBtn');
+    const customCssSelect = document.getElementById('customCssSelect');
 
     headingSelect?.addEventListener('change', () => {
         if (!(headingSelect instanceof HTMLSelectElement)) return;
         const value = String(headingSelect.value || '').trim();
         if (!value) return;
-        setHeadingLevel(value);
+        const level = value;
+        runFormatAction(() => setHeadingLevel(level));
         headingSelect.value = '';
         ta.focus();
     });
@@ -7437,43 +7942,72 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!(alignSelect instanceof HTMLSelectElement)) return;
         const value = String(alignSelect.value || '').trim();
         if (!value) return;
-        applyAlignment(value);
+        const align = value;
+        runFormatAction(() => applyAlignment(align));
         alignSelect.value = 'left';
         ta.focus();
     });
 
     boldBtn?.addEventListener('click', () => {
-        wrapOrUnwrap('**', '**');
+        runFormatAction(() => wrapOrUnwrap('**', '**'));
         ta.focus();
     });
     italicBtn?.addEventListener('click', () => {
-        wrapOrUnwrap('*', '*', {
+        runFormatAction(() => wrapOrUnwrap('*', '*', {
             singleCharSafe: ({ value, start, end }) => {
                 const prev = value[start - 2] || '';
                 const next = value[end + 1] || '';
                 return prev !== '*' && next !== '*';
             }
-        });
+        }));
         ta.focus();
     });
     underlineBtn?.addEventListener('click', () => {
-        wrapOrUnwrap('<u>', '</u>');
+        runFormatAction(() => wrapOrUnwrap('<u>', '</u>'));
         ta.focus();
     });
     blockquoteBtn?.addEventListener('click', () => {
-        toggleLinePrefix('quote');
+        runFormatAction(() => toggleLinePrefix('quote'));
         ta.focus();
     });
     orderedListBtn?.addEventListener('click', () => {
-        toggleOrderedList();
+        runFormatAction(() => toggleOrderedList());
         ta.focus();
     });
     unorderedListBtn?.addEventListener('click', () => {
-        toggleLinePrefix('bullet');
+        runFormatAction(() => toggleLinePrefix('bullet'));
         ta.focus();
     });
     insertTableBtn?.addEventListener('click', () => {
-        insertTable();
+        runFormatAction(() => insertTable());
+        ta.focus();
+    });
+
+    customCssSelect?.addEventListener('change', () => {
+        if (!(customCssSelect instanceof HTMLSelectElement)) return;
+        const key = String(customCssSelect.value || '').trim();
+        if (!key) return;
+        const snippet = customCssSnippetMap.get(key);
+        if (snippet) insertCustomCssSnippet(snippet);
+        customCssSelect.value = '';
+    });
+
+    refreshCustomCssSelect(true);
+
+    ta.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        if (ta.selectionStart == null || ta.selectionEnd == null) return;
+        if (ta.selectionStart !== ta.selectionEnd) return;
+        const tokenInfo = findHtmlTabToken();
+        if (!tokenInfo) return;
+        const info = parseHtmlTabToken(tokenInfo.token);
+        if (!info) return;
+        const snippet = buildHtmlSnippet(info);
+        if (!snippet) return;
+        e.preventDefault();
+        replaceRange(tokenInfo.start, tokenInfo.end, snippet.text);
+        const caret = tokenInfo.start + snippet.caretOffset;
+        setSelection(caret, caret);
         ta.focus();
     });
 
@@ -7502,37 +8036,46 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             return;
         }
 
+        // Repeat last formatting: Ctrl+Alt+R
+        if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+            if (typeof lastFormatAction === 'function') {
+                e.preventDefault();
+                lastFormatAction();
+            }
+            return;
+        }
+
         // Bold: Ctrl+Alt+B
         if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
             e.preventDefault();
-            wrapOrUnwrap('**', '**');
+            runFormatAction(() => wrapOrUnwrap('**', '**'));
             return;
         }
 
         // Italic: Ctrl+Alt+I
         if (!e.shiftKey && (e.key === 'i' || e.key === 'I')) {
             e.preventDefault();
-            wrapOrUnwrap('*', '*', {
+            runFormatAction(() => wrapOrUnwrap('*', '*', {
                 singleCharSafe: ({ value, start, end }) => {
                     const prev = value[start - 2] || '';
                     const next = value[end + 1] || '';
                     return prev !== '*' && next !== '*';
                 }
-            });
+            }));
             return;
         }
 
         // Strikethrough: Ctrl+Alt+X
         if (!e.shiftKey && (e.key === 'x' || e.key === 'X')) {
             e.preventDefault();
-            wrapOrUnwrap('~~', '~~');
+            runFormatAction(() => wrapOrUnwrap('~~', '~~'));
             return;
         }
 
         // Inline code: Ctrl+Alt+` (backquote key)
         if (!e.shiftKey && (e.code === 'Backquote' || e.key === '`')) {
             e.preventDefault();
-            wrapOrUnwrap('`', '`');
+            runFormatAction(() => wrapOrUnwrap('`', '`'));
             return;
         }
 
@@ -7560,28 +8103,28 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         // Blockquote toggle: Ctrl+Alt+Q
         if (!e.shiftKey && (e.key === 'q' || e.key === 'Q')) {
             e.preventDefault();
-            toggleLinePrefix('quote');
+            runFormatAction(() => toggleLinePrefix('quote'));
             return;
         }
 
         // Bullet list toggle: Ctrl+Alt+U
         if (!e.shiftKey && (e.key === 'u' || e.key === 'U')) {
             e.preventDefault();
-            toggleLinePrefix('bullet');
+            runFormatAction(() => toggleLinePrefix('bullet'));
             return;
         }
 
         // Fenced code block: Ctrl+Alt+O
         if (!e.shiftKey && (e.key === 'o' || e.key === 'O')) {
             e.preventDefault();
-            wrapOrUnwrap('```\n', '\n```');
+            runFormatAction(() => wrapOrUnwrap('```\n', '\n```'));
             return;
         }
 
         // Comment: Ctrl+Alt+/
         if (e.code === 'Slash') {
             e.preventDefault();
-            wrapOrUnwrap('<!-- ', ' -->');
+            runFormatAction(() => wrapOrUnwrap('<!-- ', ' -->'));
             return;
         }
 
@@ -7604,19 +8147,20 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const isMinus = e.code === 'NumpadSubtract' || e.key === '-';
         if (isPlus) {
             e.preventDefault();
-            adjustHeadingLevel(1);
+            runFormatAction(() => adjustHeadingLevel(1));
             return;
         }
         if (isMinus) {
             e.preventDefault();
-            adjustHeadingLevel(-1);
+            runFormatAction(() => adjustHeadingLevel(-1));
             return;
         }
 
         // Set heading level directly: Ctrl+Alt+1..6
         if (!e.shiftKey && /^[1-6]$/.test(String(e.key || ''))) {
             e.preventDefault();
-            setHeadingLevel(Number(e.key));
+            const level = Number(e.key);
+            runFormatAction(() => setHeadingLevel(level));
         }
     });
 })();

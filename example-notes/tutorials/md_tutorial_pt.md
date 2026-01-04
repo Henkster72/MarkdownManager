@@ -24,6 +24,7 @@ O modificador pode ser configurado em Configuracoes → Atalhos.
 
 - Mod+S: Salvar
 - Mod+H: Substituir
+- Mod+R: Repetir a última formatação
 - Mod+B: Negrito
 - Mod+I: Italico
 - Mod+X: Tachado

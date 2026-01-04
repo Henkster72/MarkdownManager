@@ -24,6 +24,7 @@ Shortcut modifier is configurable in Settings → Keyboard shortcuts.
 
 - Mod+S: Save
 - Mod+H: Replace modal
+- Mod+R: Repeat last formatting
 - Mod+B: Bold
 - Mod+I: Italic
 - Mod+X: Strikethrough

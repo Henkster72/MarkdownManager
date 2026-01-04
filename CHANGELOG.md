@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.3
+
+- Custom CSS quick insert: a toolbar dropdown appears when custom CSS exists and inserts selector-based snippets (single-class selectors use `{: class="..." }`).
+- HTML shorthand expansion: typing `p` or `div.class` and pressing Tab inserts matching tags with the cursor inside.
+- Repeat last formatting: new Mod+R / Ctrl+Alt+R shortcut applies the most recent formatting action to the current selection.
+- Heading selector starts at H1 and shows H1–H6 preview sizing.
+- Theme overrides now show a visible save badge, including errors.
+- Explorer collapse hides rename/delete actions.
+
 ## 0.4.2
 
 - Spanish and Italian UI translations added.

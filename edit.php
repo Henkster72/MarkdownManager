@@ -1184,14 +1184,17 @@ window.mermaid = mermaid;
                                     <span class="pi pi-floppydisk"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
                                 </button>
-                                <select id="headingSelect" class="input editor-toolbar-select" aria-label="<?=h(mdw_t('edit.toolbar.heading','Heading'))?>">
-                                    <option value="" selected>H</option>
-                                    <option value="1">H1</option>
-                                    <option value="2">H2</option>
-                                    <option value="3">H3</option>
-                                    <option value="4">H4</option>
-                                    <option value="5">H5</option>
-                                    <option value="6">H6</option>
+                                <select id="headingSelect" class="input editor-toolbar-select editor-heading-select" aria-label="<?=h(mdw_t('edit.toolbar.heading','Heading'))?>">
+                                    <option value="" class="md-h1 heading-select-option" selected>H1</option>
+                                    <option value="1" class="md-h1 heading-select-option">H1</option>
+                                    <option value="2" class="md-h2 heading-select-option">H2</option>
+                                    <option value="3" class="md-h3 heading-select-option">H3</option>
+                                    <option value="4" class="md-h4 heading-select-option">H4</option>
+                                    <option value="5" class="md-h5 heading-select-option">H5</option>
+                                    <option value="6" class="md-h6 heading-select-option">H6</option>
+                                </select>
+                                <select id="customCssSelect" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?>" hidden>
+                                    <option value="" selected><?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?></option>
                                 </select>
                                 <button type="button" id="formatBoldBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.bold','Bold'))?>">
                                     <span class="format-letter">B</span>
@@ -1814,7 +1817,7 @@ window.mermaid = mermaid;
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 				                <div class="status-text">
 					                    <?=h(mdw_t('theme.overrides.saved_auto','Theme adjustments are saved in your browser (localStorage) automatically as you type.'))?>
-				                    <span id="themeOverridesStatus" style="margin-left: 0.35rem;"></span>
+				                    <span id="themeOverridesStatus" class="chip theme-overrides-status" hidden aria-live="polite"></span>
 				                </div>
 				                <div class="modal-field">
 				                    <div class="modal-label" style="margin-bottom: 0.35rem;"><?=h(mdw_t('theme.overrides.preview_section','HTML preview'))?></div>
