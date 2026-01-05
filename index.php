@@ -106,7 +106,7 @@ foreach ($github_pages_plugins as $plugin) {
 }
 if ($github_pages_plugin_loaded) {
     $github_token = trim((string)env_str('GITHUB_TOKEN', ''));
-    $github_export_dir = trim((string)env_str('MDW_EXPORT_DIR', ''));
+    $github_export_dir = trim((string)env_str('MDM_EXPORT_DIR', ''));
     $github_pages_env_ready = ($github_token !== '' && $github_export_dir !== '');
 }
 
@@ -579,7 +579,9 @@ function mdw_delete_md_folder($full, &$error) {
 function read_shortcuts_csv($csv){
     $out=[];
     if(!file_exists($csv)) return $out;
+    $old_setting = ini_set('auto_detect_line_endings', true);
     if(($h=fopen($csv,'r'))!==false){
+        stream_set_read_buffer($h, 0);
         fgetcsv($h); // header skip
         while(($row=fgetcsv($h))!==false){
             if(count($row)>=2){
@@ -595,6 +597,7 @@ function read_shortcuts_csv($csv){
         }
         fclose($h);
     }
+    ini_set('auto_detect_line_endings', $old_setting);
     return $out;
 }
 
