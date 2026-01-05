@@ -1,31 +1,17 @@
-# Milgram's Authority Findings
+# Millgrams experiment
 
-_date: 24-07-25_
+Stanley Milgram demonstrated that roughly 80% of people will obey authority figures even when the orders are clearly immoral, harmful, or unlawful.
 
-**user:**
+This isn’t about “evil people.” It’s about ordinary people outsourcing responsibility to power, uniforms, titles, procedures. Authority provides psychological cover. I was just following instructions becomes a moral anesthetic.
 
-Rewrite in clear and concise british grammar "Psychologist Stanley Milgram discovered that 80% of the population does not have the psychological or moral resources to defy an authority's command, no matter how unlawful or morally corrupt the command.
+That leaves a small minority who hesitate, question, or refuse. Not because they are smarter or braver by default, but because they resist the comfort of obedience and accept personal responsibility instead.
 
-That's why only 20% have critical thinking skills.
+Politically, this explains a lot: why abuses repeat, why systems persist long after they fail, and why accountability is always “someone else’s job.”
 
-This explains a lot!"
+If you’re convinced you would be part of the resisting minority, it’s worth pausing. History suggests most people overestimate their own independence when authority is applied calmly, incrementally, and with official approval.
 
-**assistant:**
+Milgram’s work is worth reading in full before assuming you’re the exception:
 
-Psychologist Stanley Milgram found that 80% of people lack the psychological or moral strength to resist authority, even when the command is unlawful or morally wrong. Therefore, only 20% possess critical thinking skills. This is quite revealing!
+https://en.wikipedia.org/wiki/Milgram_experiment
 
-**user:**
 
-I want a concluding sentence like "You might overthink your behaviour" rewrite concisely and properly
-
-**assistant:**
-
-You might be overthinking your behaviour.
-
-**user:**
-
-Uhm that is not the same intention as what I was asking for...
-
-**assistant:**
-
-Psychologist Stanley Milgram found that 80% of people lack the psychological or moral strength to resist authority, even when the command is unlawful or morally wrong. Therefore, only 20% possess critical thinking skills. This explains a lot! You might want to reflect on your own behaviour.

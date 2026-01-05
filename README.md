@@ -152,10 +152,18 @@ jobs:
       - name: Export static HTML
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MDW_EXPORT_SRC: example-notes
+          MDW_EXPORT_DIR: dist
+          MDW_EXPORT_BASE: /MarkdownManager/
         run: |
-          echo "GITHUB_TOKEN=${GITHUB_TOKEN}" >> .env
-          php tools/export-wet-html.php --out dist
-          touch dist/.nojekyll
+          {
+            echo "GITHUB_TOKEN=${GITHUB_TOKEN}"
+            echo "MDW_EXPORT_SRC=${MDW_EXPORT_SRC}"
+            echo "MDW_EXPORT_DIR=${MDW_EXPORT_DIR}"
+            echo "MDW_EXPORT_BASE=${MDW_EXPORT_BASE}"
+          } >> .env
+          php tools/export-wet-html.php --out "${MDW_EXPORT_DIR}"
+          touch "${MDW_EXPORT_DIR}/.nojekyll"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -170,7 +178,7 @@ jobs:
         uses: actions/deploy-pages@v4
 ```
 
-Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` into it at runtime, but you should not commit `.env` to your repo.
+Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` and the export settings into a temporary `.env` at runtime, but you should not commit `.env` to your repo. For local testing, copy `.env.example` to `.env` and set `MDW_EXPORT_SRC=example-notes`, `MDW_EXPORT_DIR=dist`, and `MDW_EXPORT_BASE=/MarkdownManager/`.
 
 **Why these workflow permissions**
 
@@ -189,17 +197,17 @@ Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` i
 - The `images/` folder is copied into the output so image tokens (`{{ }}`) keep working.
 - Notes listed in `secret_mds.txt` are skipped automatically.
 
-**Recommended export flags**
+**Recommended export flags (this repo)**
 
 - `--out dist` (required): output folder for the static site.
-- `--src notes` (optional): export only a subfolder instead of the whole repo.
+- `--src example-notes` (optional): export only the example notes folder.
 - `--only-published` (optional): when WPM is enabled, export only `publishstate: Published`.
 
 You can also set these in `.env`:
 
 ```
 MDW_EXPORT_DIR=dist
-MDW_EXPORT_SRC=notes
+MDW_EXPORT_SRC=example-notes
 MDW_EXPORT_PUBLISHED_ONLY=1
 ```
 
@@ -211,16 +219,16 @@ Project Pages deploy to:
 https://<user>.github.io/<repo>/
 ```
 
-If your exported HTML uses root-relative links like `/css/app.css`, those will break. The exporter keeps links relative, but it is still a good idea to set a base path in the workflow:
+If your exported HTML uses root-relative links like `/css/app.css`, those will break. The exporter keeps links relative, but it is still a good idea to set a base path in the workflow for this repo:
 
 ```
-MDW_EXPORT_BASE=/YourRepoName/
+MDW_EXPORT_BASE=/MarkdownManager/
 ```
 
 Or pass it directly:
 
 ```
-php tools/export-wet-html.php --out dist --base /YourRepoName/
+php tools/export-wet-html.php --out dist --base /MarkdownManager/
 ```
 
 This inserts `<base href="/YourRepoName/">` into every exported page so assets and links resolve correctly.

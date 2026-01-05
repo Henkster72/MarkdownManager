@@ -29,10 +29,18 @@ jobs:
       - name: Export static HTML
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MDW_EXPORT_SRC: example-notes
+          MDW_EXPORT_DIR: dist
+          MDW_EXPORT_BASE: /MarkdownManager/
         run: |
-          echo "GITHUB_TOKEN=${GITHUB_TOKEN}" >> .env
-          php tools/export-wet-html.php --out dist
-          touch dist/.nojekyll
+          {
+            echo "GITHUB_TOKEN=${GITHUB_TOKEN}"
+            echo "MDW_EXPORT_SRC=${MDW_EXPORT_SRC}"
+            echo "MDW_EXPORT_DIR=${MDW_EXPORT_DIR}"
+            echo "MDW_EXPORT_BASE=${MDW_EXPORT_BASE}"
+          } >> .env
+          php tools/export-wet-html.php --out "${MDW_EXPORT_DIR}"
+          touch "${MDW_EXPORT_DIR}/.nojekyll"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
