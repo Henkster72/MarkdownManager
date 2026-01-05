@@ -577,27 +577,31 @@ function mdw_delete_md_folder($full, &$error) {
 
 /* LINKS FROM CSV (shortcuts at top) */
 function read_shortcuts_csv($csv){
-    $out=[];
-    if(!file_exists($csv)) return $out;
-    $old_setting = ini_set('auto_detect_line_endings', true);
-    if(($h=fopen($csv,'r'))!==false){
-        stream_set_read_buffer($h, 0);
-        fgetcsv($h); // header skip
-        while(($row=fgetcsv($h))!==false){
-            if(count($row)>=2){
-                $shortcut=trim($row[0]);
-                $url=trim($row[1]);
-                if($shortcut!=='' && $url!==''){
-                    $out[]=[
-                        'shortcut'=>$shortcut,
-                        'url'=>$url
-                    ];
-                }
+    $out = [];
+    if (!is_string($csv) || !is_file($csv) || !is_readable($csv)) {
+        return $out;
+    }
+
+    $h = @fopen($csv, 'r');
+    if ($h === false) {
+        return $out;
+    }
+
+    fgets($h); // Skip header line
+
+    while (($line = fgets($h)) !== false) {
+        $line = trim($line);
+        if ($line === '') continue;
+        $parts = str_getcsv($line);
+        if (count($parts) >= 2) {
+            $shortcut = trim($parts[0]);
+            $url = trim($parts[1]);
+            if ($shortcut !== '' && $url !== '') {
+                $out[] = ['shortcut' => $shortcut, 'url' => $url];
             }
         }
-        fclose($h);
     }
-    ini_set('auto_detect_line_endings', $old_setting);
+    fclose($h);
     return $out;
 }
 
