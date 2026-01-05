@@ -32,12 +32,16 @@ jobs:
           MDW_EXPORT_SRC: example-notes
           MDW_EXPORT_DIR: dist
           MDW_EXPORT_BASE: /MarkdownManager/
+          MDW_EXPORT_REPO_URL: https://github.com/Henkster72/MarkdownManager
+          MDW_EXPORT_REPO_LABEL: Source on GitHub
         run: |
           {
             echo "GITHUB_TOKEN=${GITHUB_TOKEN}"
             echo "MDW_EXPORT_SRC=${MDW_EXPORT_SRC}"
             echo "MDW_EXPORT_DIR=${MDW_EXPORT_DIR}"
             echo "MDW_EXPORT_BASE=${MDW_EXPORT_BASE}"
+            echo "MDW_EXPORT_REPO_URL=${MDW_EXPORT_REPO_URL}"
+            echo "MDW_EXPORT_REPO_LABEL=${MDW_EXPORT_REPO_LABEL}"
           } >> .env
           php tools/export-wet-html.php --out "${MDW_EXPORT_DIR}"
           touch "${MDW_EXPORT_DIR}/.nojekyll"

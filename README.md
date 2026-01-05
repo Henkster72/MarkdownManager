@@ -1,4 +1,4 @@
-# MarkdownManager v0.5
+# MarkdownManager v0.5.1
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -6,15 +6,23 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
-New in v0.5: GitHub Pages export automation, restored link modal, and better mobile navigation/focus controls.
+New in v0.5.1: richer static exports (foldered index, Mermaid support, repo footer) and a smoother Pages workflow.
 
 ## Why check this out
 
 - Flat files only: your notes are readable outside the app and easy to back up.
 - Instant live preview: Markdown updates on save, with clean HTML output.
 - WPM mode: publish states, badges, author/subtitle rules, and metadata control.
-- CMS-ready: export HTML directly or pair with AW-SSG for a full site workflow.
+- CMS-ready: export HTML directly or pair with AW-SSG for a structured full-site workflow.
 - No build chain: drop it on a PHP host and go.
+- Writing-first UX: open, edit, and publish without leaving your notes.
+
+## Short comparison: Jekyll, Astro, and other SSGs
+
+- Jekyll: great for static sites and GitHub Pages, but no live editor or content workflow. MarkdownManager is the authoring UI.
+- Astro: powerful for component-driven sites, but requires a build pipeline. MarkdownManager is light and runs anywhere PHP runs.
+- Hugo / Eleventy / Next.js: fast and flexible, but still build-focused. MarkdownManager stays in edit mode and can export to them.
+- AW-SSG: use MarkdownManager to edit and export wet HTML, then let AW-SSG handle structure, navigation, and the final static site.
 
 ## Quick start (local)
 
@@ -209,6 +217,8 @@ You can also set these in `.env`:
 MDW_EXPORT_DIR=dist
 MDW_EXPORT_SRC=example-notes
 MDW_EXPORT_PUBLISHED_ONLY=1
+MDW_EXPORT_REPO_URL=https://github.com/YourUser/YourRepo
+MDW_EXPORT_REPO_LABEL=Source on GitHub
 ```
 
 **Base path gotcha (Project Pages)**
@@ -230,6 +240,10 @@ Or pass it directly:
 ```
 php tools/export-wet-html.php --out dist --base /MarkdownManager/
 ```
+
+**Local preview tip**
+
+If you run `php -S 127.0.0.1:1234` from the repo root and open `/dist/index.html`, set `MDW_EXPORT_BASE=/dist/` in your local `.env` so assets and links resolve under `/dist/`. If you instead serve `dist/` as the web root (e.g. `php -S 127.0.0.1:1234 -t dist`), you can leave `MDW_EXPORT_BASE` empty.
 
 This inserts `<base href="/YourRepoName/">` into every exported page so assets and links resolve correctly.
 

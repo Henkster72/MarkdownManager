@@ -116,6 +116,25 @@ function ghpx_sanitize_css_for_style_tag(string $css): string {
     return str_replace('</style', '<\\/style', $css);
 }
 
+function ghpx_build_mermaid_script(): string {
+    return "\n<script type=\"module\">\n" .
+        "import mermaid from \"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs\";\n" .
+        "mermaid.initialize({ startOnLoad: true });\n" .
+        "window.mermaid = mermaid;\n" .
+        "</script>\n";
+}
+
+function ghpx_build_repo_footer(?string $repoUrl, ?string $label): string {
+    $repoUrl = trim((string)$repoUrl);
+    if ($repoUrl === '') return '';
+    $label = trim((string)$label);
+    if ($label === '') $label = 'Source on GitHub';
+    $urlEsc = htmlspecialchars($repoUrl, ENT_QUOTES, 'UTF-8');
+    $labelEsc = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    return '<footer class="export-footer"><a href="' . $urlEsc . '" target="_blank" rel="noopener noreferrer">' .
+        $labelEsc . '</a></footer>';
+}
+
 function ghpx_find_theme_name(string $themesDir, string $preset): ?string {
     if ($preset === '' || strtolower($preset) === 'default') return null;
     $themes = list_available_themes($themesDir);
@@ -366,10 +385,20 @@ try {
     $customCss = isset($settings['custom_css']) ? (string)$settings['custom_css'] : '';
 
     $baseCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/htmlpreview.css');
+    $popiconCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/popicon.css');
+    $baseHref = trim($baseHref);
+    $fontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popicon.woff2' : '/popicon.woff2';
+    if ($popiconCss !== '') {
+        $popiconCss = preg_replace('~url\\((["\\\']?)popicon\\.woff2\\1\\)~', 'url("' . $fontHref . '")', $popiconCss);
+    }
     $themeName = ghpx_find_theme_name($themesDir, $themePreset);
     $themeCss = $themeName ? ghpx_read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css') : '';
     $overridesCss = ghpx_build_overrides_css($overrides);
-    $cssChunks = array_filter([$baseCss, $themeCss, $overridesCss, $customCss], fn($c) => trim((string)$c) !== '');
+    $repoUrl = (string)(env_str('MDW_EXPORT_REPO_URL', '') ?? '');
+    $repoLabel = (string)(env_str('MDW_EXPORT_REPO_LABEL', '') ?? '');
+    $repoFooter = ghpx_build_repo_footer($repoUrl, $repoLabel);
+    $repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
+    $cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
     $css = ghpx_sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
     $cssBlock = $css !== '' ? "\n  <style data-mdw-export-css>\n{$css}\n  </style>\n" : '';
     $baseTag = $baseHref !== '' ? '  <base href="' . htmlspecialchars($baseHref, ENT_QUOTES, 'UTF-8') . '">' . "\n" : '';
@@ -378,6 +407,9 @@ try {
     $body = md_to_html($rawMd, $file, 'view');
     $body = '<article class="preview-content">' . $body . '</article>';
     $body = ghpx_rewrite_internal_links($body, $outRelFile, $baseHref !== '');
+    $hasMermaid = (strpos($body, 'class="mermaid"') !== false)
+        || (preg_match('/^```\\s*mermaid\\b/im', $rawMd) === 1);
+    $mermaidScript = $hasMermaid ? ghpx_build_mermaid_script() : '';
 
     $html = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>" .
         htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</title>\n" .
@@ -385,6 +417,8 @@ try {
         $cssBlock .
         "</head>\n<body>\n" .
         $body .
+        ($repoFooter !== '' ? "\n" . $repoFooter : '') .
+        $mermaidScript .
         "\n</body>\n</html>\n";
 
     if (@file_put_contents($outFull, $html) === false) {
@@ -394,6 +428,10 @@ try {
     $imagesSrc = $root . '/' . trim($imagesDir, '/\\');
     $imagesDst = ghpx_normalize_path($outDir) . '/' . trim($imagesDir, '/\\');
     ghpx_copy_dir($imagesSrc, $imagesDst);
+    $popiconFont = $root . '/' . trim($staticDir, '/\\') . '/popicon.woff2';
+    if (is_file($popiconFont)) {
+        @copy($popiconFont, ghpx_normalize_path($outDir) . '/popicon.woff2');
+    }
 
     echo json_encode([
         'ok' => true,

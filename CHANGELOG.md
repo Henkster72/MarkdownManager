@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+- Exporter index now groups notes by folder, uses Pop Icon (`pi-*`) styling, and copies the icon font to the output.
+- Mermaid blocks in exported HTML now load the Mermaid CDN and render client-side.
+- Optional repo footer on exported pages via `MDW_EXPORT_REPO_URL` + `MDW_EXPORT_REPO_LABEL`.
+- GitHub Pages workflow now injects export settings (source folder, base path, repo link) at build time.
+- README refreshed with a clearer SSG comparison and updated export tips.
+- Example notes updated/curated.
+
 ## 0.5
 
 - GitHub Pages export plugin: automated wet HTML build and Pages deployment using `GITHUB_TOKEN` with a ready-to-run Actions workflow.

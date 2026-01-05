@@ -2,6 +2,8 @@
 
 _date: 25-01-13_
 
+This a chatGPT export:
+
 **user:**
 
 How can I force update a flatpak?

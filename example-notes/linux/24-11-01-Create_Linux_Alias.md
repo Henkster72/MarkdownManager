@@ -2,11 +2,6 @@
 
 _date: 24-11-01_
 
-**user:**
-
-How would I make this an alias in linux?
-
-**assistant:**
 
 To create an alias in Linux that runs the last command with `sudo` using a more expressive term, you can add the following line to your shell configuration file (such as `~/.bashrc` or `~/.zshrc`):
 

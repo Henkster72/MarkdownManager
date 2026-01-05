@@ -122,6 +122,17 @@ function build_mermaid_script(): string {
         "</script>\n";
 }
 
+function build_repo_footer(?string $repoUrl, ?string $label): string {
+    $repoUrl = trim((string)$repoUrl);
+    if ($repoUrl === '') return '';
+    $label = trim((string)$label);
+    if ($label === '') $label = 'Source on GitHub';
+    $urlEsc = htmlspecialchars($repoUrl, ENT_QUOTES, 'UTF-8');
+    $labelEsc = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    return '<footer class="export-footer"><a href="' . $urlEsc . '" target="_blank" rel="noopener noreferrer">' .
+        $labelEsc . '</a></footer>';
+}
+
 function find_theme_name(string $themesDir, string $preset): ?string {
     if ($preset === '' || strtolower($preset) === 'default') return null;
     $themes = list_available_themes($themesDir);
@@ -370,6 +381,10 @@ $themeCss = $themeName
     ? read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css')
     : '';
 $overridesCss = build_overrides_css($overrides);
+$repoUrl = (string)(env_str('MDW_EXPORT_REPO_URL', '') ?? '');
+$repoLabel = (string)(env_str('MDW_EXPORT_REPO_LABEL', '') ?? '');
+$repoFooter = build_repo_footer($repoUrl, $repoLabel);
+$repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
 $indexCss = <<<CSS
 .export-index {
   display: flex;
@@ -432,7 +447,7 @@ $indexCss = <<<CSS
   word-break: break-word;
 }
 CSS;
-$cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss], fn($c) => trim((string)$c) !== '');
+$cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
 $cssBase = sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
 $cssBlock = $cssBase !== '' ? "\n  <style data-mdw-export-css>\n{$cssBase}\n  </style>\n" : '';
 
@@ -469,6 +484,7 @@ foreach ($mdFiles as $mdRel) {
         $cssBlock .
         "</head>\n<body>\n" .
         $body .
+        ($repoFooter !== '' ? "\n" . $repoFooter : '') .
         $mermaidScript .
         "\n</body>\n</html>\n";
 
@@ -510,7 +526,7 @@ foreach ($folderNames as $folder) {
 }
 
 $indexBody = '<main class="preview-content export-index"><h1>' . htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') .
-    "</h1>\n{$folderSections}</main>";
+    "</h1>\n{$folderSections}</main>" . ($repoFooter !== '' ? "\n" . $repoFooter : '');
 $indexHtml = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>" .
     htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') . "</title>\n" .
     $baseTag .
