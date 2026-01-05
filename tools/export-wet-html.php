@@ -114,6 +114,14 @@ function sanitize_css_for_style_tag(string $css): string {
     return str_replace('</style', '<\\/style', $css);
 }
 
+function build_mermaid_script(): string {
+    return "\n<script type=\"module\">\n" .
+        "import mermaid from \"https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs\";\n" .
+        "mermaid.initialize({ startOnLoad: true });\n" .
+        "window.mermaid = mermaid;\n" .
+        "</script>\n";
+}
+
 function find_theme_name(string $themesDir, string $preset): ?string {
     if ($preset === '' || strtolower($preset) === 'default') return null;
     $themes = list_available_themes($themesDir);
@@ -351,16 +359,86 @@ foreach ($it as $fi) {
 sort($mdFiles, SORT_NATURAL | SORT_FLAG_CASE);
 
 $baseCss = read_file($root . '/' . trim($staticDir, '/\\') . '/htmlpreview.css');
+$popiconCss = read_file($root . '/' . trim($staticDir, '/\\') . '/popicon.css');
+$baseHref = trim($baseHref);
+$fontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popicon.woff2' : '/popicon.woff2';
+if ($popiconCss !== '') {
+    $popiconCss = preg_replace('~url\\((["\\\']?)popicon\\.woff2\\1\\)~', 'url("' . $fontHref . '")', $popiconCss);
+}
 $themeName = find_theme_name($themesDir, $themePreset);
 $themeCss = $themeName
     ? read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css')
     : '';
 $overridesCss = build_overrides_css($overrides);
-$cssChunks = array_filter([$baseCss, $themeCss, $overridesCss, $customCss], fn($c) => trim((string)$c) !== '');
-$css = sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
-$cssBlock = $css !== '' ? "\n  <style data-mdw-export-css>\n{$css}\n  </style>\n" : '';
+$indexCss = <<<CSS
+.export-index {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.export-folder {
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+.export-folder-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.export-folder-title .pi {
+  font-size: 1.05rem;
+  opacity: 0.8;
+}
+.export-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.export-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 0.5rem;
+}
+.export-note:hover {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.export-note .pi {
+  font-size: 0.95rem;
+  opacity: 0.7;
+  margin-top: 0.15rem;
+}
+.export-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.export-note-body a {
+  text-decoration: none;
+  font-weight: 600;
+}
+.export-note-path {
+  font-size: 0.78em;
+  opacity: 0.65;
+  word-break: break-word;
+}
+CSS;
+$cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss], fn($c) => trim((string)$c) !== '');
+$cssBase = sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
+$cssBlock = $cssBase !== '' ? "\n  <style data-mdw-export-css>\n{$cssBase}\n  </style>\n" : '';
 
-$baseHref = trim($baseHref);
+$cssIndex = trim($indexCss) !== '' ? sanitize_css_for_style_tag($cssBase . "\n\n" . $indexCss) : $cssBase;
+$cssIndexBlock = $cssIndex !== '' ? "\n  <style data-mdw-export-css>\n{$cssIndex}\n  </style>\n" : '';
+
 $baseTag = $baseHref !== '' ? '  <base href="' . htmlspecialchars($baseHref, ENT_QUOTES, 'UTF-8') . '">' . "\n" : '';
 
 $exported = [];
@@ -381,12 +459,17 @@ foreach ($mdFiles as $mdRel) {
 
     $body = rewrite_internal_links($body, $outRelFile, $map, $baseHref !== '');
 
+    $hasMermaid = (strpos($body, 'class="mermaid"') !== false)
+        || (preg_match('/^```\\s*mermaid\\b/im', $raw) === 1);
+    $mermaidScript = $hasMermaid ? build_mermaid_script() : '';
+
     $html = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>" .
         htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . "</title>\n" .
         $baseTag .
         $cssBlock .
         "</head>\n<body>\n" .
         $body .
+        $mermaidScript .
         "\n</body>\n</html>\n";
 
     @file_put_contents($outFull, $html);
@@ -394,20 +477,44 @@ foreach ($mdFiles as $mdRel) {
 }
 
 // Simple index page
-$listItems = '';
+$folderMap = [];
 foreach ($exported as $item) {
-    $href = $baseHref !== '' ? $item['path'] : $item['path'];
-    $title = htmlspecialchars((string)$item['title'], ENT_QUOTES, 'UTF-8');
-    $path = htmlspecialchars((string)$item['path'], ENT_QUOTES, 'UTF-8');
-    $listItems .= "<li><a href=\"{$href}\">{$title}</a><div style=\"opacity:0.7;font-size:0.85em;\">{$path}</div></li>\n";
+    $src = $item['source'];
+    $relSrc = $map[$src] ?? $src;
+    $folder = dirname($relSrc);
+    if ($folder === '.' || $folder === '') $folder = 'root';
+    if (!isset($folderMap[$folder])) $folderMap[$folder] = [];
+    $folderMap[$folder][] = $item;
+}
+$folderNames = array_keys($folderMap);
+usort($folderNames, function($a, $b) {
+    if ($a === 'root' && $b !== 'root') return -1;
+    if ($b === 'root' && $a !== 'root') return 1;
+    return strcasecmp($a, $b);
+});
+
+$folderSections = '';
+foreach ($folderNames as $folder) {
+    $label = $folder === 'root' ? 'Root' : $folder;
+    $folderEsc = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+    $folderSections .= "<section class=\"export-folder\">\n";
+    $folderSections .= "  <div class=\"export-folder-title\"><span class=\"pi pi-openfolder\"></span><span>{$folderEsc}</span></div>\n";
+    $folderSections .= "  <ul class=\"export-notes\">\n";
+    foreach ($folderMap[$folder] as $item) {
+        $href = $item['path'];
+        $title = htmlspecialchars((string)$item['title'], ENT_QUOTES, 'UTF-8');
+        $path = htmlspecialchars((string)$item['path'], ENT_QUOTES, 'UTF-8');
+        $folderSections .= "    <li class=\"export-note\"><span class=\"pi pi-openbook\"></span><div class=\"export-note-body\"><a href=\"{$href}\">{$title}</a><div class=\"export-note-path\">{$path}</div></div></li>\n";
+    }
+    $folderSections .= "  </ul>\n</section>\n";
 }
 
-$indexBody = '<main class="preview-content"><h1>' . htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') .
-    "</h1>\n<ul>\n{$listItems}</ul>\n</main>";
+$indexBody = '<main class="preview-content export-index"><h1>' . htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') .
+    "</h1>\n{$folderSections}</main>";
 $indexHtml = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>" .
     htmlspecialchars($siteTitle, ENT_QUOTES, 'UTF-8') . "</title>\n" .
     $baseTag .
-    $cssBlock .
+    $cssIndexBlock .
     "</head>\n<body>\n" .
     $indexBody .
     "\n</body>\n</html>\n";
@@ -418,6 +525,12 @@ $indexHtml = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf
 $imagesSrc = $root . '/' . trim($imagesDir, '/\\');
 $imagesDst = $outDir . '/' . trim($imagesDir, '/\\');
 copy_dir($imagesSrc, $imagesDst);
+
+// Copy icon font for pi-* classes.
+$popiconFont = $root . '/' . trim($staticDir, '/\\') . '/popicon.woff2';
+if (is_file($popiconFont)) {
+    @copy($popiconFont, $outDir . '/popicon.woff2');
+}
 
 $count = count($exported);
 fwrite(STDOUT, "Exported {$count} HTML files to {$outDir}\n");
