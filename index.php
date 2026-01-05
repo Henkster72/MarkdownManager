@@ -587,23 +587,53 @@ function read_shortcuts_csv($csv){
         return $out;
     }
 
+    // Custom CSV line parser to avoid any dependency on fgetcsv or str_getcsv
+    $parse_csv_line = function($line, $delimiter = ',', $enclosure = '"', $escape = '\\') {
+        $fields = [];
+        $i = 0;
+        $len = strlen($line);
+        $field = '';
+        $in_enclosure = false;
+
+        while ($i < $len) {
+            $char = $line[$i];
+            if ($char === $escape) {
+                $field .= $line[$i + 1] ?? '';
+                $i += 2;
+                continue;
+            }
+            if ($char === $enclosure) {
+                $in_enclosure = !$in_enclosure;
+                $i++;
+                continue;
+            }
+            if ($char === $delimiter && !$in_enclosure) {
+                $fields[] = $field;
+                $field = '';
+                $i++;
+                continue;
+            }
+            $field .= $char;
+            $i++;
+        }
+        $fields[] = $field;
+        return $fields;
+    };
+
     fgets($h); // Skip header line
 
     while (($line = fgets($h)) !== false) {
-        $line = trim($line);
-        if ($line === '') continue;
-        $parts = str_getcsv($line);
-        if (count($parts) >= 2) {
-            $shortcut = trim($parts[0]);
-            $url = trim($parts[1]);
-            if ($shortcut !== '' && $url !== '') {
-                $out[] = ['shortcut' => $shortcut, 'url' => $url];
+        if (trim($line) !== '') {
+            $parts = $parse_csv_line(rtrim($line, "\r\n"));
+            if (isset($parts[0], $parts[1]) && trim($parts[0]) !== '' && trim($parts[1]) !== '') {
+                $out[] = ['shortcut' => trim($parts[0]), 'url' => trim($parts[1])];
             }
         }
     }
     fclose($h);
     return $out;
 }
+
 
 function load_secret_mds() {
     global $MDW_PUBLISHER_MODE;
