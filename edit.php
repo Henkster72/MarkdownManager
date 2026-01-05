@@ -73,6 +73,26 @@ if ($WPM_BASE_DOMAIN !== null) {
     }
 }
 
+require_once __DIR__ . '/explorer_view.php';
+$github_pages_plugin_loaded = false;
+$github_pages_env_ready = false;
+$github_pages_plugins = explorer_view_get_enabled_plugins([
+    'page' => 'edit',
+    'project_dir' => __DIR__,
+    'plugins_enabled' => true,
+]);
+foreach ($github_pages_plugins as $plugin) {
+    if (($plugin['id'] ?? '') === 'github_pages_export') {
+        $github_pages_plugin_loaded = true;
+        break;
+    }
+}
+if ($github_pages_plugin_loaded) {
+    $github_token = trim((string)env_str('GITHUB_TOKEN', ''));
+    $github_export_dir = trim((string)env_str('MDW_EXPORT_DIR', ''));
+    $github_pages_env_ready = ($github_token !== '' && $github_export_dir !== '');
+}
+
 function sanitize_folder_name($folder) {
     if (!is_string($folder)) return null;
     $folder = trim($folder);
@@ -1030,11 +1050,13 @@ window.mermaid = mermaid;
 	                    <?php if ($requested): ?>
 	                        <?php $crumbFolder = folder_from_path($requested); ?>
 	                        <span class="breadcrumb-sep">/</span>
-                        <a class="breadcrumb-link" href="edit.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($crumbFolder)?>">
+                        <a class="breadcrumb-link" data-crumb="folder" href="index.php?folder=<?=rawurlencode($crumbFolder)?>#contentList">
                             <?=h($crumbFolder)?>
                         </a>
 	                        <span class="breadcrumb-sep">/</span>
-	                        <span class="app-path-segment"><?=h(basename($requested))?></span>
+	                        <a class="breadcrumb-link app-path-segment" data-crumb="file" href="index.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($crumbFolder)?>&focus=<?=rawurlencode($requested)?>">
+                                <?=h(basename($requested))?>
+                            </a>
 	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>"><?=h(mdw_t('common.secret','secret'))?></span>
 	                    <?php endif; ?>
 	                    </div>
@@ -1222,20 +1244,20 @@ window.mermaid = mermaid;
                                 <button type="button" id="insertTableBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.table','Insert table'))?>">
                                     <span class="icon-table-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
                                 </button>
+                                <button type="button" id="addLinkBtn" class="btn btn-ghost">
+                                    <span class="pi pi-linkchain"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
+                                </button>
+                                <button type="button" id="addImageBtn" class="btn btn-ghost">
+                                    <span class="pi pi-image"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
+                                </button>
                                 <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
                                 </button>
                             </div>
                         </div>
-                        <button type="button" id="addLinkBtn" class="btn btn-ghost" hidden>
-                            <span class="pi pi-linkchain"></span>
-                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
-                        </button>
-                        <button type="button" id="addImageBtn" class="btn btn-ghost" hidden>
-                            <span class="pi pi-image"></span>
-                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
-                        </button>
 
                         <div class="editor-body">
                             <div class="editor-lines" id="lineNumbers"></div>
@@ -1257,6 +1279,9 @@ window.mermaid = mermaid;
                         </footer>
                     </form>
                 </div>
+                <button type="button" class="pane-focus-toggle" data-focus-target="markdown" aria-label="<?=h(mdw_t('edit.pane_focus_markdown','Focus markdown pane'))?>" title="<?=h(mdw_t('edit.pane_focus_markdown','Focus markdown pane'))?>">
+                    <span class="pi pi-downcaret"></span>
+                </button>
             </section>
 
             <!-- resizer tussen midden en rechts -->
@@ -1276,6 +1301,12 @@ window.mermaid = mermaid;
                                     <span class="pi pi-download"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.preview.export_btn','HTML download'))?></span>
                                 </button>
+                                <?php if ($requested && $github_pages_plugin_loaded && $github_pages_env_ready): ?>
+                                    <button type="button" id="githubPagesExportBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.github_pages_title','Export this note to GitHub Pages'))?>" data-auth-superuser="1">
+                                        <span class="pi pi-upload"></span>
+                                        <span class="btn-label"><?=h(mdw_t('edit.preview.github_pages_btn','GitHub Pages'))?></span>
+                                    </button>
+                                <?php endif; ?>
                                 <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('edit.preview.copy_title','Copy plain HTML to clipboard'))?>" <?= $requested ? '' : 'disabled' ?> data-copy-buttons="1" <?= $copyButtonsEnabled ? '' : 'hidden' ?> data-auth-superuser="1">
                                     <span class="btn-icon-stack">
                                         <span class="pi pi-copy copy-icon"></span>
@@ -1292,6 +1323,9 @@ window.mermaid = mermaid;
                         </div>
                     </div>
                 </div>
+                <button type="button" class="pane-focus-toggle" data-focus-target="preview" aria-label="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>" title="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>">
+                    <span class="pi pi-downcaret"></span>
+                </button>
             </section>
 
         </div>
@@ -1934,6 +1968,19 @@ window.mermaid = mermaid;
 				                </div>
 				            </div>
 				        </details>
+                        <?php if ($github_pages_plugin_loaded): ?>
+                        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
+                            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.github_pages.title','GitHub Pages export'))?></summary>
+                            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.6rem;">
+                                <div class="status-text"><?=h(mdw_t('theme.github_pages.hint','Run a configuration check before exporting.'))?></div>
+                                <div style="display:flex; align-items:center; gap: 0.6rem; flex-wrap: wrap;">
+                                    <button type="button" id="githubPagesCheckBtn" class="btn btn-ghost btn-small" data-auth-superuser-enable="1"><?=h(mdw_t('theme.github_pages.check_btn','Check GitHub Pages config'))?></button>
+                                </div>
+                                <div id="githubPagesCheckStatus" class="status-text"></div>
+                                <div id="githubPagesCheckDetails" class="status-text" style="white-space: pre-line;"></div>
+                            </div>
+                        </details>
+                        <?php endif; ?>
 				        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
 				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.settings_io.title','Settings import/export'))?></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
@@ -1976,6 +2023,9 @@ window.mermaid = mermaid;
 	</script>
 
 <script defer src="<?=h($STATIC_DIR)?>/base.js"></script>
+<?php if ($github_pages_plugin_loaded): ?>
+<script defer src="<?=h($STATIC_DIR)?>/github_pages_export.js"></script>
+<?php endif; ?>
 
 </body>
 </html>

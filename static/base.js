@@ -3386,6 +3386,29 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     if (previewBody) attachScroller(previewBody);
 })();
 
+// Edit page header breadcrumbs: warn on unsaved changes
+(function(){
+    const editor = document.getElementById('editor');
+    if (!editor) return;
+    const breadcrumb = document.querySelector('.app-breadcrumb');
+    if (!(breadcrumb instanceof HTMLElement)) return;
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+
+    breadcrumb.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target.closest('a.breadcrumb-link') : null;
+        if (!(target instanceof HTMLAnchorElement)) return;
+        if (e.defaultPrevented) return;
+        if (e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (!window.__mdDirty) return;
+        if (!confirm(t('js.unsaved_confirm', 'You have unsaved changes. Discard them and continue?'))) {
+            e.preventDefault();
+            return;
+        }
+        window.__mdDirty = false;
+    });
+})();
+
 // Delete confirm (shared: index.php + edit.php)
 (function(){
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
@@ -4960,8 +4983,24 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             // Update UI
             document.title = `${data.title} • md edit`;
             document.querySelector('.app-title').textContent = data.title;
+            const folder = (() => {
+                const filePath = String(data.file || '');
+                if (!filePath) return 'root';
+                const idx = filePath.lastIndexOf('/');
+                return idx === -1 ? 'root' : filePath.slice(0, idx);
+            })();
             const pathSegment = document.querySelector('.app-path-segment');
-            if (pathSegment) pathSegment.textContent = data.file;
+            if (pathSegment) {
+                pathSegment.textContent = data.file;
+                if (pathSegment instanceof HTMLAnchorElement) {
+                    pathSegment.href = `index.php?file=${encodeURIComponent(data.file)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(data.file)}`;
+                }
+            }
+            const folderCrumb = document.querySelector('.app-breadcrumb [data-crumb="folder"]');
+            if (folderCrumb instanceof HTMLAnchorElement) {
+                folderCrumb.textContent = folder;
+                folderCrumb.href = `index.php?folder=${encodeURIComponent(folder)}#contentList`;
+            }
 
             const mdSubtitle = document.querySelector('#paneMarkdown .pane-subtitle.small');
             if (mdSubtitle) mdSubtitle.textContent = data.file;
@@ -8370,6 +8409,122 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         r.addEventListener('mousedown', ev => startDrag(ev, which));
         r.addEventListener('touchstart', ev => startDrag(ev, which), { passive: false });
     });
+})();
+
+// Mobile pane focus toggle (edit.php)
+(function(){
+    const grid = document.getElementById('editorGrid');
+    if (!grid) return;
+    const buttons = Array.from(document.querySelectorAll('.pane-focus-toggle'));
+    if (buttons.length === 0) return;
+
+    const root = document.documentElement;
+    const mobileQuery = window.matchMedia('(max-width: 960px)');
+    const ROW_STORAGE_KEY = 'mdw_editor_row_heights';
+    let focused = null;
+
+    const readSavedRows = () => {
+        try {
+            const saved = JSON.parse(mdwStorageGet(ROW_STORAGE_KEY) || 'null');
+            if (saved && saved.top && saved.bottom) return saved;
+        } catch {}
+        return null;
+    };
+
+    const applyRows = (top, bottom) => {
+        root.style.setProperty('--row-top', top);
+        root.style.setProperty('--row-bottom', bottom);
+    };
+
+    const restoreRows = () => {
+        const saved = readSavedRows();
+        if (saved && saved.top && saved.bottom) {
+            applyRows(saved.top, saved.bottom);
+            return;
+        }
+        applyRows('50vh', '50vh');
+    };
+
+    const updateButtons = () => {
+        buttons.forEach((btn) => {
+            const target = String(btn.dataset.focusTarget || '').trim();
+            const active = target !== '' && target === focused;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    };
+
+    const setFocusClasses = () => {
+        root.classList.toggle('mdw-pane-focus-md', focused === 'markdown');
+        root.classList.toggle('mdw-pane-focus-preview', focused === 'preview');
+    };
+
+    const measureHeight = () => {
+        const view = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+        const rect = grid.getBoundingClientRect();
+        const top = Math.max(0, rect.top || 0);
+        const available = view - top;
+        if (available > 0) return available;
+        if (rect.height) return rect.height;
+        return view;
+    };
+
+    const applyFocusRows = () => {
+        if (!focused) return;
+        const resizer = document.querySelector('.col-resizer[data-resizer="right"]');
+        const resizerHeight = resizer instanceof HTMLElement ? resizer.getBoundingClientRect().height : 12;
+        const total = Math.max(0, measureHeight() - resizerHeight);
+        const major = Math.max(0, Math.round(total * 0.95));
+        const minor = Math.max(0, total - major);
+        const top = focused === 'preview' ? minor : major;
+        const bottom = focused === 'preview' ? major : minor;
+        applyRows(`${top}px`, `${bottom}px`);
+    };
+
+    const clearFocus = () => {
+        focused = null;
+        setFocusClasses();
+        restoreRows();
+        updateButtons();
+    };
+
+    const setFocus = (target) => {
+        focused = target === 'preview' ? 'preview' : 'markdown';
+        setFocusClasses();
+        applyFocusRows();
+        updateButtons();
+    };
+
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            if (!mobileQuery.matches) return;
+            if (e.defaultPrevented) return;
+            const target = String(btn.dataset.focusTarget || '').trim();
+            if (!target) return;
+            if (focused === target) {
+                clearFocus();
+            } else {
+                setFocus(target);
+            }
+        });
+    });
+
+    updateButtons();
+
+    const handleResize = () => {
+        if (!mobileQuery.matches) {
+            if (focused) clearFocus();
+            return;
+        }
+        if (focused) applyFocusRows();
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    if (typeof mobileQuery.addEventListener === 'function') {
+        mobileQuery.addEventListener('change', handleResize);
+    } else if (typeof mobileQuery.addListener === 'function') {
+        mobileQuery.addListener(handleResize);
+    }
 })();
 
 // Export HTML preview (edit.php + index.php)

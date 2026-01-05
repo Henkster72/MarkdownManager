@@ -90,6 +90,26 @@ if ($WPM_BASE_DOMAIN !== null) {
     }
 }
 
+require_once __DIR__ . '/explorer_view.php';
+$github_pages_plugin_loaded = false;
+$github_pages_env_ready = false;
+$github_pages_plugins = explorer_view_get_enabled_plugins([
+    'page' => 'index',
+    'project_dir' => __DIR__,
+    'plugins_enabled' => true,
+]);
+foreach ($github_pages_plugins as $plugin) {
+    if (($plugin['id'] ?? '') === 'github_pages_export') {
+        $github_pages_plugin_loaded = true;
+        break;
+    }
+}
+if ($github_pages_plugin_loaded) {
+    $github_token = trim((string)env_str('GITHUB_TOKEN', ''));
+    $github_export_dir = trim((string)env_str('MDW_EXPORT_DIR', ''));
+    $github_pages_env_ready = ($github_token !== '' && $github_export_dir !== '');
+}
+
 
 /* SECURITY / PATH CLEAN */
 function mdw_path_normalize($path) {
@@ -1619,15 +1639,21 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <div class="preview-container">
     <?php if ($mode === 'view' && $requested): ?>
-        <div class="preview-copy-toolbar" data-copy-buttons="1" <?= $copyButtonsEnabled ? '' : 'hidden' ?>>
-            <button type="button" id="copyMdBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_md_title','Copy Markdown to clipboard'))?>">
+        <div class="preview-copy-toolbar" data-copy-buttons="1" <?= ($copyButtonsEnabled || ($github_pages_plugin_loaded && $github_pages_env_ready)) ? '' : 'hidden' ?>>
+            <?php if ($github_pages_plugin_loaded && $github_pages_env_ready): ?>
+                <button type="button" id="githubPagesExportBtn" class="btn btn-ghost" title="<?=h(mdw_t('index.preview.github_pages_title','Export this note to GitHub Pages'))?>" data-auth-superuser="1">
+                    <span class="pi pi-upload"></span>
+                    <span class="btn-label"><?=h(mdw_t('index.preview.github_pages_btn','GitHub Pages'))?></span>
+                </button>
+            <?php endif; ?>
+            <button type="button" id="copyMdBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_md_title','Copy Markdown to clipboard'))?>" <?= $copyButtonsEnabled ? '' : 'hidden' ?>>
                 <span class="btn-icon-stack">
                     <span class="pi pi-copy copy-icon"></span>
                     <span class="pi pi-checkmark copy-check"></span>
                 </span>
                 <span class="btn-label"><?=h(mdw_t('index.preview.copy_md_btn','Copy MD'))?></span>
             </button>
-            <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>" data-auth-superuser="1">
+            <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>" <?= $copyButtonsEnabled ? '' : 'hidden' ?> data-auth-superuser="1">
                 <span class="btn-icon-stack">
                     <span class="pi pi-copy copy-icon"></span>
                     <span class="pi pi-checkmark copy-check"></span>
@@ -2028,6 +2054,19 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                </div>
 				            </div>
 				        </details>
+                        <?php if ($github_pages_plugin_loaded): ?>
+                        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
+                            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.github_pages.title','GitHub Pages export'))?></summary>
+                            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.6rem;">
+                                <div class="status-text"><?=h(mdw_t('theme.github_pages.hint','Run a configuration check before exporting.'))?></div>
+                                <div style="display:flex; align-items:center; gap: 0.6rem; flex-wrap: wrap;">
+                                    <button type="button" id="githubPagesCheckBtn" class="btn btn-ghost btn-small" data-auth-superuser-enable="1"><?=h(mdw_t('theme.github_pages.check_btn','Check GitHub Pages config'))?></button>
+                                </div>
+                                <div id="githubPagesCheckStatus" class="status-text"></div>
+                                <div id="githubPagesCheckDetails" class="status-text" style="white-space: pre-line;"></div>
+                            </div>
+                        </details>
+                        <?php endif; ?>
 				        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
 				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.settings_io.title','Settings import/export'))?></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
@@ -2067,6 +2106,9 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 		</script>
 
 	<script defer src="<?=h($STATIC_DIR)?>/base.js"></script>
+	<?php if ($github_pages_plugin_loaded): ?>
+	<script defer src="<?=h($STATIC_DIR)?>/github_pages_export.js"></script>
+	<?php endif; ?>
 
 	</body>
 	</html>

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5
+
+- GitHub Pages export plugin: automated wet HTML build and Pages deployment using `GITHUB_TOKEN` with a ready-to-run Actions workflow.
+- New CLI exporter (`tools/export-wet-html.php`) renders all Markdown to wet HTML, injects theme/custom CSS, rewrites internal links, generates an index page, and copies images.
+- GitHub Pages export endpoint (`github_pages_export.php`) adds config checks and single-note exports with CSRF/auth validation, WPM publish gating, and link/image handling.
+- UI: "GitHub Pages" export button in edit preview and index view appears only when the plugin is enabled and required env vars are set.
+- Settings modal: GitHub Pages config check button with clear status and error/warning details.
+- Plugin JS split: GitHub Pages client logic moved to `static/github_pages_export.js` and loaded only when the plugin is present.
+- Editor UX: link modal (internal/external/footnote/YouTube) restored with toolbar buttons for link + image insertion.
+- Mobile UX: pane focus toggles let you maximize Markdown or preview and restore saved split heights.
+- Navigation fixes: breadcrumb links now navigate to folder and note in index view, update on SPA nav, and warn about unsaved changes.
+- Documentation: README plugin docs and `.env.example` expanded with GitHub Pages export settings.
+
 ## 0.4.3
 
 - Custom CSS quick insert: a toolbar dropdown appears when custom CSS exists and inserts selector-based snippets (single-class selectors use `{: class="..." }`).

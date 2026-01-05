@@ -1,10 +1,12 @@
-# MarkdownManager v0.4.2
+# MarkdownManager v0.5
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
 MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No database. No lock-in. Just a clean web UI for plain text notes that live as `.md` files on disk.
 
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
+
+New in v0.5: GitHub Pages export automation, restored link modal, and better mobile navigation/focus controls.
 
 ## Why check this out
 
@@ -102,10 +104,138 @@ Notes:
 
 Semidry/Wet exports only keep classes that you explicitly add via `{: class="..."}` in Markdown.
 
+## Plugins
+
+MarkdownManager ships with a small plugin system. Plugins live in `plugins/` and are auto-loaded. Most plugins add explorer sections or header widgets, but they can also provide automation tooling.
+
+### GitHub Pages export plugin (`github_pages_export`)
+
+This plugin is a build-time integration that turns your MarkdownManager notes into a static site and deploys it to GitHub Pages. There is no "auth plugin" needed. GitHub Actions already provides `GITHUB_TOKEN` when the workflow runs, and the deployment step uses the Pages OIDC permissions.
+Plugin file: `plugins/github_pages_export_plugin.php`.
+
+**How it works (end to end)**
+
+1) A GitHub Actions workflow runs on `main` pushes (or manually).
+2) The workflow calls `php tools/export-wet-html.php --out dist`.
+3) The exporter renders each `.md` to wet HTML using the same PHP renderer as the app preview.
+4) The workflow uploads the `dist/` folder as a Pages artifact.
+5) `actions/deploy-pages` publishes the artifact to GitHub Pages.
+
+**Repo setup (required)**
+
+1) In **Settings → Pages**, set **Source = GitHub Actions**.
+2) Add the workflow at `.github/workflows/pages.yml` (this repo includes a ready-to-use file).
+
+**Workflow used by this plugin**
+
+```yaml
+name: Export wet HTML and deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+      - name: Export static HTML
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "GITHUB_TOKEN=${GITHUB_TOKEN}" >> .env
+          php tools/export-wet-html.php --out dist
+          touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` into it at runtime, but you should not commit `.env` to your repo.
+
+**Why these workflow permissions**
+
+- `contents: read` lets Actions check out the repository.
+- `pages: write` and `id-token: write` are required by `actions/deploy-pages`.
+
+**What the exporter actually generates**
+
+- One `.html` file per `.md`, preserving the folder structure (relative to `--src`).
+- A root `index.html` that lists all exported pages.
+- Markdown links that point to other exported `.md` files are rewritten to `.html`.
+- Inline wet CSS that matches the app's HTML preview:
+  - `static/htmlpreview.css`
+  - Theme preset `<theme>_htmlpreview.css` when selected
+  - Theme overrides + custom CSS from `metadata_config.json`
+- The `images/` folder is copied into the output so image tokens (`{{ }}`) keep working.
+- Notes listed in `secret_mds.txt` are skipped automatically.
+
+**Recommended export flags**
+
+- `--out dist` (required): output folder for the static site.
+- `--src notes` (optional): export only a subfolder instead of the whole repo.
+- `--only-published` (optional): when WPM is enabled, export only `publishstate: Published`.
+
+You can also set these in `.env`:
+
+```
+MDW_EXPORT_DIR=dist
+MDW_EXPORT_SRC=notes
+MDW_EXPORT_PUBLISHED_ONLY=1
+```
+
+**Base path gotcha (Project Pages)**
+
+Project Pages deploy to:
+
+```
+https://<user>.github.io/<repo>/
+```
+
+If your exported HTML uses root-relative links like `/css/app.css`, those will break. The exporter keeps links relative, but it is still a good idea to set a base path in the workflow:
+
+```
+MDW_EXPORT_BASE=/YourRepoName/
+```
+
+Or pass it directly:
+
+```
+php tools/export-wet-html.php --out dist --base /YourRepoName/
+```
+
+This inserts `<base href="/YourRepoName/">` into every exported page so assets and links resolve correctly.
+
+**No PAT, no push**
+
+You do not need to store a personal access token or push generated HTML into your repo. The workflow deploys a build artifact using the built-in `GITHUB_TOKEN` and Pages permissions.
+
+### Google site search plugin (`google_search`)
+
+WPM-only plugin that adds a site-scoped Google search box for your public domain (`WPM_BASE_URL`).
+
 ## Extras
 
 - **links.csv**: shows a "Shortcuts" list (CSV with `shortcut,url`).
-- **Google site search plugin** (WPM): add a site search box for your public domain.
 
 ## Troubleshooting
 
