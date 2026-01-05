@@ -78,6 +78,8 @@ Edit `.env` to tune paths and features:
 - `METADATA_CONFIG_FILE`, `METADATA_PUBLISHER_CONFIG_FILE`
 - `WPM_BASE_URL` (for public link + search plugin)
 - `SECRET_MDS_FILE`, `SECRET_MDS_PASSWORD`
+ 
+Export-related settings use the `MDM_` prefix (short for MarkdownManager).
 
 ## Website publication mode (WPM)
 
@@ -159,19 +161,12 @@ jobs:
           php-version: "8.2"
       - name: Export static HTML
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MDW_EXPORT_SRC: example-notes
-          MDW_EXPORT_DIR: dist
-          MDW_EXPORT_BASE: /MarkdownManager/
+          MDM_EXPORT_SRC: example-notes
+          MDM_EXPORT_DIR: dist
+          MDM_EXPORT_BASE: /MarkdownManager/
         run: |
-          {
-            echo "GITHUB_TOKEN=${GITHUB_TOKEN}"
-            echo "MDW_EXPORT_SRC=${MDW_EXPORT_SRC}"
-            echo "MDW_EXPORT_DIR=${MDW_EXPORT_DIR}"
-            echo "MDW_EXPORT_BASE=${MDW_EXPORT_BASE}"
-          } >> .env
-          php tools/export-wet-html.php --out "${MDW_EXPORT_DIR}"
-          touch "${MDW_EXPORT_DIR}/.nojekyll"
+          php tools/export-wet-html.php --out "${MDM_EXPORT_DIR}" --src "${MDM_EXPORT_SRC}" --base "${MDM_EXPORT_BASE}"
+          touch "${MDM_EXPORT_DIR}/.nojekyll"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -186,7 +181,7 @@ jobs:
         uses: actions/deploy-pages@v4
 ```
 
-Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` and the export settings into a temporary `.env` at runtime, but you should not commit `.env` to your repo. For local testing, copy `.env.example` to `.env` and set `MDW_EXPORT_SRC=example-notes`, `MDW_EXPORT_DIR=dist`, and `MDW_EXPORT_BASE=/MarkdownManager/`.
+Note: `.env` is loaded by `env_loader.php` for local use. The GitHub Pages workflow passes its settings directly via environment variables (no `.env` file in CI). For local testing, copy `.env.example` to `.env` and set `MDM_EXPORT_SRC=example-notes`, `MDM_EXPORT_DIR=dist`, and `MDM_EXPORT_BASE=/MarkdownManager/`.
 
 **Why these workflow permissions**
 
@@ -214,11 +209,11 @@ Note: `.env` is loaded by `env_loader.php`. The workflow writes `GITHUB_TOKEN` a
 You can also set these in `.env`:
 
 ```
-MDW_EXPORT_DIR=dist
-MDW_EXPORT_SRC=example-notes
-MDW_EXPORT_PUBLISHED_ONLY=1
-MDW_EXPORT_REPO_URL=https://github.com/YourUser/YourRepo
-MDW_EXPORT_REPO_LABEL=Source on GitHub
+MDM_EXPORT_DIR=dist
+MDM_EXPORT_SRC=example-notes
+MDM_EXPORT_PUBLISHED_ONLY=1
+MDM_EXPORT_REPO_URL=https://github.com/YourUser/YourRepo
+MDM_EXPORT_REPO_LABEL=Source on GitHub
 ```
 
 **Base path gotcha (Project Pages)**
@@ -232,7 +227,7 @@ https://<user>.github.io/<repo>/
 If your exported HTML uses root-relative links like `/css/app.css`, those will break. The exporter keeps links relative, but it is still a good idea to set a base path in the workflow for this repo:
 
 ```
-MDW_EXPORT_BASE=/MarkdownManager/
+MDM_EXPORT_BASE=/MarkdownManager/
 ```
 
 Or pass it directly:
@@ -243,7 +238,7 @@ php tools/export-wet-html.php --out dist --base /MarkdownManager/
 
 **Local preview tip**
 
-If you run `php -S 127.0.0.1:1234` from the repo root and open `/dist/index.html`, set `MDW_EXPORT_BASE=/dist/` in your local `.env` so assets and links resolve under `/dist/`. If you instead serve `dist/` as the web root (e.g. `php -S 127.0.0.1:1234 -t dist`), you can leave `MDW_EXPORT_BASE` empty.
+If you run `php -S 127.0.0.1:1234` from the repo root and open `/dist/index.html`, set `MDM_EXPORT_BASE=/dist/` in your local `.env` so assets and links resolve under `/dist/`. If you instead serve `dist/` as the web root (e.g. `php -S 127.0.0.1:1234 -t dist`), you can leave `MDM_EXPORT_BASE` empty.
 
 This inserts `<base href="/YourRepoName/">` into every exported page so assets and links resolve correctly.
 

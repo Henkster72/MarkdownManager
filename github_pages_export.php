@@ -273,8 +273,8 @@ function ghpx_env_errors(string $root): array {
     $token = trim((string)env_str('GITHUB_TOKEN', ''));
     if ($token === '') $errors[] = 'GITHUB_TOKEN is missing (set it in .env).';
 
-    $out = trim((string)env_str('MDW_EXPORT_DIR', ''));
-    if ($out === '') $errors[] = 'MDW_EXPORT_DIR is missing (set it in .env).';
+    $out = trim((string)env_str('MDM_EXPORT_DIR', ''));
+    if ($out === '') $errors[] = 'MDM_EXPORT_DIR is missing (set it in .env).';
 
     $exporter = $root . '/tools/export-wet-html.php';
     if (!is_file($exporter)) $errors[] = 'tools/export-wet-html.php is missing.';
@@ -282,9 +282,9 @@ function ghpx_env_errors(string $root): array {
     $workflow = $root . '/.github/workflows/pages.yml';
     if (!is_file($workflow)) $errors[] = '.github/workflows/pages.yml is missing.';
 
-    $base = trim((string)env_str('MDW_EXPORT_BASE', ''));
+    $base = trim((string)env_str('MDM_EXPORT_BASE', ''));
     if ($base === '') {
-        $warnings[] = 'MDW_EXPORT_BASE is empty (needed for Project Pages).';
+        $warnings[] = 'MDM_EXPORT_BASE is empty (needed for Project Pages).';
     }
 
     return [$errors, $warnings];
@@ -325,10 +325,10 @@ try {
         exit;
     }
 
-    $outRaw = trim((string)env_str('MDW_EXPORT_DIR', ''));
-    $srcRaw = trim((string)env_str('MDW_EXPORT_SRC', ''));
-    $baseHref = trim((string)env_str('MDW_EXPORT_BASE', ''));
-    $onlyPublished = (string)env_str('MDW_EXPORT_PUBLISHED_ONLY', '');
+    $outRaw = trim((string)env_str('MDM_EXPORT_DIR', ''));
+    $srcRaw = trim((string)env_str('MDM_EXPORT_SRC', ''));
+    $baseHref = trim((string)env_str('MDM_EXPORT_BASE', ''));
+    $onlyPublished = (string)env_str('MDM_EXPORT_PUBLISHED_ONLY', '');
     $onlyPublished = $onlyPublished !== '' && in_array(strtolower($onlyPublished), ['1', 'true', 'yes', 'on'], true);
 
     $outDir = ghpx_resolve_dir($root, $outRaw);
@@ -347,7 +347,7 @@ try {
     }
     $fullNorm = ghpx_normalize_path($fullPath);
     if (!str_starts_with($fullNorm, $srcDirNorm . '/')) {
-        throw new RuntimeException('File is outside MDW_EXPORT_SRC.');
+        throw new RuntimeException('File is outside MDM_EXPORT_SRC.');
     }
 
     $relToSrc = ltrim(substr($fullNorm, strlen($srcDirNorm)), '/');
@@ -394,8 +394,8 @@ try {
     $themeName = ghpx_find_theme_name($themesDir, $themePreset);
     $themeCss = $themeName ? ghpx_read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css') : '';
     $overridesCss = ghpx_build_overrides_css($overrides);
-    $repoUrl = (string)(env_str('MDW_EXPORT_REPO_URL', '') ?? '');
-    $repoLabel = (string)(env_str('MDW_EXPORT_REPO_LABEL', '') ?? '');
+    $repoUrl = (string)(env_str('MDM_EXPORT_REPO_URL', '') ?? '');
+    $repoLabel = (string)(env_str('MDM_EXPORT_REPO_LABEL', '') ?? '');
     $repoFooter = ghpx_build_repo_footer($repoUrl, $repoLabel);
     $repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
     $cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');

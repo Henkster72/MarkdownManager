@@ -89,7 +89,7 @@ foreach ($github_pages_plugins as $plugin) {
 }
 if ($github_pages_plugin_loaded) {
     $github_token = trim((string)env_str('GITHUB_TOKEN', ''));
-    $github_export_dir = trim((string)env_str('MDW_EXPORT_DIR', ''));
+    $github_export_dir = trim((string)env_str('MDM_EXPORT_DIR', ''));
     $github_pages_env_ready = ($github_token !== '' && $github_export_dir !== '');
 }
 

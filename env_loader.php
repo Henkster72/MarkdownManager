@@ -46,6 +46,17 @@ function load_dotenv_file(string $path): void
 function env_str(string $key, ?string $default = null): ?string
 {
     $v = getenv($key);
+    if ($v === false) {
+        $alt = null;
+        if (str_starts_with($key, 'MDW_')) {
+            $alt = 'MDM_' . substr($key, 4);
+        } else if (str_starts_with($key, 'MDM_')) {
+            $alt = 'MDW_' . substr($key, 4);
+        }
+        if ($alt !== null) {
+            $v = getenv($alt);
+        }
+    }
     if ($v === false) return $default;
     return (string)$v;
 }
@@ -67,4 +78,3 @@ function env_path(string $key, string $default, ?string $baseDir = null): string
 }
 
 load_dotenv_file(__DIR__ . '/.env');
-

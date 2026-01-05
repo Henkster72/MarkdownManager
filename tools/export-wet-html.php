@@ -19,7 +19,7 @@ function usage(): void {
 Usage: php tools/export-wet-html.php --out <dir> [options]
 
 Options:
-  --out <dir>           Output directory (required unless MDW_EXPORT_DIR is set).
+  --out <dir>           Output directory (required unless MDM_EXPORT_DIR is set).
   --src <dir>           Source folder to export (default: project root).
   --base <href>         Optional <base href="..."> for GitHub Pages.
   --clean               Remove existing output contents first.
@@ -27,10 +27,10 @@ Options:
   --help                Show this help.
 
 Environment:
-  MDW_EXPORT_DIR              Default output dir if --out not set.
-  MDW_EXPORT_SRC              Default source dir if --src not set.
-  MDW_EXPORT_BASE             Default base href if --base not set.
-  MDW_EXPORT_PUBLISHED_ONLY   Same as --only-published when set to 1/true.
+  MDM_EXPORT_DIR              Default output dir if --out not set.
+  MDM_EXPORT_SRC              Default source dir if --src not set.
+  MDM_EXPORT_BASE             Default base href if --base not set.
+  MDM_EXPORT_PUBLISHED_ONLY   Same as --only-published when set to 1/true.
 TXT;
     fwrite(STDOUT, $help . "\n");
 }
@@ -251,11 +251,11 @@ if (isset($opts['help'])) {
     exit(0);
 }
 
-$outRaw = isset($opts['out']) ? (string)$opts['out'] : (string)(env_str('MDW_EXPORT_DIR', 'dist') ?? 'dist');
-$srcRaw = isset($opts['src']) ? (string)$opts['src'] : (string)(env_str('MDW_EXPORT_SRC', '') ?? '');
-$baseHref = isset($opts['base']) ? (string)$opts['base'] : (string)(env_str('MDW_EXPORT_BASE', '') ?? '');
+$outRaw = isset($opts['out']) ? (string)$opts['out'] : (string)(env_str('MDM_EXPORT_DIR', 'dist') ?? 'dist');
+$srcRaw = isset($opts['src']) ? (string)$opts['src'] : (string)(env_str('MDM_EXPORT_SRC', '') ?? '');
+$baseHref = isset($opts['base']) ? (string)$opts['base'] : (string)(env_str('MDM_EXPORT_BASE', '') ?? '');
 $clean = array_key_exists('clean', $opts);
-$onlyPublished = array_key_exists('only-published', $opts) || is_truthy((string)(env_str('MDW_EXPORT_PUBLISHED_ONLY', '') ?? ''));
+$onlyPublished = array_key_exists('only-published', $opts) || is_truthy((string)(env_str('MDM_EXPORT_PUBLISHED_ONLY', '') ?? ''));
 
 if (trim($outRaw) === '') {
     usage();
@@ -381,8 +381,8 @@ $themeCss = $themeName
     ? read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css')
     : '';
 $overridesCss = build_overrides_css($overrides);
-$repoUrl = (string)(env_str('MDW_EXPORT_REPO_URL', '') ?? '');
-$repoLabel = (string)(env_str('MDW_EXPORT_REPO_LABEL', '') ?? '');
+$repoUrl = (string)(env_str('MDM_EXPORT_REPO_URL', '') ?? '');
+$repoLabel = (string)(env_str('MDM_EXPORT_REPO_LABEL', '') ?? '');
 $repoFooter = build_repo_footer($repoUrl, $repoLabel);
 $repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
 $indexCss = <<<CSS
