@@ -254,6 +254,10 @@ if (is_array($settingsIn)) {
         ? trim((string)($settingsIn['copy_html_mode'] ?? ''))
         : trim((string)($curSettings['copy_html_mode'] ?? 'dry'));
     if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+    $tocMenu = array_key_exists('toc_menu', $settingsIn)
+        ? strtolower(trim((string)($settingsIn['toc_menu'] ?? '')))
+        : strtolower(trim((string)($curSettings['toc_menu'] ?? 'inline')));
+    if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
     $postDateFormat = array_key_exists('post_date_format', $settingsIn)
         ? trim((string)($settingsIn['post_date_format'] ?? ''))
         : trim((string)($curSettings['post_date_format'] ?? 'mdy_short'));
@@ -314,6 +318,7 @@ if (is_array($settingsIn)) {
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
+        'toc_menu' => $tocMenu,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,

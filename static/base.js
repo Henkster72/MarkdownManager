@@ -84,6 +84,26 @@ const mdwWriteDeleteAfter = (value) => {
 window.__mdwReadDeleteAfter = mdwReadDeleteAfter;
 window.__mdwWriteDeleteAfter = mdwWriteDeleteAfter;
 
+const mdwNormalizeMermaidPie = (source) => {
+    const raw = String(source || '').replace(/\r\n/g, '\n');
+    const lines = raw.split('\n');
+    let i = 0;
+    while (i < lines.length && lines[i].trim() === '') i++;
+    if (i >= lines.length) return source;
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!/^pie\\b/i.test(trimmed)) return source;
+    const m = trimmed.match(/^pie(?:\\s+(showData))?(?:\\s+title\\s+(.+))?$/i);
+    if (!m) return source;
+    const title = String(m[2] || '').trim();
+    if (!title) return source;
+    const lead = line.match(/^\\s*/)?.[0] ?? '';
+    const header = `pie${m[1] ? ' showData' : ''}`;
+    lines[i] = lead + header;
+    lines.splice(i + 1, 0, lead + `title ${title}`);
+    return lines.join('\n');
+};
+
 const mdwRenderMermaid = async (root) => {
     const mermaid = window.mermaid;
     if (!mermaid || typeof mermaid.run !== 'function') return;
@@ -97,6 +117,7 @@ const mdwRenderMermaid = async (root) => {
         } else {
             node.textContent = node.__mdwMermaidSrc;
         }
+        node.textContent = mdwNormalizeMermaidPie(node.textContent || '');
         node.removeAttribute('data-processed');
     });
     try {
@@ -1555,6 +1576,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
     const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
     const copySettingsStatus = document.getElementById('copySettingsStatus');
+    const tocMenuSelect = document.getElementById('tocMenuSelect');
+    const tocMenuStatus = document.getElementById('tocMenuStatus');
     const settingsExportBtn = document.getElementById('settingsExportBtn');
     const settingsImportBtn = document.getElementById('settingsImportBtn');
     const settingsImportFile = document.getElementById('settingsImportFile');
@@ -1636,6 +1659,14 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
 
+    const setTocMenuStatus = (msg, kind = 'info') => {
+        if (!(tocMenuStatus instanceof HTMLElement)) return;
+        tocMenuStatus.textContent = String(msg || '');
+        tocMenuStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
     const setSettingsIoStatus = (msg, kind = 'info') => {
         if (!(settingsImportExportStatus instanceof HTMLElement)) return;
         settingsImportExportStatus.textContent = String(msg || '');
@@ -1694,6 +1725,11 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const s = getSettings();
         const v = s && typeof s.copy_html_mode === 'string' ? s.copy_html_mode.trim() : '';
         return (v === 'wet' || v === 'dry' || v === 'medium') ? v : 'dry';
+    };
+    const readTocMenuSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.toc_menu === 'string' ? s.toc_menu.trim().toLowerCase() : '';
+        return (v === 'left' || v === 'right' || v === 'inline') ? v : 'inline';
     };
     const readPostDateFormatSetting = () => {
         const s = getSettings();
@@ -1933,6 +1969,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }
         if (copyHtmlModeSelect instanceof HTMLSelectElement) {
             copyHtmlModeSelect.value = readCopyHtmlModeSetting();
+        }
+        if (tocMenuSelect instanceof HTMLSelectElement) {
+            tocMenuSelect.value = readTocMenuSetting();
         }
         if (postDateFormatSelect instanceof HTMLSelectElement) {
             postDateFormatSelect.value = readPostDateFormatSetting();
@@ -2197,6 +2236,34 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         }
     };
 
+    const saveTocMenuSetting = async (nextValue) => {
+        setTocMenuStatus(t('theme.toc_menu.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setTocMenuStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = (nextValue === 'left' || nextValue === 'right' || nextValue === 'inline') ? nextValue : 'inline';
+            const result = await saveSettingsToServer({ toc_menu: value });
+            if (!result.ok) throw new Error(result.message || t('theme.toc_menu.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.toc_menu = value;
+            }
+            refreshPreviewAfterSettings();
+            setTocMenuStatus(t('theme.toc_menu.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('toc menu save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.toc_menu.save_failed', 'Save failed');
+            setTocMenuStatus(msg, 'error');
+            return false;
+        }
+    };
+
     const refreshPreviewAfterSettings = () => {
         const ta = document.getElementById('editor');
         if (ta instanceof HTMLTextAreaElement) {
@@ -2429,6 +2496,12 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (!(copyHtmlModeSelect instanceof HTMLSelectElement)) return;
             const next = String(copyHtmlModeSelect.value || '').trim();
             await saveCopyHtmlModeSetting(next);
+        });
+
+        tocMenuSelect?.addEventListener('change', async () => {
+            if (!(tocMenuSelect instanceof HTMLSelectElement)) return;
+            const next = String(tocMenuSelect.value || '').trim();
+            await saveTocMenuSetting(next);
         });
 
         settingsExportBtn?.addEventListener('click', () => {
@@ -5019,6 +5092,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (typeof window.__mdwApplyTocHotKeyword === 'function') {
                 window.__mdwApplyTocHotKeyword(preview, data.content);
             }
+            if (typeof window.__mdwInitTocSideMenus === 'function') {
+                window.__mdwInitTocSideMenus(preview);
+            }
             fileInput.value = data.file;
 
             const deleteFileInput = document.getElementById('deleteFileInput');
@@ -6816,6 +6892,92 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     };
     window.__mdwApplyTocHotKeyword = applyTocHotKeyword;
 
+    const initTocSideMenus = (root = document) => {
+        const base = (root instanceof Element || root instanceof Document) ? root : document;
+        const layouts = Array.from(base.querySelectorAll('.md-toc-layout'));
+        if (base instanceof Element && base.classList.contains('md-toc-layout')) {
+            layouts.unshift(base);
+        }
+        const getHrefId = (link) => {
+            if (!(link instanceof HTMLAnchorElement)) return '';
+            const href = String(link.getAttribute('href') || '');
+            return href.startsWith('#') ? href.slice(1) : '';
+        };
+        layouts.forEach((layout) => {
+            const menu = layout.querySelector('.md-toc-side');
+            if (!(menu instanceof HTMLElement)) return;
+            const links = Array.from(menu.querySelectorAll('a[href^="#"]'))
+                .filter((link) => link instanceof HTMLAnchorElement);
+            if (!links.length) return;
+            const idToLink = new Map();
+            links.forEach((link) => {
+                const id = getHrefId(link);
+                if (id) idToLink.set(id, link);
+            });
+            const headings = Array.from(layout.querySelectorAll('h3[id]'))
+                .filter((heading) => heading instanceof HTMLElement && idToLink.has(heading.id));
+            if (!headings.length) return;
+
+            if (layout.__mdwTocObserver) {
+                try { layout.__mdwTocObserver.disconnect(); } catch {}
+                layout.__mdwTocObserver = null;
+            }
+
+            const setActive = (id) => {
+                if (!id) return;
+                if (layout.dataset.mdwTocActive === id) return;
+                layout.dataset.mdwTocActive = id;
+                links.forEach((link) => {
+                    const linkId = getHrefId(link);
+                    link.classList.toggle('is-active', linkId === id);
+                });
+            };
+
+            const rootEl = layout.closest('.pane-body');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
+                    const target = entry.target;
+                    if (!(target instanceof HTMLElement)) return;
+                    setActive(target.id);
+                });
+            }, {
+                root: rootEl instanceof HTMLElement ? rootEl : null,
+                rootMargin: '-45% 0px -45% 0px',
+                threshold: 0,
+            });
+
+            headings.forEach((heading) => observer.observe(heading));
+            layout.__mdwTocObserver = observer;
+
+            const center = (() => {
+                if (rootEl instanceof HTMLElement) {
+                    const rect = rootEl.getBoundingClientRect();
+                    return rect.top + (rootEl.clientHeight / 2);
+                }
+                return window.innerHeight / 2;
+            })();
+
+            let closestId = '';
+            let closestDist = Number.POSITIVE_INFINITY;
+            headings.forEach((heading) => {
+                const rect = heading.getBoundingClientRect();
+                const dist = Math.abs(rect.top - center);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestId = heading.id;
+                }
+            });
+            if (closestId) setActive(closestId);
+        });
+    };
+    window.__mdwInitTocSideMenus = initTocSideMenus;
+    if (document.readyState === 'complete') {
+        initTocSideMenus();
+    } else {
+        window.addEventListener('load', () => initTocSideMenus(), { once: true });
+    }
+
     async function sendPreview() {
         const body = 'content=' + encodeURIComponent(ta.value);
         try {
@@ -6837,6 +6999,9 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             }
             prev.innerHTML = html;
             applyTocHotKeyword(prev, ta.value);
+            if (typeof window.__mdwInitTocSideMenus === 'function') {
+                window.__mdwInitTocSideMenus(prev);
+            }
             if (window.MathJax?.typesetPromise) {
                 window.MathJax.typesetPromise([prev]).catch((err) => {
                     if (status) status.textContent = t('js.preview_render_errors', 'Preview updated with render errors.');
@@ -8209,6 +8374,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const grid = document.getElementById('editorGrid');
     if (!grid) return;
 
+    const root = document.documentElement;
     const STORAGE_KEY = 'mdw_editor_col_widths';
     const ROW_STORAGE_KEY = 'mdw_editor_row_heights';
     const mobileQuery = window.matchMedia('(max-width: 960px)');
@@ -8228,7 +8394,6 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     }
 
     function applyRows(top, bottom, save) {
-        const root = document.documentElement;
         root.style.setProperty('--row-top', top);
         root.style.setProperty('--row-bottom', bottom);
         if (save) {
@@ -8269,14 +8434,85 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     };
 
     initRows();
+
+    let syncRaf = null;
+    const parseRowSize = (val, viewHeight) => {
+        const raw = String(val || '').trim();
+        if (!raw) return null;
+        if (raw.endsWith('px')) {
+            const n = parseFloat(raw);
+            return Number.isFinite(n) ? n : null;
+        }
+        if (raw.endsWith('vh')) {
+            const n = parseFloat(raw);
+            if (!Number.isFinite(n)) return null;
+            return (viewHeight * n) / 100;
+        }
+        return null;
+    };
+
+    const syncMobileRows = () => {
+        if (!mobileQuery.matches) return;
+        if (root.classList.contains('mdw-pane-focus-md') || root.classList.contains('mdw-pane-focus-preview')) return;
+        const main = document.querySelector('.app-main');
+        if (!(main instanceof HTMLElement)) return;
+        const mainStyles = getComputedStyle(main);
+        const padTop = parseFloat(mainStyles.paddingTop) || 0;
+        const padBottom = parseFloat(mainStyles.paddingBottom) || 0;
+        const innerHeight = Math.max(0, main.clientHeight - padTop - padBottom);
+        if (!innerHeight) return;
+        const resizer = document.querySelector('.col-resizer[data-resizer="right"]');
+        const resizerHeight = resizer instanceof HTMLElement ? resizer.getBoundingClientRect().height : 12;
+        const total = innerHeight - resizerHeight;
+        if (total <= 0) return;
+        const rootStyles = getComputedStyle(root);
+        const viewHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+        const topPx = parseRowSize(rootStyles.getPropertyValue('--row-top'), viewHeight);
+        const bottomPx = parseRowSize(rootStyles.getPropertyValue('--row-bottom'), viewHeight);
+        if (!(topPx > 0) || !(bottomPx > 0)) return;
+        const ratio = topPx / (topPx + bottomPx);
+        const minSize = 240;
+        let newTop = Math.round(total * ratio);
+        let newBottom = Math.round(total - newTop);
+        if (newTop < minSize) {
+            newTop = minSize;
+            newBottom = Math.max(minSize, total - newTop);
+        } else if (newBottom < minSize) {
+            newBottom = minSize;
+            newTop = Math.max(minSize, total - newBottom);
+        }
+        applyRows(`${newTop}px`, `${newBottom}px`, false);
+    };
+
+    const scheduleSyncRows = () => {
+        if (syncRaf) return;
+        syncRaf = requestAnimationFrame(() => {
+            syncRaf = null;
+            syncMobileRows();
+        });
+    };
+    scheduleSyncRows();
     if (typeof mobileQuery.addEventListener === 'function') {
         mobileQuery.addEventListener('change', (ev) => {
-            if (ev.matches) initRows();
+            if (ev.matches) {
+                initRows();
+                scheduleSyncRows();
+            }
         });
     } else if (typeof mobileQuery.addListener === 'function') {
         mobileQuery.addListener((ev) => {
-            if (ev.matches) initRows();
+            if (ev.matches) {
+                initRows();
+                scheduleSyncRows();
+            }
         });
+    }
+    window.addEventListener('resize', scheduleSyncRows, { passive: true });
+    if (typeof MutationObserver === 'function') {
+        const mo = new MutationObserver(() => {
+            scheduleSyncRows();
+        });
+        mo.observe(root, { attributes: true, attributeFilter: ['class'] });
     }
 
     let active = null;
@@ -8469,6 +8705,16 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         return view;
     };
 
+    let focusRaf = null;
+    const scheduleFocusRows = () => {
+        if (!focused || !mobileQuery.matches) return;
+        if (focusRaf) return;
+        focusRaf = requestAnimationFrame(() => {
+            focusRaf = null;
+            applyFocusRows();
+        });
+    };
+
     const applyFocusRows = () => {
         if (!focused) return;
         const resizer = document.querySelector('.col-resizer[data-resizer="right"]');
@@ -8516,7 +8762,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             if (focused) clearFocus();
             return;
         }
-        if (focused) applyFocusRows();
+        if (focused) scheduleFocusRows();
     };
 
     window.addEventListener('resize', handleResize, { passive: true });
@@ -8524,6 +8770,13 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         mobileQuery.addEventListener('change', handleResize);
     } else if (typeof mobileQuery.addListener === 'function') {
         mobileQuery.addListener(handleResize);
+    }
+
+    if (typeof MutationObserver === 'function') {
+        const headerObserver = new MutationObserver(() => {
+            scheduleFocusRows();
+        });
+        headerObserver.observe(root, { attributes: true, attributeFilter: ['class'] });
     }
 })();
 
@@ -8578,6 +8831,27 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+
+    const buildThemeFontLinks = (htmlMode) => {
+        if (htmlMode !== 'wet') return '';
+        const links = Array.from(document.querySelectorAll('link[data-mdw-theme-font]'))
+            .filter((el) => el instanceof HTMLLinkElement);
+        if (!links.length) return '';
+        const out = [];
+        links.forEach((link) => {
+            const rel = String(link.getAttribute('rel') || '').trim();
+            const href = String(link.getAttribute('href') || '').trim();
+            if (!rel || !href) return;
+            const crossorigin = String(link.getAttribute('crossorigin') || '').trim();
+            const attrs = [
+                `rel="${escapeHtml(rel)}"`,
+                `href="${escapeHtml(href)}"`,
+            ];
+            if (crossorigin) attrs.push(`crossorigin="${escapeHtml(crossorigin)}"`);
+            out.push(`  <link ${attrs.join(' ')}>\n`);
+        });
+        return out.length ? out.join('') : '';
+    };
 
     const collectAllowedMetaKeys = () => {
         const keys = new Set();
@@ -8741,11 +9015,29 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (htmlMode !== 'wet') return;
     };
 
+    const normalizeTocLayoutForExport = (targetRoot, htmlMode) => {
+        if (!(targetRoot instanceof Element)) return;
+        if (htmlMode === 'wet') return;
+        const layouts = Array.from(targetRoot.querySelectorAll('.md-toc-layout'));
+        layouts.forEach((layout) => {
+            const body = layout.querySelector('.md-toc-body');
+            if (!(body instanceof HTMLElement)) return;
+            const tocWrap = layout.querySelector('.md-toc-side .md-toc-wrap');
+            if (tocWrap instanceof HTMLElement && !body.querySelector('.md-toc-wrap')) {
+                body.insertBefore(tocWrap.cloneNode(true), body.firstChild);
+            }
+            const frag = document.createDocumentFragment();
+            Array.from(body.childNodes).forEach((node) => frag.appendChild(node));
+            layout.replaceWith(frag);
+        });
+    };
+
     const getPreviewSnapshot = (stripMeta, htmlMode, allowedClasses) => {
         if (!(preview instanceof HTMLElement)) return null;
         const clone = preview.cloneNode(true);
         if (clone instanceof HTMLElement) clone.removeAttribute('id');
         if (stripMeta) stripMetaHtml(clone);
+        normalizeTocLayoutForExport(clone, htmlMode);
         applyHtmlMode(clone, htmlMode, allowedClasses);
         return clone instanceof HTMLElement ? clone.outerHTML : null;
     };
@@ -8852,7 +9144,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         s = s.replace(/\.preview-content\b/g, ' ').replace(/\s+/g, ' ');
         s = s.replace(/^\s*[>+~]\s*/, '').trim();
         if (!s) s = 'body';
-        if (s.includes('.md-')) return null;
+        if (s.includes('.md-') && !/\.md-toc\b|\.md-toc-/.test(s)) return null;
         if (allowedClasses instanceof Set) {
             const classMatches = s.match(/\.([A-Za-z0-9_-]+)/g) || [];
             for (const match of classMatches) {
@@ -8964,8 +9256,22 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         const filename = `${src || 'export'}.html`;
         const markdownSource = getMarkdownSource();
         const allowedClasses = htmlMode !== 'dry' ? collectAttrListClasses(markdownSource) : null;
+        if (htmlMode === 'wet' && allowedClasses instanceof Set) {
+            [
+                'md-toc-layout',
+                'md-toc-left',
+                'md-toc-right',
+                'md-toc-side',
+                'md-toc-body',
+                'md-toc-wrap',
+                'md-toc',
+                'md-toc-item',
+                'is-active',
+            ].forEach((cls) => allowedClasses.add(cls));
+        }
         let bodyHtml = getPreviewSnapshot(stripMeta, htmlMode, allowedClasses);
         const exportCss = await collectExportCss(htmlMode, allowedClasses);
+        const fontLinks = buildThemeFontLinks(htmlMode);
         if (!bodyHtml) {
             const rendered = (typeof markdownSource === 'string')
                 ? await getServerRenderedHtml(markdownSource)
@@ -8980,7 +9286,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-${cssBlock}</head>
+${fontLinks}${cssBlock}</head>
 <body>
 ${bodyHtml}
 </body>

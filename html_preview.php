@@ -1038,6 +1038,7 @@ function mdw_metadata_default_config() {
             'copy_buttons_enabled' => true,
             'copy_include_meta' => true,
             'copy_html_mode' => 'dry',
+            'toc_menu' => 'inline',
             'post_date_format' => 'mdy_short',
             'post_date_align' => 'left',
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
@@ -1109,6 +1110,8 @@ function mdw_metadata_normalize_config($cfg) {
     $copyIncludeMeta = !array_key_exists('copy_include_meta', $inSettings) ? true : (bool)$inSettings['copy_include_meta'];
     $copyHtmlMode = isset($inSettings['copy_html_mode']) ? trim((string)$inSettings['copy_html_mode']) : 'dry';
     if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+    $tocMenu = isset($inSettings['toc_menu']) ? strtolower(trim((string)$inSettings['toc_menu'])) : 'inline';
+    if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
     $postDateFormat = isset($inSettings['post_date_format']) ? trim((string)$inSettings['post_date_format']) : 'mdy_short';
     if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
     $postDateAlign = isset($inSettings['post_date_align']) ? trim((string)$inSettings['post_date_align']) : 'left';
@@ -1131,6 +1134,7 @@ function mdw_metadata_normalize_config($cfg) {
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
+        'toc_menu' => $tocMenu,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'ui_language' => $uiLanguage,
@@ -1340,6 +1344,7 @@ function mdw_metadata_settings() {
         'copy_buttons_enabled' => !array_key_exists('copy_buttons_enabled', $s) ? true : (bool)$s['copy_buttons_enabled'],
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
         'copy_html_mode' => isset($s['copy_html_mode']) ? trim((string)$s['copy_html_mode']) : 'dry',
+        'toc_menu' => isset($s['toc_menu']) ? strtolower(trim((string)$s['toc_menu'])) : 'inline',
         'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
         'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
@@ -1352,6 +1357,7 @@ function mdw_metadata_settings() {
     if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
     if (!in_array($out['post_date_align'], ['left', 'center', 'right'], true)) $out['post_date_align'] = 'left';
     if (!in_array($out['copy_html_mode'], ['dry', 'medium', 'wet'], true)) $out['copy_html_mode'] = 'dry';
+    if (!in_array($out['toc_menu'], ['inline', 'left', 'right'], true)) $out['toc_menu'] = 'inline';
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';
     if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
     if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
@@ -1546,10 +1552,47 @@ function mdw_attr_list_extract_classes($line) {
     return $classes;
 }
 
+function mdw_auth_password_algo() {
+    if (defined('PASSWORD_ARGON2ID')) return PASSWORD_ARGON2ID;
+    return PASSWORD_BCRYPT;
+}
+
+function mdw_auth_password_options($algo) {
+    if ($algo === PASSWORD_BCRYPT) return ['cost' => 12];
+    return [];
+}
+
 function mdw_auth_hash_password($password) {
     $password = (string)$password;
     if ($password === '') return '';
-    return hash('sha256', $password);
+    $algo = mdw_auth_password_algo();
+    $options = mdw_auth_password_options($algo);
+    $hash = password_hash($password, $algo, $options);
+    return $hash === false ? '' : $hash;
+}
+
+function mdw_auth_is_legacy_hash($hash) {
+    $hash = trim((string)$hash);
+    return $hash !== '' && preg_match('/^[a-f0-9]{64}$/i', $hash);
+}
+
+function mdw_auth_verify_password($password, $storedHash) {
+    $storedHash = trim((string)$storedHash);
+    if ($storedHash === '') return false;
+    if (mdw_auth_is_legacy_hash($storedHash)) {
+        $hash = hash('sha256', (string)$password);
+        return hash_equals($storedHash, $hash);
+    }
+    return password_verify((string)$password, $storedHash);
+}
+
+function mdw_auth_password_needs_rehash($storedHash) {
+    $storedHash = trim((string)$storedHash);
+    if ($storedHash === '') return false;
+    if (mdw_auth_is_legacy_hash($storedHash)) return true;
+    $algo = mdw_auth_password_algo();
+    $options = mdw_auth_password_options($algo);
+    return password_needs_rehash($storedHash, $algo, $options);
 }
 
 function mdw_auth_config() {
@@ -1772,6 +1815,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $publisherMode = !empty($settings['publisher_mode']);
     $cfg = mdw_metadata_load_config();
     $pcfg = mdw_metadata_load_publisher_config();
+    $tocMenu = isset($settings['toc_menu']) ? strtolower(trim((string)$settings['toc_menu'])) : 'inline';
+    if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+    $tocLayout = ($tocMenu === 'left' || $tocMenu === 'right') ? $tocMenu : '';
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
     [$text, $comments] = mdw_extract_html_comments($text);
@@ -2032,7 +2078,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
         if ($tocRequested && mdw_toc_is_token_line($line)) {
             $closeAllLists();
-            $html[] = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+            if ($tocLayout === '') {
+                $html[] = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+            }
             $tocActive = true;
             continue;
         }
@@ -2323,6 +2371,21 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     }
 
     $output = implode("\n",$html);
+    if ($tocRequested && $tocLayout !== '' && !empty($tocItems)) {
+        $layoutClass = 'md-toc-layout md-toc-' . $tocLayout;
+        $layoutAttr = htmlspecialchars($tocLayout, ENT_QUOTES, 'UTF-8');
+        $tocHtml = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+        $output = implode("\n", [
+            '<div class="'.$layoutClass.'" data-mdw-toc-layout="'.$layoutAttr.'">',
+            '<nav class="md-toc-side" aria-label="Table of contents">',
+            $tocHtml,
+            '</nav>',
+            '<div class="md-toc-body">',
+            $output,
+            '</div>',
+            '</div>',
+        ]);
+    }
     return mdw_restore_html_comments($output, $comments);
 }
 

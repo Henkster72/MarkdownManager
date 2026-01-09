@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6
+
+- Settings: UI language list is auto-detected from available translations (fixes missing ES/IT) with case-insensitive codes.
+- TOC: new inline/left/right menu option, vertical sidebar preview, and active section highlight on scroll.
+- TOC export: wet HTML preserves sidebar layout/classes, non-wet exports fall back to inline TOC.
+- WPM header link now appears only for published notes and no longer depends on the Google search plugin.
+- Header public link icon styling is simplified (no extra background/border).
+- Index page title now includes the app name.
+- Wet HTML export includes theme Google Font links.
+- Mermaid: pie chart syntax normalization for stricter Mermaid versions.
+- Auth: password storage upgraded to `password_hash` (Argon2id/bcrypt) with automatic SHA256 migration on login.
+- Mobile: pane focus heights recalc with header show/hide; preview focus toggle uses an up-caret icon.
+
 ## 0.5.1
 
 - Exporter index now groups notes by folder, uses Pop Icon (`pi-*`) styling, and copies the icon font to the output.

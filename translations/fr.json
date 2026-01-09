@@ -161,6 +161,16 @@
       "saved": "Enregistré",
       "save_failed": "Échec de l'enregistrement"
     },
+    "toc_menu": {
+      "label": "Menu du sommaire",
+      "option_inline": "En ligne (par défaut)",
+      "option_left": "Barre latérale gauche",
+      "option_right": "Barre latérale droite",
+      "hint": "Le menu latéral apparaît en aperçu/lecture et n’est exporté qu’en HTML wet.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
     "post_date_format": {
       "label": "Format de date de publication",
       "option_mdy_short": "nov. 20, 2025",

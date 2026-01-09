@@ -11,6 +11,7 @@
     "publisher_default_author": "",
     "publisher_require_h2": true,
     "copy_html_mode": "dry",
+    "toc_menu": "inline",
     "ui_language": "",
     "ui_theme": "",
     "theme_preset": "default",

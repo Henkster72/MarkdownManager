@@ -47,6 +47,11 @@ if ($action === 'setup') {
 
     $userHash = mdw_auth_hash_password($userPw);
     $superHash = mdw_auth_hash_password($superPw);
+    if ($userHash === '' || $superHash === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'hash_failed']);
+        exit;
+    }
     $cfg = mdw_metadata_load_config();
     $cfg['_auth'] = [
         'user_hash' => $userHash,
@@ -79,10 +84,12 @@ if ($action === 'login') {
         echo json_encode(['ok' => false, 'error' => 'missing_password']);
         exit;
     }
-    $hash = mdw_auth_hash_password($password);
+    $matches = ['user' => false, 'superuser' => false];
     if ($role === '') {
-        $matchSuper = $auth['superuser_hash'] !== '' && hash_equals($auth['superuser_hash'], $hash);
-        $matchUser = $auth['user_hash'] !== '' && hash_equals($auth['user_hash'], $hash);
+        $matchSuper = $auth['superuser_hash'] !== '' && mdw_auth_verify_password($password, $auth['superuser_hash']);
+        $matchUser = $auth['user_hash'] !== '' && mdw_auth_verify_password($password, $auth['user_hash']);
+        $matches['superuser'] = $matchSuper;
+        $matches['user'] = $matchUser;
         if ($matchSuper) $role = 'superuser';
         else if ($matchUser) $role = 'user';
         else {
@@ -107,11 +114,38 @@ if ($action === 'login') {
             exit;
         }
         $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
-        if (!hash_equals($stored, $hash)) {
+        if (!mdw_auth_verify_password($password, $stored)) {
             http_response_code(403);
             echo json_encode(['ok' => false, 'error' => 'invalid_password']);
             exit;
         }
+        $matches[$role] = true;
+        $otherRole = $role === 'superuser' ? 'user' : 'superuser';
+        $otherKey = $otherRole . '_hash';
+        if ($auth[$otherKey] !== '' && mdw_auth_verify_password($password, $auth[$otherKey])) {
+            $matches[$otherRole] = true;
+        }
+    }
+
+    $rehash = [];
+    foreach (['user', 'superuser'] as $maybeRole) {
+        $key = $maybeRole . '_hash';
+        $stored = $auth[$key];
+        if (!$matches[$maybeRole] || $stored === '') continue;
+        if (!mdw_auth_password_needs_rehash($stored)) continue;
+        $newHash = mdw_auth_hash_password($password);
+        if ($newHash !== '') {
+            $rehash[$key] = $newHash;
+        }
+    }
+    if ($rehash) {
+        $cfg = mdw_metadata_load_config();
+        $cfg['_auth'] = isset($cfg['_auth']) && is_array($cfg['_auth']) ? $cfg['_auth'] : [];
+        foreach ($rehash as $key => $val) {
+            $cfg['_auth'][$key] = $val;
+            $auth[$key] = $val;
+        }
+        mdw_metadata_save_config($cfg);
     }
 
     $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];

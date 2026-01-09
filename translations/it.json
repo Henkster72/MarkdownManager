@@ -170,6 +170,16 @@
       "saved": "Salvato",
       "save_failed": "Errore di salvataggio"
     },
+    "toc_menu": {
+      "label": "Menu sommario",
+      "option_inline": "In linea (predefinito)",
+      "option_left": "Barra laterale sinistra",
+      "option_right": "Barra laterale destra",
+      "hint": "Il menu laterale appare in anteprima/vista e viene esportato solo in HTML wet.",
+      "saving": "Salvando…",
+      "saved": "Salvato",
+      "save_failed": "Errore di salvataggio"
+    },
     "post_date_format": {
       "label": "Formato data di pubblicazione",
       "option_mdy_short": "20 nov 2025",

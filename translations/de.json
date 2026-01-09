@@ -161,6 +161,16 @@
       "saved": "Gespeichert",
       "save_failed": "Speichern fehlgeschlagen"
     },
+    "toc_menu": {
+      "label": "Inhaltsverzeichnis-Menü",
+      "option_inline": "Inline (Standard)",
+      "option_left": "Linke Seitenleiste",
+      "option_right": "Rechte Seitenleiste",
+      "hint": "Seitenmenü erscheint in Vorschau/Ansicht und wird nur in Wet-HTML exportiert.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
     "post_date_format": {
       "label": "Beitragsdatum-Format",
       "option_mdy_short": "Nov. 20, 2025",

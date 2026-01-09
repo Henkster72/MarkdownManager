@@ -282,6 +282,8 @@ $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) |
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
 if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+$tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
+if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
@@ -1269,6 +1271,7 @@ if (isset($_GET['file'])) {
 	$mode = 'index';
 	$article_title = 'Index';
 	$article_html  = '';
+    $raw = '';
 	$secret_error  = null;
 	$requested_is_secret = $requested ? is_secret_file($requested) : false;
 	$folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
@@ -1308,6 +1311,18 @@ if ($requested) {
 	        }
 	    }
 	}
+
+    $current_publish_state = 'Concept';
+    $current_publish_state_lower = 'concept';
+    if (!empty($MDW_PUBLISHER_MODE) && $mode === 'view') {
+        $meta = [];
+        if ($raw !== '') {
+            mdw_hidden_meta_extract_and_remove_all($raw, $meta);
+        }
+        $current_publish_state = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
+        if ($current_publish_state === '') $current_publish_state = 'Concept';
+        $current_publish_state_lower = strtolower($current_publish_state);
+    }
 
     // Prev/next neighbors for ArrowLeft/ArrowRight navigation in view mode.
     if ($mode === 'view' && $requested) {
@@ -1367,7 +1382,7 @@ if ($requested) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?=h($article_title)?></title>
+<title><?=h($APP_NAME)?> • <?=h($article_title)?></title>
 
 <script>
 // Namespace localStorage per app base URL to avoid cross-instance collisions.
@@ -1468,10 +1483,10 @@ window.mermaid = mermaid;
 	                            <span style="font-weight: 500; opacity: 0.75;"> • overview</span>
 	                        <?php endif; ?>
 	                    </div>
-                        <?php if ($mode === 'view' && $requested && $WPM_PLUGIN_ACTIVE): ?>
+                        <?php if ($mode === 'view' && $requested && !empty($MDW_PUBLISHER_MODE) && $current_publish_state_lower === 'published'): ?>
                             <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
                             <?php if ($wpm_public_url): ?>
-                                <a class="btn btn-ghost icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
+                                <a class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
                                     <span class="pi pi-externallink"></span>
                                 </a>
                             <?php endif; ?>
@@ -1912,16 +1927,25 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 			                    <input id="copyIncludeMetaToggle" type="checkbox" <?= $copyIncludeMeta ? 'checked' : '' ?> data-auth-superuser-enable="1">
 			                    <span class="status-text"><?=h(mdw_t('theme.copy.include_meta','Include metadata in copy'))?></span>
 			                </label>
-			                <label class="modal-label" for="copyHtmlModeSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.html_mode_label','HTML copy mode'))?></label>
-			                <select id="copyHtmlModeSelect" class="input" data-auth-superuser-enable="1">
-			                    <option value="dry" <?= $copyHtmlMode === 'dry' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_dry','Dry HTML (no classes/styles)'))?></option>
-			                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
-			                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
-			                </select>
-			                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
-			                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
-			                </div>
-			            </div>
+				                <label class="modal-label" for="copyHtmlModeSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.html_mode_label','HTML copy mode'))?></label>
+				                <select id="copyHtmlModeSelect" class="input" data-auth-superuser-enable="1">
+				                    <option value="dry" <?= $copyHtmlMode === 'dry' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_dry','Dry HTML (no classes/styles)'))?></option>
+				                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
+				                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
+				                </select>
+				                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
+				                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
+				                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
+				                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
+				                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
+				                </select>
+				                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
+				                </div>
+				                <div id="tocMenuStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.toc_menu.hint','Side menu appears in preview/view and only exports in wet HTML.'))?>
+				                </div>
+				            </div>
 
 			            <div class="modal-field" data-auth-superuser="1">
 			                <label class="modal-label" for="postDateFormatSelect"><?=h(mdw_t('theme.post_date_format.label','Post date format'))?></label>

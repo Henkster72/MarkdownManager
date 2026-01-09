@@ -170,6 +170,16 @@
       "saved": "Saved",
       "save_failed": "Save failed"
     },
+    "toc_menu": {
+      "label": "TOC menu",
+      "option_inline": "Inline (default)",
+      "option_left": "Left sidebar",
+      "option_right": "Right sidebar",
+      "hint": "Side menu appears in preview/view and only exports in wet HTML.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
     "post_date_format": {
       "label": "Post date format",
       "option_mdy_short": "Nov 20, 2025",

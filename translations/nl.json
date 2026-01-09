@@ -161,6 +161,16 @@
       "saved": "Opgeslagen",
       "save_failed": "Opslaan mislukt"
     },
+    "toc_menu": {
+      "label": "TOC-menu",
+      "option_inline": "Inline (standaard)",
+      "option_left": "Linker zijbalk",
+      "option_right": "Rechter zijbalk",
+      "hint": "Zijmenu verschijnt in preview/weergave en wordt alleen geëxporteerd in wet HTML.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
     "post_date_format": {
       "label": "Postdatumformaat",
       "option_mdy_short": "nov 20, 2025",

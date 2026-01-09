@@ -270,6 +270,8 @@ $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) |
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
 if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+$tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
+if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
@@ -1035,10 +1037,10 @@ window.mermaid = mermaid;
 	                <div class="app-header-text">
 	                    <div class="app-title-row">
 	                        <div class="app-title"><?=h($current_title)?></div>
-                            <?php if ($requested && $WPM_PLUGIN_ACTIVE): ?>
+                            <?php if ($requested && !empty($MDW_PUBLISHER_MODE) && $current_publish_state_lower === 'published'): ?>
                                 <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
                                 <?php if ($wpm_public_url): ?>
-                                    <a class="btn btn-ghost icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
+                                    <a class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
                                         <span class="pi pi-externallink"></span>
                                     </a>
                                 <?php endif; ?>
@@ -1324,7 +1326,7 @@ window.mermaid = mermaid;
                     </div>
                 </div>
                 <button type="button" class="pane-focus-toggle" data-focus-target="preview" aria-label="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>" title="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>">
-                    <span class="pi pi-downcaret"></span>
+                    <span class="pi pi-upcaret"></span>
                 </button>
             </section>
 
@@ -1794,8 +1796,17 @@ window.mermaid = mermaid;
 				                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
 				                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
 				                </select>
+				                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
+				                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
+				                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
+				                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
+				                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
+				                </select>
 				                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
 				                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
+				                </div>
+				                <div id="tocMenuStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.toc_menu.hint','Side menu appears in preview/view and only exports in wet HTML.'))?>
 				                </div>
 				            </div>
 

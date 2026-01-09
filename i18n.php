@@ -27,9 +27,18 @@ function mdw_i18n_list_languages($projectDir, $dirRel) {
     ];
 
     $langs = [];
-    foreach (glob($fullDir . '/*.json') ?: [] as $file) {
-        $code = basename($file, '.json');
-        if (!preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $code)) continue;
+    $seen = [];
+    $entries = scandir($fullDir);
+    if ($entries === false) $entries = [];
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') continue;
+        $file = $fullDir . '/' . $entry;
+        if (!is_file($file)) continue;
+        if (strtolower(pathinfo($entry, PATHINFO_EXTENSION)) !== 'json') continue;
+        $code = strtolower(pathinfo($entry, PATHINFO_FILENAME));
+        if ($code === '' || !preg_match('/^[a-z]{2}(-[a-z0-9]+)?$/', $code)) continue;
+        if (isset($seen[$code])) continue;
+        $seen[$code] = true;
         $label = $code;
         $native = $code;
         $raw = @file_get_contents($file);
@@ -51,6 +60,22 @@ function mdw_i18n_list_languages($projectDir, $dirRel) {
     return $langs;
 }
 
+function mdw_i18n_find_lang_file($baseDir, $lang) {
+    $lang = strtolower(trim((string)$lang));
+    if ($lang === '') return null;
+    $entries = scandir($baseDir);
+    if ($entries === false) return null;
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') continue;
+        $path = $baseDir . '/' . $entry;
+        if (!is_file($path)) continue;
+        if (strtolower(pathinfo($entry, PATHINFO_EXTENSION)) !== 'json') continue;
+        $code = strtolower(pathinfo($entry, PATHINFO_FILENAME));
+        if ($code === $lang) return $path;
+    }
+    return null;
+}
+
 function mdw_i18n_default_lang_from_config($codes) {
     if (!is_array($codes) || !$codes) return '';
     if (!function_exists('env_str')) return '';
@@ -64,6 +89,7 @@ function mdw_i18n_default_lang_from_config($codes) {
     $json = json_decode((string)@file_get_contents($raw), true);
     if (!is_array($json)) return '';
     $lang = isset($json['_settings']['ui_language']) ? trim((string)$json['_settings']['ui_language']) : '';
+    if ($lang !== '') $lang = strtolower($lang);
     if ($lang !== '' && isset($codes[$lang])) return $lang;
     return '';
 }
@@ -73,7 +99,7 @@ function mdw_i18n_pick_lang($availableLangs) {
     foreach ($availableLangs as $l) {
         if (isset($l['code']) && is_string($l['code'])) $codes[$l['code']] = true;
     }
-    $cookie = isset($_COOKIE['mdw_lang']) ? (string)$_COOKIE['mdw_lang'] : '';
+    $cookie = isset($_COOKIE['mdw_lang']) ? strtolower(trim((string)$_COOKIE['mdw_lang'])) : '';
     if ($cookie !== '' && isset($codes[$cookie])) return $cookie;
     $cfgLang = mdw_i18n_default_lang_from_config($codes);
     if ($cfgLang !== '') return $cfgLang;
@@ -96,7 +122,15 @@ function mdw_i18n_load($projectDir, $dirRel, $lang) {
         if (is_array($j)) $data = $j;
     }
 
-    if ($lang !== 'en' && is_file($file)) {
+    if ($lang !== 'en') {
+        if (!is_file($file)) {
+            $alt = mdw_i18n_find_lang_file($base, $lang);
+            if (is_string($alt)) $file = $alt;
+        }
+        if (!is_file($file)) $file = '';
+    }
+
+    if ($lang !== 'en' && $file !== '') {
         $raw = @file_get_contents($file);
         $j = json_decode((string)$raw, true);
         if (is_array($j)) {

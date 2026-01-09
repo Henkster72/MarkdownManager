@@ -170,6 +170,16 @@
       "saved": "Guardado",
       "save_failed": "Error al guardar"
     },
+    "toc_menu": {
+      "label": "Menú de índice",
+      "option_inline": "En línea (predeterminado)",
+      "option_left": "Barra lateral izquierda",
+      "option_right": "Barra lateral derecha",
+      "hint": "El menú lateral aparece en la vista previa/vista y solo se exporta en HTML wet.",
+      "saving": "Guardando…",
+      "saved": "Guardado",
+      "save_failed": "Error al guardar"
+    },
     "post_date_format": {
       "label": "Formato de fecha de publicación",
       "option_mdy_short": "20 nov 2025",
