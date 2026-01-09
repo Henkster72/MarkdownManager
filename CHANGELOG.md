@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- README: GitHub Pages section shortened and now points to tutorials; version list refreshed.
+- Tutorials: added GitHub Pages export walkthroughs in EN/NL/DE/FR/ES/IT/PT under `example-notes/tutorials/`.
+
 ## 0.6
 
 - Settings: UI language list is auto-detected from available translations (fixes missing ES/IT) with case-insensitive codes.
