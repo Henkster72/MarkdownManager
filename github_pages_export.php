@@ -1,33 +1,23 @@
 <?php
 
-session_start();
-
-require_once __DIR__ . '/env_loader.php';
+require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
 require_once __DIR__ . '/themes_lib.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
-    exit;
+    json(['ok' => false, 'error' => 'method_not_allowed'], 405);
 }
 
 $raw = file_get_contents('php://input');
 $data = json_decode((string)$raw, true);
 if (!is_array($data)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'invalid_json']);
-    exit;
+    json(['ok' => false, 'error' => 'invalid_json'], 400);
 }
 
 $action = isset($data['action']) ? (string)$data['action'] : '';
 $csrf = isset($data['csrf']) ? (string)$data['csrf'] : '';
 if (!isset($_SESSION['csrf_token']) || $csrf === '' || !hash_equals($_SESSION['csrf_token'], $csrf)) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'csrf', 'message' => 'Invalid session (CSRF). Reload and try again.']);
-    exit;
+    json(['ok' => false, 'error' => 'csrf', 'message' => 'Invalid session (CSRF). Reload and try again.'], 403);
 }
 
 $auth = mdw_auth_config();
@@ -37,9 +27,7 @@ if ($authRequired) {
     $role = isset($authIn['role']) ? (string)$authIn['role'] : '';
     $token = isset($authIn['token']) ? (string)$authIn['token'] : '';
     if ($role !== 'superuser' || !mdw_auth_verify_token('superuser', $token)) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'auth_required', 'message' => 'Superuser login required.']);
-        exit;
+        json(['ok' => false, 'error' => 'auth_required', 'message' => 'Superuser login required.'], 403);
     }
 }
 
@@ -294,25 +282,18 @@ try {
     if ($action === 'check') {
         [$errors, $warnings] = ghpx_env_errors(__DIR__);
         if ($errors) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'config_invalid', 'errors' => $errors, 'warnings' => $warnings]);
-            exit;
+            json(['ok' => false, 'error' => 'config_invalid', 'errors' => $errors, 'warnings' => $warnings], 400);
         }
-        echo json_encode(['ok' => true, 'warnings' => $warnings]);
-        exit;
+        json(['ok' => true, 'warnings' => $warnings]);
     }
 
     if ($action !== 'export') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'invalid_action']);
-        exit;
+        json(['ok' => false, 'error' => 'invalid_action'], 400);
     }
 
     [$errors, $warnings] = ghpx_env_errors(__DIR__);
     if ($errors) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'config_invalid', 'errors' => $errors, 'warnings' => $warnings]);
-        exit;
+        json(['ok' => false, 'error' => 'config_invalid', 'errors' => $errors, 'warnings' => $warnings], 400);
     }
 
     $file = isset($data['file']) ? (string)$data['file'] : '';
@@ -320,9 +301,7 @@ try {
     if ($root === false) throw new RuntimeException('Project root not found.');
     $file = ghpx_sanitize_md_path($root, $file);
     if ($file === null) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'invalid_file', 'message' => 'Invalid markdown file.']);
-        exit;
+        json(['ok' => false, 'error' => 'invalid_file', 'message' => 'Invalid markdown file.'], 400);
     }
 
     $outRaw = trim((string)env_str('MDM_EXPORT_DIR', ''));
@@ -370,9 +349,7 @@ try {
         mdw_hidden_meta_extract_and_remove_all($rawMd, $meta);
         $state = strtolower(trim((string)($meta['publishstate'] ?? '')));
         if ($state !== 'published') {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'not_published', 'message' => 'This note is not Published.']);
-            exit;
+            json(['ok' => false, 'error' => 'not_published', 'message' => 'This note is not Published.'], 400);
         }
     }
 
@@ -433,15 +410,12 @@ try {
         @copy($popiconFont, ghpx_normalize_path($outDir) . '/popicon.woff2');
     }
 
-    echo json_encode([
+    json([
         'ok' => true,
         'path' => $outRelFile,
         'output_dir' => ghpx_normalize_path($outDir),
         'warnings' => $warnings,
     ]);
-    exit;
 } catch (Throwable $err) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'export_failed', 'message' => $err->getMessage()]);
-    exit;
+    json(['ok' => false, 'error' => 'export_failed', 'message' => $err->getMessage()], 500);
 }

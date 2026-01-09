@@ -5,10 +5,7 @@
  * - shared security + secret_mds logic
  *******************************/
 
-session_start();
-
-/* CONFIG */
-require_once __DIR__ . '/env_loader.php';
+require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/i18n.php';
 
 $LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
@@ -91,111 +88,6 @@ if ($github_pages_plugin_loaded) {
     $github_token = trim((string)env_str('GITHUB_TOKEN', ''));
     $github_export_dir = trim((string)env_str('MDM_EXPORT_DIR', ''));
     $github_pages_env_ready = ($github_token !== '' && $github_export_dir !== '');
-}
-
-function sanitize_folder_name($folder) {
-    if (!is_string($folder)) return null;
-    $folder = trim($folder);
-    if ($folder === '') return null;
-    if (strpos($folder, '..') !== false) return null;
-    $folder = str_replace("\\", "/", $folder);
-    $folder = trim($folder, "/");
-    if ($folder === '') return null;
-    $parts = explode('/', $folder);
-    if (count($parts) > 2) return null;
-    foreach ($parts as $p) {
-        if ($p === '' || $p === '.' || $p === '..') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
-    }
-    return implode('/', $parts);
-}
-
-function folder_from_path($path) {
-    if (!$path) return null;
-    $d = dirname($path);
-    if ($d === '.' || $d === '') return 'root';
-    return $d;
-}
-
-/* SECURITY / PATH CLEAN */
-function mdw_path_normalize($path) {
-    return str_replace("\\", "/", (string)$path);
-}
-
-function mdw_project_root() {
-    static $root = null;
-    if ($root === null) {
-        $root = realpath(__DIR__);
-        if ($root === false) $root = __DIR__;
-    }
-    return $root;
-}
-
-function mdw_path_within_root($path, $root = null) {
-    $root = $root ?? mdw_project_root();
-    if (!is_string($root) || $root === '') return false;
-    $rootNorm = rtrim(mdw_path_normalize($root), '/');
-    $pathNorm = mdw_path_normalize($path);
-    if ($pathNorm === $rootNorm) return true;
-    return str_starts_with($pathNorm, $rootNorm . '/');
-}
-
-function mdw_safe_full_path($relativePath, $requireExists = true) {
-    if (!is_string($relativePath) || $relativePath === '') return null;
-    $root = mdw_project_root();
-    if (!is_string($root) || $root === '') return null;
-    $clean = mdw_path_normalize($relativePath);
-    $clean = ltrim($clean, "/");
-    if ($clean === '') return null;
-    $full = rtrim($root, "/\\") . '/' . $clean;
-
-    if ($requireExists) {
-        $resolved = realpath($full);
-        if ($resolved === false) return null;
-        if (!mdw_path_within_root($resolved, $root)) return null;
-        return $full;
-    }
-
-    $parent = dirname($full);
-    $parentResolved = realpath($parent);
-    if ($parentResolved === false) return null;
-    if (!mdw_path_within_root($parentResolved, $root)) return null;
-    return $full;
-}
-
-function sanitize_md_path($path) {
-    if (!$path) return null;
-    if (strpos($path, '..') !== false) return null;
-
-    $parts = explode('/', $path);
-    if (count($parts) > 3) return null;
-    foreach ($parts as $p) {
-        if ($p === '') return null;
-        // allow unicode letters/numbers plus . _ -
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
-    }
-
-    if (!preg_match('/\.md$/i', end($parts))) return null;
-
-    $full = mdw_safe_full_path($path, true);
-    if (!$full || !is_file($full)) return null;
-
-    return $path;
-}
-
-function sanitize_new_md_slug($slug) {
-    if (!is_string($slug)) return null;
-    $slug = trim($slug);
-    if ($slug === '') return null;
-    $slug = preg_replace('/\\.md$/i', '', $slug);
-    $slug = str_replace(['\\', '/'], ' ', $slug);
-    $slug = preg_replace('/\\s+/u', '-', $slug);
-    $slug = preg_replace('/[^A-Za-z0-9._\\-\\p{L}\\p{N}]+/u', '', $slug);
-    $slug = preg_replace('/-+/', '-', $slug);
-    $slug = trim($slug, '-');
-    $slug = trim($slug, '.');
-    if ($slug === '' || $slug === '.' || $slug === '..') return null;
-    return $slug;
 }
 
 /* ESCAPE */
@@ -491,10 +383,8 @@ $posted_content_for_render = '';
 
 /* HANDLE PREVIEW ENDPOINT (AJAX) */
 if (isset($_GET['preview']) && $_GET['preview'] === '1') {
-    header('Content-Type: text/html; charset=utf-8');
     $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
-    echo md_to_html($content, $requested);
-    exit;
+    html(md_to_html($content, $requested));
 }
 
 /* LOAD DATA FOR JSON REQUEST */
@@ -504,12 +394,9 @@ $can_view_json = $requested && (!$is_secret_req_json || ($is_secret_req_json && 
 /* HANDLE JSON DATA REQUEST (AJAX) */
 if (isset($_GET['json']) && $_GET['json'] === '1') {
     if ($can_view_json) {
-        header('Content-Type: application/json; charset=utf-8');
         $full = mdw_safe_full_path($requested, true);
         if (!$full || !is_file($full)) {
-            http_response_code(404);
-            echo json_encode(['error' => 'not_found']);
-            exit;
+            json(['error' => 'not_found'], 404);
         }
         $raw_content = file_get_contents($full);
         $publishState = '';
@@ -520,7 +407,7 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
             if ($publishState === '') $publishState = 'Concept';
         }
 
-        echo json_encode([
+        json([
             'file'    => $requested,
             'title'   => mdw_editor_title_from_raw($raw_content, !empty($MDW_PUBLISHER_MODE)),
             'content' => $raw_content,
@@ -529,12 +416,8 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
             'secret_authenticated' => is_secret_authenticated(),
             'publish_state' => $publishState,
         ]);
-        exit;
     } else {
-        http_response_code(403);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'forbidden']);
-        exit;
+        json(['error' => 'forbidden'], 403);
     }
 }
 
@@ -592,8 +475,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             $save_error = mdw_t('flash.rename_failed', 'Could not rename file.');
                             if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
                         } else {
-                            header('Location: edit.php?file=' . rawurlencode($newPath));
-                            exit;
+                            redirect('edit.php?file=' . rawurlencode($newPath));
                         }
                     }
                 }
@@ -617,13 +499,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if (is_secret_file($san) && !is_secret_authenticated()) {
             // niet stiekem saven als je niet ingelogd bent
             if ($isAjax) {
-                http_response_code(403);
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['ok' => false, 'error' => 'forbidden']);
-                exit;
+                json(['ok' => false, 'error' => 'forbidden'], 403);
             }
-            header('Location: index.php?file='.rawurlencode($san));
-            exit;
+            redirect('index.php?file=' . rawurlencode($san));
         }
             $full = mdw_safe_full_path($san, true);
             if (!$full || !is_file($full)) {
@@ -778,12 +656,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 $err = error_get_last();
                                 if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
                                     if ($isAjax) {
-                                        header('Content-Type: application/json; charset=utf-8');
-                                        echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
-                                        exit;
+                                        json(['ok' => true, 'publish_state' => $finalPublishState]);
                                     }
-                                    header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                                    exit;
+                                    redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                                 }
                                 $save_error = 'Kon tijdelijke file niet schrijven.';
                                 if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
@@ -798,12 +673,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     if ($diag !== '') $save_error_details = $diag;
                                 } else {
                                     if ($isAjax) {
-                                        header('Content-Type: application/json; charset=utf-8');
-                                        echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
-                                        exit;
+                                        json(['ok' => true, 'publish_state' => $finalPublishState]);
                                     }
-                                    header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                                    exit;
+                                    redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                                 }
                             }
                         } else {
@@ -815,12 +687,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 if ($diag !== '') $save_error_details = $diag;
                             } else {
                                 if ($isAjax) {
-                                    header('Content-Type: application/json; charset=utf-8');
-                                    echo json_encode(['ok' => true, 'publish_state' => $finalPublishState]);
-                                    exit;
+                                    json(['ok' => true, 'publish_state' => $finalPublishState]);
                                 }
-                                header('Location: edit.php?file=' . rawurlencode($san) . '&saved=1');
-                                exit;
+                                redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                             }
                         }
                 }
@@ -832,14 +701,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
     if ($isAjax) {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
+        json([
             'ok' => false,
             'error' => (string)($save_error ?: 'Save failed.'),
             'details' => $save_error_details,
-        ]);
-        exit;
+        ], 400);
     }
 }
 /* LOAD REQUESTED FILE CONTENT */
@@ -851,8 +717,7 @@ $is_secret_req   = $requested ? is_secret_file($requested) : false;
 if ($requested) {
     if ($is_secret_req && !is_secret_authenticated()) {
         // eerst via index.php wachtwoord laten invoeren
-        header('Location: index.php?file='.rawurlencode($requested));
-        exit;
+        redirect('index.php?file=' . rawurlencode($requested));
     }
 
 	$full = mdw_safe_full_path($requested, true);
@@ -2033,7 +1898,16 @@ window.mermaid = mermaid;
 	window.MDW_META_PUBLISHER_CONFIG = <?= json_encode($META_PUBLISHER_CFG, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 	</script>
 
-<script defer src="<?=h($STATIC_DIR)?>/base.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.dom.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.api.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.ui.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.auth.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.settings.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.editor.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.explorer.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.modals.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.layout.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.core.js"></script>
 <?php if ($github_pages_plugin_loaded): ?>
 <script defer src="<?=h($STATIC_DIR)?>/github_pages_export.js"></script>
 <?php endif; ?>

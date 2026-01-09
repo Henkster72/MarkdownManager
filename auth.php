@@ -1,56 +1,43 @@
 <?php
 
-require_once __DIR__ . '/env_loader.php';
+require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
-    exit;
+    json(['ok' => false, 'error' => 'method_not_allowed'], 405);
 }
 
 $raw = file_get_contents('php://input');
 $data = json_decode((string)$raw, true);
 if (!is_array($data)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'invalid_json']);
-    exit;
+    json(['ok' => false, 'error' => 'invalid_json'], 400);
 }
 
 $action = isset($data['action']) ? (string)$data['action'] : '';
 $auth = mdw_auth_config();
 
 if ($action === 'status') {
-    echo json_encode([
+    json([
         'ok' => true,
         'has_user' => $auth['user_hash'] !== '',
         'has_superuser' => $auth['superuser_hash'] !== '',
     ]);
-    exit;
 }
 
 if ($action === 'setup') {
     if ($auth['user_hash'] !== '' || $auth['superuser_hash'] !== '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'already_set']);
-        exit;
+        json(['ok' => false, 'error' => 'already_set'], 400);
     }
     $userPw = isset($data['user_password']) ? trim((string)$data['user_password']) : '';
     $superPw = isset($data['superuser_password']) ? trim((string)$data['superuser_password']) : '';
     if ($userPw === '' || $superPw === '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'missing_password']);
-        exit;
+        json(['ok' => false, 'error' => 'missing_password'], 400);
     }
 
     $userHash = mdw_auth_hash_password($userPw);
     $superHash = mdw_auth_hash_password($superPw);
     if ($userHash === '' || $superHash === '') {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'hash_failed']);
-        exit;
+        json(['ok' => false, 'error' => 'hash_failed'], 500);
     }
     $cfg = mdw_metadata_load_config();
     $cfg['_auth'] = [
@@ -60,19 +47,16 @@ if ($action === 'setup') {
 
     [$ok, $msg] = mdw_metadata_save_config($cfg);
     if (!$ok) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'write_failed', 'message' => $msg]);
-        exit;
+        json(['ok' => false, 'error' => 'write_failed', 'message' => $msg], 500);
     }
 
-    echo json_encode([
+    json([
         'ok' => true,
         'role' => 'superuser',
         'token' => $superHash,
         'has_user' => $userHash !== '',
         'has_superuser' => $superHash !== '',
     ]);
-    exit;
 }
 
 if ($action === 'login') {
@@ -80,9 +64,7 @@ if ($action === 'login') {
     $password = isset($data['password']) ? (string)$data['password'] : '';
     $password = trim($password);
     if ($password === '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'missing_password']);
-        exit;
+        json(['ok' => false, 'error' => 'missing_password'], 400);
     }
     $matches = ['user' => false, 'superuser' => false];
     if ($role === '') {
@@ -93,31 +75,21 @@ if ($action === 'login') {
         if ($matchSuper) $role = 'superuser';
         else if ($matchUser) $role = 'user';
         else {
-            http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'invalid_password']);
-            exit;
+            json(['ok' => false, 'error' => 'invalid_password'], 403);
         }
     } else {
         if ($role !== 'user' && $role !== 'superuser') {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'invalid_role']);
-            exit;
+            json(['ok' => false, 'error' => 'invalid_role'], 400);
         }
         if ($role === 'user' && $auth['user_hash'] === '') {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'user_not_set']);
-            exit;
+            json(['ok' => false, 'error' => 'user_not_set'], 400);
         }
         if ($role === 'superuser' && $auth['superuser_hash'] === '') {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'superuser_not_set']);
-            exit;
+            json(['ok' => false, 'error' => 'superuser_not_set'], 400);
         }
         $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
         if (!mdw_auth_verify_password($password, $stored)) {
-            http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'invalid_password']);
-            exit;
+            json(['ok' => false, 'error' => 'invalid_password'], 403);
         }
         $matches[$role] = true;
         $otherRole = $role === 'superuser' ? 'user' : 'superuser';
@@ -150,15 +122,13 @@ if ($action === 'login') {
 
     $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
 
-    echo json_encode([
+    json([
         'ok' => true,
         'role' => $role,
         'token' => $stored,
         'has_user' => $auth['user_hash'] !== '',
         'has_superuser' => $auth['superuser_hash'] !== '',
     ]);
-    exit;
 }
 
-http_response_code(400);
-echo json_encode(['ok' => false, 'error' => 'invalid_action']);
+json(['ok' => false, 'error' => 'invalid_action'], 400);

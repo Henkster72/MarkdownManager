@@ -162,6 +162,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
+- 0.6.2: JS refactor into `mdm.*` modules with shared helpers and core bootstrap.
 - 0.6: TOC sidebar option, wet export font links, safer auth hashes, and mobile pane focus fixes.
 - 0.5.1: Foldered export index, Mermaid in exports, optional repo footer, and Pages workflow polish.
 - 0.5: GitHub Pages export plugin + CLI wet HTML exporter, settings checks, UI upgrades.

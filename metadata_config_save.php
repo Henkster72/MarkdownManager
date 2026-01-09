@@ -1,37 +1,25 @@
 <?php
 
-session_start();
-
-require_once __DIR__ . '/env_loader.php';
+require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'error' => 'method_not_allowed']);
-    exit;
+    json(['ok' => false, 'error' => 'method_not_allowed'], 405);
 }
 
 $raw = file_get_contents('php://input');
 $data = json_decode((string)$raw, true);
 if (!is_array($data)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'invalid_json']);
-    exit;
+    json(['ok' => false, 'error' => 'invalid_json'], 400);
 }
 
 if (empty($_SESSION['csrf_token'])) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'no_session']);
-    exit;
+    json(['ok' => false, 'error' => 'no_session'], 403);
 }
 
 $csrf = isset($data['csrf']) ? (string)$data['csrf'] : '';
 if (!hash_equals((string)$_SESSION['csrf_token'], $csrf)) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'csrf']);
-    exit;
+    json(['ok' => false, 'error' => 'csrf'], 403);
 }
 
 $cfg = isset($data['config']) ? $data['config'] : null; // base fields map or config object
@@ -42,9 +30,7 @@ $authIn = isset($data['auth']) ? $data['auth'] : null;
 if (!is_array($cfg)) $cfg = [];
 if (!is_array($publisherCfgIn)) $publisherCfgIn = [];
 if ($cfg === [] && !is_array($settingsIn)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'invalid_config']);
-    exit;
+    json(['ok' => false, 'error' => 'invalid_config'], 400);
 }
 
 $cfgFields = (isset($cfg['fields']) && is_array($cfg['fields'])) ? $cfg['fields'] : $cfg;
@@ -61,9 +47,7 @@ $authRequired = function_exists('mdw_auth_has_role')
     ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
     : false;
 if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
-    http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'auth_required']);
-    exit;
+    json(['ok' => false, 'error' => 'auth_required'], 403);
 }
 
 function mdw_wpm_sanitize_folder_name($folder) {
@@ -299,9 +283,7 @@ if (is_array($settingsIn)) {
     }
 
     if ($publisherMode && $defaultAuthor === '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'publisher_author_required']);
-        exit;
+        json(['ok' => false, 'error' => 'publisher_author_required'], 400);
     }
 
     $wpmMigration = null;
@@ -333,9 +315,7 @@ if (is_array($settingsIn)) {
 
 [$ok, $msg] = mdw_metadata_save_config($out);
 if (!$ok) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'write_failed', 'message' => $msg]);
-    exit;
+    json(['ok' => false, 'error' => 'write_failed', 'message' => $msg], 500);
 }
 
 // Publisher config (separate file)
@@ -363,16 +343,14 @@ if (is_array($publisherHtmlMapIn)) {
 }
 [$ok2, $msg2] = mdw_metadata_save_publisher_config($outPub);
 if (!$ok2) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'write_failed', 'message' => $msg2]);
-    exit;
+    json(['ok' => false, 'error' => 'write_failed', 'message' => $msg2], 500);
 }
 
 $cfgOut = mdw_metadata_normalize_config($out);
 if (is_array($cfgOut) && array_key_exists('_auth', $cfgOut)) {
     unset($cfgOut['_auth']);
 }
-echo json_encode([
+json([
     'ok' => true,
     'config' => $cfgOut,
     'publisher_config' => mdw_metadata_normalize_publisher_config($outPub),

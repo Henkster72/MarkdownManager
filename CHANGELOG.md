@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- JS: refactored `static/base.js` into DRY `static/mdm.*.js` modules with shared helpers and a core bootstrap.
+
 ## 0.6.1
 
 - README: GitHub Pages section shortened and now points to tutorials; version list refreshed.

@@ -1,8 +1,6 @@
 <?php
 
-session_start();
-
-require_once __DIR__ . '/env_loader.php';
+require __DIR__ . '/_bootstrap.php';
 
 function image_manager_sanitize_dir_name($name, $fallback) {
     $name = is_string($name) ? trim($name) : '';
@@ -29,10 +27,7 @@ function image_manager_sanitize_dir_name($name, $fallback) {
 }
 
 function image_manager_json($payload, $status = 200) {
-    http_response_code((int)$status);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    exit;
+    json($payload, (int)$status);
 }
 
 function image_manager_error($code, $status = 400, $extra = []) {
