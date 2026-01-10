@@ -224,6 +224,7 @@
     "metadata": {
       "title": "Metadados",
       "hint": "Controle se os metadados são mostrados no editor Markdown e/ou na pré-visualização HTML. Se estiver oculto no Markdown, também fica oculto na pré-visualização HTML.",
+      "author_label": "Autor:",
       "field": "Campo",
       "show_markdown": "Markdown",
       "show_html": "HTML",

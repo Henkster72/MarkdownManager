@@ -233,6 +233,7 @@
     "metadata": {
       "title": "Metadata",
       "hint": "Control whether metadata is shown in the Markdown editor and/or HTML preview. If hidden in Markdown, it is also hidden in HTML preview.",
+      "author_label": "Author:",
       "field": "Field",
       "show_markdown": "Markdown",
       "show_html": "HTML",

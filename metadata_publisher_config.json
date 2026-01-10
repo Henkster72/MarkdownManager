@@ -5,8 +5,8 @@
   "fields": {
     "author": {
       "label": "Author",
-      "markdown_visible": true,
-      "html_visible": false
+      "markdown_visible": false,
+      "html_visible": true
     },
     "creationdate": {
       "label": "Created",

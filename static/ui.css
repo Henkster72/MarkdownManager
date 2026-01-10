@@ -63,6 +63,9 @@ body.app-body {
   --line-number: #64748b;
   --hover-bg: rgba(148, 163, 184, 0.10);
   --active-bg: rgba(148, 163, 184, 0.14);
+  --editor-bracket-paren: #f59e0b;
+  --editor-bracket-brace: #22c55e;
+  --editor-bracket-bracket: #38bdf8;
 }
 
 .theme-light body.app-body {
@@ -87,6 +90,9 @@ body.app-body {
   --line-number: #94a3b8;
   --hover-bg: rgba(15, 23, 42, 0.06);
   --active-bg: rgba(15, 23, 42, 0.09);
+  --editor-bracket-paren: #b45309;
+  --editor-bracket-brace: #15803d;
+  --editor-bracket-bracket: #1d4ed8;
 }
 
 /* links */

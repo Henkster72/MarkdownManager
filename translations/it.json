@@ -232,6 +232,7 @@
     "metadata": {
       "title": "Metadati",
       "hint": "Controlla se i metadati sono mostrati nell'editor Markdown e/o nell'anteprima HTML. Se nascosti in Markdown, sono nascosti anche nell'anteprima HTML.",
+      "author_label": "Autore:",
       "field": "Campo",
       "show_markdown": "Markdown",
       "show_html": "HTML",

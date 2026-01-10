@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.3
+
+- Editor: caret-adjacent bracket matching for `()`, `[]`, and `{}` with color-coded background highlights.
+- Editor: overlay alignment now respects wrap mode and inherits custom editor font/size styling.
+- Links: dragging a note from the explorer into the editor inserts an internal link using the link modal format.
+- Links: internal link builder now targets `index.php?file=...` with a depth-aware relative prefix.
+- WPM metadata: `author` can be hidden in Markdown while still visible in HTML preview (defaults updated).
+- WPM metadata: author label is localized in HTML preview and falls back to the WPM default author when missing.
+
 ## 0.6.2
 
 - JS: refactored `static/base.js` into DRY `static/mdm.*.js` modules with shared helpers and a core bootstrap.

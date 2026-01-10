@@ -7,11 +7,9 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.6.3: editor bracket-pair highlight, HTML-only author metadata in WPM, and drag/drop internal link insertion.
 - v0.6: TOC sidebar option, wet export font links, safer auth hashes, and mobile pane focus fixes.
 - v0.5.1: richer static exports (foldered index, Mermaid support, repo footer) and a smoother Pages workflow.
-- v0.5: GitHub Pages export plugin plus a CLI wet HTML exporter.
-- v0.4.3: formatting shortcuts, theme override badges, and export class discipline.
-- v0.4.2: Spanish/Italian UI and refreshed tutorials.
 
 ## Why check this out
 

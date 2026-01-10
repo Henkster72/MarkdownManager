@@ -224,6 +224,7 @@
     "metadata": {
       "title": "Metadaten",
       "hint": "Steuern, ob Metadaten im Markdown-Editor und/oder der HTML-Vorschau angezeigt werden. Wenn in Markdown verborgen, ist es auch in der HTML-Vorschau verborgen.",
+      "author_label": "Autor:",
       "field": "Feld",
       "show_markdown": "Markdown",
       "show_html": "HTML",

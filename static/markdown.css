@@ -27,6 +27,60 @@
     background-color: var(--surface-code);
     outline: none;
     overflow: auto;
+    position: relative;
+    z-index: 1;
+}
+
+.editor-textarea-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+}
+
+.editor-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: transparent;
+    z-index: 2;
+}
+
+.editor-overlay-content {
+    padding: 0.4rem 0.6rem 0.4rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.35;
+    tab-size: 2;
+    white-space: pre;
+    color: transparent;
+    box-sizing: border-box;
+}
+
+.mdw-wrap-on .editor-overlay-content {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.editor-bracket-match {
+    font-weight: inherit;
+    color: transparent;
+    border-radius: 0.12rem;
+    padding: 0;
+}
+
+.editor-bracket-paren {
+    background-color: color-mix(in srgb, var(--editor-bracket-paren, #f59e0b) 28%, transparent);
+}
+
+.editor-bracket-brace {
+    background-color: color-mix(in srgb, var(--editor-bracket-brace, #22c55e) 28%, transparent);
+}
+
+.editor-bracket-bracket {
+    background-color: color-mix(in srgb, var(--editor-bracket-bracket, #38bdf8) 28%, transparent);
 }
 
 .editor-textarea:focus {

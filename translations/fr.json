@@ -224,6 +224,7 @@
     "metadata": {
       "title": "Métadonnées",
       "hint": "Contrôlez si les métadonnées sont affichées dans l'éditeur Markdown et/ou l'aperçu HTML. Si elles sont masquées dans Markdown, elles sont aussi masquées dans l'aperçu HTML.",
+      "author_label": "Auteur:",
       "field": "Champ",
       "show_markdown": "Markdown",
       "show_html": "HTML",

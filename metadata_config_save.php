@@ -204,7 +204,7 @@ foreach ($cfgFields as $k => $in) {
     if ($label === '') $label = $k;
     $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
     $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
-    if (!$mdVis) $htmlVis = false;
+    if (!$mdVis && $k !== 'author') $htmlVis = false;
     $fields[$k] = [
         'label' => $label,
         'markdown_visible' => $mdVis,
@@ -329,7 +329,7 @@ foreach ($publisherFieldsIn as $k => $in) {
     if ($label === '') $label = $k;
     $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
     $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
-    if (!$mdVis) $htmlVis = false;
+    if (!$mdVis && $k !== 'author') $htmlVis = false;
     $pubFields[$k] = [
         'label' => $label,
         'markdown_visible' => $mdVis,

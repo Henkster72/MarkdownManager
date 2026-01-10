@@ -224,6 +224,7 @@
     "metadata": {
       "title": "Metadata",
       "hint": "Bepaal of metadata zichtbaar is in de Markdown editor en/of HTML-voorbeeld. Als het verborgen is in Markdown, is het ook verborgen in HTML-voorbeeld.",
+      "author_label": "Auteur:",
       "field": "Veld",
       "show_markdown": "Markdown",
       "show_html": "HTML",

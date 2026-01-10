@@ -391,7 +391,9 @@
     };
 
     let fileDragSrc = '';
+    let fileDragTitle = '';
     let fileDragRow = null;
+    let fileDragCanMove = false;
 
     document.addEventListener('dragstart', (e) => {
         const link = e.target instanceof Element ? e.target.closest('.note-link') : null;
@@ -399,23 +401,24 @@
         if (!(row instanceof HTMLElement)) return;
         const file = getFilePathFromRow(row);
         if (!file) return;
-        if (!canManageFolders()) {
-            e.preventDefault();
-            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
-            return;
-        }
+        const canMove = canManageFolders();
         fileDragSrc = file;
+        fileDragTitle = String(row.dataset.title || '').trim();
         fileDragRow = row;
+        fileDragCanMove = canMove;
         row.classList.add('note-dragging');
         try {
+            const linkHint = `edit.php?file=${encodeURIComponent(file)}`;
             e.dataTransfer?.setData('text/plain', file);
             e.dataTransfer?.setData('text/mdw-file', file);
-            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer?.setData('text/uri-list', linkHint);
+            if (fileDragTitle) e.dataTransfer?.setData('text/mdw-title', fileDragTitle);
+            e.dataTransfer.effectAllowed = canMove ? 'copyMove' : 'copy';
         } catch {}
     });
 
     document.addEventListener('dragover', (e) => {
-        if (!fileDragSrc) return;
+        if (!fileDragSrc || !fileDragCanMove) return;
         const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
         const header = section?.querySelector('.note-group-title');
         if (!(header instanceof HTMLElement)) return;
@@ -429,7 +432,7 @@
     });
 
     document.addEventListener('drop', (e) => {
-        if (!fileDragSrc) return;
+        if (!fileDragSrc || !fileDragCanMove) return;
         const section = e.target instanceof Element ? e.target.closest('.nav-section[data-folder-section]') : null;
         const header = section?.querySelector('.note-group-title');
         const targetPath = header instanceof HTMLElement ? String(header.dataset.folderPath || '').trim() : '';
@@ -438,7 +441,9 @@
         fileDragRow?.classList.remove('note-dragging');
         if (targetPath) moveFile(fileDragSrc, targetPath);
         fileDragSrc = '';
+        fileDragTitle = '';
         fileDragRow = null;
+        fileDragCanMove = false;
     });
 
     document.addEventListener('dragend', () => {
@@ -446,6 +451,8 @@
         fileDragRow?.classList.remove('note-dragging');
         fileDragRow = null;
         fileDragSrc = '';
+        fileDragTitle = '';
+        fileDragCanMove = false;
     });
 
     let fileTouchDrag = null;

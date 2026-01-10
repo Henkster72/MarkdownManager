@@ -242,6 +242,12 @@
 
     window.__mdwMaybeShowWpmSetup = maybeShow;
     window.__mdwGetWpmAuthor = getAuthor;
+    window.__mdwSetWpmAuthor = (value) => {
+        const next = setAuthor(value);
+        if (authorInput instanceof HTMLInputElement) authorInput.value = next;
+        applyAuthorToForms(next);
+        return next;
+    };
 
     switchBtn?.addEventListener('click', () => {
         try {
@@ -714,7 +720,7 @@
             const props = [];
             if (eFont) props.push(`font-family: ${eFont};`);
             if (eSize) props.push(`font-size: ${eSize};`);
-            add(`.editor-textarea { ${props.join(' ')} }`);
+            add(`.editor-textarea, .editor-overlay-content { ${props.join(' ')} }`);
         }
 
         if (eAccent) {
@@ -1875,6 +1881,8 @@
                 : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
         };
 
+        const allowHtmlWithoutMarkdown = (key) => key === 'author';
+
         const syncMetaUiRules = (inputs) => {
             const byKey = new Map();
             inputs.forEach((input) => {
@@ -1890,8 +1898,12 @@
                 const html = row.html;
                 if (!(md instanceof HTMLInputElement) || !(html instanceof HTMLInputElement)) return;
                 if (!md.checked) {
-                    html.checked = false;
-                    html.disabled = true;
+                    if (!allowHtmlWithoutMarkdown(String(md.dataset.metaKey || '').trim())) {
+                        html.checked = false;
+                        html.disabled = true;
+                    } else {
+                        html.disabled = false;
+                    }
                 } else {
                     html.disabled = false;
                 }
@@ -1908,8 +1920,8 @@
                 if (field === 'markdown') cfg[key].markdown_visible = input.checked;
                 if (field === 'html') cfg[key].html_visible = input.checked;
             });
-            Object.entries(cfg).forEach(([_, v]) => {
-                if (!v.markdown_visible) v.html_visible = false;
+            Object.entries(cfg).forEach(([key, v]) => {
+                if (!v.markdown_visible && !allowHtmlWithoutMarkdown(key)) v.html_visible = false;
             });
             return cfg;
         };
@@ -1957,6 +1969,11 @@
             }
         });
         publisherAuthorInput?.addEventListener('input', () => setMetaStatus('', 'info'));
+        publisherAuthorInput?.addEventListener('change', () => {
+            if (typeof window.__mdwSetWpmAuthor === 'function') {
+                window.__mdwSetWpmAuthor(String(publisherAuthorInput.value || '').trim());
+            }
+        });
         syncPublisherUi();
 
         if (baseMetaInputs.length) {
@@ -1985,7 +2002,7 @@
                 if (!key || out[key]) return;
                 const f = (fields && typeof fields === 'object') ? fields[key] : null;
                 const mdVis = f ? !!f.markdown_visible : true;
-                const htmlVis = f ? (!!f.html_visible && mdVis) : false;
+                const htmlVis = f ? (!!f.html_visible && (mdVis || allowHtmlWithoutMarkdown(key))) : false;
                 out[key] = { markdown_visible: mdVis, html_visible: htmlVis };
             });
             return out;
@@ -2157,6 +2174,9 @@
                 }
                 window.MDW_META_CONFIG = data.config;
                 if (data.publisher_config) window.MDW_META_PUBLISHER_CONFIG = data.publisher_config;
+                if (publisherSettings.publisher_default_author && typeof window.__mdwSetWpmAuthor === 'function') {
+                    window.__mdwSetWpmAuthor(publisherSettings.publisher_default_author);
+                }
                 setMetaStatus(t('theme.metadata.saved', 'Saved'), 'ok');
                 if (data && data.wpm_migration) {
                     showWpmMigrationNotice(data.wpm_migration);

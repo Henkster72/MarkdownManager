@@ -1805,14 +1805,15 @@ window.mermaid = mermaid;
 				                        <?php
 				                            $label = (string)($f['label'] ?? $k);
 				                            $mdVis = !empty($f['markdown_visible']);
-				                            $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                            $allowHtmlNoMd = ($k === 'author');
+				                            $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
 				                        ?>
 				                        <div><?=h($label)?></div>
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="markdown" <?= $mdVis ? 'checked' : '' ?>>
 				                        </label>
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
-				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= ($mdVis || $allowHtmlNoMd) ? '' : 'disabled' ?>>
 				                        </label>
 				                    <?php endforeach; ?>
 				                </div>
@@ -1826,14 +1827,15 @@ window.mermaid = mermaid;
 				                            <?php
 				                                $label = (string)($f['label'] ?? $k);
 				                                $mdVis = !empty($f['markdown_visible']);
-				                                $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                                $allowHtmlNoMd = ($k === 'author');
+				                                $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
 				                            ?>
 				                            <div><?=h($label)?></div>
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="markdown" <?= $mdVis ? 'checked' : '' ?>>
 				                            </label>
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
-				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= ($mdVis || $allowHtmlNoMd) ? '' : 'disabled' ?>>
 				                            </label>
 				                        <?php endforeach; ?>
 				                    </div>

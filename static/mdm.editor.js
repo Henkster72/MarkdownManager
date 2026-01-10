@@ -511,12 +511,319 @@
 
     if (!ta || !ln || !prev) return;
 
+    const overlayState = {
+        wrap: null,
+        overlay: null,
+        content: null,
+        lastKey: null,
+        lastText: null,
+    };
+
+    const initEditorOverlay = () => {
+        if (overlayState.overlay || !ta.parentNode) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'editor-textarea-wrap';
+        ta.parentNode.insertBefore(wrap, ta);
+        wrap.appendChild(ta);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'editor-overlay';
+        overlay.setAttribute('aria-hidden', 'true');
+        const content = document.createElement('div');
+        content.className = 'editor-overlay-content';
+        overlay.appendChild(content);
+        wrap.insertBefore(overlay, ta);
+
+        overlayState.wrap = wrap;
+        overlayState.overlay = overlay;
+        overlayState.content = content;
+    };
+
+    initEditorOverlay();
+
     const escapeHtml = (value) => String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+
+    const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    const dirname = (p) => {
+        const clean = normalizePath(p);
+        const idx = clean.lastIndexOf('/');
+        return idx === -1 ? '' : clean.slice(0, idx);
+    };
+    const relativePath = (fromFile, toFile) => {
+        const fromDir = dirname(fromFile);
+        const fromParts = fromDir ? fromDir.split('/').filter(Boolean) : [];
+        const to = normalizePath(toFile);
+        const toParts = to.split('/').filter(Boolean);
+        if (toParts.length === 0) return '';
+        const toDirParts = toParts.slice(0, -1);
+        const toName = toParts[toParts.length - 1];
+
+        let i = 0;
+        while (i < fromParts.length && i < toDirParts.length && fromParts[i] === toDirParts[i]) i++;
+        const up = fromParts.length - i;
+        const down = toDirParts.slice(i);
+        const out = [];
+        for (let k = 0; k < up; k++) out.push('..');
+        out.push(...down);
+        out.push(toName);
+        return out.join('/');
+    };
+    const buildInternalHref = (fromFile, path) => {
+        const clean = normalizePath(path);
+        if (!clean) return '';
+        const fromDir = dirname(fromFile);
+        const depth = fromDir ? fromDir.split('/').filter(Boolean).length : 0;
+        const prefix = depth > 0 ? '../'.repeat(depth) : '';
+        return `${prefix}index.php?file=${encodeURIComponent(clean)}`;
+    };
+
+    const insertAtSelection = (text) => {
+        const start = ta.selectionStart ?? 0;
+        const end = ta.selectionEnd ?? 0;
+        const before = ta.value.slice(0, start);
+        const after = ta.value.slice(end);
+        ta.value = before + text + after;
+        const pos = start + text.length;
+        ta.setSelectionRange(pos, pos);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+    };
+
+    const findNoteRowByPath = (path) => {
+        const clean = normalizePath(path);
+        if (!clean) return null;
+        const items = Array.from(document.querySelectorAll('.note-item[data-kind="md"]'));
+        let baseMatch = null;
+        const base = clean.split('/').pop() || '';
+        for (const item of items) {
+            if (!(item instanceof HTMLElement)) continue;
+            const itemPath = normalizePath(item.dataset.file || '');
+            if (!itemPath) continue;
+            if (itemPath === clean) return item;
+            if (base && (itemPath.split('/').pop() || '') === base) {
+                if (baseMatch) return null;
+                baseMatch = item;
+            }
+        }
+        return baseMatch;
+    };
+
+    const extractFileFromUrl = (raw) => {
+        if (!raw) return '';
+        try {
+            const url = new URL(raw, window.location.href);
+            const fileParam = url.searchParams.get('file');
+            if (!fileParam) return '';
+            return decodeURIComponent(fileParam);
+        } catch {
+            return '';
+        }
+    };
+
+    const extractFileFromText = (raw) => {
+        const trimmed = String(raw || '').trim();
+        if (!trimmed) return '';
+        const fromUrl = extractFileFromUrl(trimmed);
+        if (fromUrl) return fromUrl;
+        const first = trimmed.split(/\s+/)[0] || '';
+        const clean = first.replace(/[?#].*$/, '');
+        if (/\.md$/i.test(clean)) return clean;
+        const match = trimmed.match(/([A-Za-z0-9._\\/-]+\\.md)\\b/i);
+        return match ? match[1] : '';
+    };
+
+    const getDropNoteInfo = (dt) => {
+        if (!dt) return null;
+        let file = String(dt.getData('text/mdw-file') || '').trim();
+        let title = String(dt.getData('text/mdw-title') || '').trim();
+        if (!file) {
+            const uri = String(dt.getData('text/uri-list') || '').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#')) || '';
+            const plain = String(dt.getData('text/plain') || '').trim();
+            file = extractFileFromUrl(uri) || extractFileFromText(plain);
+        }
+        if (!file) return null;
+        const row = findNoteRowByPath(file);
+        if (row) {
+            file = String(row.dataset.file || '').trim() || file;
+            if (!title) title = String(row.dataset.title || '').trim();
+        }
+        file = normalizePath(file);
+        if (!file) return null;
+        return { file, title };
+    };
+
+    const BRACKET_PAIRS = {
+        '(': ')',
+        '[': ']',
+        '{': '}',
+    };
+    const BRACKET_CLOSE = {
+        ')': '(',
+        ']': '[',
+        '}': '{',
+    };
+    const BRACKET_CLASS = {
+        '(': 'editor-bracket-paren',
+        ')': 'editor-bracket-paren',
+        '[': 'editor-bracket-bracket',
+        ']': 'editor-bracket-bracket',
+        '{': 'editor-bracket-brace',
+        '}': 'editor-bracket-brace',
+    };
+
+    const isBracket = (ch) => BRACKET_PAIRS[ch] || BRACKET_CLOSE[ch];
+
+    const findBracketMatch = (text, idx) => {
+        const ch = text[idx];
+        if (BRACKET_PAIRS[ch]) {
+            const close = BRACKET_PAIRS[ch];
+            let depth = 0;
+            for (let i = idx + 1; i < text.length; i++) {
+                const cur = text[i];
+                if (cur === ch) {
+                    depth++;
+                } else if (cur === close) {
+                    if (depth === 0) return { open: idx, close: i, type: ch };
+                    depth--;
+                }
+            }
+            return null;
+        }
+        if (BRACKET_CLOSE[ch]) {
+            const open = BRACKET_CLOSE[ch];
+            let depth = 0;
+            for (let i = idx - 1; i >= 0; i--) {
+                const cur = text[i];
+                if (cur === ch) {
+                    depth++;
+                } else if (cur === open) {
+                    if (depth === 0) return { open: i, close: idx, type: open };
+                    depth--;
+                }
+            }
+        }
+        return null;
+    };
+
+    const syncOverlayScroll = () => {
+        if (!overlayState.content) return;
+        const x = ta.scrollLeft || 0;
+        const y = ta.scrollTop || 0;
+        overlayState.content.style.transform = `translate(${-x}px, ${-y}px)`;
+    };
+
+    let overlayStyleKey = '';
+    const syncOverlayMetrics = () => {
+        if (!overlayState.content) return;
+        const cs = getComputedStyle(ta);
+        const w = ta.clientWidth || 0;
+        const h = ta.scrollHeight || 0;
+        const key = [
+            cs.fontFamily,
+            cs.fontSize,
+            cs.fontWeight,
+            cs.fontStyle,
+            cs.lineHeight,
+            cs.letterSpacing,
+            cs.paddingTop,
+            cs.paddingRight,
+            cs.paddingBottom,
+            cs.paddingLeft,
+            cs.whiteSpace,
+            cs.tabSize,
+            cs.wordBreak,
+            cs.overflowWrap,
+            w,
+            h,
+        ].join('|');
+        if (key === overlayStyleKey) return;
+        overlayStyleKey = key;
+        const st = overlayState.content.style;
+        st.fontFamily = cs.fontFamily;
+        st.fontSize = cs.fontSize;
+        st.fontWeight = cs.fontWeight;
+        st.fontStyle = cs.fontStyle;
+        st.lineHeight = cs.lineHeight;
+        st.letterSpacing = cs.letterSpacing;
+        st.paddingTop = cs.paddingTop;
+        st.paddingRight = cs.paddingRight;
+        st.paddingBottom = cs.paddingBottom;
+        st.paddingLeft = cs.paddingLeft;
+        st.whiteSpace = cs.whiteSpace;
+        st.tabSize = cs.tabSize;
+        st.wordBreak = cs.wordBreak;
+        st.overflowWrap = cs.overflowWrap;
+        if (w > 0) st.width = `${w}px`;
+        if (h > 0) st.minHeight = `${h}px`;
+    };
+
+    const clearOverlay = () => {
+        if (!overlayState.content) return;
+        if (overlayState.lastKey === null && overlayState.content.innerHTML === '') return;
+        overlayState.content.innerHTML = '';
+        overlayState.lastKey = null;
+        overlayState.lastText = null;
+    };
+
+    const renderOverlay = (text, openIdx, closeIdx, typeChar) => {
+        if (!overlayState.content) return;
+        const cls = BRACKET_CLASS[typeChar] || 'editor-bracket-paren';
+        const openChar = escapeHtml(text[openIdx] || '');
+        const closeChar = escapeHtml(text[closeIdx] || '');
+        const before = escapeHtml(text.slice(0, openIdx));
+        const between = escapeHtml(text.slice(openIdx + 1, closeIdx));
+        const after = escapeHtml(text.slice(closeIdx + 1));
+        const openSpan = `<span class="editor-bracket-match ${cls} editor-bracket-open">${openChar}</span>`;
+        const closeSpan = `<span class="editor-bracket-match ${cls} editor-bracket-close">${closeChar}</span>`;
+        overlayState.content.innerHTML = before + openSpan + between + closeSpan + after;
+    };
+
+    let overlayTicking = false;
+    const updateBracketOverlay = () => {
+        overlayTicking = false;
+        if (!overlayState.content) return;
+        syncOverlayMetrics();
+        const text = ta.value || '';
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? 0;
+        if (selStart !== selEnd) {
+            clearOverlay();
+            return;
+        }
+        let idx = -1;
+        if (selStart > 0 && isBracket(text[selStart - 1])) {
+            idx = selStart - 1;
+        } else if (selStart < text.length && isBracket(text[selStart])) {
+            idx = selStart;
+        }
+        if (idx < 0) {
+            clearOverlay();
+            return;
+        }
+        const match = findBracketMatch(text, idx);
+        if (!match) {
+            clearOverlay();
+            return;
+        }
+        const key = `${match.open}:${match.close}:${match.type}`;
+        if (overlayState.lastKey !== key || overlayState.lastText !== text) {
+            overlayState.lastKey = key;
+            overlayState.lastText = text;
+            renderOverlay(text, match.open, match.close, match.type);
+        }
+        syncOverlayScroll();
+    };
+
+    const scheduleBracketOverlay = () => {
+        if (overlayTicking) return;
+        overlayTicking = true;
+        requestAnimationFrame(updateBracketOverlay);
+    };
 
     const showPreviewError = (message, details) => {
         const msg = message || t('js.preview_failed', 'Preview failed.');
@@ -1061,9 +1368,50 @@
         updateLineNumbers();
         recomputeDirty();
         schedulePreview();
+        scheduleBracketOverlay();
+    });
+    const canHandleDrop = (dt) => {
+        if (!dt) return false;
+        try {
+            const types = Array.from(dt.types || []);
+            if (types.includes('text/mdw-file')) return true;
+        } catch {}
+        try {
+            return !!getDropNoteInfo(dt);
+        } catch {
+            return false;
+        }
+    };
+    ta.addEventListener('dragover', (e) => {
+        if (!canHandleDrop(e.dataTransfer)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    ta.addEventListener('drop', (e) => {
+        const info = getDropNoteInfo(e.dataTransfer);
+        if (!info) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const file = info.file;
+        const title = info.title;
+        const start = ta.selectionStart ?? 0;
+        const end = ta.selectionEnd ?? 0;
+        const selection = start !== end ? ta.value.slice(start, end) : '';
+        const base = file.split('/').pop() || file;
+        const fallback = base.replace(/\.md$/i, '');
+        const text = selection || title || fallback || file;
+        const href = buildInternalHref(window.CURRENT_FILE || '', file) || file;
+        insertAtSelection(`[${text}](${href}) {: class="link"}`);
     });
     ta.addEventListener('scroll', function(){
         ln.scrollTop = ta.scrollTop;
+        syncOverlayScroll();
+    });
+    ta.addEventListener('keyup', scheduleBracketOverlay);
+    ta.addEventListener('mouseup', scheduleBracketOverlay);
+    ta.addEventListener('focus', scheduleBracketOverlay);
+    document.addEventListener('selectionchange', () => {
+        if (document.activeElement === ta) scheduleBracketOverlay();
     });
 
     // Recompute wraps when panes are resized (affects visual line wrapping).
@@ -1075,6 +1423,8 @@
             resizeTicking = false;
             updateLineNumbers();
             ln.scrollTop = ta.scrollTop;
+            syncOverlayMetrics();
+            syncOverlayScroll();
         });
     };
     try {
@@ -1094,12 +1444,14 @@
             updateLineNumbers();
             recomputeDirty();
             schedulePreview();
+            scheduleBracketOverlay();
         });
     }
 
     updateLineNumbers();
     window.initialContent = normalizeNewlines(window.initialContent || '');
     recomputeDirty();
+    scheduleBracketOverlay();
 })();
 
 // Editor: Markdown keyboard shortcuts (edit.php)

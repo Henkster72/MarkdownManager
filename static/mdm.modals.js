@@ -47,24 +47,13 @@
         return idx === -1 ? '' : p.slice(0, idx);
     };
 
-    const relativePath = (fromFile, toFile) => {
+    const buildInternalHref = (fromFile, path) => {
+        const clean = normalizePath(path);
+        if (!clean) return '';
         const fromDir = dirname(fromFile);
-        const fromParts = fromDir ? fromDir.split('/').filter(Boolean) : [];
-        const to = normalizePath(toFile);
-        const toParts = to.split('/').filter(Boolean);
-        if (toParts.length === 0) return '';
-        const toDirParts = toParts.slice(0, -1);
-        const toName = toParts[toParts.length - 1];
-
-        let i = 0;
-        while (i < fromParts.length && i < toDirParts.length && fromParts[i] === toDirParts[i]) i++;
-        const up = fromParts.length - i;
-        const down = toDirParts.slice(i);
-        const out = [];
-        for (let k = 0; k < up; k++) out.push('..');
-        out.push(...down);
-        out.push(toName);
-        return out.join('/');
+        const depth = fromDir ? fromDir.split('/').filter(Boolean).length : 0;
+        const prefix = depth > 0 ? '../'.repeat(depth) : '';
+        return `${prefix}index.php?file=${encodeURIComponent(clean)}`;
     };
 
     let mode = 'internal';
@@ -445,7 +434,7 @@
         if (!selectedPath) return;
         const selection = getEditorSelectionText();
         const text = selection || selectedTitle || selectedPath;
-        const href = relativePath(window.CURRENT_FILE || '', selectedPath);
+        const href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
         insertAtSelection(`[${text}](${href}) {: class="link"}`);
         close();
     };

@@ -1153,7 +1153,7 @@ function mdw_metadata_normalize_config($cfg) {
             : (string)($v['label'] ?? $k);
         $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
         $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
-        if (!$mdVis) $htmlVis = false;
+        if (!$mdVis && $k !== 'author') $htmlVis = false;
         $out['fields'][$k] = [
             'label' => $label,
             'markdown_visible' => $mdVis,
@@ -1178,7 +1178,7 @@ function mdw_metadata_default_publisher_config() {
     return [
         '_meta' => ['version' => 1],
         'fields' => [
-            'author' => ['label' => 'Author', 'markdown_visible' => true, 'html_visible' => false],
+            'author' => ['label' => 'Author', 'markdown_visible' => false, 'html_visible' => true],
             'creationdate' => ['label' => 'Created', 'markdown_visible' => true, 'html_visible' => false],
             'changedate' => ['label' => 'Updated', 'markdown_visible' => true, 'html_visible' => false],
             'published_date' => ['label' => 'Published date', 'markdown_visible' => true, 'html_visible' => false],
@@ -1215,7 +1215,7 @@ function mdw_metadata_normalize_publisher_config($cfg) {
             : (string)($v['label'] ?? $k);
         $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
         $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
-        if (!$mdVis) $htmlVis = false;
+        if (!$mdVis && $k !== 'author') $htmlVis = false;
         $out['fields'][$k] = [
             'label' => $label,
             'markdown_visible' => $mdVis,
@@ -1813,6 +1813,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $body = mdw_hidden_meta_extract_and_remove_all($text, $meta);
     $settings = mdw_metadata_settings();
     $publisherMode = !empty($settings['publisher_mode']);
+    if ($publisherMode) {
+        $publisherDefaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
+        if ($publisherDefaultAuthor !== '' && (!isset($meta['author']) || trim((string)$meta['author']) === '')) {
+            $meta['author'] = $publisherDefaultAuthor;
+        }
+    }
     $cfg = mdw_metadata_load_config();
     $pcfg = mdw_metadata_load_publisher_config();
     $tocMenu = isset($settings['toc_menu']) ? strtolower(trim((string)$settings['toc_menu'])) : 'inline';
@@ -1872,7 +1878,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $f = isset($metaFields['page_picture']) && is_array($metaFields['page_picture']) ? $metaFields['page_picture'] : null;
             $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
             $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
-            if (!$mdVis) $htmlVis = false;
+            if (!$mdVis && $k !== 'author') $htmlVis = false;
             if ($htmlVis) {
                 $titleText = isset($meta['page_title']) ? trim((string)$meta['page_title']) : '';
                 $src = mdw_page_picture_src($pictureValue);
@@ -1900,7 +1906,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
                 $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
                 $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
-                if (!$mdVis) $htmlVis = false;
+                if (!$mdVis && $k !== 'author') $htmlVis = false;
                 if (!$htmlVis) continue;
                 $prefix = isset($spec['prefix']) ? (string)$spec['prefix'] : '';
                 $postfix = isset($spec['postfix']) ? (string)$spec['postfix'] : '';
@@ -1933,9 +1939,18 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
         $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
         $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
-        if (!$mdVis) $htmlVis = false;
+        if (!$mdVis && $k !== 'author') $htmlVis = false;
         if (!$htmlVis) continue;
+        if ($k === 'author' && !$mdVis && $publisherMode) {
+            $defaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
+            if ($defaultAuthor !== '') {
+                $v = $defaultAuthor;
+            }
+        }
         $label = $f && isset($f['label']) ? (string)$f['label'] : $k;
+        if ($k === 'author' && function_exists('mdw_t')) {
+            $label = mdw_t('theme.metadata.author_label', $label);
+        }
         $isPostDate = ($k === 'post_date');
         $metaShown[] = [
             'k' => $k,
