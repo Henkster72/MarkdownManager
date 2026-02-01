@@ -1839,6 +1839,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $tocItems = $tocRequested ? mdw_toc_assign_ids(mdw_toc_collect_h3($text)) : [];
     $tocIndex = 0;
     $tocActive = false;
+    $tocInlineLayout = false;
 
     $lines = explode("\n",$text);
     $footnoteInfo = mdw_collect_footnote_refs($text);
@@ -2094,7 +2095,15 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if ($tocRequested && mdw_toc_is_token_line($line)) {
             $closeAllLists();
             if ($tocLayout === '') {
-                $html[] = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+                if (!$tocInlineLayout) {
+                    $tocHtml = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
+                    $html[] = '<div class="md-toc-layout md-toc-inline" data-mdw-toc-layout="inline">';
+                    $html[] = '<nav class="md-toc-side" aria-label="Table of contents">';
+                    $html[] = $tocHtml;
+                    $html[] = '</nav>';
+                    $html[] = '<div class="md-toc-body">';
+                    $tocInlineLayout = true;
+                }
             }
             $tocActive = true;
             continue;
@@ -2363,7 +2372,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $textRaw = trim((string)($fn['text'] ?? ''));
                 if ($textRaw === '') continue;
                 $textHtml = inline_md($textRaw, $mdPath, $profile, $context);
-                $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-label">['.$numEsc.']:</span> <span class="md-footnote-text">'.$textHtml.'</span></li>';
+                $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-text">'.$textHtml.'</span></li>';
                 continue;
             }
 
@@ -2376,13 +2385,18 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
             $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
             $linkEsc = htmlspecialchars($linkText, ENT_QUOTES, 'UTF-8');
-            $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-label">['.$numEsc.']:</span> <a class="externlink" href="'.
+            $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><a class="externlink" href="'.
                 $urlEsc.
                 '" target="_blank" rel="noopener noreferrer">'.$linkEsc.'</a></li>';
         }
         if (!empty($items)) {
             $html[] = '<ol class="md-footnotes">' . implode("\n", $items) . '</ol>';
         }
+    }
+
+    if ($tocInlineLayout) {
+        $html[] = '</div>';
+        $html[] = '</div>';
     }
 
     $output = implode("\n",$html);

@@ -183,15 +183,37 @@ if (is_array($META_CFG_CLIENT) && array_key_exists('_auth', $META_CFG_CLIENT)) {
     unset($META_CFG_CLIENT['_auth']);
 }
 
-function mdw_editor_title_from_raw($raw, $publisherMode = false) {
+function mdw_title_from_path($path) {
+    $path = trim((string)$path);
+    if ($path === '') return '';
+    $path = str_replace("\\", "/", $path);
+    $base = basename($path);
+    $base = preg_replace('/\.md$/i', '', $base);
+    $base = str_replace(['_', '-'], ' ', $base);
+    $base = preg_replace('/\s+/', ' ', $base);
+    return trim($base);
+}
+
+function mdw_clean_page_title_value($value) {
+    $value = trim((string)$value);
+    if ($value === '') return '';
+    if (preg_match('/^(.*?)\}\s*\{[A-Za-z][A-Za-z0-9_-]*\s*:/', $value, $m)) {
+        $value = $m[1];
+    }
+    return trim($value);
+}
+
+function mdw_editor_title_from_raw($raw, $publisherMode = false, $filePath = '') {
     $raw = (string)$raw;
     $fallback = extract_title($raw);
     if (!$publisherMode) return $fallback;
     if (!function_exists('mdw_hidden_meta_extract_and_remove_all')) return $fallback;
     $meta = [];
     mdw_hidden_meta_extract_and_remove_all($raw, $meta);
-    $pageTitle = trim((string)($meta['page_title'] ?? ''));
-    return $pageTitle !== '' ? $pageTitle : $fallback;
+    $pageTitle = mdw_clean_page_title_value($meta['page_title'] ?? '');
+    if ($pageTitle !== '') return $pageTitle;
+    $fileTitle = mdw_title_from_path($filePath);
+    return $fileTitle !== '' ? $fileTitle : $fallback;
 }
 
 /* DATE PARSE */
@@ -377,6 +399,7 @@ $folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
 
 $save_error = null;
 $save_error_details = null;
+$save_warning = [];
 $saved_flag = isset($_GET['saved']) ? true : false;
 $use_posted_content = false;
 $posted_content_for_render = '';
@@ -409,7 +432,7 @@ if (isset($_GET['json']) && $_GET['json'] === '1') {
 
         json([
             'file'    => $requested,
-            'title'   => mdw_editor_title_from_raw($raw_content, !empty($MDW_PUBLISHER_MODE)),
+            'title'   => mdw_editor_title_from_raw($raw_content, !empty($MDW_PUBLISHER_MODE), $requested),
             'content' => $raw_content,
             'html'    => md_to_html($raw_content, $requested),
             'is_secret' => (bool)$is_secret_req_json,
@@ -543,6 +566,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
                 $desiredPublishState = null;
                 $allowedPublishStates = ['Concept', 'Processing', 'Published'];
+                $canPublish = false;
+                $publishStateCandidate = null;
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $authRequired = function_exists('mdw_auth_has_role')
                         ? (mdw_auth_has_role('superuser') || mdw_auth_has_role('user'))
@@ -556,6 +581,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
                         if (in_array($candidate, $allowedPublishStates, true)) {
                             $desiredPublishState = $candidate;
+                            $publishStateCandidate = $candidate;
                         }
                     }
 
@@ -568,33 +594,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $finalPublishState = $desiredPublishState;
                 }
 
+                $isPublishAttempt = false;
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $isPublishAttempt = ($canPublish && $publishAction === 'publish')
+                        || ($publishStateCandidate !== null && $publishStateCandidate !== 'Concept');
+                }
+
                 $author = '';
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
-                    if ($authIsUser && $author === '') {
-                    $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
-                    } else if ($author === '') {
-                    $save_error = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
-                    } else {
-                        $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
-                        if ($pageTitle === '') {
-                        $save_error = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
-                        } else {
-                            $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
-                            if ($pagePicture === '') {
-                            $save_error = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
-                            }
-                        }
+                    $publisherWarnings = [];
+                    if ($author === '') {
+                        $publisherWarnings[] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
                     }
-                    if ($save_error === null) {
-                        $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
-                        if ($requireH2 && !mdw_md_has_h2($content)) {
-                    $save_error = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
-                        }
+                    $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
+                    if ($pageTitle === '') {
+                        $publisherWarnings[] = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
+                    }
+                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
+                    if ($pagePicture === '') {
+                        $publisherWarnings[] = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
+                    }
+                    $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
+                    if ($requireH2 && !mdw_md_has_h2($content)) {
+                        $publisherWarnings[] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
+                    }
+                    if ($isPublishAttempt && !empty($publisherWarnings)) {
+                        $save_error = $publisherWarnings[0];
+                    } else if (!empty($publisherWarnings)) {
+                        $save_warning = array_values(array_unique(array_merge($save_warning, $publisherWarnings)));
                     }
                 }
 
                 if ($save_error === null) {
+                    $save_ok_payload = ['ok' => true, 'publish_state' => $finalPublishState];
+                    if (!empty($save_warning)) {
+                        $save_ok_payload['warnings'] = array_values($save_warning);
+                    }
                     $metaOverrides = [];
                     $fieldCfg = function_exists('mdw_metadata_all_field_configs')
                         ? mdw_metadata_all_field_configs(!empty($MDW_PUBLISHER_MODE))
@@ -656,7 +692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 $err = error_get_last();
                                 if ($fileWritable && file_put_contents($full, $content, LOCK_EX) !== false) {
                                     if ($isAjax) {
-                                        json(['ok' => true, 'publish_state' => $finalPublishState]);
+                                        json($save_ok_payload);
                                     }
                                     redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                                 }
@@ -673,7 +709,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     if ($diag !== '') $save_error_details = $diag;
                                 } else {
                                     if ($isAjax) {
-                                        json(['ok' => true, 'publish_state' => $finalPublishState]);
+                                        json($save_ok_payload);
                                     }
                                     redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                                 }
@@ -687,7 +723,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 if ($diag !== '') $save_error_details = $diag;
                             } else {
                                 if ($isAjax) {
-                                    json(['ok' => true, 'publish_state' => $finalPublishState]);
+                                    json($save_ok_payload);
                                 }
                                 redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
                             }
@@ -724,12 +760,12 @@ if ($requested) {
 	if ($use_posted_content && $posted_content_for_render !== '') {
 	    $raw             = $posted_content_for_render;
 	    $current_content = (string)$raw;
-	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
+	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
 	    $current_html    = md_to_html($raw, $requested);
 	} else if ($full && is_file($full)) {
 	    $raw             = file_get_contents($full);
 	    $current_content = (string)$raw;
-	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE));
+	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
 	    $current_html    = md_to_html($raw, $requested);
 	} else {
 	    $save_error = 'Bestand niet gevonden.';
@@ -1073,6 +1109,28 @@ window.mermaid = mermaid;
                                     <span class="pi pi-floppydisk"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
                                 </button>
+                                <button type="button" id="formatBoldBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.bold','Bold'))?>">
+                                    <span class="format-letter">B</span>
+                                </button>
+                                <button type="button" id="formatItalicBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.italic','Italic'))?>">
+                                    <span class="format-letter format-italic">I</span>
+                                </button>
+                                <button type="button" id="formatUnderlineBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.underline','Underline'))?>">
+                                    <span class="format-letter format-underline">U</span>
+                                </button>
+                                <button type="button" id="addLinkBtn" class="btn btn-ghost">
+                                    <span class="pi pi-linkchain"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
+                                </button>
+                                <button type="button" id="addImageBtn" class="btn btn-ghost">
+                                    <span class="pi pi-image"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
+                                </button>
+                                <select id="alignSelect" class="input editor-toolbar-select editor-align-select" aria-label="<?=h(mdw_t('edit.toolbar.align','Align'))?>">
+                                    <option value="left">L</option>
+                                    <option value="center">C</option>
+                                    <option value="right">R</option>
+                                </select>
                                 <select id="headingSelect" class="input editor-toolbar-select editor-heading-select" aria-label="<?=h(mdw_t('edit.toolbar.heading','Heading'))?>">
                                     <option value="" class="md-h1 heading-select-option" selected>H1</option>
                                     <option value="1" class="md-h1 heading-select-option">H1</option>
@@ -1084,40 +1142,21 @@ window.mermaid = mermaid;
                                 </select>
                                 <select id="customCssSelect" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?>" hidden>
                                     <option value="" selected><?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?></option>
-                                </select>
-                                <button type="button" id="formatBoldBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.bold','Bold'))?>">
-                                    <span class="format-letter">B</span>
-                                </button>
-                                <button type="button" id="formatItalicBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.italic','Italic'))?>">
-                                    <span class="format-letter format-italic">I</span>
-                                </button>
-                                <button type="button" id="formatUnderlineBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.underline','Underline'))?>">
-                                    <span class="format-letter format-underline">U</span>
-                                </button>
-                                <select id="alignSelect" class="input editor-toolbar-select editor-align-select" aria-label="<?=h(mdw_t('edit.toolbar.align','Align'))?>">
-                                    <option value="left">L</option>
-                                    <option value="center">C</option>
-                                    <option value="right">R</option>
-                                </select>
-                                <button type="button" id="formatBlockquoteBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.blockquote','Blockquote'))?>">
+                                </select>                                <button type="button" id="formatBlockquoteBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.blockquote','Blockquote'))?>">
                                     <span class="pi pi-quote"></span>
                                 </button>
                                 <button type="button" id="formatOrderedListBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.ordered_list','Ordered list'))?>">
-                                    <span class="format-letter">1.</span>
+                                    <span class="format-letter format-ordered-list" aria-hidden="true">
+                                        <span>1.</span>
+                                        <span>2.</span>
+                                        <span>3.</span>
+                                    </span>
                                 </button>
                                 <button type="button" id="formatUnorderedListBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.unordered_list','Unordered list'))?>">
                                     <span class="pi pi-list"></span>
                                 </button>
                                 <button type="button" id="insertTableBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.table','Insert table'))?>">
                                     <span class="icon-table-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-                                </button>
-                                <button type="button" id="addLinkBtn" class="btn btn-ghost">
-                                    <span class="pi pi-linkchain"></span>
-                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.link','Link'))?></span>
-                                </button>
-                                <button type="button" id="addImageBtn" class="btn btn-ghost">
-                                    <span class="pi pi-image"></span>
-                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.image','Image'))?></span>
                                 </button>
                                 <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>

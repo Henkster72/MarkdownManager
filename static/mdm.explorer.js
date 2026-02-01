@@ -1276,6 +1276,15 @@
         if (user !== null) return user;
         return getFolderDefaultOpen(section);
     };
+    const findParentFolderSection = (section) => {
+        if (!(section instanceof HTMLElement)) return null;
+        let ancestor = section.parentElement;
+        while (ancestor) {
+            if (ancestor.hasAttribute('data-folder-section')) return ancestor;
+            ancestor = ancestor.parentElement;
+        }
+        return null;
+    };
     const setFolderOpen = (section, open) => {
         if (!(section instanceof HTMLElement)) return;
         const btn = section.querySelector('button.folder-toggle');
@@ -1475,9 +1484,13 @@
             if (el.style.display !== nextDisplay) el.style.display = nextDisplay;
             if (!match) continue;
             visible++;
-            if (section instanceof HTMLElement) {
-                visibleBySection.set(section, (visibleBySection.get(section) || 0) + 1);
+        if (section instanceof HTMLElement) {
+            let current = section;
+            while (current) {
+                visibleBySection.set(current, (visibleBySection.get(current) || 0) + 1);
+                current = findParentFolderSection(current);
             }
+        }
         }
 
         navCount.textContent = filtering

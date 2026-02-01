@@ -16,19 +16,51 @@
     if (!(editor instanceof HTMLTextAreaElement) || !(form instanceof HTMLFormElement)) return;
 
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    const getStatusHold = () => {
+        if (window.__mdwStatusHold && typeof window.__mdwStatusHold.isHeld === 'function') {
+            return window.__mdwStatusHold;
+        }
+        const state = { until: 0 };
+        const api = {
+            hold(ms) {
+                const next = Date.now() + Math.max(0, ms || 0);
+                if (next > state.until) state.until = next;
+                return state.until;
+            },
+            isHeld() {
+                return Date.now() < state.until;
+            },
+        };
+        window.__mdwStatusHold = api;
+        return api;
+    };
+    const statusHold = getStatusHold();
+    const warningHoldMs = 10000;
 
-    const parseMetaLine = (line) => {
+    const parseMetaEntries = (line) => {
         const normalized = String(line ?? '')
             .replace(/\u00a0/g, ' ')
             .replace(/[\u200B\uFEFF]/g, '');
-        let m = normalized.match(/^\s*\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*$/u);
-        if (!m) {
-            m = normalized.match(/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u);
+        const entries = [];
+        let rest = normalized;
+        while (true) {
+            const m = rest.match(/^\s*\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*([^}]*)\}+/u);
+            if (!m) break;
+            const key = String(m[1] || '').trim().toLowerCase();
+            if (key) {
+                entries.push({ key, value: String(m[2] || '').trim() });
+            }
+            rest = rest.slice(m[0].length);
         }
+        if (entries.length) {
+            if (rest.trim() !== '') return null;
+            return entries;
+        }
+        const m = normalized.match(/^\s*_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*$/u);
         if (!m) return null;
         const key = String(m[1] || '').trim().toLowerCase();
         if (!key) return null;
-        return { key, value: String(m[2] || '').trim() };
+        return [{ key, value: String(m[2] || '').trim() }];
     };
 
     const getBaseCfg = () => {
@@ -137,10 +169,19 @@
                 .replace(/\u00a0/g, ' ')
                 .replace(/[\u200B\uFEFF]/g, '');
             if (inMeta) {
-            const parsed = parseMetaLine(line);
-            if (parsed) {
-                if (known.has(parsed.key)) {
-                    meta[parsed.key] = parsed.value;
+            const parsedEntries = parseMetaEntries(line);
+            if (parsedEntries) {
+                let hasKnown = false;
+                let hasUnknown = false;
+                parsedEntries.forEach(({ key, value }) => {
+                    if (known.has(key)) {
+                        meta[key] = value;
+                        hasKnown = true;
+                    } else {
+                        hasUnknown = true;
+                    }
+                });
+                if (hasKnown && !hasUnknown) {
                     seenMeta = true;
                     continue;
                 }
@@ -163,6 +204,53 @@
         return { meta, body: bodyLines.join('\n') };
     };
 
+    const normalizeFileTitle = (filePath) => {
+        let base = String(filePath || '').trim();
+        if (!base) return '';
+        base = base.replace(/\\/g, '/');
+        base = base.split('/').pop() || '';
+        base = base.replace(/\.md$/i, '');
+        base = base.replace(/[_-]+/g, ' ');
+        base = base.replace(/\s+/g, ' ').trim();
+        return base;
+    };
+
+    const cleanMetaTitleValue = (value) => {
+        let out = String(value || '').trim();
+        if (!out) return '';
+        const idx = out.indexOf('}{');
+        if (idx !== -1) {
+            const tail = out.slice(idx + 2).trim();
+            if (/^[A-Za-z][A-Za-z0-9_-]*\s*:/.test(tail)) {
+                out = out.slice(0, idx).trim();
+            }
+        }
+        return out;
+    };
+
+    const getCurrentFilePath = () => {
+        const formFile = form.querySelector('input[name="file"]');
+        const fromForm = formFile instanceof HTMLInputElement ? String(formFile.value || '').trim() : '';
+        if (fromForm) return fromForm;
+        const fromState = String(window.CURRENT_FILE || '').trim();
+        if (fromState) return fromState;
+        const fromQuery = new URLSearchParams(window.location.search).get('file');
+        return fromQuery ? String(fromQuery).trim() : '';
+    };
+
+    const updateAppTitleFromEditor = () => {
+        if (!isPublisherMode()) return;
+        const { meta } = extractMetaAndBody(editor.value);
+        const pageTitle = cleanMetaTitleValue(meta.page_title || '');
+        const fileTitle = normalizeFileTitle(getCurrentFilePath());
+        const nextTitle = pageTitle || fileTitle;
+        if (!nextTitle) return;
+        const appTitleEl = document.querySelector('.app-title');
+        if (appTitleEl) appTitleEl.textContent = nextTitle;
+        const dirty = !!window.__mdDirty;
+        document.title = `${nextTitle} • md edit${dirty ? ' *' : ''}`;
+    };
+
     const buildMetaBlock = (meta, includeKeys) => {
         const { order } = getKnownKeysAndOrder();
         const out = [];
@@ -183,13 +271,14 @@
     let hasAppliedOnce = false;
     const warnHiddenMeta = (keys) => {
         if (!keys.length || !(liveStatus instanceof HTMLElement)) return;
+        statusHold.hold(warningHoldMs);
         liveStatus.textContent = `Hidden metadata removed: ${keys.join(', ')}.`;
         liveStatus.style.color = 'var(--danger)';
         if (metaWarnTimer) clearTimeout(metaWarnTimer);
         metaWarnTimer = setTimeout(() => {
             liveStatus.textContent = '';
             liveStatus.style.color = '';
-        }, 4000);
+        }, warningHoldMs);
     };
 
     const applyMetaVisibility = () => {
@@ -221,7 +310,6 @@
             filteredMeta[key] = v;
         });
         if (blockedKeys.length) warnHiddenMeta(blockedKeys);
-        metaStore = { ...metaStore, ...filteredMeta };
 
         const { order } = getKnownKeysAndOrder();
         const includeKeys = order.filter((k) => {
@@ -232,6 +320,13 @@
             if (inPublisherCfg && !publisherMode) return false;
             return isMarkdownVisible(f);
         });
+        includeKeys.forEach((k) => {
+            if (!Object.prototype.hasOwnProperty.call(filteredMeta, k)
+                && Object.prototype.hasOwnProperty.call(metaStore, k)) {
+                delete metaStore[k];
+            }
+        });
+        metaStore = { ...metaStore, ...filteredMeta };
 
         const block = buildMetaBlock(metaStore, includeKeys);
         const cleanedBody = String(body).replace(/^\n+/, '');
@@ -245,7 +340,46 @@
             editor.dispatchEvent(new Event('input', { bubbles: true }));
             isApplying = false;
         }
+        updateAppTitleFromEditor();
         hasAppliedOnce = true;
+    };
+
+    const setupPublishControlsPlacement = () => {
+        const publishBtn = document.getElementById('publishBtn');
+        const publishStateSelect = document.getElementById('publishStateSelect');
+        if (!(publishBtn instanceof HTMLElement) || !(publishStateSelect instanceof HTMLElement)) return;
+        const headerActions = document.querySelector('#paneMarkdown .pane-header-actions');
+        const toolbarLeft = document.querySelector('#paneMarkdown .editor-toolbar-left');
+        const revertBtn = document.getElementById('btnRevert');
+        if (!(headerActions instanceof HTMLElement) || !(toolbarLeft instanceof HTMLElement) || !(revertBtn instanceof HTMLElement)) return;
+
+        const moveToToolbar = () => {
+            if (publishBtn.parentElement === toolbarLeft) return;
+            revertBtn.insertAdjacentElement('afterend', publishBtn);
+            publishBtn.insertAdjacentElement('afterend', publishStateSelect);
+        };
+        const moveToHeader = () => {
+            if (publishBtn.parentElement === headerActions) return;
+            headerActions.appendChild(publishBtn);
+            headerActions.appendChild(publishStateSelect);
+        };
+
+        const mq = window.matchMedia ? window.matchMedia('(max-width: 960px)') : null;
+        const update = () => {
+            if (mq && mq.matches) {
+                moveToToolbar();
+            } else {
+                moveToHeader();
+            }
+        };
+        update();
+        if (mq && typeof mq.addEventListener === 'function') {
+            mq.addEventListener('change', update);
+        } else if (mq && typeof mq.addListener === 'function') {
+            mq.addListener(update);
+        } else {
+            window.addEventListener('resize', update);
+        }
     };
 
     window.__mdwApplyMetaVisibility = applyMetaVisibility;
@@ -271,6 +405,7 @@
         applyMetaVisibility();
     };
     applyMetaVisibility();
+    setupPublishControlsPlacement();
 
     const scheduleApply = () => {
         if (isApplying) return;
@@ -284,12 +419,29 @@
     editor.addEventListener('input', () => {
         if (isApplying) return;
         scheduleApply();
+        updateAppTitleFromEditor();
     });
 
     form.addEventListener('submit', (event) => {
         const { meta, body } = extractMetaAndBody(editor.value);
         const mergedMeta = { ...metaStore, ...meta };
-        if (isPublisherMode()) {
+        const submitter = event.submitter;
+        const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        let isPublish = (
+            (submitter instanceof HTMLElement && submitter.getAttribute('name') === 'publish_action') ||
+            (active && active.getAttribute('name') === 'publish_action')
+        );
+        if (!isPublish) {
+            const overrideEl = document.getElementById('publishStateOverride');
+            const selectEl = document.getElementById('publishStateSelect');
+            const overrideVal = overrideEl instanceof HTMLInputElement ? String(overrideEl.value || '').trim().toLowerCase() : '';
+            const overrideOn = (overrideVal === '1' || overrideVal === 'true');
+            if (overrideOn && selectEl instanceof HTMLSelectElement) {
+                const state = String(selectEl.value || '').trim().toLowerCase();
+                if (state && state !== 'concept') isPublish = true;
+            }
+        }
+        if (isPublisherMode() && isPublish) {
             const pageTitle = String(mergedMeta.page_title || '').trim();
             if (!pageTitle) {
                 alert(t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', { app: getAppTitle() }));
@@ -907,6 +1059,27 @@
     const saveErrorDetailsWrap = document.getElementById('saveErrorDetailsWrap');
     const saveErrorDetails = document.getElementById('saveErrorDetails');
     let saveChipTimer = null;
+    let saveWarnTimer = null;
+    const warningHoldMs = 10000;
+    const getStatusHold = () => {
+        if (window.__mdwStatusHold && typeof window.__mdwStatusHold.isHeld === 'function') {
+            return window.__mdwStatusHold;
+        }
+        const state = { until: 0 };
+        const api = {
+            hold(ms) {
+                const next = Date.now() + Math.max(0, ms || 0);
+                if (next > state.until) state.until = next;
+                return state.until;
+            },
+            isHeld() {
+                return Date.now() < state.until;
+            },
+        };
+        window.__mdwStatusHold = api;
+        return api;
+    };
+    const statusHold = getStatusHold();
     const showSaveChip = () => {
         if (!saveChip) return;
         saveChip.style.display = '';
@@ -925,6 +1098,18 @@
         if (typeof window.__mdwShowErrorModal === 'function') {
             window.__mdwShowErrorModal(message, details);
         }
+    };
+    const showSaveWarning = (message) => {
+        if (!status || !message) return;
+        if (saveWarnTimer) clearTimeout(saveWarnTimer);
+        status.textContent = message;
+        status.style.color = 'var(--warning)';
+        statusHold.hold(warningHoldMs);
+        saveWarnTimer = setTimeout(() => {
+            if (!status) return;
+            status.textContent = '';
+            status.style.color = '';
+        }, warningHoldMs);
     };
     const clearSaveError = () => {
         if (saveErrorPanel) saveErrorPanel.hidden = true;
@@ -1068,7 +1253,15 @@
             if (publishStateOverride instanceof HTMLInputElement) {
                 publishStateOverride.value = '0';
             }
-            if (status) status.textContent = t('common.saved', 'Saved');
+            const warnings = (data && typeof data === 'object' && Array.isArray(data.warnings))
+                ? data.warnings.map((w) => String(w || '').trim()).filter(Boolean)
+                : [];
+            if (warnings.length) {
+                const savedLabel = t('common.saved', 'Saved');
+                showSaveWarning(savedLabel + ': ' + warnings.join(' '));
+            } else if (status) {
+                status.textContent = t('common.saved', 'Saved');
+            }
             showSaveChip();
             clearSaveError();
         } catch (err) {
@@ -1164,7 +1357,9 @@
         if (!window.CURRENT_FILE) return;
         clearTimeout(previewTimer);
         previewTimer = setTimeout(sendPreview, 350);
-        if (status) status.textContent = t('js.preview_updating', 'Updating preview…');
+        if (status && !statusHold.isHeld()) {
+            status.textContent = t('js.preview_updating', 'Updating preview…');
+        }
     }
 
     const applyTocHotKeyword = (previewEl, rawText) => {
@@ -1172,6 +1367,12 @@
         const text = String(rawText || '');
         if (!/(^|\\n)\\s*\\{TOC\\}\\s*(\\n|$)/i.test(text)) return;
         if (previewEl.querySelector('[data-mdw-toc="1"]')) return;
+        const readTocMenuSetting = () => {
+            const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+            const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+            const raw = s && typeof s.toc_menu === 'string' ? s.toc_menu.trim().toLowerCase() : '';
+            return (raw === 'left' || raw === 'right' || raw === 'inline') ? raw : 'inline';
+        };
 
         const placeholder = (() => {
             const walker = document.createTreeWalker(previewEl, NodeFilter.SHOW_ELEMENT, {
@@ -1215,11 +1416,11 @@
             return { id, label: (el.textContent || '').trim() };
         });
 
-        const wrap = document.createElement('div');
-        wrap.className = 'md-toc-wrap';
-        wrap.dataset.mdwToc = '1';
+        const tocWrap = document.createElement('div');
+        tocWrap.className = 'md-toc-wrap';
+        tocWrap.dataset.mdwToc = '1';
 
-        wrap.appendChild(document.createComment(' Table of contents '));
+        tocWrap.appendChild(document.createComment(' Table of contents '));
         const list = document.createElement('ul');
         list.className = 'md-list md-toc';
         items.forEach((item) => {
@@ -1231,9 +1432,41 @@
             li.appendChild(a);
             list.appendChild(li);
         });
-        wrap.appendChild(list);
+        tocWrap.appendChild(list);
 
-        placeholder.replaceWith(wrap);
+        const tocMenu = readTocMenuSetting();
+        const layoutMode = (tocMenu === 'left' || tocMenu === 'right') ? tocMenu : 'inline';
+        const layout = document.createElement('div');
+        layout.className = layoutMode === 'inline'
+            ? 'md-toc-layout md-toc-inline'
+            : `md-toc-layout md-toc-${layoutMode}`;
+        layout.dataset.mdwTocLayout = layoutMode === 'inline' ? 'inline' : layoutMode;
+
+        const nav = document.createElement('nav');
+        nav.className = 'md-toc-side';
+        nav.setAttribute('aria-label', 'Table of contents');
+        nav.appendChild(tocWrap);
+
+        const body = document.createElement('div');
+        body.className = 'md-toc-body';
+
+        layout.appendChild(nav);
+        layout.appendChild(body);
+
+        if (layoutMode === 'inline') {
+            let node = placeholder.nextSibling;
+            while (node) {
+                const next = node.nextSibling;
+                body.appendChild(node);
+                node = next;
+            }
+            placeholder.replaceWith(layout);
+        } else {
+            placeholder.remove();
+            const nodes = Array.from(previewEl.childNodes);
+            nodes.forEach((node) => body.appendChild(node));
+            previewEl.appendChild(layout);
+        }
     };
     window.__mdwApplyTocHotKeyword = applyTocHotKeyword;
 
@@ -1354,7 +1587,9 @@
             if (typeof window.__mdwInitCodeCopyButtons === 'function') {
                 window.__mdwInitCodeCopyButtons();
             }
-            if (status) status.textContent = t('js.preview_up_to_date', 'Preview up to date');
+            if (status && !statusHold.isHeld()) {
+                status.textContent = t('js.preview_up_to_date', 'Preview up to date');
+            }
         } catch (err) {
             const detail = err && err.message ? String(err.message) : '';
             if (typeof window.__mdwReportNetworkError === 'function') {
@@ -3512,6 +3747,7 @@
         if (htmlMode === 'wet' && allowedClasses instanceof Set) {
             [
                 'md-toc-layout',
+                'md-toc-inline',
                 'md-toc-left',
                 'md-toc-right',
                 'md-toc-side',

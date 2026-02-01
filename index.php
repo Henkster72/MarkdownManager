@@ -1045,6 +1045,23 @@ function try_secret_login($passwordInput) {
 		                    $settingsOverride['publisher_default_author'] = $author;
 		                    $opts['settings'] = $settingsOverride;
 		                }
+		                if (!empty($MDW_PUBLISHER_MODE)) {
+		                    $pageTitleCandidate = trim((string)($titleInput ?? ''));
+		                    if ($pageTitleCandidate === '') {
+		                        $pageTitleCandidate = preg_replace('/\.md$/i', '', basename($sanNew));
+		                        $pageTitleCandidate = str_replace(['_', '-'], ' ', $pageTitleCandidate);
+		                        $pageTitleCandidate = preg_replace('/\s+/', ' ', $pageTitleCandidate);
+		                        $pageTitleCandidate = trim($pageTitleCandidate);
+		                    }
+		                    if ($pageTitleCandidate !== '' && function_exists('mdw_hidden_meta_extract_and_remove_all')) {
+		                        $contentMeta = [];
+		                        mdw_hidden_meta_extract_and_remove_all($content, $contentMeta);
+		                        $existingPageTitle = trim((string)($contentMeta['page_title'] ?? ''));
+		                        if ($existingPageTitle === '') {
+		                            $opts['set']['page_title'] = $pageTitleCandidate;
+		                        }
+		                    }
+		                }
 		                $content = mdw_hidden_meta_ensure_block($content, $sanNew, $opts);
 	                $parentDir = dirname($full);
 	                if (!is_dir($parentDir) || !is_writable($parentDir)) {
