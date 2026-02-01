@@ -384,6 +384,14 @@
 
     window.__mdwApplyMetaVisibility = applyMetaVisibility;
     window.__mdwStripHiddenMetaForDirty = stripHiddenMeta;
+    window.__mdwBuildPreviewContent = () => {
+        const { meta, body } = extractMetaAndBody(editor.value);
+        const mergedMeta = { ...metaStore, ...meta };
+        const { order } = getKnownKeysAndOrder();
+        const block = buildMetaBlock(mergedMeta, order.slice());
+        const cleanedBody = String(body).replace(/^\n+/, '');
+        return block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+    };
     window.__mdwSetMetaValue = (key, value) => {
         const kk = String(key || '').trim().toLowerCase();
         if (!kk) return;
@@ -1134,6 +1142,12 @@
         if (s === 'processing') return t('edit.publish_state.processing', 'Processing');
         return t('edit.publish_state.concept', 'Concept');
     };
+    const publishStateIcon = (state) => {
+        const s = String(state || '').trim().toLowerCase();
+        if (s === 'published') return 'pi-checkedcertificate';
+        if (s === 'processing') return 'pi-certificate';
+        return 'pi-lightbulb';
+    };
     const publishStateClass = (state) => {
         const s = String(state || '').trim().toLowerCase();
         if (s === 'published') return 'publish-published';
@@ -1145,7 +1159,18 @@
         if (!(row instanceof HTMLElement)) return;
         const badge = row.querySelector('.badge-publish');
         if (!(badge instanceof HTMLElement)) return;
-        badge.textContent = publishStateLabel(state);
+        const iconClass = publishStateIcon(state);
+        const label = publishStateLabel(state);
+        badge.textContent = '';
+        if (iconClass) {
+            const icon = document.createElement('span');
+            icon.className = `pi ${iconClass}`;
+            icon.setAttribute('aria-hidden', 'true');
+            badge.appendChild(icon);
+        }
+        const text = document.createElement('span');
+        text.textContent = label;
+        badge.appendChild(text);
         badge.classList.remove('publish-concept', 'publish-processing', 'publish-published');
         badge.classList.add(publishStateClass(state));
     };
@@ -1562,13 +1587,16 @@
                 throw new Error('network');
             }
             const fd = new FormData();
-            fd.set('content', ta.value);
+            const previewContent = (typeof window.__mdwBuildPreviewContent === 'function')
+                ? window.__mdwBuildPreviewContent()
+                : ta.value;
+            fd.set('content', previewContent);
             const html = await mdmApi.form('edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1', fd);
             if (typeof window.__mdwMarkOnline === 'function') {
                 window.__mdwMarkOnline();
             }
             prev.innerHTML = html;
-            applyTocHotKeyword(prev, ta.value);
+            applyTocHotKeyword(prev, previewContent);
             if (typeof window.__mdwInitTocSideMenus === 'function') {
                 window.__mdwInitTocSideMenus(prev);
             }

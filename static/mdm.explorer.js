@@ -1542,10 +1542,22 @@
                 el.classList.remove('nav-item-current', 'dirty');
                 const a = el.querySelector('a.kbd-item');
                 if (a) a.classList.remove('active');
+                const icon = el.querySelector('.note-icon');
+                if (icon) {
+                    icon.classList.remove('pi-documentlabel');
+                    if (!icon.classList.contains('pi-document')) {
+                        icon.classList.add('pi-document');
+                    }
+                }
             });
             item.classList.add('nav-item-current');
             const a = item.querySelector('a.kbd-item');
             if (a) a.classList.add('active');
+            const icon = item.querySelector('.note-icon');
+            if (icon) {
+                icon.classList.remove('pi-document');
+                icon.classList.add('pi-documentlabel');
+            }
         };
 
         const focusCurrentInExplorer = () => {
@@ -1555,6 +1567,10 @@
             }
         };
 
+        const initialCurrent = overview.querySelector('.note-item.nav-item-current');
+        if (initialCurrent instanceof HTMLElement) {
+            setCurrentItem(initialCurrent);
+        }
         focusCurrentInExplorer();
         mdmDelegate(overview, 'click', 'a.kbd-item', (e, link) => {
             if (!(link instanceof HTMLAnchorElement)) return;

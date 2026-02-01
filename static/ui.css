@@ -24,7 +24,7 @@ html, body {
   --col-right: 30%;
   --app-header-height: 56px;
   --app-header-gap: var(--app-header-height);
-  --editor-toolbar-control-height: 2.3rem;
+  --editor-toolbar-control-height: 1.8rem;
 }
 
 body.app-body {
@@ -468,6 +468,7 @@ a:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.25rem;
   padding: 0.15rem 0.5rem;
   font-size: 0.6rem;
   border-radius: 999px;
@@ -476,6 +477,11 @@ a:hover {
   border: 1px solid var(--border-soft);
   background: var(--bg-panel-alt);
   color: var(--text-main);
+}
+
+.badge-publish .pi {
+  font-size: 0.7rem;
+  line-height: 1;
 }
 
 .badge-publish.publish-concept {
@@ -505,7 +511,7 @@ a:hover {
   justify-content: center;
   gap: 0.35rem;
   border-radius: 0.5rem;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 500;
   padding: 0.35rem 0.7rem;
   border: 1px solid transparent;
@@ -679,9 +685,9 @@ a:hover {
 
 .editor-pane {
   background: var(--bg-panel);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--border-strong);
-  padding: 0.75rem;
+  padding: 0.5rem;
   display: flex;
   flex-direction: column;
   container-type: inline-size;
@@ -1120,6 +1126,10 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   color: var(--text-muted);
 }
 
+.nav-item-current > .note-link .note-icon.pi-document::before {
+  content: "\e986";
+}
+
 .note-text {
   display: flex;
   flex-direction: column;
@@ -1453,7 +1463,6 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 }
 
 .editor-toolbar-left .editor-toolbar-select.input {
-  padding-inline: 0.6rem;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -1473,7 +1482,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 
 .editor-toolbar-select.input {
   min-width: 2.75rem;
-  padding: 0.25rem 0.45rem;
+  padding: 0.25rem;
   text-align: center;
 }
 
@@ -1747,7 +1756,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 .icon-button {
   width: 1.4rem;
   height: 1.4rem;
-  padding: 0 0.25rem;
+  padding: 0.5rem;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -1798,6 +1807,20 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.35rem;
     width: 100%;
+  }
+
+  .edit-page .editor-toolbar-left .btn,
+  .edit-page .editor-toolbar-left .editor-toolbar-select.input {
+    height: 1.8rem;
+    min-height: 1.8rem;
+  }
+
+  .edit-page .editor-toolbar-left .btn {
+    padding-inline: 0.45rem;
+  }
+
+  .edit-page .editor-toolbar-left .format-btn {
+    padding-inline: 0.35rem;
   }
 
   .edit-page .editor-toolbar .pi {

@@ -1349,7 +1349,7 @@ window.mermaid = mermaid;
 	        <div class="app-header-actions">
 	            <span id="offlineIndicator" class="chip offline-chip" hidden aria-live="polite" title="<?=h(mdw_t('common.offline_hint','Offline: changes are stored locally until you are back online.'))?>"><?=h(mdw_t('common.offline','Offline'))?></span>
 	            <?php if ($mode==='index'): ?>
-	            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
+	            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
 	            <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=h(mdw_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
 		                <span class="pi pi-folder"></span>
 		                <span>+</span>

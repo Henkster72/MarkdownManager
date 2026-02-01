@@ -1471,6 +1471,20 @@ function mdw_attr_list_parse_line($line) {
     return $out ?: null;
 }
 
+function mdw_attr_list_extract_trailing($text) {
+    $text = (string)$text;
+    $attrs = null;
+    // Allow "{: ... }" to be appended to a block line (e.g. list items) and apply to the generated element.
+    while (preg_match('/\\s*(\\{:\\s*[^}]+\\})\\s*$/', $text, $m)) {
+        $parsed = mdw_attr_list_parse_line($m[1]);
+        if ($parsed) {
+            $attrs = mdw_merge_attr_list($attrs, $parsed);
+        }
+        $text = rtrim(substr($text, 0, -strlen($m[0])));
+    }
+    return ['text' => $text, 'attrs' => $attrs];
+}
+
 function mdw_apply_attr_list_to_html($html, $attrs) {
     if (!is_string($html) || !$attrs || !is_array($attrs)) return $html;
     if (!preg_match('/^<([A-Za-z][A-Za-z0-9:-]*)([^>]*)>/', $html, $m)) return $html;
@@ -1752,9 +1766,12 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
             $meta['publishstate'] = 'Concept';
         }
         $meta['publishstate'] = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
-        if (!isset($meta['author']) || trim((string)$meta['author']) === '') {
-            if ($publisherDefaultAuthor !== '') {
-                $meta['author'] = $publisherDefaultAuthor;
+        if ($meta['publishstate'] === '') $meta['publishstate'] = 'Concept';
+        if ($meta['publishstate'] === 'Concept') {
+            if (!isset($meta['author']) || trim((string)$meta['author']) === '') {
+                if ($publisherDefaultAuthor !== '') {
+                    $meta['author'] = $publisherDefaultAuthor;
+                }
             }
         }
     } else {
@@ -1813,9 +1830,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $body = mdw_hidden_meta_extract_and_remove_all($text, $meta);
     $settings = mdw_metadata_settings();
     $publisherMode = !empty($settings['publisher_mode']);
+    $publishState = '';
     if ($publisherMode) {
         $publisherDefaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
-        if ($publisherDefaultAuthor !== '' && (!isset($meta['author']) || trim((string)$meta['author']) === '')) {
+        $publishState = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
+        if ($publishState === '') $publishState = 'Concept';
+        if ($publishState === 'Concept' && $publisherDefaultAuthor !== '' && (!isset($meta['author']) || trim((string)$meta['author']) === '')) {
             $meta['author'] = $publisherDefaultAuthor;
         }
     }
@@ -1944,7 +1964,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if (!$htmlVis) continue;
         if ($k === 'author' && !$mdVis && $publisherMode) {
             $defaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
-            if ($defaultAuthor !== '') {
+            if ($v === '' && $defaultAuthor !== '' && $publishState === 'Concept') {
                 $v = $defaultAuthor;
             }
         }
@@ -2299,6 +2319,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $tag = $isOrdered ? 'ol' : 'ul';
             $indent = md_indent_width($m[1] ?? '');
             $content = (string)($m[3] ?? '');
+            $inlineAttrs = null;
+            $trailing = mdw_attr_list_extract_trailing($content);
+            if (is_array($trailing)) {
+                $content = (string)($trailing['text'] ?? $content);
+                $inlineAttrs = $trailing['attrs'] ?? null;
+            }
 
             if (!empty($listStack)) {
                 $top = $listStack[count($listStack) - 1];
@@ -2334,7 +2360,11 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
             $liClass = $p['li_class'] ?? '';
             $liAttr = $liClass ? ' class="'.htmlspecialchars($liClass, ENT_QUOTES, 'UTF-8').'"' : '';
-            $html[] = '<li'.$liAttr.'>' . inline_md($content, $mdPath, $profile, $context);
+            $liHtml = '<li'.$liAttr.'>' . inline_md($content, $mdPath, $profile, $context);
+            if ($inlineAttrs) {
+                $liHtml = mdw_apply_attr_list_to_html($liHtml, $inlineAttrs);
+            }
+            $html[] = $liHtml;
             $listStack[$topIndex]['liOpen'] = true;
             continue;
         }

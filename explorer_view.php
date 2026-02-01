@@ -388,6 +388,7 @@ function explorer_view_render_tree($opts) {
                 : (string)($info['title'] ?? $entry['basename']);
             $publishState = null;
             $publishStateLabel = null;
+            $publishIcon = '';
             if ($publisher_mode) {
                 $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
                 $publishState = function_exists('mdw_publisher_normalize_publishstate')
@@ -409,15 +410,17 @@ function explorer_view_render_tree($opts) {
             $publishClass = '';
             if ($publisher_mode) {
                 $s = strtolower((string)$publishState);
-                if ($s === 'published') $publishClass = 'publish-published';
-                else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
+                if ($s === 'published') {
+                    $publishClass = 'publish-published';
+                    $publishIcon = 'pi-checkedcertificate';
+                    $publishStateLabel = explorer_view_t('edit.publish_state.published', 'Published');
+                } else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
                     $publishClass = 'publish-processing';
-                }
-                else $publishClass = 'publish-concept';
-                if ($s === 'published') $publishStateLabel = explorer_view_t('edit.publish_state.published', 'Published');
-                else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
+                    $publishIcon = 'pi-certificate';
                     $publishStateLabel = explorer_view_t('edit.publish_state.processing', 'Processing');
-                } else if ($s === 'concept') {
+                } else {
+                    $publishClass = 'publish-concept';
+                    $publishIcon = 'pi-lightbulb';
                     $publishStateLabel = explorer_view_t('edit.publish_state.concept', 'Concept');
                 }
             }
@@ -426,14 +429,19 @@ function explorer_view_render_tree($opts) {
             <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>" draggable="true">
                 <span class="note-leading">
                     <span class="note-caret-spacer" aria-hidden="true"></span>
-                    <span class="note-icon pi pi-document" aria-hidden="true"></span>
+                    <span class="note-icon pi <?= $isCurrent ? 'pi-documentlabel' : 'pi-document' ?>" aria-hidden="true"></span>
                 </span>
                 <span class="note-text">
                     <span class="note-title">
                         <span><?=explorer_view_escape($t)?></span>
                         <span class="note-badges">
                             <?php if ($publisher_mode): ?>
-                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>"><?=explorer_view_escape($publishStateLabel ?? $publishState ?? '')?></span>
+                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>">
+                                    <?php if ($publishIcon !== ''): ?>
+                                        <span class="pi <?=explorer_view_escape($publishIcon)?>" aria-hidden="true"></span>
+                                    <?php endif; ?>
+                                    <span><?=explorer_view_escape($publishStateLabel ?? $publishState ?? '')?></span>
+                                </span>
                             <?php endif; ?>
                             <?php if ($isSecret): ?>
                                 <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7
+
+- Explorer: WPM publish badges now include state icons (lightbulb/certificate/checked certificate).
+- Explorer: active note icon uses the labeled document glyph and stays in sync during SPA navigation.
+- Preview: trailing `{: class="..." }` now applies to list items (`li`) as well as paragraphs.
+- Preview: hidden metadata is preserved for rendering so publish state stays accurate in live preview.
+- WPM author defaults: only injected for Concept notes when author is empty; published/processing no longer get a default author in preview.
+- Editor toolbar: tightened sizing, icon polish, and ordered-list glyph tweaks for a cleaner, consistent layout.
+
 ## 0.6.3
 
 - Editor: caret-adjacent bracket matching for `()`, `[]`, and `{}` with color-coded background highlights.

@@ -972,9 +972,9 @@ window.mermaid = mermaid;
                     <div class="chip" style="background-color: var(--danger); color: white;"<?= $save_error_details ? ' title="' . h($save_error_details) . '"' : '' ?>><?=h($save_error)?></div>
                 <?php endif; ?>
 
-                    <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+MD</button>
+                    <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
                     <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
-                        <span class="pi pi-list"></span>
+                        <span class="pi pi-openfolder"></span>
                     </button>
 		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('theme.settings_title','Settings'))?>" aria-label="<?=h(mdw_t('theme.settings_title','Settings'))?>" data-auth-superuser="1">
 		                    <span class="pi pi-gear"></span>
@@ -1064,7 +1064,7 @@ window.mermaid = mermaid;
                     <header class="pane-header editor-header">
 	                        <div class="pane-title-row">
 	                            <div class="pane-title">
-	                                <span class="icon-text-logo">MD</span>
+	                                <span class="icon-text-logo"><span class="pi pi-documentlabel"></span></span>
 	                                <span><?=h(mdw_t('common.markdown','Markdown'))?></span>
 	                            </div>
 			                            <div class="pane-header-actions">
