@@ -7,6 +7,7 @@
 
 require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/i18n.php';
+require_once __DIR__ . '/new_md_modal.php';
 
 $LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
 $SECRET_MDS_FILE     = env_path('SECRET_MDS_FILE', __DIR__ . '/secret_mds.txt');
@@ -72,6 +73,7 @@ if ($WPM_BASE_DOMAIN !== null) {
 
 require_once __DIR__ . '/explorer_view.php';
 $github_pages_plugin_loaded = false;
+$aw_ssg_template_plugin_loaded = false;
 $github_pages_env_ready = false;
 $github_pages_plugins = explorer_view_get_enabled_plugins([
     'page' => 'edit',
@@ -79,9 +81,11 @@ $github_pages_plugins = explorer_view_get_enabled_plugins([
     'plugins_enabled' => true,
 ]);
 foreach ($github_pages_plugins as $plugin) {
-    if (($plugin['id'] ?? '') === 'github_pages_export') {
+    $pluginId = (string)($plugin['id'] ?? '');
+    if ($pluginId === 'github_pages_export') {
         $github_pages_plugin_loaded = true;
-        break;
+    } else if ($pluginId === 'aw_ssg_template_export') {
+        $aw_ssg_template_plugin_loaded = true;
     }
 }
 if ($github_pages_plugin_loaded) {
@@ -162,6 +166,10 @@ $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) |
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
 if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+$exportClassPrefix = isset($MDW_SETTINGS['export_class_prefix']) ? trim((string)$MDW_SETTINGS['export_class_prefix']) : '';
+$exportClassPrefix = preg_replace('/[^A-Za-z0-9_-]+/', '', (string)$exportClassPrefix);
+if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) $exportClassPrefix = substr($exportClassPrefix, 0, 24);
+$jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($MDW_SETTINGS['jinja_meta_prefix'] ?? 'page_');
 $tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
 if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
@@ -171,6 +179,7 @@ if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign
 $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
+$internalLinkPrefix = isset($MDW_SETTINGS['internal_link_prefix']) ? trim((string)$MDW_SETTINGS['internal_link_prefix']) : '';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -322,6 +331,41 @@ function list_md_by_subdir_sorted(){
     return $map;
 }
 
+function list_existing_folders_sorted($excludeNames = []) {
+    $exclude = [];
+    if (is_array($excludeNames)) {
+        foreach ($excludeNames as $n) {
+            if (is_string($n) && $n !== '') $exclude[$n] = true;
+        }
+    }
+
+    $dirs = array_filter(glob('*'), function($f) use ($exclude){
+        if (!is_dir($f)) return false;
+        if ($f === '' || $f[0] === '.') return false;
+        if (isset($exclude[$f])) return false;
+        return true;
+    });
+
+    sort($dirs, SORT_NATURAL | SORT_FLAG_CASE);
+
+    $out = [];
+    foreach ($dirs as $dir) {
+        $out[] = $dir;
+        $subdirs = array_filter(glob($dir . '/*'), function($f){
+            if (!is_dir($f)) return false;
+            $base = basename($f);
+            if ($base === '' || $base[0] === '.') return false;
+            return true;
+        });
+        sort($subdirs, SORT_NATURAL | SORT_FLAG_CASE);
+        foreach ($subdirs as $sub) {
+            $out[] = $dir . '/' . basename($sub);
+        }
+    }
+
+    return $out;
+}
+
 /* SHORTCUTS */
 function read_shortcuts_csv($csv){
     $out=[];
@@ -403,10 +447,77 @@ $save_warning = [];
 $saved_flag = isset($_GET['saved']) ? true : false;
 $use_posted_content = false;
 $posted_content_for_render = '';
+$open_new_panel = isset($_GET['new']) && $_GET['new'] === '1';
+$new_md_draft = null;
+if (isset($_SESSION['new_md_draft']) && is_array($_SESSION['new_md_draft'])) {
+    $new_md_draft = $_SESSION['new_md_draft'];
+    unset($_SESSION['new_md_draft']);
+    $open_new_panel = true;
+}
+
+$pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
+$excludeFolders = [basename($pluginsDir), 'HTML', 'PDF', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+$existingFolders = list_existing_folders_sorted($excludeFolders);
+$default_new_folder = 'root';
+if ($requested) {
+    $requestedFolder = folder_from_path($requested);
+    if ($requestedFolder && in_array($requestedFolder, $existingFolders, true)) {
+        $default_new_folder = $requestedFolder;
+    }
+}
+if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
+    $default_new_folder = $folder_filter;
+}
+$today_prefix = date('y-m-d-');
+$new_md_title_value = '';
+$new_md_slug_value = '';
+$new_md_content_value = '';
+$new_md_prefix_checked = empty($MDW_PUBLISHER_MODE);
+if (is_array($new_md_draft)) {
+    $draftFolder = sanitize_folder_name((string)($new_md_draft['folder'] ?? '')) ?? 'root';
+    if ($draftFolder === 'root' || in_array($draftFolder, $existingFolders, true)) {
+        $default_new_folder = $draftFolder;
+    }
+    $new_md_title_value = (string)($new_md_draft['title'] ?? '');
+    $new_md_slug_value = (string)($new_md_draft['slug'] ?? (string)($new_md_draft['file'] ?? ''));
+    $new_md_content_value = (string)($new_md_draft['content'] ?? '');
+    $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
+}
 
 /* HANDLE PREVIEW ENDPOINT (AJAX) */
 if (isset($_GET['preview']) && $_GET['preview'] === '1') {
-    $content = isset($_POST['content']) ? (string)$_POST['content'] : '';
+    $contentProvided = array_key_exists('content', $_POST);
+    if ($contentProvided) {
+        $content = (string)$_POST['content'];
+    } else {
+        $content = '';
+        if ($requested) {
+            $isSecretReq = is_secret_file($requested);
+            if ($isSecretReq && !is_secret_authenticated()) {
+                json(['error' => 'forbidden'], 403);
+            }
+            $full = mdw_safe_full_path($requested, true);
+            if ($full && is_file($full)) {
+                $content = (string)file_get_contents($full);
+            }
+        }
+    }
+
+    $templateMode = isset($_GET['template']) ? strtolower(trim((string)$_GET['template'])) : '';
+    if ($templateMode === 'jinja' || $templateMode === 'aw_ssg') {
+        if (empty($aw_ssg_template_plugin_loaded)) {
+            json(['ok' => false, 'error' => 'plugin_disabled', 'message' => 'AW-SSG template export plugin is not enabled.'], 404);
+        }
+        $bodyHtml = isset($_POST['body_html']) ? (string)$_POST['body_html'] : '';
+        $template = mdw_export_markdown_jinja_template($content, [
+            'md_path' => $requested,
+            'content_html' => $bodyHtml,
+        ]);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $template;
+        exit;
+    }
+
     html(md_to_html($content, $requested));
 }
 
@@ -1063,10 +1174,12 @@ window.mermaid = mermaid;
                 <div class="editor-pane-inner">
                     <header class="pane-header editor-header">
 	                        <div class="pane-title-row">
-	                            <div class="pane-title">
-	                                <span class="icon-text-logo"><span class="pi pi-documentlabel"></span></span>
-	                                <span><?=h(mdw_t('common.markdown','Markdown'))?></span>
-	                            </div>
+                            <div class="pane-title">
+                                <span class="icon-text-logo"><span class="pi pi-documentlabel"></span></span>
+                                <?php if ($requested): ?>
+                                    <span class="pane-subtitle small"><?=h($requested)?></span>
+                                <?php endif; ?>
+                            </div>
 			                            <div class="pane-header-actions">
 			                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
                                     <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-publish="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
@@ -1089,11 +1202,6 @@ window.mermaid = mermaid;
 			                                <?php endif; ?>
                             </div>
                         </div>
-                        <?php if ($requested): ?>
-                        <div class="pane-subtitle small">
-                            <?=h($requested)?>
-                        </div>
-                        <?php endif; ?>
                     </header>
 
                     <form method="post" class="editor-form" id="editor-form" autocomplete="off">
@@ -1207,6 +1315,12 @@ window.mermaid = mermaid;
                                     <span class="pi pi-download"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.preview.export_btn','HTML download'))?></span>
                                 </button>
+                                <?php if (!empty($aw_ssg_template_plugin_loaded)): ?>
+                                <button type="button" id="exportTemplateBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.export_template_title','Download an AW-SSG Jinja template export'))?>" <?= $requested ? '' : 'disabled' ?> data-auth-superuser="1">
+                                    <span class="pi pi-download"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.preview.export_template_btn','Template download'))?></span>
+                                </button>
+                                <?php endif; ?>
                                 <?php if ($requested && $github_pages_plugin_loaded && $github_pages_env_ready): ?>
                                     <button type="button" id="githubPagesExportBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.github_pages_title','Export this note to GitHub Pages'))?>" data-auth-superuser="1">
                                         <span class="pi pi-upload"></span>
@@ -1241,6 +1355,26 @@ window.mermaid = mermaid;
 		    <footer class="app-footer">
 		        <?=date('Y')?> • <a href="https://github.com/Henkster72/MarkdownManager" target="_blank" rel="noopener noreferrer">Markdown Manager</a> • <a href="https://allroundwebsite.com" target="_blank" rel="noopener noreferrer">Allroundwebsite.com</a>
 		    </footer>
+
+        <?php
+        mdw_render_new_md_modal([
+            'open' => $open_new_panel,
+            'csrf' => $CSRF_TOKEN,
+            'form_action' => 'index.php',
+            'existing_folders' => $existingFolders,
+            'default_folder' => $default_new_folder,
+            'today_prefix' => $today_prefix,
+            'title' => $new_md_title_value,
+            'slug' => $new_md_slug_value,
+            'content' => $new_md_content_value,
+            'prefix_checked' => $new_md_prefix_checked,
+            'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
+            'hidden_fields' => [
+                'return_page' => 'edit',
+                'return_file' => (string)($requested ?? ''),
+            ],
+        ]);
+        ?>
 
         <div class="modal-overlay" id="renameModalOverlay" hidden></div>
         <div class="modal" id="renameModal" role="dialog" aria-modal="true" aria-labelledby="renameModalTitle" hidden>
@@ -1400,6 +1534,23 @@ window.mermaid = mermaid;
                     <label class="modal-label" for="footnoteLinkTitle"><?=h(mdw_t('link_modal.footnote_title_label','Footnote title (optional)'))?></label>
                     <input id="footnoteLinkTitle" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.footnote_title_placeholder','e.g. Ongekend onrecht'))?>">
                 </div>
+                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+                    <div class="modal-field" style="flex: 1 1 14rem; margin: 0;">
+                        <label class="modal-label" for="footnoteStyleSelect"><?=h(mdw_t('link_modal.footnote_style_label','Footnote style'))?></label>
+                        <select id="footnoteStyleSelect" class="input">
+                            <option value="decimal"><?=h(mdw_t('link_modal.footnote_style_decimal','1, 2, 3'))?></option>
+                            <option value="roman-upper"><?=h(mdw_t('link_modal.footnote_style_roman_upper','I, II, III'))?></option>
+                            <option value="roman-lower"><?=h(mdw_t('link_modal.footnote_style_roman_lower','i, ii, iii'))?></option>
+                            <option value="alpha-lower"><?=h(mdw_t('link_modal.footnote_style_alpha_lower','a, b, c'))?></option>
+                            <option value="alpha-upper"><?=h(mdw_t('link_modal.footnote_style_alpha_upper','A, B, C'))?></option>
+                        </select>
+                    </div>
+                    <div class="modal-field" style="flex: 0 0 9rem; margin: 0;">
+                        <label class="modal-label" for="footnoteNextLabel"><?=h(mdw_t('link_modal.footnote_next_label','Next label'))?></label>
+                        <input id="footnoteNextLabel" type="text" class="input" value="1" readonly>
+                    </div>
+                </div>
+                <div id="footnoteStyleHint" class="status-text"><?=h(mdw_t('link_modal.footnote_style_hint','Style detection runs on the current note.'))?></div>
             </div>
 	        <div id="linkModalYoutube" class="link-modal-section" hidden>
 	            <div class="modal-field">
@@ -1659,6 +1810,17 @@ window.mermaid = mermaid;
 				            </div>
 
 				            <div class="modal-field" data-auth-superuser="1">
+				                <label class="modal-label" for="internalLinkPrefixInput"><?=h(mdw_t('theme.internal_links.prefix_label','Internal link prefix'))?></label>
+				                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+				                    <input id="internalLinkPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.internal_links.prefix_placeholder','https://example.com/markdownmanager/'))?>" value="<?=h($internalLinkPrefix)?>" data-auth-superuser-enable="1">
+				                    <button type="button" class="btn btn-ghost btn-small" id="internalLinkPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.internal_links.prefix_save','Save prefix'))?></button>
+				                </div>
+				                <div id="internalLinkPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.internal_links.prefix_hint','Prefix is added before index.php?file= (leave empty for relative links).'))?>
+				                </div>
+				            </div>
+
+				            <div class="modal-field" data-auth-superuser="1">
 				                <label class="modal-label" for="folderIconStyleSelect"><?=h(mdw_t('theme.folder_icons.label','Folder icons'))?></label>
 				                <select id="folderIconStyleSelect" class="input" data-auth-superuser-enable="1">
 				                    <option value="folder" <?= $folderIconStyle === 'folder' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_folder','Folder'))?></option>
@@ -1700,6 +1862,14 @@ window.mermaid = mermaid;
 				                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
 				                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
 				                </select>
+				                <label class="modal-label" for="exportClassPrefixInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.class_prefix_label','Export class prefix'))?></label>
+				                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+				                    <input id="exportClassPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.copy.class_prefix_placeholder','md-'))?>" value="<?=h($exportClassPrefix)?>" data-auth-superuser-enable="1">
+				                    <button type="button" class="btn btn-ghost btn-small" id="exportClassPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.copy.class_prefix_save','Save prefix'))?></button>
+				                </div>
+				                <div id="exportClassPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.copy.class_prefix_hint','Applies to medium/wet HTML export; dry export removes all classes.'))?>
+				                </div>
 				                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
 				                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
 				                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
@@ -1836,16 +2006,32 @@ window.mermaid = mermaid;
 				                <div class="status-text">
 				                    <?=h(mdw_t('theme.metadata.hint','Control whether metadata is shown in the Markdown editor and/or HTML preview. If hidden in Markdown, it is also hidden in HTML preview.'))?>
 				                </div>
-				                <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                <?php if (!empty($aw_ssg_template_plugin_loaded)): ?>
+				                <div class="modal-field" style="margin: 0;">
+				                    <label class="modal-label" for="jinjaMetaPrefixInput"><?=h(mdw_t('theme.metadata.jinja_prefix_label','Jinja mapped prefix'))?></label>
+				                    <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+				                        <input id="jinjaMetaPrefixInput" type="text" class="input" style="flex: 1 1 auto;" value="<?=h($jinjaMetaPrefix)?>" placeholder="<?=h(mdw_t('theme.metadata.jinja_prefix_placeholder','page_'))?>">
+				                        <button type="button" class="btn btn-ghost btn-small" id="jinjaMetaPrefixSaveBtn"><?=h(mdw_t('theme.metadata.jinja_prefix_save','Save prefix'))?></button>
+				                    </div>
+				                    <div id="jinjaMetaPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+				                        <?=h(mdw_t('theme.metadata.jinja_prefix_hint','Maps metadata keys like page_picture -> blog_picture in Template download (default: page_).'))?>
+				                    </div>
+				                </div>
+				                <?php endif; ?>
+				                <div style="display:grid; grid-template-columns: 1fr auto auto auto minmax(10rem, 1fr); gap: 0.5rem 0.75rem; align-items:center;">
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.obligatory','Obligatory'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.default_value','Default value'))?></div>
 				                    <?php foreach (($META_CFG['fields'] ?? []) as $k => $f): ?>
 				                        <?php
 				                            $label = (string)($f['label'] ?? $k);
 				                            $mdVis = !empty($f['markdown_visible']);
 				                            $allowHtmlNoMd = ($k === 'author');
 				                            $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
+				                            $obligatory = !empty($f['obligatory']);
+				                            $defaultValue = trim((string)($f['default_value'] ?? ''));
 				                        ?>
 				                        <div><?=h($label)?></div>
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -1854,20 +2040,28 @@ window.mermaid = mermaid;
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= ($mdVis || $allowHtmlNoMd) ? '' : 'disabled' ?>>
 				                        </label>
+				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
+				                        </label>
+				                        <input type="text" class="input" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
 				                    <?php endforeach; ?>
 				                </div>
 				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
 				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
-				                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                    <div style="display:grid; grid-template-columns: 1fr auto auto auto minmax(10rem, 1fr); gap: 0.5rem 0.75rem; align-items:center;">
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.obligatory','Obligatory'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.default_value','Default value'))?></div>
 				                        <?php foreach (($META_PUBLISHER_CFG['fields'] ?? []) as $k => $f): ?>
 				                            <?php
 				                                $label = (string)($f['label'] ?? $k);
 				                                $mdVis = !empty($f['markdown_visible']);
 				                                $allowHtmlNoMd = ($k === 'author');
 				                                $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
+				                                $obligatory = !empty($f['obligatory']);
+				                                $defaultValue = trim((string)($f['default_value'] ?? ''));
 				                            ?>
 				                            <div><?=h($label)?></div>
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -1876,6 +2070,10 @@ window.mermaid = mermaid;
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= ($mdVis || $allowHtmlNoMd) ? '' : 'disabled' ?>>
 				                            </label>
+				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
+				                            </label>
+				                            <input type="text" class="input" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
 				                        <?php endforeach; ?>
 				                    </div>
 				                </div>

@@ -356,6 +356,12 @@
     word-break: normal;
 }
 
+.preview-content .mdw-preview-selection {
+    background-color: color-mix(in srgb, var(--preview-accent, var(--accent, #38bdf8)) 22%, transparent);
+    color: inherit;
+    border-radius: 0.12rem;
+}
+
 .preview-content mjx-container {
     max-width: 100%;
 }
@@ -437,21 +443,23 @@
     border: 0;
 }
 
-.preview-content .md-footnotes {
+.preview-content .md-footnotes,
+.preview-content ol.fn-section {
     list-style: none;
     padding-left: 0;
     margin: 0.85rem 0;
-    counter-reset: mdw-footnote;
 }
 
 .preview-content .md-footnote-item {
     margin: 0.2rem 0;
-    counter-increment: mdw-footnote;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
 }
 
-.preview-content .md-footnote-item::before {
-    content: "[" counter(mdw-footnote) "] ";
+.preview-content .md-footnote-marker {
     font-weight: 600;
+    white-space: nowrap;
 }
 
 @media (min-width: 1100px) {

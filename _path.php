@@ -77,7 +77,7 @@ function sanitize_md_path($path) {
     if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}]+$/u', $p)) return null;
     }
 
     if (!preg_match('/\.md$/i', end($parts))) return null;
@@ -103,7 +103,7 @@ function sanitize_md_path_like($path) {
     if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}]+$/u', $p)) return null;
     }
     if (!preg_match('/\.md$/i', end($parts))) return null;
     return $path;

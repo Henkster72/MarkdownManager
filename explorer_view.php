@@ -425,7 +425,7 @@ function explorer_view_render_tree($opts) {
                 }
             }
         ?>
-        <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>">
+        <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>" data-publish-state="<?=explorer_view_escape($publisher_mode ? strtolower((string)$publishState) : '')?>">
             <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>" draggable="true">
                 <span class="note-leading">
                     <span class="note-caret-spacer" aria-hidden="true"></span>

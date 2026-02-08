@@ -13,6 +13,7 @@
 
 require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/i18n.php';
+require_once __DIR__ . '/new_md_modal.php';
 
 $LINKS_CSV           = env_path('LINKS_CSV', __DIR__ . '/links.csv');
 $SECRET_MDS_FILE     = env_path('SECRET_MDS_FILE', __DIR__ . '/secret_mds.txt');
@@ -89,6 +90,7 @@ if ($WPM_BASE_DOMAIN !== null) {
 
 require_once __DIR__ . '/explorer_view.php';
 $github_pages_plugin_loaded = false;
+$aw_ssg_template_plugin_loaded = false;
 $github_pages_env_ready = false;
 $github_pages_plugins = explorer_view_get_enabled_plugins([
     'page' => 'index',
@@ -96,9 +98,11 @@ $github_pages_plugins = explorer_view_get_enabled_plugins([
     'plugins_enabled' => true,
 ]);
 foreach ($github_pages_plugins as $plugin) {
-    if (($plugin['id'] ?? '') === 'github_pages_export') {
+    $pluginId = (string)($plugin['id'] ?? '');
+    if ($pluginId === 'github_pages_export') {
         $github_pages_plugin_loaded = true;
-        break;
+    } else if ($pluginId === 'aw_ssg_template_export') {
+        $aw_ssg_template_plugin_loaded = true;
     }
 }
 if ($github_pages_plugin_loaded) {
@@ -127,6 +131,10 @@ $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) |
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
 if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
+$exportClassPrefix = isset($MDW_SETTINGS['export_class_prefix']) ? trim((string)$MDW_SETTINGS['export_class_prefix']) : '';
+$exportClassPrefix = preg_replace('/[^A-Za-z0-9_-]+/', '', (string)$exportClassPrefix);
+if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) $exportClassPrefix = substr($exportClassPrefix, 0, 24);
+$jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($MDW_SETTINGS['jinja_meta_prefix'] ?? 'page_');
 $tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
 if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
@@ -422,6 +430,18 @@ function mdw_delete_md_folder($full, &$error) {
     return true;
 }
 
+function mdw_new_md_return_url_from_post() {
+    $returnPage = isset($_POST['return_page']) ? strtolower(trim((string)$_POST['return_page'])) : 'index';
+    if ($returnPage === 'edit') {
+        $returnFileRaw = isset($_POST['return_file']) ? (string)$_POST['return_file'] : '';
+        $returnFile = sanitize_md_path($returnFileRaw);
+        if ($returnFile) {
+            return 'edit.php?file=' . rawurlencode($returnFile) . '&new=1';
+        }
+    }
+    return 'index.php?new=1';
+}
+
 /* LINKS FROM CSV (shortcuts at top) */
 function read_shortcuts_csv($csv){
     $out = [];
@@ -529,9 +549,13 @@ function try_secret_login($passwordInput) {
         }
 
 		if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+            $postAction = isset($_POST['action']) ? (string)$_POST['action'] : '';
 		    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
 	    if (!hash_equals($CSRF_TOKEN, $csrf)) {
             $_SESSION['flash_error'] = mdw_t('flash.csrf_invalid', 'Invalid session (CSRF). Reload the page.');
+            if ($postAction === 'create') {
+                redirect(mdw_new_md_return_url_from_post());
+            }
             redirect('index.php');
 	    } else if ($_POST['action'] === 'delete') {
         $postedFile = isset($_POST['file']) ? (string)$_POST['file'] : '';
@@ -895,6 +919,7 @@ function try_secret_login($passwordInput) {
 		        $_SESSION['flash_ok'] = mdw_t('flash.folder_created_prefix', 'Folder created:') . ' ' . $name;
 		        redirect('index.php?folder=' . rawurlencode($name));
             } else if ($_POST['action'] === 'create') {
+            $returnAfterCreateError = mdw_new_md_return_url_from_post();
             $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
             $prefixDate = isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
                 $draftFolder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : 'root';
@@ -1023,7 +1048,7 @@ function try_secret_login($passwordInput) {
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
 		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
-		                        redirect('index.php?new=1');
+		                        redirect($returnAfterCreateError);
 		                    }
 		                    $requireH2 = !array_key_exists('publisher_require_h2', $MDW_SETTINGS) ? true : !empty($MDW_SETTINGS['publisher_require_h2']);
 		                    if ($requireH2 && !mdw_md_has_h2($content)) {
@@ -1035,7 +1060,7 @@ function try_secret_login($passwordInput) {
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
 		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
-		                        redirect('index.php?new=1');
+		                        redirect($returnAfterCreateError);
 		                    }
 		                }
 		                // Ensure hidden metadata block at top (creationdate/changedate/date/published_date/publishstate).
@@ -1046,6 +1071,7 @@ function try_secret_login($passwordInput) {
 		                    $opts['settings'] = $settingsOverride;
 		                }
 		                if (!empty($MDW_PUBLISHER_MODE)) {
+		                    $opts['inject_obligatory'] = true;
 		                    $pageTitleCandidate = trim((string)($titleInput ?? ''));
 		                    if ($pageTitleCandidate === '') {
 		                        $pageTitleCandidate = preg_replace('/\.md$/i', '', basename($sanNew));
@@ -1092,7 +1118,7 @@ function try_secret_login($passwordInput) {
                 'content' => $draftContent,
                 'prefix_date' => $prefixDate ? 1 : 0,
             ];
-	        redirect('index.php?new=1');
+	        redirect($returnAfterCreateError);
 	    }
 	}
 
@@ -1402,58 +1428,6 @@ window.mermaid = mermaid;
 </section>
 <?php endif; ?>
 
-<section id="newMdPanel" class="editor-pane" style="margin: 0 0 1.5rem; padding: 1rem; display: <?= $open_new_panel ? 'block' : 'none' ?>;">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-        <div>
-            <div style="font-size: 0.9rem; font-weight: 600;"><?=h(mdw_t('index.new_markdown.title','New markdown'))?></div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                <?=h(mdw_t('index.new_markdown.relative_path','Pick a folder, add a title, and a slug is created for the filename.'))?>
-            </div>
-        </div>
-        <button id="newMdClose" type="button" class="btn btn-ghost btn-small"><?=h(mdw_t('index.new_markdown.close','Close'))?></button>
-    </div>
-
-	    <form method="post" style="margin-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem;">
-	        <input type="hidden" name="action" value="create">
-	        <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-		        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-		            <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
-			                <select name="new_folder" class="input" style="width: auto; flex: 1 1 12rem; min-width: 10rem;" aria-label="<?=h(mdw_t('common.folder','Folder'))?>">
-			                <option value="root" <?= $default_new_folder === 'root' ? 'selected' : '' ?>><?=h(mdw_t('common.root','Root'))?></option>
-		                <?php foreach ($existingFolders as $folder): ?>
-		                    <option value="<?=h($folder)?>" <?= $default_new_folder === $folder ? 'selected' : '' ?>><?=h($folder)?></option>
-		                <?php endforeach; ?>
-		            </select>
-			            <label class="status-text" style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;" title="<?=h(mdw_t('index.new_markdown.date_prefix_title','Adds a yy-mm-dd- prefix so notes sort nicely by date.'))?>">
-			                <input id="newMdPrefixDate" type="checkbox" name="prefix_date" value="1" <?= $new_md_prefix_checked ? 'checked' : '' ?> data-date-prefix="<?=h($today_prefix)?>">
-			                <span>yy-mm-dd-</span>
-			            </label>
-			            </div>
-                        <div style="display:flex; flex-direction: column; gap: 0.35rem;">
-                            <label class="status-text" for="newMdTitle"><?=h(mdw_t('index.new_markdown.title_label','Title'))?></label>
-                            <input id="newMdTitle" name="new_title" class="input" style="width: 100%;" type="text" value="<?=h($new_md_title_value)?>" placeholder="<?=h(mdw_t('index.new_markdown.title_placeholder','Your title'))?>" minlength="<?=MDW_NEW_MD_TITLE_MIN?>" maxlength="<?=MDW_NEW_MD_TITLE_MAX?>" data-title-min="<?=MDW_NEW_MD_TITLE_MIN?>" data-title-max="<?=MDW_NEW_MD_TITLE_MAX?>" required>
-                            <div id="newMdTitleHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
-                        </div>
-                        <div style="display:flex; flex-direction: column; gap: 0.35rem;">
-                            <label class="status-text" for="newMdFile"><?=h(mdw_t('index.new_markdown.slug_label','Slug / filename'))?></label>
-                            <div style="display:flex; align-items:center; gap: 0.4rem;">
-                                <input id="newMdFile" name="new_slug" class="input" style="width: 100%;" type="text" value="<?=h($new_md_slug_value)?>" placeholder="<?=h(mdw_t('index.new_markdown.filename_placeholder','my-title'))?>" minlength="<?=MDW_NEW_MD_SLUG_MIN?>" maxlength="<?=MDW_NEW_MD_SLUG_MAX?>" data-slug-min="<?=MDW_NEW_MD_SLUG_MIN?>" data-slug-max="<?=MDW_NEW_MD_SLUG_MAX?>" required>
-                                <span class="status-text">.md</span>
-                            </div>
-                            <div id="newMdFileHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
-                            <div id="newMdFilePreview" class="status-text" data-label="<?=h(mdw_t('index.new_markdown.filename_preview','Filename'))?>" style="margin-top: 0.1rem; display: none;">
-                                <?=h(mdw_t('index.new_markdown.filename_preview','Filename'))?>: <code id="newMdFilePreviewValue"></code>
-                            </div>
-                            <div class="status-text" data-auth-regular="1" style="margin-top: 0.1rem;"><?=h(mdw_t('index.new_markdown.slug_locked','Only a superuser can edit the slug.'))?></div>
-                        </div>
-			        </div>
-			        <textarea name="new_content" class="input" rows="4" style="height: auto; display: block;" placeholder="<?=h(mdw_t('index.new_markdown.content_placeholder', "# Title\n\nStart writing..."))?>"><?=h($new_md_content_value)?></textarea>
-			        <div style="display: flex; justify-content: flex-end;">
-				            <button type="submit" class="btn btn-primary btn-small"><?=h(mdw_t('index.new_markdown.create_edit','Create & edit'))?></button>
-				        </div>
-			    </form>
-</section>
-
 	<?php
 	require_once __DIR__ . '/explorer_view.php';
 	explorer_view_render_plugin_hook('header', [
@@ -1492,6 +1466,22 @@ window.mermaid = mermaid;
 	    'show_actions' => true,
 	]);
 	?>
+
+    <?php
+    mdw_render_new_md_modal([
+        'open' => $open_new_panel,
+        'csrf' => $CSRF_TOKEN,
+        'form_action' => 'index.php',
+        'existing_folders' => $existingFolders,
+        'default_folder' => $default_new_folder,
+        'today_prefix' => $today_prefix,
+        'title' => $new_md_title_value,
+        'slug' => $new_md_slug_value,
+        'content' => $new_md_content_value,
+        'prefix_checked' => $new_md_prefix_checked,
+        'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
+    ]);
+    ?>
 
 <?php elseif ($mode==='secret_prompt'): ?>
 
@@ -1772,6 +1762,14 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
 				                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
 				                </select>
+				                <label class="modal-label" for="exportClassPrefixInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.class_prefix_label','Export class prefix'))?></label>
+				                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+				                    <input id="exportClassPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.copy.class_prefix_placeholder','md-'))?>" value="<?=h($exportClassPrefix)?>" data-auth-superuser-enable="1">
+				                    <button type="button" class="btn btn-ghost btn-small" id="exportClassPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.copy.class_prefix_save','Save prefix'))?></button>
+				                </div>
+				                <div id="exportClassPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.copy.class_prefix_hint','Applies to medium/wet HTML export; dry export removes all classes.'))?>
+				                </div>
 				                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
 				                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
 				                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
@@ -1907,15 +1905,31 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                <div class="status-text">
 				                    <?=h(mdw_t('theme.metadata.hint','Control whether metadata is shown in the Markdown editor and/or HTML preview. If hidden in Markdown, it is also hidden in HTML preview.'))?>
 				                </div>
-				                <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                <?php if (!empty($aw_ssg_template_plugin_loaded)): ?>
+				                <div class="modal-field" style="margin: 0;">
+				                    <label class="modal-label" for="jinjaMetaPrefixInput"><?=h(mdw_t('theme.metadata.jinja_prefix_label','Jinja mapped prefix'))?></label>
+				                    <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+				                        <input id="jinjaMetaPrefixInput" type="text" class="input" style="flex: 1 1 auto;" value="<?=h($jinjaMetaPrefix)?>" placeholder="<?=h(mdw_t('theme.metadata.jinja_prefix_placeholder','page_'))?>">
+				                        <button type="button" class="btn btn-ghost btn-small" id="jinjaMetaPrefixSaveBtn"><?=h(mdw_t('theme.metadata.jinja_prefix_save','Save prefix'))?></button>
+				                    </div>
+				                    <div id="jinjaMetaPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+				                        <?=h(mdw_t('theme.metadata.jinja_prefix_hint','Maps metadata keys like page_picture -> blog_picture in Template download (default: page_).'))?>
+				                    </div>
+				                </div>
+				                <?php endif; ?>
+				                <div style="display:grid; grid-template-columns: 1fr auto auto auto minmax(10rem, 1fr); gap: 0.5rem 0.75rem; align-items:center;">
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
 				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.obligatory','Obligatory'))?></div>
+				                    <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.default_value','Default value'))?></div>
 				                    <?php foreach (($META_CFG['fields'] ?? []) as $k => $f): ?>
 				                        <?php
 				                            $label = (string)($f['label'] ?? $k);
 				                            $mdVis = !empty($f['markdown_visible']);
 				                            $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                            $obligatory = !empty($f['obligatory']);
+				                            $defaultValue = trim((string)($f['default_value'] ?? ''));
 				                        ?>
 				                        <div><?=h($label)?></div>
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -1924,19 +1938,27 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
 				                        </label>
+				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
+				                        </label>
+				                        <input type="text" class="input" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
 				                    <?php endforeach; ?>
 				                </div>
 				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
 				                    <div class="status-text" style="font-weight: 600; margin-bottom: 0.4rem;"><?=h(mdw_t('theme.publisher.title','WPM (Website publication mode)'))?></div>
-				                    <div style="display:grid; grid-template-columns: 1fr auto auto; gap: 0.5rem 0.75rem; align-items:center;">
+				                    <div style="display:grid; grid-template-columns: 1fr auto auto auto minmax(10rem, 1fr); gap: 0.5rem 0.75rem; align-items:center;">
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.field','Field'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_markdown','Markdown'))?></div>
 				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.show_html','HTML'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.obligatory','Obligatory'))?></div>
+				                        <div class="status-text" style="font-weight: 600;"><?=h(mdw_t('theme.metadata.default_value','Default value'))?></div>
 				                        <?php foreach (($META_PUBLISHER_CFG['fields'] ?? []) as $k => $f): ?>
 				                            <?php
 				                                $label = (string)($f['label'] ?? $k);
 				                                $mdVis = !empty($f['markdown_visible']);
 				                                $htmlVis = !empty($f['html_visible']) && $mdVis;
+				                                $obligatory = !empty($f['obligatory']);
+				                                $defaultValue = trim((string)($f['default_value'] ?? ''));
 				                            ?>
 				                            <div><?=h($label)?></div>
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -1945,6 +1967,10 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="html" <?= $htmlVis ? 'checked' : '' ?> <?= $mdVis ? '' : 'disabled' ?>>
 				                            </label>
+				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
+				                            </label>
+				                            <input type="text" class="input" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
 				                        <?php endforeach; ?>
 				                    </div>
 				                </div>

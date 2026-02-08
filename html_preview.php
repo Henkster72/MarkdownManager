@@ -340,16 +340,18 @@ function fix_mathjax_currency_in_math_delimiters($text) {
     return $text;
 }
 
-function mdw_extract_footnotes($text) {
+function mdw_extract_footnotes($text, $lineMapIn = null, &$lineMapOut = null) {
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
     $lines = explode("\n", $text);
     $out = [];
+    $map = [];
     $footnotes = [];
     $in_codeblock = false;
 
-    foreach ($lines as $line) {
+    foreach ($lines as $idx => $line) {
         if (preg_match('/^\s*```/', $line)) {
             $out[] = $line;
+            if (is_array($lineMapIn)) $map[] = $lineMapIn[$idx] ?? $idx;
             $in_codeblock = !$in_codeblock;
             continue;
         }
@@ -383,8 +385,12 @@ function mdw_extract_footnotes($text) {
         }
 
         $out[] = $line;
+        if (is_array($lineMapIn)) $map[] = $lineMapIn[$idx] ?? $idx;
     }
 
+    if (func_num_args() >= 3) {
+        $lineMapOut = is_array($lineMapIn) ? $map : $lineMapOut;
+    }
     return [implode("\n", $out), $footnotes];
 }
 
@@ -403,25 +409,25 @@ function mdw_collect_footnote_refs($text) {
         }
         if ($in_codeblock) continue;
 
-        if (preg_match_all('/\[([^\]]+)\]\[(\d+)\]/', $line, $m, PREG_SET_ORDER)) {
+        if (preg_match_all('/\[([^\]]+)\]\[([A-Za-z0-9_-]+)\]/', $line, $m, PREG_SET_ORDER)) {
             foreach ($m as $match) {
                 $label = trim((string)($match[1] ?? ''));
-                $num = (string)($match[2] ?? '');
-                if ($num === '') continue;
-                if (!isset($labels[$num]) && $label !== '') $labels[$num] = $label;
-                if (isset($seen[$num])) continue;
-                $seen[$num] = true;
-                $order[] = $num;
+                $ref = (string)($match[2] ?? '');
+                if ($ref === '') continue;
+                if (!isset($labels[$ref]) && $label !== '') $labels[$ref] = $label;
+                if (isset($seen[$ref])) continue;
+                $seen[$ref] = true;
+                $order[] = $ref;
             }
         }
 
         if (preg_match_all('/\[\^([A-Za-z0-9_-]+)\]/', $line, $m, PREG_SET_ORDER)) {
             foreach ($m as $match) {
-                $num = (string)($match[1] ?? '');
-                if ($num === '') continue;
-                if (isset($seen[$num])) continue;
-                $seen[$num] = true;
-                $order[] = $num;
+                $ref = (string)($match[1] ?? '');
+                if ($ref === '') continue;
+                if (isset($seen[$ref])) continue;
+                $seen[$ref] = true;
+                $order[] = $ref;
             }
         }
     }
@@ -515,10 +521,10 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
         $text
     );
 
-    // [text][1] (numeric footnotes)
+    // [text][label] footnotes
     $text = preg_replace_callback(
-        "/\\[([^\\]]+)\\]\\[(\\d+)\\]/",
-        function($m) use ($mdPath, $footnotes){
+        "/\\[([^\\]]+)\\]\\[([A-Za-z0-9_-]+)\\]/",
+        function($m) use ($footnotes){
             $labelEsc = $m[1];
             $key = (string)($m[2] ?? '');
             if (!isset($footnotes[$key])) return $m[0];
@@ -530,9 +536,9 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
 
             $hover = $labelRaw !== '' ? $labelRaw : ($titleRaw !== '' ? $titleRaw : $urlRaw);
             $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
-            $numEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
 
-            return '<sup class="md-footnote"><a class="md-footnote-ref" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
+            return '<sup class="md-footnote fn"><a class="md-footnote-ref fn" href="#fn-'.$keyEsc.'"'.$titleAttr.'>'.$keyEsc.'</a></sup>';
         },
         $text
     );
@@ -556,7 +562,7 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
             }
             $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
             $numEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
-            return '<sup class="md-footnote"><a class="md-footnote-ref" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
+            return '<sup class="md-footnote fn"><a class="md-footnote-ref fn" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
         },
         $text
     );
@@ -737,16 +743,18 @@ function mdw_hidden_meta_match($line, &$keyOut = null, &$valueOut = null) {
     return true;
 }
 
-function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null) {
+function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null, &$lineMapOut = null) {
     $raw = str_replace(["\r\n", "\r"], "\n", (string)$raw);
     $lines = explode("\n", $raw);
     if (!$lines) {
         $metaOut = [];
+        if (func_num_args() >= 3) $lineMapOut = [];
         return '';
     }
 
     $meta = [];
     $out = [];
+    $lineMap = [];
     $bufferedLeading = [];
     $inMeta = true;
     $seenMeta = false;
@@ -755,7 +763,7 @@ function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null) {
     if (isset($lines[0])) {
         $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
     }
-    foreach ($lines as $line) {
+    foreach ($lines as $idx => $line) {
         if ($inMeta) {
             $k = null;
             $v = null;
@@ -765,27 +773,31 @@ function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null) {
                 continue;
             }
             if (!$seenMeta && trim((string)$line) === '') {
-                $bufferedLeading[] = $line;
+                $bufferedLeading[] = ['line' => $line, 'idx' => $idx];
                 continue;
             }
             $inMeta = false;
             if (!empty($bufferedLeading)) {
                 foreach ($bufferedLeading as $buffered) {
-                    $out[] = $buffered;
+                    $out[] = $buffered['line'];
+                    $lineMap[] = $buffered['idx'];
                 }
                 $bufferedLeading = [];
             }
         }
         $out[] = $line;
+        $lineMap[] = $idx;
     }
 
     if ($inMeta && !empty($bufferedLeading)) {
         foreach ($bufferedLeading as $buffered) {
-            $out[] = $buffered;
+            $out[] = $buffered['line'];
+            $lineMap[] = $buffered['idx'];
         }
     }
 
     $metaOut = $meta;
+    if (func_num_args() >= 3) $lineMapOut = $lineMap;
     return implode("\n", $out);
 }
 
@@ -945,7 +957,7 @@ function mdw_html_tag_balance_delta($line, $tag) {
 function mdw_html_set_attr($attrs, $name, $value) {
     $attrs = trim((string)$attrs);
     $name = preg_quote((string)$name, '/');
-    $attrs = preg_replace('/\\s+'.$name.'\\s*=\\s*(\"[^\"]*\"|\\\'[^\\\']*\\\'|[^\\s>]+)/i', '', $attrs);
+    $attrs = preg_replace('/(?:^|\\s+)'.$name.'\\s*=\\s*(\"[^\"]*\"|\\\'[^\\\']*\\\'|[^\\s>]+)/i', '', $attrs);
     $attrs = trim($attrs);
     $safeValue = htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
     $attrs .= ($attrs !== '' ? ' ' : '') . preg_replace('/\\\\/', '', $name) . '="' . $safeValue . '"';
@@ -966,6 +978,80 @@ function mdw_html_add_class($attrs, $class) {
     }
     $new = trim(implode(' ', array_filter($classes)));
     return mdw_html_set_attr($attrs, 'class', $new);
+}
+
+function mdw_html_insert_attrs($html, $attrs) {
+    if (!is_string($html) || $html === '' || !is_string($attrs) || $attrs === '') return $html;
+    $pos = strpos($html, '<');
+    if ($pos === false) return $html;
+    if (isset($html[$pos + 1]) && $html[$pos + 1] === '/') return $html;
+    $gt = strpos($html, '>', $pos);
+    if ($gt === false) return $html;
+    $head = substr($html, $pos, $gt - $pos);
+    if (stripos($head, 'data-mdw-src-start') !== false) return $html;
+    return substr($html, 0, $gt) . $attrs . substr($html, $gt);
+}
+
+function mdw_html_strip_source_map_attrs($html) {
+    if (!is_string($html) || $html === '') return (string)$html;
+    return (string)preg_replace('/\\sdata-mdw-src-(?:start|end)\\s*=\\s*(?:"[^"]*"|\\\'[^\\\']*\\\'|[^\\s>]+)/i', '', $html);
+}
+
+function mdw_normalize_export_class_prefix($prefix) {
+    $prefix = trim((string)$prefix);
+    if ($prefix === '') return '';
+    $prefix = preg_replace('/[^A-Za-z0-9_-]+/', '', $prefix);
+    if ($prefix === null) $prefix = '';
+    if (strlen($prefix) > 24) $prefix = substr($prefix, 0, 24);
+    return $prefix;
+}
+
+function mdw_normalize_jinja_meta_prefix($prefix) {
+    $prefix = strtolower(trim((string)$prefix));
+    if ($prefix === '') return 'page_';
+    $prefix = preg_replace('/[^a-z0-9_]+/', '_', $prefix);
+    if (!is_string($prefix) || $prefix === '') return 'page_';
+    if (preg_match('/^[0-9]/', $prefix)) $prefix = 'p_' . $prefix;
+    if (!str_ends_with($prefix, '_')) $prefix .= '_';
+    if (strlen($prefix) > 24) $prefix = substr($prefix, 0, 24);
+    if (!preg_match('/[a-z]/', $prefix)) return 'page_';
+    return $prefix;
+}
+
+function mdw_rewrite_md_class_prefix_in_css($css, $prefix) {
+    $css = (string)$css;
+    $prefix = mdw_normalize_export_class_prefix($prefix);
+    if ($css === '' || $prefix === 'md-') return $css;
+    return (string)preg_replace('/(?<=\\.)md-([A-Za-z0-9_-]+)/', $prefix . '$1', $css);
+}
+
+function mdw_rewrite_md_class_prefix_in_html($html, $prefix, $dropMdClassesWhenPrefixEmpty = false) {
+    $html = (string)$html;
+    $prefix = mdw_normalize_export_class_prefix($prefix);
+    if ($html === '' || $prefix === 'md-') return $html;
+    $dropMdClassesWhenPrefixEmpty = (bool)$dropMdClassesWhenPrefixEmpty;
+    return (string)preg_replace_callback('/(\\s*)\\bclass\\s*=\\s*(["\\\'])(.*?)\\2/si', function($m) use ($prefix, $dropMdClassesWhenPrefixEmpty) {
+        $lead = (string)($m[1] ?? '');
+        $quote = (string)($m[2] ?? '"');
+        $raw = html_entity_decode((string)($m[3] ?? ''), ENT_QUOTES, 'UTF-8');
+        $tokens = preg_split('/\\s+/', trim($raw));
+        if (!is_array($tokens) || !$tokens) return $m[0];
+        $mapped = [];
+        foreach ($tokens as $cls) {
+            $cls = trim((string)$cls);
+            if ($cls === '') continue;
+            if (strncmp($cls, 'md-', 3) === 0) {
+                if ($prefix === '' && $dropMdClassesWhenPrefixEmpty) {
+                    continue;
+                }
+                $cls = $prefix . substr($cls, 3);
+            }
+            $mapped[] = $cls;
+        }
+        $mapped = array_values(array_unique($mapped));
+        if (!$mapped) return '';
+        return $lead . 'class=' . $quote . htmlspecialchars(implode(' ', $mapped), ENT_QUOTES, 'UTF-8') . $quote;
+    }, $html);
 }
 
 function mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, &$tocIndex) {
@@ -1048,9 +1134,12 @@ function mdw_metadata_default_config() {
             'theme_overrides' => ['preview' => [], 'editor' => []],
             'custom_css' => '',
             'app_title' => '',
+            'internal_link_prefix' => '',
+            'export_class_prefix' => '',
+            'jinja_meta_prefix' => 'page_',
         ],
         'fields' => [
-            'date' => ['label' => 'Date', 'markdown_visible' => true, 'html_visible' => false],
+            'date' => ['label' => 'Date', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
         ],
     ];
 }
@@ -1125,6 +1214,17 @@ function mdw_metadata_normalize_config($cfg) {
     $themeOverrides = mdw_theme_overrides_normalize($inSettings['theme_overrides'] ?? []);
     $customCss = mdw_sanitize_custom_css($inSettings['custom_css'] ?? '');
     $appTitle = isset($inSettings['app_title']) ? trim((string)$inSettings['app_title']) : '';
+    $internalLinkPrefix = isset($inSettings['internal_link_prefix']) ? trim((string)$inSettings['internal_link_prefix']) : '';
+    $internalLinkPrefix = preg_replace('/[\r\n]+/', '', $internalLinkPrefix);
+    if (is_string($internalLinkPrefix) && strlen($internalLinkPrefix) > 240) {
+        $internalLinkPrefix = substr($internalLinkPrefix, 0, 240);
+    }
+    $exportClassPrefix = isset($inSettings['export_class_prefix']) ? trim((string)$inSettings['export_class_prefix']) : '';
+    $exportClassPrefix = preg_replace('/[^A-Za-z0-9_-]+/', '', (string)$exportClassPrefix);
+    if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) {
+        $exportClassPrefix = substr($exportClassPrefix, 0, 24);
+    }
+    $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($inSettings['jinja_meta_prefix'] ?? 'page_');
     $out['_settings'] = [
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $publisherDefaultAuthor,
@@ -1143,6 +1243,9 @@ function mdw_metadata_normalize_config($cfg) {
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
         'app_title' => $appTitle,
+        'internal_link_prefix' => $internalLinkPrefix,
+        'export_class_prefix' => $exportClassPrefix,
+        'jinja_meta_prefix' => $jinjaMetaPrefix,
     ];
 
     $fields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
@@ -1153,11 +1256,16 @@ function mdw_metadata_normalize_config($cfg) {
             : (string)($v['label'] ?? $k);
         $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
         $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+        $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($v['obligatory'] ?? false);
+        $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($v['default_value'] ?? ''));
+        $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
         if (!$mdVis && $k !== 'author') $htmlVis = false;
         $out['fields'][$k] = [
             'label' => $label,
             'markdown_visible' => $mdVis,
             'html_visible' => $htmlVis,
+            'obligatory' => $obligatory,
+            'default_value' => $defaultValue,
         ];
     }
 
@@ -1178,22 +1286,22 @@ function mdw_metadata_default_publisher_config() {
     return [
         '_meta' => ['version' => 1],
         'fields' => [
-            'author' => ['label' => 'Author', 'markdown_visible' => false, 'html_visible' => true],
-            'creationdate' => ['label' => 'Created', 'markdown_visible' => true, 'html_visible' => false],
-            'changedate' => ['label' => 'Updated', 'markdown_visible' => true, 'html_visible' => false],
-            'published_date' => ['label' => 'Published date', 'markdown_visible' => true, 'html_visible' => false],
-            'publishstate' => ['label' => 'Publish state', 'markdown_visible' => true, 'html_visible' => false],
+            'author' => ['label' => 'Author', 'markdown_visible' => false, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
+            'creationdate' => ['label' => 'Created', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
+            'changedate' => ['label' => 'Updated', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
+            'published_date' => ['label' => 'Published date', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
+            'publishstate' => ['label' => 'Publish state', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
 
-            'extends' => ['label' => 'Extends', 'markdown_visible' => true, 'html_visible' => false],
-            'page_title' => ['label' => 'Page title', 'markdown_visible' => true, 'html_visible' => true],
-            'page_subtitle' => ['label' => 'Page subtitle', 'markdown_visible' => true, 'html_visible' => true],
-            'post_date' => ['label' => 'Post date', 'markdown_visible' => true, 'html_visible' => true],
-            'page_picture' => ['label' => 'Page picture', 'markdown_visible' => true, 'html_visible' => true],
-            'active_page' => ['label' => 'Active page', 'markdown_visible' => true, 'html_visible' => false],
-            'cta' => ['label' => 'CTA', 'markdown_visible' => true, 'html_visible' => false],
-            'blurmenu' => ['label' => 'Blur menu', 'markdown_visible' => true, 'html_visible' => false],
-            'sociallinks' => ['label' => 'Social links', 'markdown_visible' => true, 'html_visible' => false],
-            'blog' => ['label' => 'Blog', 'markdown_visible' => true, 'html_visible' => false],
+            'extends' => ['label' => 'Extends', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
+            'page_title' => ['label' => 'Page title', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
+            'page_subtitle' => ['label' => 'Page subtitle', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
+            'post_date' => ['label' => 'Post date', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
+            'page_picture' => ['label' => 'Page picture', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
+            'active_page' => ['label' => 'Active page', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => true, 'default_value' => ''],
+            'cta' => ['label' => 'CTA', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => true, 'default_value' => 'True'],
+            'blurmenu' => ['label' => 'Blur menu', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => true, 'default_value' => 'True'],
+            'sociallinks' => ['label' => 'Social links', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => true, 'default_value' => 'True'],
+            'blog' => ['label' => 'Blog', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => true, 'default_value' => 'True'],
         ],
         'html_map' => [
             'page_title' => ['prefix' => '<h1>', 'postfix' => '</h1>', 'omit_meta' => true],
@@ -1215,11 +1323,16 @@ function mdw_metadata_normalize_publisher_config($cfg) {
             : (string)($v['label'] ?? $k);
         $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
         $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
+        $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($v['obligatory'] ?? false);
+        $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($v['default_value'] ?? ''));
+        $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
         if (!$mdVis && $k !== 'author') $htmlVis = false;
         $out['fields'][$k] = [
             'label' => $label,
             'markdown_visible' => $mdVis,
             'html_visible' => $htmlVis,
+            'obligatory' => $obligatory,
+            'default_value' => $defaultValue,
         ];
     }
 
@@ -1309,6 +1422,38 @@ function mdw_metadata_all_field_configs($publisherMode = null) {
     return array_merge($baseFields, $pubFields);
 }
 
+function mdw_active_page_from_md_path($mdPath) {
+    $mdPath = trim(str_replace("\\", "/", (string)$mdPath));
+    if ($mdPath === '') return '';
+    $dir = trim((string)dirname($mdPath));
+    if ($dir === '' || $dir === '.' || $dir === '/') return '';
+    $dir = trim(str_replace("\\", "/", $dir), '/');
+    if ($dir === '') return '';
+    $parts = array_values(array_filter(explode('/', $dir), fn($p) => trim((string)$p) !== ''));
+    if (empty($parts)) return '';
+    // Use top-level section so nested paths still map to the primary site section.
+    return trim((string)$parts[0]);
+}
+
+function mdw_metadata_obligatory_defaults($publisherMode = null, $mdPath = null) {
+    $fields = mdw_metadata_all_field_configs($publisherMode);
+    if (!is_array($fields) || empty($fields)) return [];
+    $out = [];
+    foreach ($fields as $k => $f) {
+        $key = strtolower(trim((string)$k));
+        if ($key === '' || !is_array($f) || empty($f['obligatory'])) continue;
+        $defaultValue = trim((string)($f['default_value'] ?? ''));
+        $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
+        if ($key === 'active_page') {
+            $derived = mdw_active_page_from_md_path($mdPath);
+            if ($derived !== '') $defaultValue = $derived;
+        }
+        if ($defaultValue === '') continue;
+        $out[$key] = $defaultValue;
+    }
+    return $out;
+}
+
 function mdw_metadata_allowed_keys() {
     static $allowed = null;
     if (is_array($allowed)) return $allowed;
@@ -1353,6 +1498,9 @@ function mdw_metadata_settings() {
         'theme_overrides' => mdw_theme_overrides_normalize($s['theme_overrides'] ?? []),
         'custom_css' => mdw_sanitize_custom_css($s['custom_css'] ?? ''),
         'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
+        'internal_link_prefix' => isset($s['internal_link_prefix']) ? trim((string)$s['internal_link_prefix']) : '',
+        'export_class_prefix' => isset($s['export_class_prefix']) ? trim((string)$s['export_class_prefix']) : '',
+        'jinja_meta_prefix' => isset($s['jinja_meta_prefix']) ? trim((string)$s['jinja_meta_prefix']) : 'page_',
     ];
     if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
     if (!in_array($out['post_date_align'], ['left', 'center', 'right'], true)) $out['post_date_align'] = 'left';
@@ -1361,6 +1509,15 @@ function mdw_metadata_settings() {
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';
     if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
     if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
+    $out['internal_link_prefix'] = preg_replace('/[\r\n]+/', '', $out['internal_link_prefix'] ?? '');
+    if (is_string($out['internal_link_prefix']) && strlen($out['internal_link_prefix']) > 240) {
+        $out['internal_link_prefix'] = substr($out['internal_link_prefix'], 0, 240);
+    }
+    $out['export_class_prefix'] = preg_replace('/[^A-Za-z0-9_-]+/', '', (string)($out['export_class_prefix'] ?? ''));
+    if (is_string($out['export_class_prefix']) && strlen($out['export_class_prefix']) > 24) {
+        $out['export_class_prefix'] = substr($out['export_class_prefix'], 0, 24);
+    }
+    $out['jinja_meta_prefix'] = mdw_normalize_jinja_meta_prefix($out['jinja_meta_prefix'] ?? 'page_');
     return $out;
 }
 
@@ -1431,6 +1588,382 @@ function mdw_format_post_date_value($raw, $format, $lang = null) {
     $label = $months['short'][$month - 1] ?? '';
     if ($label === '') return (string)$raw;
     return sprintf('%s %d, %d', $label, $day, $year);
+}
+
+function mdw_jinja_quote_string($value, $quoteMode = 'double') {
+    $value = str_replace(["\r\n", "\r"], "\n", (string)$value);
+    if ($quoteMode === 'single') {
+        $value = str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
+        return "'" . $value . "'";
+    }
+    $value = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
+    return '"' . $value . '"';
+}
+
+function mdw_jinja_parse_bool_literal($value, &$outBool = null) {
+    $v = strtolower(trim((string)$value));
+    if (in_array($v, ['true', '1', 'yes', 'on'], true)) {
+        $outBool = true;
+        return true;
+    }
+    if (in_array($v, ['false', '0', 'no', 'off'], true)) {
+        $outBool = false;
+        return true;
+    }
+    return false;
+}
+
+function mdw_jinja_value_literal($value, $quoteMode = 'double') {
+    $value = trim((string)$value);
+    $bool = null;
+    if (mdw_jinja_parse_bool_literal($value, $bool)) {
+        return $bool ? 'True' : 'False';
+    }
+    if (preg_match('/^-?\d+(?:\.\d+)?$/', $value)) {
+        return $value;
+    }
+    return mdw_jinja_quote_string($value, $quoteMode === 'single' ? 'single' : 'double');
+}
+
+function mdw_jinja_map_meta_var_name($key, $mappedPrefix = 'page_') {
+    $key = strtolower(trim((string)$key));
+    $mappedPrefix = mdw_normalize_jinja_meta_prefix($mappedPrefix);
+    if (str_starts_with($key, 'page_')) {
+        $key = $mappedPrefix . substr($key, strlen('page_'));
+    }
+    $key = preg_replace('/[^a-z0-9_]+/', '_', $key);
+    if (!is_string($key) || $key === '') $key = 'meta_value';
+    $key = trim($key, '_');
+    if ($key === '') $key = 'meta_value';
+    if (preg_match('/^[0-9]/', $key)) $key = 'meta_' . $key;
+    return $key;
+}
+
+function mdw_jinja_title_prefix_label($mappedPrefix) {
+    $label = trim((string)$mappedPrefix);
+    $label = preg_replace('/_+$/', '', $label);
+    $label = str_replace('_', ' ', $label);
+    $label = trim(preg_replace('/\s+/', ' ', $label));
+    if ($label === '') return 'Page';
+    return ucfirst($label);
+}
+
+function mdw_jinja_normalize_text_value($value) {
+    $value = html_entity_decode(strip_tags((string)$value), ENT_QUOTES, 'UTF-8');
+    $value = str_replace("\xC2\xA0", ' ', $value);
+    $value = preg_replace('/\s+/u', ' ', $value);
+    return strtolower(trim((string)$value));
+}
+
+function mdw_jinja_extract_attr_value($attrs, $name) {
+    $attrs = (string)$attrs;
+    $name = preg_quote((string)$name, '/');
+    if (!preg_match('/\b' . $name . '\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $m)) {
+        return '';
+    }
+    $raw = '';
+    if (isset($m[1]) && $m[1] !== '') $raw = $m[1];
+    else if (isset($m[2]) && $m[2] !== '') $raw = $m[2];
+    else if (isset($m[3]) && $m[3] !== '') $raw = $m[3];
+    return html_entity_decode((string)$raw, ENT_QUOTES, 'UTF-8');
+}
+
+function mdw_jinja_strip_inline_style_attrs($html) {
+    if (!is_string($html) || $html === '') return (string)$html;
+    return (string)preg_replace('/\sstyle\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+}
+
+function mdw_jinja_sanitize_token_path($path) {
+    $path = html_entity_decode(trim((string)$path), ENT_QUOTES, 'UTF-8');
+    if ($path === '') return '';
+    $path = str_replace("\\", "/", $path);
+
+    $parts = @parse_url($path);
+    if (is_array($parts) && isset($parts['path'])) {
+        $path = (string)$parts['path'];
+    } else {
+        $cut = null;
+        $q = strpos($path, '?');
+        $h = strpos($path, '#');
+        if ($q !== false && $h !== false) $cut = min($q, $h);
+        else if ($q !== false) $cut = $q;
+        else if ($h !== false) $cut = $h;
+        if ($cut !== null) $path = substr($path, 0, $cut);
+    }
+
+    $path = rawurldecode((string)$path);
+    $path = ltrim(trim($path), '/');
+    if ($path === '') return '';
+
+    $segments = explode('/', $path);
+    $out = [];
+    foreach ($segments as $seg) {
+        $seg = trim((string)$seg);
+        if ($seg === '' || $seg === '.') continue;
+        if ($seg === '..') {
+            if (!empty($out)) array_pop($out);
+            continue;
+        }
+        $seg = str_replace(["\0", '{', '}', '"', "'"], '', $seg);
+        if ($seg === '') continue;
+        $out[] = $seg;
+    }
+    if (empty($out)) return '';
+    return implode('/', $out);
+}
+
+function mdw_jinja_to_template_href_path($path) {
+    $path = rtrim(mdw_jinja_sanitize_token_path($path), '/');
+    if ($path === '') return '';
+    $ext = strtolower((string)pathinfo($path, PATHINFO_EXTENSION));
+    if ($ext === 'md' || $ext === 'markdown') {
+        $path = preg_replace('/\.(?:md|markdown)$/i', '.html', $path);
+    } else if ($ext === '') {
+        $path .= '.html';
+    }
+    return (string)$path;
+}
+
+function mdw_jinja_link_token_path_from_href($href) {
+    $href = html_entity_decode(trim((string)$href), ENT_QUOTES, 'UTF-8');
+    if ($href === '') return '';
+    if (str_starts_with($href, '#')) return '';
+    if (preg_match('/^(?:mailto|tel|javascript|data):/i', $href)) return '';
+
+    $parts = @parse_url($href);
+    if (is_array($parts)) {
+        $query = isset($parts['query']) ? (string)$parts['query'] : '';
+        if ($query !== '') {
+            $queryMap = [];
+            parse_str($query, $queryMap);
+            if (isset($queryMap['file']) && trim((string)$queryMap['file']) !== '') {
+                return mdw_jinja_to_template_href_path((string)$queryMap['file']);
+            }
+        }
+
+        $scheme = isset($parts['scheme']) ? strtolower((string)$parts['scheme']) : '';
+        $host = isset($parts['host']) ? trim((string)$parts['host']) : '';
+        if ($scheme !== '' || $host !== '' || str_starts_with($href, '//')) {
+            return '';
+        }
+
+        $path = isset($parts['path']) ? (string)$parts['path'] : '';
+        if ($path === '') return '';
+        $path = mdw_jinja_sanitize_token_path($path);
+        if ($path === '') return '';
+        if (preg_match('~(?:^|/)(?:index|edit)\.php$~i', $path)) return '';
+        return mdw_jinja_to_template_href_path($path);
+    }
+
+    if (is_external_url($href) || str_starts_with($href, '//')) return '';
+    return mdw_jinja_to_template_href_path($href);
+}
+
+function mdw_jinja_image_token_path_from_src($src) {
+    $src = html_entity_decode(trim((string)$src), ENT_QUOTES, 'UTF-8');
+    if ($src === '') return '';
+    if (str_starts_with($src, '#')) return '';
+    if (preg_match('/^(?:javascript|data):/i', $src)) return '';
+    if (is_external_url($src) || str_starts_with($src, '//')) return '';
+
+    $parts = @parse_url($src);
+    if (is_array($parts)) {
+        $scheme = isset($parts['scheme']) ? strtolower((string)$parts['scheme']) : '';
+        $host = isset($parts['host']) ? trim((string)$parts['host']) : '';
+        if ($scheme !== '' || $host !== '') return '';
+        $src = isset($parts['path']) ? (string)$parts['path'] : '';
+    }
+
+    $src = mdw_jinja_sanitize_token_path($src);
+    if ($src === '') return '';
+
+    $imagesDir = trim((string)html_preview_images_dir(), '/');
+    if ($imagesDir !== '' && str_starts_with($src, $imagesDir . '/')) {
+        $src = substr($src, strlen($imagesDir) + 1);
+    }
+    return trim((string)$src, '/');
+}
+
+function mdw_jinja_prepare_body_html($bodyHtml, $meta = []) {
+    $bodyHtml = trim((string)$bodyHtml);
+    if ($bodyHtml === '') return '<div class="preview-content"></div>';
+    $meta = is_array($meta) ? $meta : [];
+
+    $bodyHtml = mdw_html_strip_source_map_attrs($bodyHtml);
+    $bodyHtml = mdw_jinja_strip_inline_style_attrs($bodyHtml);
+
+    $pageTitleNorm = mdw_jinja_normalize_text_value($meta['page_title'] ?? '');
+    if ($pageTitleNorm !== '') {
+        $removed = false;
+        $bodyHtml = preg_replace_callback('/<h1\b[^>]*>.*?<\/h1>/is', function($m) use (&$removed, $pageTitleNorm) {
+            if ($removed) return $m[0];
+            $textNorm = mdw_jinja_normalize_text_value($m[0]);
+            if ($textNorm === $pageTitleNorm) {
+                $removed = true;
+                return '';
+            }
+            return $m[0];
+        }, $bodyHtml);
+    }
+
+    $pageSubtitleNorm = mdw_jinja_normalize_text_value($meta['page_subtitle'] ?? '');
+    if ($pageSubtitleNorm !== '') {
+        $removed = false;
+        $bodyHtml = preg_replace_callback('/<h2\b[^>]*>.*?<\/h2>/is', function($m) use (&$removed, $pageSubtitleNorm) {
+            if ($removed) return $m[0];
+            $textNorm = mdw_jinja_normalize_text_value($m[0]);
+            if ($textNorm === $pageSubtitleNorm) {
+                $removed = true;
+                return '';
+            }
+            return $m[0];
+        }, $bodyHtml);
+    }
+
+    $pagePictureToken = '';
+    $pagePictureValue = trim((string)($meta['page_picture'] ?? ''));
+    if ($pagePictureValue !== '') {
+        $pagePictureToken = mdw_jinja_image_token_path_from_src(mdw_page_picture_src($pagePictureValue));
+    }
+    $removedPagePicture = false;
+    $bodyHtml = preg_replace_callback('/<img\b([^>]*)>/i', function($m) use (&$removedPagePicture, $pagePictureToken) {
+        $attrs = (string)($m[1] ?? '');
+        $srcRaw = mdw_jinja_extract_attr_value($attrs, 'src');
+        $tokenPath = mdw_jinja_image_token_path_from_src($srcRaw);
+        if ($tokenPath === '') return $m[0];
+
+        if (!$removedPagePicture && $pagePictureToken !== '') {
+            $tokenBase = strtolower((string)basename($tokenPath));
+            $pageBase = strtolower((string)basename($pagePictureToken));
+            if ($tokenPath === $pagePictureToken || ($tokenBase !== '' && $tokenBase === $pageBase)) {
+                $removedPagePicture = true;
+                return '';
+            }
+        }
+
+        return '{{' . $tokenPath . '}}';
+    }, $bodyHtml);
+
+    $bodyHtml = preg_replace_callback('/<a\b([^>]*)>/i', function($m) {
+        $attrs = (string)($m[1] ?? '');
+        $hrefRaw = mdw_jinja_extract_attr_value($attrs, 'href');
+        $tokenPath = mdw_jinja_link_token_path_from_href($hrefRaw);
+        if ($tokenPath === '') return $m[0];
+        $nextAttrs = mdw_html_set_attr($attrs, 'href', '{{' . $tokenPath . '}}');
+        $nextAttrs = trim((string)$nextAttrs);
+        return '<a' . ($nextAttrs !== '' ? ' ' . $nextAttrs : '') . '>';
+    }, $bodyHtml);
+
+    // Avoid double numbering in ordered footnotes: browser list numbers + explicit "[n]" marker.
+    $bodyHtml = (string)preg_replace(
+        '/(<li\b[^>]*\bid\s*=\s*(?:"fn-[^"]+"|\'fn-[^\']+\'|fn-[^\s>]+)[^>]*>)\s*<span\b[^>]*>\s*\[[^\]]+\]\s*<\/span>/i',
+        '$1',
+        $bodyHtml
+    );
+
+    $bodyHtml = (string)preg_replace('/<p\b[^>]*>\s*<\/p>/i', '', $bodyHtml);
+    $bodyHtml = (string)preg_replace("/\n{3,}/", "\n\n", $bodyHtml);
+    $bodyHtml = trim((string)$bodyHtml);
+    return $bodyHtml !== '' ? $bodyHtml : '<div class="preview-content"></div>';
+}
+
+function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
+    $opts = is_array($opts) ? $opts : [];
+    $settings = (isset($opts['settings']) && is_array($opts['settings'])) ? $opts['settings'] : mdw_metadata_settings();
+    $mdPath = isset($opts['md_path']) ? (string)$opts['md_path'] : null;
+    $mappedPrefix = mdw_normalize_jinja_meta_prefix($settings['jinja_meta_prefix'] ?? 'page_');
+    $exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_prefix'] ?? '');
+    $postDateFormat = isset($settings['post_date_format']) ? trim((string)$settings['post_date_format']) : 'mdy_short';
+    if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
+
+    $meta = [];
+    $bodyMarkdown = mdw_hidden_meta_extract_and_remove_all((string)$rawMarkdown, $meta);
+    $effectiveMeta = $meta;
+    if (!empty($settings['publisher_mode'])) {
+        $requiredDefaults = mdw_metadata_obligatory_defaults(true, $mdPath);
+        foreach ($requiredDefaults as $k => $v) {
+            $cur = isset($effectiveMeta[$k]) ? trim((string)$effectiveMeta[$k]) : '';
+            if ($cur !== '') continue;
+            $effectiveMeta[$k] = (string)$v;
+        }
+    }
+    $activePageValue = trim((string)($effectiveMeta['active_page'] ?? ''));
+    if ($activePageValue === '') {
+        $activePageValue = mdw_active_page_from_md_path($mdPath);
+    }
+    if ($activePageValue !== '') {
+        $effectiveMeta['active_page'] = $activePageValue;
+    }
+    $bodyHtml = '';
+    $useProvidedContentHtml = !empty($opts['use_content_html']);
+    if ($useProvidedContentHtml && isset($opts['content_html']) && is_string($opts['content_html']) && trim((string)$opts['content_html']) !== '') {
+        $bodyHtml = mdw_html_strip_source_map_attrs((string)$opts['content_html']);
+    } else {
+        $rendered = md_to_html($bodyMarkdown, $mdPath, 'edit', ['source_map' => false]);
+        $rendered = mdw_html_strip_source_map_attrs($rendered);
+        $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
+    }
+    $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
+    $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
+
+    $lines = [];
+    $extendsValue = trim((string)($effectiveMeta['extends'] ?? ''));
+    if ($extendsValue === '') $extendsValue = 'base.html';
+    $lines[] = '{% extends ' . mdw_jinja_quote_string($extendsValue, 'double') . ' %}';
+
+    $titleVar = mdw_jinja_map_meta_var_name('page_title', $mappedPrefix);
+    $titleValue = trim((string)($effectiveMeta['page_title'] ?? ''));
+    if ($titleValue !== '') {
+        $lines[] = '{% set ' . $titleVar . ' = ' . mdw_jinja_value_literal($titleValue, 'double') . ' %}';
+    }
+
+    $postDateValue = trim((string)($effectiveMeta['post_date'] ?? ''));
+    if ($postDateValue !== '') {
+        $formattedPostDate = mdw_format_post_date_value($postDateValue, $postDateFormat);
+        $lines[] = '{% set post_date = ' . mdw_jinja_value_literal($formattedPostDate, 'double') . ' %}';
+    }
+
+    $pictureValue = trim((string)($effectiveMeta['page_picture'] ?? ''));
+    if ($pictureValue !== '') {
+        $pictureVar = mdw_jinja_map_meta_var_name('page_picture', $mappedPrefix);
+        $lines[] = '{% set ' . $pictureVar . ' = ' . mdw_jinja_value_literal($pictureValue, 'double') . ' %}';
+    }
+
+    if ($titleValue !== '') {
+        $titlePrefix = mdw_jinja_title_prefix_label($mappedPrefix);
+        $lines[] = '{% block title %}' . $titlePrefix . ' - {{ ' . $titleVar . ' }}{% endblock title %}';
+    }
+    if ($activePageValue !== '') {
+        $lines[] = '{% set active_page = ' . mdw_jinja_value_literal($activePageValue, 'single') . ' %}';
+    }
+
+    $skipKeys = [
+        'extends' => true,
+        'page_title' => true,
+        'post_date' => true,
+        'page_picture' => true,
+        'active_page' => true,
+        'publishstate' => true,
+        'creationdate' => true,
+        'changedate' => true,
+        'published_date' => true,
+        'date' => true,
+    ];
+
+    foreach ($effectiveMeta as $rawKey => $rawValue) {
+        $key = strtolower(trim((string)$rawKey));
+        if ($key === '' || isset($skipKeys[$key])) continue;
+        $value = trim((string)$rawValue);
+        if ($value === '') continue;
+        $varName = mdw_jinja_map_meta_var_name($key, $mappedPrefix);
+        $quoteMode = ($key === 'active_page') ? 'single' : 'double';
+        $lines[] = '{% set ' . $varName . ' = ' . mdw_jinja_value_literal($value, $quoteMode) . ' %}';
+    }
+
+    $lines[] = '{% block content %}';
+    $lines[] = $bodyHtml;
+    $lines[] = '{% endblock content %}';
+    return implode("\n", $lines) . "\n";
 }
 
 function mdw_attr_list_parse_line($line) {
@@ -1745,6 +2278,15 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         }
     }
 
+    if (!empty($opts['inject_obligatory'])) {
+        $requiredDefaults = mdw_metadata_obligatory_defaults($publisherMode, $mdPath);
+        foreach ($requiredDefaults as $k => $v) {
+            $existing = isset($meta[$k]) ? trim((string)$meta[$k]) : '';
+            if ($existing !== '') continue;
+            $meta[$k] = (string)$v;
+        }
+    }
+
     if (!isset($meta['date']) || trim((string)$meta['date']) === '') {
         $fileDate = null;
         if (is_string($mdPath) && $mdPath !== '') {
@@ -1826,8 +2368,13 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
 function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $p = md_render_profile($profile);
 
+    $context = is_array($context) ? $context : [];
+    $sourceMapEnabled = !array_key_exists('source_map', $context) || !empty($context['source_map']);
+
     $meta = [];
-    $body = mdw_hidden_meta_extract_and_remove_all($text, $meta);
+    $lineMap = null;
+    $raw = str_replace(["\r\n","\r"], "\n", (string)$text);
+    $body = mdw_hidden_meta_extract_and_remove_all($raw, $meta, $lineMap);
     $settings = mdw_metadata_settings();
     $publisherMode = !empty($settings['publisher_mode']);
     $publishState = '';
@@ -1847,8 +2394,11 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
     [$text, $comments] = mdw_extract_html_comments($text);
-    $context = is_array($context) ? $context : [];
-    [$text, $localFootnotes] = mdw_extract_footnotes($text);
+    if ($sourceMapEnabled && is_array($lineMap)) {
+        [$text, $localFootnotes] = mdw_extract_footnotes($text, $lineMap, $lineMap);
+    } else {
+        [$text, $localFootnotes] = mdw_extract_footnotes($text);
+    }
     $footnotes = (isset($context['footnotes']) && is_array($context['footnotes'])) ? $context['footnotes'] : [];
     foreach ($localFootnotes as $k => $v) {
         if (!isset($footnotes[$k])) $footnotes[$k] = $v;
@@ -1862,6 +2412,31 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $tocInlineLayout = false;
 
     $lines = explode("\n",$text);
+    $rawLines = [];
+    $lineOffsets = [];
+    if ($sourceMapEnabled && is_array($lineMap)) {
+        $rawLines = explode("\n", $raw);
+        $pos = 0;
+        foreach ($rawLines as $idx => $line) {
+            $lineOffsets[$idx] = $pos;
+            $pos += strlen($line) + 1;
+        }
+    }
+    $srcAttrsFor = function($startLine, $endLine) use ($sourceMapEnabled, $lineMap, $lineOffsets, $rawLines) {
+        if (!$sourceMapEnabled || !is_array($lineMap) || empty($lineMap)) return '';
+        if (!is_int($startLine) || !is_int($endLine)) return '';
+        $origStart = $lineMap[$startLine] ?? null;
+        $origEnd = $lineMap[$endLine] ?? $origStart;
+        if ($origStart === null || $origEnd === null) return '';
+        $startOffset = $lineOffsets[$origStart] ?? 0;
+        $endOffset = ($lineOffsets[$origEnd] ?? 0) + strlen($rawLines[$origEnd] ?? '');
+        if ($endOffset < $startOffset) $endOffset = $startOffset;
+        return ' data-mdw-src-start="' . $startOffset . '" data-mdw-src-end="' . $endOffset . '"';
+    };
+    $applySrcAttrs = function($html, $startLine, $endLine) use ($srcAttrsFor) {
+        $attrs = $srcAttrsFor($startLine, $endLine);
+        return $attrs ? mdw_html_insert_attrs($html, $attrs) : $html;
+    };
     $footnoteInfo = mdw_collect_footnote_refs($text);
     $footnoteRefs = (is_array($footnoteInfo) && isset($footnoteInfo['order']) && is_array($footnoteInfo['order']))
         ? $footnoteInfo['order']
@@ -1873,6 +2448,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $html = [];
     $in_codeblock = false;
     $codeblock_type = null;
+    $codeblockStartLine = null;
+    $codeblockOpenIndex = null;
     $listStack = [];
     $inHtmlBlock = false;
     $htmlBlockTag = '';
@@ -2028,36 +2605,49 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $line = $lines[$i];
 
         // ``` fenced code blocks (allow indentation, e.g. inside lists)
-	        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
-	            $closeAllLists();
-	            if ($in_codeblock) {
-	                if ($codeblock_type === 'mermaid') {
-	                    $html[] = "</pre>";
-	                } else {
-	                    $html[] = "</code></pre>";
-	                }
-	                $in_codeblock = false;
-	                $codeblock_type = null;
-	            } else {
-	                $in_codeblock = true;
-	                $lang = trim((string)($m[1] ?? ''));
-	                if (strtolower($lang) === 'mermaid') {
-	                    $codeblock_type = 'mermaid';
-	                    $preCls = md_join_classes('mermaid', $p['codeblock_pre_class'] ?? '');
-	                    $preAttr = $preCls ? ' class="'.htmlspecialchars($preCls, ENT_QUOTES, 'UTF-8').'"' : ' class="mermaid"';
-	                    $html[] = '<pre'.$preAttr.'>';
-	                } else {
-	                    $codeblock_type = 'code';
-	                    $langEsc = $lang ? htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') : '';
-	                    $langAttr = $lang ? ' class="language-'.$langEsc.'"' : '';
-	                    $langDataAttr = $lang ? ' data-lang="'.$langEsc.'"' : '';
-	                    $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
-	                    $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
-	                    $html[] = '<pre'.$preAttr.$langDataAttr.'><code'.$langAttr.'>';
-	                }
-	            }
-	            continue;
-	        }
+        if (preg_match('/^\s*```(.*)$/', $line, $m)) {
+            $closeAllLists();
+            if ($in_codeblock) {
+                if ($codeblockOpenIndex !== null && isset($html[$codeblockOpenIndex])) {
+                    $startLine = ($codeblockStartLine !== null) ? $codeblockStartLine + 1 : $i;
+                    $endLine = $i - 1;
+                    if ($endLine < $startLine) {
+                        $startLine = $codeblockStartLine ?? $i;
+                        $endLine = $i;
+                    }
+                    $html[$codeblockOpenIndex] = $applySrcAttrs($html[$codeblockOpenIndex], $startLine, $endLine);
+                }
+                if ($codeblock_type === 'mermaid') {
+                    $html[] = "</pre>";
+                } else {
+                    $html[] = "</code></pre>";
+                }
+                $in_codeblock = false;
+                $codeblock_type = null;
+                $codeblockStartLine = null;
+                $codeblockOpenIndex = null;
+            } else {
+                $in_codeblock = true;
+                $codeblockStartLine = $i;
+                $codeblockOpenIndex = count($html);
+                $lang = trim((string)($m[1] ?? ''));
+                if (strtolower($lang) === 'mermaid') {
+                    $codeblock_type = 'mermaid';
+                    $preCls = md_join_classes('mermaid', $p['codeblock_pre_class'] ?? '');
+                    $preAttr = $preCls ? ' class="'.htmlspecialchars($preCls, ENT_QUOTES, 'UTF-8').'"' : ' class="mermaid"';
+                    $html[] = '<pre'.$preAttr.'>';
+                } else {
+                    $codeblock_type = 'code';
+                    $langEsc = $lang ? htmlspecialchars($lang, ENT_QUOTES, 'UTF-8') : '';
+                    $langAttr = $lang ? ' class="language-'.$langEsc.'"' : '';
+                    $langDataAttr = $lang ? ' data-lang="'.$langEsc.'"' : '';
+                    $preCls = htmlspecialchars($p['codeblock_pre_class'] ?? '', ENT_QUOTES, 'UTF-8');
+                    $preAttr = $preCls ? ' class="'.$preCls.'"' : '';
+                    $html[] = '<pre'.$preAttr.$langDataAttr.'><code'.$langAttr.'>';
+                }
+            }
+            continue;
+        }
 
         if ($in_codeblock) {
             $html[] = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
@@ -2100,7 +2690,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $srcEsc = htmlspecialchars($src, ENT_QUOTES, 'UTF-8');
                 $iframeClassEsc = htmlspecialchars(trim($iframeClass), ENT_QUOTES, 'UTF-8');
                 $wrapperClassEsc = htmlspecialchars(trim($wrapperClass), ENT_QUOTES, 'UTF-8');
-                $html[] = '<div class="'.$wrapperClassEsc.'"><iframe class="'.$iframeClassEsc.'" src="'.$srcEsc.'" frameborder="0" allowfullscreen></iframe></div>';
+                $iframeHtml = '<div class="'.$wrapperClassEsc.'"><iframe class="'.$iframeClassEsc.'" src="'.$srcEsc.'" frameborder="0" allowfullscreen></iframe></div>';
+                $iframeHtml = $applySrcAttrs($iframeHtml, $i, $i);
+                $html[] = $iframeHtml;
                 $i += $consume;
                 continue;
             }
@@ -2132,7 +2724,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if ($inHtmlBlock) {
             $headingHtml = mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, $tocIndex);
             if ($headingHtml !== null) {
-                $html[] = $headingHtml;
+                $html[] = $applySrcAttrs($headingHtml, $i, $i);
             } else {
                 $html[] = $line;
             }
@@ -2148,14 +2740,14 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $headingHtml = mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, $tocIndex);
         if ($headingHtml !== null) {
             $closeAllLists();
-            $html[] = $headingHtml;
+            $html[] = $applySrcAttrs($headingHtml, $i, $i);
             continue;
         }
 
         $blockTag = mdw_html_block_tag_from_line($line);
         if ($blockTag !== '') {
             $closeAllLists();
-            $html[] = $line;
+            $html[] = $applySrcAttrs($line, $i, $i);
             if (!mdw_html_is_self_closing_tag($blockTag)) {
                 $delta = mdw_html_tag_balance_delta($line, $blockTag);
                 if ($delta > 0) {
@@ -2195,7 +2787,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                     && $lineIndent > $listStack[count($listStack) - 1]['indent'];
                 if (!$stayInLi) $closeAllLists();
 
-                $html[] = '<div class="md-math-block">' . $mathEsc . '</div>';
+                $mathHtml = '<div class="md-math-block">' . $mathEsc . '</div>';
+                $mathHtml = $applySrcAttrs($mathHtml, $i, $closeIndex);
+                $html[] = $mathHtml;
                 $i = $closeIndex;
                 continue;
             }
@@ -2212,11 +2806,13 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if (preg_match('/^\s*>\s?(.*)$/', $line)) {
             $closeAllLists();
 
+            $bqStartLine = $i;
             $bq = [];
             while ($i < $count && preg_match('/^\s*>\s?(.*)$/', $lines[$i], $m)) {
                 $bq[] = $m[1];
                 $i++;
             }
+            $bqEndLine = $i - 1;
             $i--;
             $bqAttrs = null;
             while (!empty($bq)) {
@@ -2226,7 +2822,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $bqAttrs = mdw_merge_attr_list($bqAttrs, $parsed);
             }
             $inner = implode("\n", $bq);
-            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, $context) . "\n" . '</blockquote>';
+            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false])) . "\n" . '</blockquote>';
+            $bqHtml = $applySrcAttrs($bqHtml, $bqStartLine, $bqEndLine);
             if ($bqAttrs) {
                 $bqHtml = mdw_apply_attr_list_to_html($bqHtml, $bqAttrs);
             }
@@ -2238,6 +2835,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         if (strpos($line, '|') !== false && ($i + 1) < $count && is_md_table_separator($lines[$i + 1])) {
             $closeAllLists();
 
+            $tableStartLine = $i;
             $headerCells = split_md_table_row($line);
             $alignCells = split_md_table_row($lines[$i + 1]);
             $colCount = max(count($headerCells), count($alignCells));
@@ -2258,6 +2856,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $rows[] = $cells;
                 $i++;
             }
+            $tableEndLine = $i - 1;
             $i--;
 
             $tableClass = htmlspecialchars($p['table_class'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -2265,6 +2864,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
             $table = [];
             $table[] = '<table'.$tableAttr.'>';
+            $table[0] = mdw_html_insert_attrs($table[0], $srcAttrsFor($tableStartLine, $tableEndLine));
             $table[] = '<thead><tr>';
             for ($c = 0; $c < $colCount; $c++) {
                 $txt = $headerCells[$c] ?? '';
@@ -2309,7 +2909,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $tocIndex++;
             }
 
-            $html[] = "<$tag$idAttr$clsAttr>".inline_md($content, $mdPath, $profile, $context)."</$tag>";
+            $srcAttr = $srcAttrsFor($i, $i);
+            $html[] = "<$tag$idAttr$clsAttr$srcAttr>".inline_md($content, $mdPath, $profile, $context)."</$tag>";
             continue;
         }
 
@@ -2360,7 +2961,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
             $liClass = $p['li_class'] ?? '';
             $liAttr = $liClass ? ' class="'.htmlspecialchars($liClass, ENT_QUOTES, 'UTF-8').'"' : '';
-            $liHtml = '<li'.$liAttr.'>' . inline_md($content, $mdPath, $profile, $context);
+            $srcAttr = $srcAttrsFor($i, $i);
+            $liHtml = '<li'.$liAttr.$srcAttr.'>' . inline_md($content, $mdPath, $profile, $context);
             if ($inlineAttrs) {
                 $liHtml = mdw_apply_attr_list_to_html($liHtml, $inlineAttrs);
             }
@@ -2381,12 +2983,21 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
             $pClass = $p['p_class'] ?? '';
             $pAttr = $pClass ? ' class="'.htmlspecialchars($pClass, ENT_QUOTES, 'UTF-8').'"' : '';
-            $html[]='<p'.$pAttr.'>'.inline_md($line, $mdPath, $profile, $context).'</p>';
+            $srcAttr = $srcAttrsFor($i, $i);
+            $html[]='<p'.$pAttr.$srcAttr.'>'.inline_md($line, $mdPath, $profile, $context).'</p>';
         }
     }
 
     $closeAllLists();
     if ($in_codeblock) {
+        if ($codeblockOpenIndex !== null && isset($html[$codeblockOpenIndex])) {
+            $startLine = ($codeblockStartLine !== null) ? $codeblockStartLine + 1 : $count - 1;
+            $endLine = $count - 1;
+            if ($endLine < $startLine) {
+                $startLine = $codeblockStartLine ?? $endLine;
+            }
+            $html[$codeblockOpenIndex] = $applySrcAttrs($html[$codeblockOpenIndex], $startLine, $endLine);
+        }
         $html[] = ($codeblock_type === 'mermaid') ? '</pre>' : '</code></pre>';
     }
 
@@ -2402,7 +3013,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $textRaw = trim((string)($fn['text'] ?? ''));
                 if ($textRaw === '') continue;
                 $textHtml = inline_md($textRaw, $mdPath, $profile, $context);
-                $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-text">'.$textHtml.'</span></li>';
+                $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-marker">['.$numEsc.']</span><span class="md-footnote-text">'.$textHtml.'</span></li>';
                 continue;
             }
 
@@ -2415,12 +3026,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
             $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
             $linkEsc = htmlspecialchars($linkText, ENT_QUOTES, 'UTF-8');
-            $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><a class="externlink" href="'.
+            $items[] = '<li id="fn-'.$numEsc.'" class="md-footnote-item"><span class="md-footnote-marker">['.$numEsc.']</span><a class="externlink" href="'.
                 $urlEsc.
                 '" target="_blank" rel="noopener noreferrer">'.$linkEsc.'</a></li>';
         }
         if (!empty($items)) {
-            $html[] = '<ol class="md-footnotes">' . implode("\n", $items) . '</ol>';
+            $html[] = '<ol class="md-footnotes fn-section">' . implode("\n", $items) . '</ol>';
         }
     }
 

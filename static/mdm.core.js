@@ -275,6 +275,104 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 })();
 
 (function(){
+    const isEscapeKey = (e) => !!e && (e.key === 'Escape' || e.key === 'Esc');
+    const asElement = (value) => {
+        if (value instanceof Element) return value;
+        if (typeof value === 'string' && value) return document.getElementById(value);
+        return null;
+    };
+    const asArray = (value) => Array.isArray(value) ? value : (value == null ? [] : [value]);
+
+    /**
+     * Small shared modal binder for future modal dialogs.
+     * Usage: window.__mdwBindModal({ modal, overlay, closeButtons, ... }).
+     */
+    const bindModal = (options = {}) => {
+        const modal = asElement(options.modal);
+        if (!(modal instanceof Element)) return null;
+        if (modal.__mdwModalController) return modal.__mdwModalController;
+
+        const overlay = asElement(options.overlay);
+        const closeButtons = asArray(options.closeButtons)
+            .map((item) => asElement(item))
+            .filter((item) => item instanceof Element);
+        const closeOnOverlay = options.closeOnOverlay !== false;
+        const closeOnEsc = options.closeOnEsc !== false;
+        const manageVisibility = options.manageVisibility !== false;
+
+        const isOpen = () => {
+            if (typeof options.isOpen === 'function') {
+                try { return !!options.isOpen(); } catch {}
+            }
+            if (overlay instanceof HTMLElement) return !overlay.hidden;
+            if (modal instanceof HTMLElement) return !modal.hidden;
+            return true;
+        };
+
+        const canClose = (ctx) => {
+            if (typeof options.canClose !== 'function') return true;
+            try { return options.canClose(ctx) !== false; } catch { return false; }
+        };
+
+        const open = (ctx = {}) => {
+            if (typeof options.onOpen === 'function') {
+                try { options.onOpen(ctx); } catch {}
+            }
+            if (manageVisibility) {
+                if (overlay instanceof HTMLElement) overlay.hidden = false;
+                if (modal instanceof HTMLElement) modal.hidden = false;
+            }
+            return true;
+        };
+
+        const close = (ctx = {}) => {
+            const payload = {
+                source: String(ctx.source || 'api'),
+                force: !!ctx.force,
+            };
+            if (!payload.force && !canClose(payload)) return false;
+            if (manageVisibility) {
+                if (modal instanceof HTMLElement) modal.hidden = true;
+                if (overlay instanceof HTMLElement) overlay.hidden = true;
+            }
+            if (typeof options.onClose === 'function') {
+                try { options.onClose(payload); } catch {}
+            }
+            return true;
+        };
+
+        closeButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                close({ source: 'button' });
+            });
+        });
+        if (closeOnOverlay && overlay instanceof Element) {
+            overlay.addEventListener('click', () => {
+                close({ source: 'overlay' });
+            });
+        }
+        if (closeOnEsc) {
+            document.addEventListener('keydown', (e) => {
+                if (e.defaultPrevented) return;
+                if (!isOpen() || !isEscapeKey(e)) return;
+                const didClose = close({ source: 'escape' });
+                if (didClose) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                }
+            });
+        }
+
+        const controller = { modal, overlay, isOpen, open, close };
+        modal.__mdwModalController = controller;
+        return controller;
+    };
+
+    window.__mdwIsEscapeKey = isEscapeKey;
+    window.__mdwBindModal = bindModal;
+})();
+
+(function(){
     const MDM = window.MDM = window.MDM || {};
     const module = MDM.core = MDM.core || {};
     const init = () => {

@@ -203,6 +203,7 @@
         }
         return { meta, body: bodyLines.join('\n') };
     };
+    window.__mdwExtractMetaAndBody = extractMetaAndBody;
 
     const normalizeFileTitle = (filePath) => {
         let base = String(filePath || '').trim();
@@ -678,6 +679,7 @@
         lastKey: null,
         lastText: null,
     };
+    let selectionOverlayActive = false;
 
     const initEditorOverlay = () => {
         if (overlayState.overlay || !ta.parentNode) return;
@@ -714,6 +716,21 @@
         const idx = clean.lastIndexOf('/');
         return idx === -1 ? '' : clean.slice(0, idx);
     };
+    const normalizeInternalLinkPrefixLocal = (value) => {
+        let out = String(value || '').trim();
+        if (!out) return '';
+        if (!/[\/?#=&]$/.test(out)) out += '/';
+        return out;
+    };
+    const readInternalLinkPrefixLocal = () => {
+        if (typeof window.__mdwReadInternalLinkPrefix === 'function') {
+            return normalizeInternalLinkPrefixLocal(window.__mdwReadInternalLinkPrefix());
+        }
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = settings && typeof settings.internal_link_prefix === 'string' ? settings.internal_link_prefix.trim() : '';
+        return normalizeInternalLinkPrefixLocal(raw);
+    };
     const relativePath = (fromFile, toFile) => {
         const fromDir = dirname(fromFile);
         const fromParts = fromDir ? fromDir.split('/').filter(Boolean) : [];
@@ -736,10 +753,36 @@
     const buildInternalHref = (fromFile, path) => {
         const clean = normalizePath(path);
         if (!clean) return '';
+        const configuredPrefix = readInternalLinkPrefixLocal();
+        if (configuredPrefix) {
+            if (/index\.php\?file=?$/i.test(configuredPrefix)) {
+                return `${configuredPrefix}${encodeURIComponent(clean)}`;
+            }
+            return `${configuredPrefix}index.php?file=${encodeURIComponent(clean)}`;
+        }
         const fromDir = dirname(fromFile);
         const depth = fromDir ? fromDir.split('/').filter(Boolean).length : 0;
         const prefix = depth > 0 ? '../'.repeat(depth) : '';
         return `${prefix}index.php?file=${encodeURIComponent(clean)}`;
+    };
+    const normalizeFileTitleLocal = (filePath) => {
+        let base = String(filePath || '').trim();
+        if (!base) return '';
+        base = base.replace(/\\/g, '/');
+        base = base.split('/').pop() || '';
+        base = base.replace(/\.md$/i, '');
+        base = base.replace(/[_-]+/g, ' ');
+        base = base.replace(/\s+/g, ' ').trim();
+        return base;
+    };
+    const getCurrentFilePathLocal = () => {
+        const formFile = editorForm?.querySelector?.('input[name="file"]');
+        const fromForm = formFile instanceof HTMLInputElement ? String(formFile.value || '').trim() : '';
+        if (fromForm) return fromForm;
+        const fromState = String(window.CURRENT_FILE || '').trim();
+        if (fromState) return fromState;
+        const fromQuery = new URLSearchParams(window.location.search).get('file');
+        return fromQuery ? String(fromQuery).trim() : '';
     };
 
     const insertAtSelection = (text) => {
@@ -752,6 +795,299 @@
         ta.setSelectionRange(pos, pos);
         ta.dispatchEvent(new Event('input', { bubbles: true }));
         ta.focus();
+    };
+
+    const linkSuggestState = {
+        open: false,
+        start: -1,
+        caret: -1,
+        query: '',
+        items: [],
+        activeIndex: 0,
+    };
+    let linkSuggestEl = null;
+    let linkSuggestList = null;
+    let linkSuggestMirror = null;
+    let linkSuggestItems = null;
+    let linkSuggestTicking = false;
+
+    const ensureLinkSuggestElements = () => {
+        if (linkSuggestEl) return;
+        linkSuggestEl = document.createElement('div');
+        linkSuggestEl.className = 'mdw-link-suggest';
+        linkSuggestEl.hidden = true;
+        linkSuggestEl.innerHTML = '<div class="mdw-link-suggest-list"></div>';
+        linkSuggestList = linkSuggestEl.querySelector('.mdw-link-suggest-list');
+        document.body.appendChild(linkSuggestEl);
+
+        linkSuggestEl.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+        linkSuggestEl.addEventListener('click', (e) => {
+            const target = e.target instanceof Element ? e.target.closest('.mdw-link-suggest-item') : null;
+            if (!(target instanceof HTMLElement)) return;
+            const idx = parseInt(target.getAttribute('data-index') || '', 10);
+            if (!Number.isFinite(idx)) return;
+            insertLinkSuggestItem(idx);
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (!linkSuggestState.open) return;
+            const target = e.target;
+            if (target instanceof Element) {
+                if (linkSuggestEl.contains(target) || target === ta) return;
+            }
+            hideLinkSuggest();
+        });
+    };
+
+    const ensureLinkSuggestMirror = () => {
+        if (linkSuggestMirror) return;
+        linkSuggestMirror = document.createElement('div');
+        linkSuggestMirror.className = 'mdw-link-suggest-mirror';
+        linkSuggestMirror.setAttribute('aria-hidden', 'true');
+        linkSuggestMirror.style.position = 'fixed';
+        linkSuggestMirror.style.visibility = 'hidden';
+        linkSuggestMirror.style.whiteSpace = 'pre-wrap';
+        linkSuggestMirror.style.wordBreak = 'break-word';
+        linkSuggestMirror.style.wordWrap = 'break-word';
+        linkSuggestMirror.style.overflow = 'auto';
+        linkSuggestMirror.style.pointerEvents = 'none';
+        document.body.appendChild(linkSuggestMirror);
+    };
+
+    const normalizeSuggestText = (value) => String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    const getLinkSuggestItems = () => {
+        if (Array.isArray(linkSuggestItems)) return linkSuggestItems;
+        const out = [];
+        const seen = new Set();
+        const picker = document.getElementById('linkPicker');
+        if (picker) {
+            const nodes = Array.from(picker.querySelectorAll('.link-pick-item[data-path]'));
+            nodes.forEach((node) => {
+                if (!(node instanceof HTMLElement)) return;
+                const path = normalizePath(node.getAttribute('data-path') || '');
+                if (!path || seen.has(path)) return;
+                seen.add(path);
+                let title = String(node.getAttribute('data-title') || '').trim();
+                if (!title) {
+                    title = String(node.textContent || '').trim();
+                }
+                if (!title) title = normalizeFileTitleLocal(path);
+                out.push({
+                    path,
+                    title: title || path,
+                    norm: normalizeSuggestText(title || path),
+                    pathNorm: normalizeSuggestText(path),
+                });
+            });
+        }
+        if (!out.length) {
+            const nodes = Array.from(document.querySelectorAll('.note-item[data-file]'));
+            nodes.forEach((node) => {
+                if (!(node instanceof HTMLElement)) return;
+                const path = normalizePath(node.dataset.file || '');
+                if (!path || seen.has(path)) return;
+                seen.add(path);
+                const title = String(node.dataset.title || '').trim() || normalizeFileTitleLocal(path);
+                out.push({
+                    path,
+                    title: title || path,
+                    norm: normalizeSuggestText(title || path),
+                    pathNorm: normalizeSuggestText(path),
+                });
+            });
+        }
+        linkSuggestItems = out;
+        return out;
+    };
+
+    const getLinkSuggestContext = () => {
+        if (ta.selectionStart == null || ta.selectionEnd == null) return null;
+        if (ta.selectionStart !== ta.selectionEnd) return null;
+        const caret = ta.selectionStart;
+        const value = ta.value;
+        const lineStart = value.lastIndexOf('\n', caret - 1) + 1;
+        const start = value.lastIndexOf('[', caret - 1);
+        if (start < lineStart) return null;
+        if (start > 0 && value[start - 1] === '!') return null;
+        if (value[start - 1] === '\\') return null;
+        const between = value.slice(start + 1, caret);
+        if (between.includes(']')) return null;
+        return { start, caret, query: between };
+    };
+
+    const renderLinkSuggestList = () => {
+        if (!linkSuggestList) return;
+        linkSuggestList.innerHTML = '';
+        linkSuggestState.items.forEach((item, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'mdw-link-suggest-item';
+            btn.setAttribute('data-index', String(idx));
+            if (idx === linkSuggestState.activeIndex) btn.classList.add('is-active');
+
+            const title = document.createElement('div');
+            title.className = 'mdw-link-suggest-title';
+            title.textContent = item.title;
+
+            const path = document.createElement('div');
+            path.className = 'mdw-link-suggest-path';
+            path.textContent = item.path;
+
+            btn.appendChild(title);
+            btn.appendChild(path);
+            linkSuggestList.appendChild(btn);
+        });
+    };
+
+    const syncLinkSuggestMirrorStyle = () => {
+        ensureLinkSuggestMirror();
+        if (!linkSuggestMirror) return;
+        const rect = ta.getBoundingClientRect();
+        const st = window.getComputedStyle(ta);
+        const props = [
+            'boxSizing',
+            'width',
+            'height',
+            'paddingTop',
+            'paddingRight',
+            'paddingBottom',
+            'paddingLeft',
+            'borderTopWidth',
+            'borderRightWidth',
+            'borderBottomWidth',
+            'borderLeftWidth',
+            'fontFamily',
+            'fontSize',
+            'fontWeight',
+            'fontStyle',
+            'letterSpacing',
+            'textTransform',
+            'textAlign',
+            'lineHeight',
+            'tabSize',
+            'wordBreak',
+        ];
+        props.forEach((prop) => {
+            linkSuggestMirror.style[prop] = st[prop];
+        });
+        linkSuggestMirror.style.left = `${rect.left}px`;
+        linkSuggestMirror.style.top = `${rect.top}px`;
+        linkSuggestMirror.style.width = `${rect.width}px`;
+        linkSuggestMirror.style.height = `${rect.height}px`;
+    };
+
+    const getCaretRect = (pos) => {
+        syncLinkSuggestMirrorStyle();
+        if (!linkSuggestMirror) return ta.getBoundingClientRect();
+        const before = ta.value.slice(0, pos);
+        const after = ta.value.slice(pos);
+        linkSuggestMirror.textContent = before;
+        const span = document.createElement('span');
+        span.textContent = after || '\u200b';
+        linkSuggestMirror.appendChild(span);
+        linkSuggestMirror.scrollTop = ta.scrollTop;
+        linkSuggestMirror.scrollLeft = ta.scrollLeft;
+        const rect = span.getBoundingClientRect();
+        linkSuggestMirror.textContent = '';
+        return rect;
+    };
+
+    const positionLinkSuggest = () => {
+        if (!linkSuggestState.open || !linkSuggestEl) return;
+        const rect = getCaretRect(linkSuggestState.caret);
+        const margin = 6;
+        let left = rect.left;
+        let top = rect.bottom + margin;
+        linkSuggestEl.style.left = `${Math.round(left)}px`;
+        linkSuggestEl.style.top = `${Math.round(top)}px`;
+
+        const box = linkSuggestEl.getBoundingClientRect();
+        const maxLeft = Math.max(8, window.innerWidth - box.width - 8);
+        if (box.right > window.innerWidth - 8) left = maxLeft;
+        if (box.left < 8) left = 8;
+        if (box.bottom > window.innerHeight - 8) {
+            top = Math.max(8, rect.top - box.height - margin);
+        }
+        linkSuggestEl.style.left = `${Math.round(left)}px`;
+        linkSuggestEl.style.top = `${Math.round(top)}px`;
+    };
+
+    const showLinkSuggest = () => {
+        ensureLinkSuggestElements();
+        if (!linkSuggestEl) return;
+        linkSuggestEl.hidden = false;
+        linkSuggestState.open = true;
+        renderLinkSuggestList();
+        positionLinkSuggest();
+    };
+
+    const hideLinkSuggest = () => {
+        if (!linkSuggestState.open) return;
+        linkSuggestState.open = false;
+        linkSuggestState.items = [];
+        if (linkSuggestEl) linkSuggestEl.hidden = true;
+    };
+
+    const updateLinkSuggest = () => {
+        if (document.activeElement !== ta) {
+            if (!linkSuggestState.open) return;
+        }
+        const ctx = getLinkSuggestContext();
+        if (!ctx) {
+            hideLinkSuggest();
+            return;
+        }
+        const queryNorm = normalizeSuggestText(ctx.query);
+        const items = getLinkSuggestItems();
+        let matches = items;
+        if (queryNorm) {
+            matches = items.filter((item) => item.norm.startsWith(queryNorm) || item.pathNorm.startsWith(queryNorm));
+        }
+        matches = matches.slice(0, 8);
+        if (!matches.length) {
+            hideLinkSuggest();
+            return;
+        }
+        linkSuggestState.start = ctx.start;
+        linkSuggestState.caret = ctx.caret;
+        linkSuggestState.query = ctx.query;
+        linkSuggestState.items = matches;
+        linkSuggestState.activeIndex = 0;
+        showLinkSuggest();
+    };
+
+    const scheduleLinkSuggest = () => {
+        if (linkSuggestTicking) return;
+        linkSuggestTicking = true;
+        requestAnimationFrame(() => {
+            linkSuggestTicking = false;
+            updateLinkSuggest();
+        });
+    };
+
+    const insertLinkSuggestItem = (idx) => {
+        const item = linkSuggestState.items[idx];
+        if (!item) return;
+        const text = item.title || item.path;
+        const href = buildInternalHref(getCurrentFilePathLocal(), item.path) || item.path;
+        const snippet = `[${text}](${href}) {: class="link"}`;
+        const start = linkSuggestState.start;
+        const end = linkSuggestState.caret;
+        if (start < 0 || end < start) return;
+        const before = ta.value.slice(0, start);
+        const after = ta.value.slice(end);
+        ta.value = before + snippet + after;
+        const caret = start + snippet.length;
+        ta.setSelectionRange(caret, caret);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+        hideLinkSuggest();
     };
 
     const findNoteRowByPath = (path) => {
@@ -930,6 +1266,28 @@
         overlayState.lastText = null;
     };
 
+    const renderSelectionOverlay = (text, selStart, selEnd) => {
+        if (!overlayState.content) return;
+        syncOverlayMetrics();
+        const start = Math.max(0, Math.min(selStart, text.length));
+        const end = Math.max(start, Math.min(selEnd, text.length));
+        const before = escapeHtml(text.slice(0, start));
+        const middle = escapeHtml(text.slice(start, end)) || '&nbsp;';
+        const after = escapeHtml(text.slice(end));
+        overlayState.content.innerHTML = before + `<span class="editor-selection">${middle}</span>` + after;
+        overlayState.lastKey = `sel:${start}:${end}`;
+        overlayState.lastText = text;
+        selectionOverlayActive = true;
+        syncOverlayScroll();
+    };
+
+    const clearSelectionOverlay = () => {
+        if (!selectionOverlayActive) return;
+        selectionOverlayActive = false;
+        clearOverlay();
+        scheduleBracketOverlay();
+    };
+
     const renderOverlay = (text, openIdx, closeIdx, typeChar) => {
         if (!overlayState.content) return;
         const cls = BRACKET_CLASS[typeChar] || 'editor-bracket-paren';
@@ -980,6 +1338,7 @@
     };
 
     const scheduleBracketOverlay = () => {
+        if (selectionOverlayActive) return;
         if (overlayTicking) return;
         overlayTicking = true;
         requestAnimationFrame(updateBracketOverlay);
@@ -1129,6 +1488,7 @@
     const publishBtn = document.getElementById('publishBtn');
     const publishStateSelect = document.getElementById('publishStateSelect');
     const publishStateOverride = document.getElementById('publishStateOverride');
+    let currentPublishState = '';
     const normalizePublishState = (raw) => {
         const s = String(raw || '').trim().toLowerCase();
         if (!s) return '';
@@ -1136,6 +1496,9 @@
         if (s === 'processing' || s === 'to publish' || s === 'topublish' || s === 'to-publish') return 'Processing';
         return 'Concept';
     };
+    currentPublishState = normalizePublishState(
+        publishStateSelect instanceof HTMLSelectElement ? publishStateSelect.value : ''
+    );
     const publishStateLabel = (state) => {
         const s = String(state || '').trim().toLowerCase();
         if (s === 'published') return t('edit.publish_state.published', 'Published');
@@ -1157,6 +1520,7 @@
     const updatePublishBadge = (state) => {
         const row = mdm$('.note-item.nav-item-current');
         if (!(row instanceof HTMLElement)) return;
+        row.dataset.publishState = String(state || '').trim().toLowerCase();
         const badge = row.querySelector('.badge-publish');
         if (!(badge instanceof HTMLElement)) return;
         const iconClass = publishStateIcon(state);
@@ -1173,10 +1537,17 @@
         badge.appendChild(text);
         badge.classList.remove('publish-concept', 'publish-processing', 'publish-published');
         badge.classList.add(publishStateClass(state));
+        if (typeof window.__mdwSortOverviewNotes === 'function') {
+            const mode = (document.getElementById('navSortSelect') instanceof HTMLSelectElement)
+                ? String(document.getElementById('navSortSelect').value || 'date')
+                : 'date';
+            window.__mdwSortOverviewNotes(mode);
+        }
     };
     const applyPublishStateUi = (stateRaw) => {
         const state = normalizePublishState(stateRaw);
         if (!state) return;
+        currentPublishState = state;
         if (publishStateSelect instanceof HTMLSelectElement) {
             publishStateSelect.value = state;
         }
@@ -1193,6 +1564,7 @@
         if (!(publishStateSelect instanceof HTMLSelectElement)) return;
         const state = normalizePublishState(publishStateSelect.value);
         if (!state) return;
+        const previousState = normalizePublishState(currentPublishState || '');
         if (publishStateOverride instanceof HTMLInputElement) {
             publishStateOverride.value = '1';
         }
@@ -1207,6 +1579,19 @@
             }
         }
         applyPublishStateUi(state);
+        (async () => {
+            const ok = await ajaxSave();
+            if (ok) return;
+            if (publishStateOverride instanceof HTMLInputElement) {
+                publishStateOverride.value = '0';
+            }
+            if (previousState) {
+                if (typeof window.__mdwSetMetaValue === 'function') {
+                    window.__mdwSetMetaValue('publishstate', previousState);
+                }
+                applyPublishStateUi(previousState);
+            }
+        })();
     });
 
     let ignoreBeforeUnload = false;
@@ -1216,9 +1601,38 @@
     editorForm?.addEventListener('submit', setIgnoreBeforeUnload);
     deleteForm?.addEventListener('submit', setIgnoreBeforeUnload);
 
+    const ensureEditorFormAuthFields = () => {
+        if (!(editorForm instanceof HTMLFormElement)) return;
+        const ensureInput = (name, value) => {
+            let input = editorForm.querySelector(`input[name="${name}"]`);
+            if (!(input instanceof HTMLInputElement)) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                editorForm.appendChild(input);
+            }
+            input.value = String(value || '');
+        };
+        let role = '';
+        let token = '';
+        if (typeof window.__mdwAuthState === 'function') {
+            const auth = window.__mdwAuthState();
+            role = String(auth?.role || '').trim();
+            token = String(auth?.token || '').trim();
+        }
+        if ((!role || !token) && typeof window.__mdwStorageGet === 'function') {
+            role = role || String(window.__mdwStorageGet('mdw_auth_role') || '').trim();
+            token = token || String(window.__mdwStorageGet('mdw_auth_token') || '').trim();
+        }
+        if (!role || !token) return;
+        ensureInput('auth_role', role);
+        ensureInput('auth_token', token);
+    };
+
     const ajaxSave = async () => {
         if (!(editorForm instanceof HTMLFormElement)) return;
         if (!(ta instanceof HTMLTextAreaElement)) return;
+        ensureEditorFormAuthFields();
         const action = editorForm.getAttribute('action') || window.location.pathname + window.location.search;
         const fd = new FormData(editorForm);
         if (!fd.has('content')) fd.set('content', ta.value);
@@ -1254,7 +1668,7 @@
                 showSaveError(msg, details);
                 showErrorModal(msg, details);
                 clearIgnoreBeforeUnload();
-                return;
+                return false;
             }
             if (typeof window.__mdwMarkOnline === 'function') {
                 window.__mdwMarkOnline();
@@ -1289,6 +1703,7 @@
             }
             showSaveChip();
             clearSaveError();
+            return true;
         } catch (err) {
             if (typeof window.__mdwReportNetworkError === 'function') {
                 window.__mdwReportNetworkError(err);
@@ -1297,6 +1712,7 @@
             const detail = err && err.message ? String(err.message) : '';
             showSaveError(t('js.save_failed', 'Save failed.'), detail);
             showErrorModal(t('js.save_failed', 'Save failed.'), detail);
+            return false;
         } finally {
             clearIgnoreBeforeUnload();
         }
@@ -1596,6 +2012,9 @@
                 window.__mdwMarkOnline();
             }
             prev.innerHTML = html;
+            if (typeof window.__mdwResetSelectionSync === 'function') {
+                window.__mdwResetSelectionSync(previewContent);
+            }
             applyTocHotKeyword(prev, previewContent);
             if (typeof window.__mdwInitTocSideMenus === 'function') {
                 window.__mdwInitTocSideMenus(prev);
@@ -1632,6 +2051,7 @@
         recomputeDirty();
         schedulePreview();
         scheduleBracketOverlay();
+        scheduleLinkSuggest();
     });
     const canHandleDrop = (dt) => {
         if (!dt) return false;
@@ -1669,13 +2089,705 @@
     ta.addEventListener('scroll', function(){
         ln.scrollTop = ta.scrollTop;
         syncOverlayScroll();
+        positionLinkSuggest();
     });
-    ta.addEventListener('keyup', scheduleBracketOverlay);
-    ta.addEventListener('mouseup', scheduleBracketOverlay);
-    ta.addEventListener('focus', scheduleBracketOverlay);
+    ta.addEventListener('keyup', () => {
+        scheduleBracketOverlay();
+        scheduleLinkSuggest();
+    });
+    ta.addEventListener('keydown', (e) => {
+        if (!linkSuggestState.open) return;
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            e.preventDefault();
+            hideLinkSuggest();
+        }
+    });
+    ta.addEventListener('mouseup', () => {
+        scheduleBracketOverlay();
+        scheduleLinkSuggest();
+    });
+    ta.addEventListener('focus', () => {
+        scheduleBracketOverlay();
+        scheduleLinkSuggest();
+    });
     document.addEventListener('selectionchange', () => {
-        if (document.activeElement === ta) scheduleBracketOverlay();
+        if (document.activeElement === ta) {
+            scheduleBracketOverlay();
+            scheduleLinkSuggest();
+        }
     });
+    window.addEventListener('resize', positionLinkSuggest);
+
+    const selectionSync = (() => {
+        let mapCache = new WeakMap();
+        let previewSource = null;
+        let syncing = false;
+        let scheduled = false;
+        let previewHighlights = [];
+        const debug = (...args) => {
+            if (!window.MDW_SELECTION_DEBUG) return;
+            console.info('[mdw-selection]', ...args);
+        };
+
+        const clearPreviewHighlights = () => {
+            if (!previewHighlights.length) return;
+            previewHighlights.forEach((span) => {
+                const parent = span.parentNode;
+                if (!parent) return;
+                while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                parent.removeChild(span);
+                parent.normalize();
+            });
+            previewHighlights = [];
+        };
+
+        const reset = (source) => {
+            previewSource = String(source ?? '');
+            mapCache = new WeakMap();
+            clearPreviewHighlights();
+            clearSelectionOverlay();
+            const count = prev instanceof HTMLElement
+                ? prev.querySelectorAll('[data-mdw-src-start]').length
+                : 0;
+            debug('reset', { length: previewSource.length, blocks: count });
+        };
+
+        const getSource = () => {
+            if (previewSource !== null) return previewSource;
+            return (typeof window.__mdwBuildPreviewContent === 'function') ? window.__mdwBuildPreviewContent() : ta.value;
+        };
+
+        const normalizeText = (value) => String(value ?? '').replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
+
+        const isTableSeparatorLine = (line) => {
+            const trimmed = String(line || '').trim();
+            if (!trimmed) return false;
+            if (!trimmed.includes('|')) return false;
+            return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(trimmed);
+        };
+
+        const findMatchingParen = (text, start) => {
+            let depth = 0;
+            for (let i = start; i < text.length; i++) {
+                const ch = text[i];
+                if (ch === '(') {
+                    depth += 1;
+                } else if (ch === ')') {
+                    depth -= 1;
+                    if (depth === 0) return i;
+                }
+            }
+            return -1;
+        };
+
+        const parseInlineInto = (segment, base, emit, opts) => {
+            let i = 0;
+            const len = segment.length;
+            while (i < len) {
+                const ch = segment[i];
+                if (opts.table && ch === '|') {
+                    emit(' ', base + i);
+                    i += 1;
+                    continue;
+                }
+                if (ch === '\\' && i + 1 < len) {
+                    emit(segment[i + 1], base + i + 1);
+                    i += 2;
+                    continue;
+                }
+                if (ch === '`') {
+                    const end = segment.indexOf('`', i + 1);
+                    if (end !== -1) {
+                        for (let k = i + 1; k < end; k++) {
+                            emit(segment[k], base + k);
+                        }
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                if (ch === '!' && segment[i + 1] === '[') {
+                    const close = segment.indexOf(']', i + 2);
+                    if (close !== -1 && segment[close + 1] === '(') {
+                        const endParen = findMatchingParen(segment, close + 1);
+                        if (endParen !== -1) {
+                            i = endParen + 1;
+                            continue;
+                        }
+                    }
+                }
+                if (ch === '[' && segment[i + 1] === '^') {
+                    const close = segment.indexOf(']', i + 2);
+                    if (close !== -1) {
+                        for (let k = i + 2; k < close; k++) {
+                            emit(segment[k], base + k);
+                        }
+                        i = close + 1;
+                        continue;
+                    }
+                }
+                if (ch === '[') {
+                    const close = segment.indexOf(']', i + 1);
+                    if (close !== -1) {
+                        const next = segment[close + 1];
+                        if (next === '(') {
+                            const endParen = findMatchingParen(segment, close + 1);
+                            if (endParen !== -1) {
+                                const inner = segment.slice(i + 1, close);
+                                parseInlineInto(inner, base + i + 1, emit, opts);
+                                i = endParen + 1;
+                                continue;
+                            }
+                        } else if (next === '[') {
+                            const close2 = segment.indexOf(']', close + 2);
+                            if (close2 !== -1) {
+                                const ref = segment.slice(close + 2, close2);
+                                if (/^\d+$/.test(ref)) {
+                                    for (let k = 0; k < ref.length; k++) {
+                                        emit(ref[k], base + close + 2 + k);
+                                    }
+                                } else {
+                                    const inner = segment.slice(i + 1, close);
+                                    parseInlineInto(inner, base + i + 1, emit, opts);
+                                }
+                                i = close2 + 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                if (ch === '~' && segment[i + 1] === '~') {
+                    const end = segment.indexOf('~~', i + 2);
+                    if (end !== -1) {
+                        const inner = segment.slice(i + 2, end);
+                        parseInlineInto(inner, base + i + 2, emit, opts);
+                        i = end + 2;
+                        continue;
+                    }
+                }
+                if (ch === '*' && segment[i + 1] === '*') {
+                    const end = segment.indexOf('**', i + 2);
+                    if (end !== -1) {
+                        const inner = segment.slice(i + 2, end);
+                        parseInlineInto(inner, base + i + 2, emit, opts);
+                        i = end + 2;
+                        continue;
+                    }
+                }
+                if (ch === '*') {
+                    const end = segment.indexOf('*', i + 1);
+                    if (end !== -1) {
+                        const inner = segment.slice(i + 1, end);
+                        parseInlineInto(inner, base + i + 1, emit, opts);
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                if (ch === '<') {
+                    const gt = segment.indexOf('>', i + 1);
+                    if (gt !== -1) {
+                        const tag = segment.slice(i + 1, gt).trim();
+                        const name = tag.replace(/^\//, '').split(/\s+/)[0].replace(/\/$/, '').toLowerCase();
+                        if (name === 'br' || name === 'hr') {
+                            emit('\n', base + i);
+                        }
+                        i = gt + 1;
+                        continue;
+                    }
+                }
+                emit(ch, base + i);
+                i += 1;
+            }
+        };
+
+        const buildPlainTextMap = (raw, baseOffset, opts) => {
+            const textOut = [];
+            const mapOut = [];
+            const emit = (ch, idx) => {
+                textOut.push(ch);
+                mapOut.push(idx);
+            };
+            const lines = String(raw || '').split('\n');
+            let offset = 0;
+            for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+                let line = lines[lineIdx];
+                let lineBase = baseOffset + offset;
+
+                const isFirst = lineIdx === 0;
+                const isLast = lineIdx === lines.length - 1;
+
+                if (opts.stripFence && ((isFirst || isLast) && /^\s*```/.test(line))) {
+                    offset += line.length + 1;
+                    if (!isLast) emit('\n', baseOffset + offset - 1);
+                    continue;
+                }
+
+                if (opts.blockquote) {
+                    const m = line.match(/^(\s*>\s?)/);
+                    if (m) {
+                        line = line.slice(m[1].length);
+                        lineBase += m[1].length;
+                    }
+                }
+
+                if (opts.stripHeading && isFirst) {
+                    const m = line.match(/^(\s*#{1,6}\s+)/);
+                    if (m) {
+                        line = line.slice(m[1].length);
+                        lineBase += m[1].length;
+                    }
+                }
+
+                if (opts.stripList && isFirst) {
+                    const m = line.match(/^(\s*(?:[-*]|\d+\.)\s+)/);
+                    if (m) {
+                        line = line.slice(m[1].length);
+                        lineBase += m[1].length;
+                    }
+                }
+
+                if (opts.table && isTableSeparatorLine(line)) {
+                    offset += line.length + 1;
+                    if (!isLast) emit('\n', baseOffset + offset - 1);
+                    continue;
+                }
+
+                if (opts.code) {
+                    for (let k = 0; k < line.length; k++) {
+                        emit(line[k], lineBase + k);
+                    }
+                } else {
+                    parseInlineInto(line, lineBase, emit, opts);
+                }
+
+                offset += line.length + 1;
+                if (!isLast) emit('\n', baseOffset + offset - 1);
+            }
+            return { text: textOut.join(''), map: mapOut };
+        };
+
+        const getBlockOptions = (el) => {
+            const tag = (el.tagName || '').toLowerCase();
+            const opts = { table: false, code: false, stripFence: false, stripList: false, stripHeading: false, blockquote: false };
+            if (tag === 'li') opts.stripList = true;
+            if (tag === 'pre') {
+                opts.code = true;
+                opts.stripFence = true;
+            }
+            if (tag === 'table') opts.table = true;
+            if (tag === 'blockquote') opts.blockquote = true;
+            if (tag.length === 2 && tag[0] === 'h') opts.stripHeading = true;
+            if (el.classList && el.classList.contains('md-math-block')) opts.code = true;
+            return opts;
+        };
+
+        const buildDisplayToSource = (sourceText, sourceMap, displayText) => {
+            if (!sourceMap || !sourceMap.length) return [];
+            if (sourceText === displayText) return sourceMap.slice();
+            const displayToSource = new Array(displayText.length);
+            let srcIdx = 0;
+            let matched = 0;
+            for (let i = 0; i < displayText.length; i++) {
+                const ch = displayText[i];
+                while (srcIdx < sourceText.length && sourceText[srcIdx] !== ch) srcIdx += 1;
+                if (srcIdx < sourceText.length) {
+                    displayToSource[i] = sourceMap[srcIdx];
+                    srcIdx += 1;
+                    matched += 1;
+                } else {
+                    displayToSource[i] = sourceMap[sourceMap.length - 1] ?? 0;
+                }
+            }
+            if (displayText.length && (matched / displayText.length) < 0.6) {
+                const max = sourceMap.length - 1;
+                return displayText.split('').map((_, i) => {
+                    const ratio = displayText.length > 1 ? i / (displayText.length - 1) : 0;
+                    return sourceMap[Math.round(ratio * max)];
+                });
+            }
+            return displayToSource;
+        };
+
+        const buildSourcePoints = (displayToSource) => {
+            const points = [];
+            for (let i = 0; i < displayToSource.length; i++) {
+                const src = displayToSource[i];
+                if (Number.isFinite(src)) points.push({ src, display: i });
+            }
+            points.sort((a, b) => (a.src - b.src) || (a.display - b.display));
+            return points;
+        };
+
+        const getBodyStart = (raw) => {
+            const fn = window.__mdwExtractMetaAndBody;
+            if (typeof fn === 'function') {
+                const body = fn(raw)?.body ?? '';
+                const rawStr = String(raw ?? '');
+                return Math.max(0, rawStr.length - String(body).length);
+            }
+            const str = String(raw ?? '');
+            const lines = str.replace(/\r\n?/g, '\n').split('\n');
+            let idx = 0;
+            let inMeta = true;
+            let seenMeta = false;
+            for (const line of lines) {
+                const normalized = String(line ?? '')
+                    .replace(/\u00a0/g, ' ')
+                    .replace(/[\u200B\uFEFF]/g, '');
+                if (inMeta) {
+                    if (/^\s*\{+\s*[A-Za-z][A-Za-z0-9_-]*\s*:\s*.*?\s*\}+\s*$/.test(line)) {
+                        seenMeta = true;
+                    } else if (/^\s*_+[A-Za-z][A-Za-z0-9_-]*\s*:\s*.*?\s*_+\s*$/.test(line)) {
+                        seenMeta = true;
+                    } else if (!seenMeta && normalized.trim() === '') {
+                        // keep leading blanks
+                    } else {
+                        inMeta = false;
+                    }
+                }
+                if (!inMeta) break;
+                idx += line.length + 1;
+            }
+            return idx;
+        };
+
+        const getOffsetMap = () => {
+            const preview = getSource();
+            const editor = ta.value;
+            if (preview === editor) {
+                return { preview, editor, delta: 0, previewBodyStart: 0, editorBodyStart: 0 };
+            }
+            const previewBodyStart = getBodyStart(preview);
+            const editorBodyStart = getBodyStart(editor);
+            const delta = previewBodyStart - editorBodyStart;
+            return { preview, editor, delta, previewBodyStart, editorBodyStart };
+        };
+
+        const editorToPreviewOffset = (offset, map) => {
+            if (!map || map.delta === 0) return offset;
+            if (offset < map.editorBodyStart) return null;
+            return offset + map.delta;
+        };
+
+        const previewToEditorOffset = (offset, map) => {
+            if (!map || map.delta === 0) return offset;
+            if (offset < map.previewBodyStart) return null;
+            const next = offset - map.delta;
+            return Math.max(map.editorBodyStart, next);
+        };
+
+        const getMapForElement = (el) => {
+            if (!(el instanceof HTMLElement)) return null;
+            const cached = mapCache.get(el);
+            if (cached) return cached;
+            const start = Number(el.dataset.mdwSrcStart);
+            const end = Number(el.dataset.mdwSrcEnd);
+            if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+            const source = getSource();
+            const raw = source.slice(start, end);
+            const opts = getBlockOptions(el);
+            const built = buildPlainTextMap(raw, start, opts);
+            const sourceText = normalizeText(built.text);
+            const displayText = normalizeText(el.textContent || '');
+            const displayToSource = buildDisplayToSource(sourceText, built.map, displayText);
+            const info = {
+                start,
+                end,
+                sourceText,
+                displayText,
+                displayToSource,
+                sourcePoints: buildSourcePoints(displayToSource),
+            };
+            mapCache.set(el, info);
+            return info;
+        };
+
+        const getBlockFromNode = (node) => {
+            let el = node instanceof HTMLElement ? node : (node && node.parentElement ? node.parentElement : null);
+            while (el && el !== prev) {
+                if (el.dataset && el.dataset.mdwSrcStart) return el;
+                el = el.parentElement;
+            }
+            return null;
+        };
+
+        const findBlockForOffset = (offset) => {
+            const nodes = prev.querySelectorAll('[data-mdw-src-start]');
+            let best = null;
+            let bestSize = Infinity;
+            nodes.forEach((el) => {
+                const start = Number(el.dataset.mdwSrcStart);
+                const end = Number(el.dataset.mdwSrcEnd);
+                if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+                if (offset < start || offset > end) return;
+                const size = end - start;
+                if (size < bestSize) {
+                    best = el;
+                    bestSize = size;
+                }
+            });
+            return best;
+        };
+
+        const getDisplayIndex = (el, container, offset) => {
+            try {
+                const range = document.createRange();
+                range.setStart(el, 0);
+                range.setEnd(container, offset);
+                return range.toString().length;
+            } catch {
+                return 0;
+            }
+        };
+
+        const findNodeAtIndex = (el, index) => {
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let remaining = Math.max(0, index);
+            let last = null;
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                last = node;
+                const len = node.nodeValue ? node.nodeValue.length : 0;
+                if (remaining <= len) return { node, offset: remaining };
+                remaining -= len;
+            }
+            if (last) return { node: last, offset: last.nodeValue ? last.nodeValue.length : 0 };
+            return null;
+        };
+
+        const displayIndexToSource = (info, index, preferEnd) => {
+            if (!info || !info.displayToSource || !info.displayToSource.length) return info ? info.start : 0;
+            const max = info.displayToSource.length - 1;
+            let idx = Math.max(0, Math.min(index, max));
+            let src = info.displayToSource[idx];
+            if (!Number.isFinite(src)) {
+                let left = idx - 1;
+                let right = idx + 1;
+                while (left >= 0 || right <= max) {
+                    if (left >= 0 && Number.isFinite(info.displayToSource[left])) {
+                        src = info.displayToSource[left];
+                        break;
+                    }
+                    if (right <= max && Number.isFinite(info.displayToSource[right])) {
+                        src = info.displayToSource[right];
+                        break;
+                    }
+                    left -= 1;
+                    right += 1;
+                }
+            }
+            if (!Number.isFinite(src)) src = info.start;
+            if (preferEnd) src += 1;
+            if (src < info.start) src = info.start;
+            if (src > info.end) src = info.end;
+            return src;
+        };
+
+        const sourceOffsetToDisplay = (info, offset) => {
+            if (!info || !info.sourcePoints || !info.sourcePoints.length) return 0;
+            const points = info.sourcePoints;
+            let lo = 0;
+            let hi = points.length - 1;
+            let best = points.length - 1;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                if (points[mid].src >= offset) {
+                    best = mid;
+                    hi = mid - 1;
+                } else {
+                    lo = mid + 1;
+                }
+            }
+            return points[best] ? points[best].display : 0;
+        };
+
+        const selectPreviewRange = (startEl, startIndex, endEl, endIndex) => {
+            const startPos = findNodeAtIndex(startEl, startIndex);
+            const endPos = findNodeAtIndex(endEl, endIndex);
+            if (!startPos || !endPos) return;
+            const sel = document.getSelection();
+            if (!sel) return;
+            const range = document.createRange();
+            range.setStart(startPos.node, startPos.offset);
+            range.setEnd(endPos.node, endPos.offset);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        };
+
+        const highlightTextRange = (el, startIndex, endIndex) => {
+            if (!(el instanceof HTMLElement)) return;
+            const start = Math.max(0, startIndex);
+            const end = Math.max(start, endIndex);
+            if (start === end) return;
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let offset = 0;
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const value = node.nodeValue || '';
+                const len = value.length;
+                const nodeStart = offset;
+                const nodeEnd = offset + len;
+                if (end <= nodeStart) break;
+                if (start >= nodeEnd) {
+                    offset = nodeEnd;
+                    continue;
+                }
+                const sliceStart = Math.max(0, start - nodeStart);
+                const sliceEnd = Math.min(len, end - nodeStart);
+                let target = node;
+                if (sliceStart > 0) target = target.splitText(sliceStart);
+                if (sliceEnd - sliceStart < target.nodeValue.length) {
+                    target.splitText(sliceEnd - sliceStart);
+                }
+                const span = document.createElement('span');
+                span.className = 'mdw-preview-selection';
+                target.parentNode?.insertBefore(span, target);
+                span.appendChild(target);
+                previewHighlights.push(span);
+                offset = nodeEnd;
+            }
+        };
+
+        const highlightPreviewRange = (startEl, startIndex, endEl, endIndex) => {
+            clearPreviewHighlights();
+            if (!(startEl instanceof HTMLElement) || !(endEl instanceof HTMLElement)) return;
+            if (startEl === endEl) {
+                highlightTextRange(startEl, startIndex, endIndex);
+                return;
+            }
+            const startOffset = Number(startEl.dataset.mdwSrcStart);
+            const endOffset = Number(endEl.dataset.mdwSrcEnd);
+            if (!Number.isFinite(startOffset) || !Number.isFinite(endOffset)) return;
+            const blocks = Array.from(prev.querySelectorAll('[data-mdw-src-start]'));
+            blocks.forEach((block) => {
+                const s = Number(block.dataset.mdwSrcStart);
+                const e = Number(block.dataset.mdwSrcEnd);
+                if (!Number.isFinite(s) || !Number.isFinite(e)) return;
+                if (e < startOffset || s > endOffset) return;
+                if (block === startEl) {
+                    highlightTextRange(block, startIndex, Number.POSITIVE_INFINITY);
+                } else if (block === endEl) {
+                    highlightTextRange(block, 0, endIndex);
+                } else if (block instanceof HTMLElement) {
+                    highlightTextRange(block, 0, (block.textContent || '').length);
+                }
+            });
+        };
+
+        const syncFromEditor = () => {
+            const map = getOffsetMap();
+            const source = map.preview;
+            clearSelectionOverlay();
+            const start = ta.selectionStart ?? 0;
+            const end = ta.selectionEnd ?? 0;
+            if (start === end) {
+                debug('skip editor sync: empty selection', { start, end });
+                return;
+            }
+            const previewStart = editorToPreviewOffset(start, map);
+            const previewEnd = editorToPreviewOffset(Math.max(end - 1, start), map);
+            if (previewStart === null || previewEnd === null) {
+                debug('skip editor sync: selection in metadata block');
+                return;
+            }
+            const startEl = findBlockForOffset(previewStart);
+            const endEl = findBlockForOffset(previewEnd);
+            if (!(startEl instanceof HTMLElement) || !(endEl instanceof HTMLElement)) {
+                debug('skip editor sync: no preview block for selection', { start, end });
+                return;
+            }
+            const startInfo = getMapForElement(startEl);
+            const endInfo = getMapForElement(endEl);
+            if (!startInfo || !endInfo) {
+                debug('skip editor sync: missing mapping', { hasStart: !!startInfo, hasEnd: !!endInfo });
+                return;
+            }
+            const startIndex = sourceOffsetToDisplay(startInfo, previewStart);
+            const endIndex = sourceOffsetToDisplay(endInfo, previewEnd);
+            syncing = true;
+            highlightPreviewRange(startEl, startIndex, endEl, endIndex);
+            syncing = false;
+            debug('editor -> preview', { start, end, startIndex, endIndex, delta: map.delta });
+        };
+
+        const syncFromPreview = () => {
+            const map = getOffsetMap();
+            const sel = document.getSelection();
+            if (!sel || !sel.rangeCount) {
+                debug('skip preview sync: no selection');
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            if (!range) {
+                debug('skip preview sync: no range');
+                return;
+            }
+            const startEl = getBlockFromNode(range.startContainer);
+            const endEl = getBlockFromNode(range.endContainer);
+            if (!(startEl instanceof HTMLElement) || !(endEl instanceof HTMLElement)) {
+                debug('skip preview sync: no source block for range');
+                return;
+            }
+            const startInfo = getMapForElement(startEl);
+            const endInfo = getMapForElement(endEl);
+            if (!startInfo || !endInfo) {
+                debug('skip preview sync: missing mapping', { hasStart: !!startInfo, hasEnd: !!endInfo });
+                return;
+            }
+            const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
+            const endIndex = getDisplayIndex(endEl, range.endContainer, range.endOffset);
+            const srcStart = displayIndexToSource(startInfo, startIndex, false);
+            const srcEnd = displayIndexToSource(endInfo, Math.max(endIndex - 1, startIndex), true);
+            const editorStart = previewToEditorOffset(srcStart, map);
+            const editorEnd = previewToEditorOffset(srcEnd, map);
+            if (editorStart === null || editorEnd === null) {
+                debug('skip preview sync: selection in hidden metadata block');
+                return;
+            }
+            if (srcStart === srcEnd) {
+                debug('skip preview sync: empty source range', { srcStart, srcEnd });
+                return;
+            }
+            syncing = true;
+            ta.setSelectionRange(editorStart, editorEnd);
+            syncing = false;
+            renderSelectionOverlay(ta.value || '', editorStart, editorEnd);
+            debug('preview -> editor', { srcStart, srcEnd, startIndex, endIndex, delta: map.delta });
+        };
+
+        const runSync = () => {
+            if (syncing) return;
+            const sel = document.getSelection();
+            if (document.activeElement === ta) {
+                debug('run sync: editor active');
+                syncFromEditor();
+                return;
+            }
+            if (sel && sel.rangeCount && prev.contains(sel.anchorNode)) {
+                debug('run sync: preview selection');
+                syncFromPreview();
+            }
+        };
+
+        const schedule = () => {
+            if (scheduled) return;
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                runSync();
+            });
+        };
+
+        document.addEventListener('selectionchange', schedule);
+        ta.addEventListener('mouseup', schedule);
+        ta.addEventListener('keyup', schedule);
+        ta.addEventListener('select', schedule);
+        prev.addEventListener('mouseup', schedule);
+        prev.addEventListener('keyup', schedule);
+
+        return { reset };
+    })();
+
+    window.__mdwResetSelectionSync = selectionSync.reset;
 
     // Recompute wraps when panes are resized (affects visual line wrapping).
     let resizeTicking = false;
@@ -1715,6 +2827,10 @@
     window.initialContent = normalizeNewlines(window.initialContent || '');
     recomputeDirty();
     scheduleBracketOverlay();
+    if (typeof window.__mdwResetSelectionSync === 'function') {
+        const initialPreview = (typeof window.__mdwBuildPreviewContent === 'function') ? window.__mdwBuildPreviewContent() : ta.value;
+        window.__mdwResetSelectionSync(initialPreview);
+    }
 })();
 
 // Editor: Markdown keyboard shortcuts (edit.php)
@@ -1957,12 +3073,42 @@
         return { text: open + close, caretOffset: open.length };
     };
 
-    const wrapOrUnwrap = (left, right, { singleCharSafe } = {}) => {
+    const wrapOrUnwrap = (left, right, { singleCharSafe, lineWiseOnMultiline = false } = {}) => {
         const { start, end, text } = getSelection();
         const v = ta.value;
 
         const leftLen = left.length;
         const rightLen = right.length;
+
+        const canLineWrap = (
+            lineWiseOnMultiline
+            && start !== end
+            && text.includes('\n')
+            && leftLen > 0
+            && rightLen > 0
+            && !left.includes('\n')
+            && !right.includes('\n')
+        );
+        if (canLineWrap) {
+            const lines = text.split('\n');
+            const hasContent = lines.some((line) => line.trim() !== '');
+            if (hasContent) {
+                const lineIsWrapped = (line) => {
+                    if (line.trim() === '') return true;
+                    return line.startsWith(left) && line.endsWith(right) && line.length >= leftLen + rightLen;
+                };
+                const unwrapAll = lines.every(lineIsWrapped);
+                const mapped = lines.map((line) => {
+                    if (line.trim() === '') return line;
+                    if (unwrapAll) return line.slice(leftLen, line.length - rightLen);
+                    return left + line + right;
+                });
+                const nextText = mapped.join('\n');
+                replaceRange(start, end, nextText);
+                setSelection(start, start + nextText.length);
+                return;
+            }
+        }
 
         const selectionStartsWith = text.startsWith(left) && text.endsWith(right) && text.length >= leftLen + rightLen;
         if (selectionStartsWith) {
@@ -2798,11 +3944,12 @@
     });
 
     boldBtn?.addEventListener('click', () => {
-        runFormatAction(() => wrapOrUnwrap('**', '**'));
+        runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
         ta.focus();
     });
     italicBtn?.addEventListener('click', () => {
         runFormatAction(() => wrapOrUnwrap('*', '*', {
+            lineWiseOnMultiline: true,
             singleCharSafe: ({ value, start, end }) => {
                 const prev = value[start - 2] || '';
                 const next = value[end + 1] || '';
@@ -2812,7 +3959,7 @@
         ta.focus();
     });
     underlineBtn?.addEventListener('click', () => {
-        runFormatAction(() => wrapOrUnwrap('<u>', '</u>'));
+        runFormatAction(() => wrapOrUnwrap('<u>', '</u>', { lineWiseOnMultiline: true }));
         ta.focus();
     });
     blockquoteBtn?.addEventListener('click', () => {
@@ -2897,7 +4044,7 @@
         // Bold: Ctrl+Alt+B
         if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
             e.preventDefault();
-            runFormatAction(() => wrapOrUnwrap('**', '**'));
+            runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
             return;
         }
 
@@ -2905,6 +4052,7 @@
         if (!e.shiftKey && (e.key === 'i' || e.key === 'I')) {
             e.preventDefault();
             runFormatAction(() => wrapOrUnwrap('*', '*', {
+                lineWiseOnMultiline: true,
                 singleCharSafe: ({ value, start, end }) => {
                     const prev = value[start - 2] || '';
                     const next = value[end + 1] || '';
@@ -2917,14 +4065,14 @@
         // Strikethrough: Ctrl+Alt+X
         if (!e.shiftKey && (e.key === 'x' || e.key === 'X')) {
             e.preventDefault();
-            runFormatAction(() => wrapOrUnwrap('~~', '~~'));
+            runFormatAction(() => wrapOrUnwrap('~~', '~~', { lineWiseOnMultiline: true }));
             return;
         }
 
         // Inline code: Ctrl+Alt+` (backquote key)
         if (!e.shiftKey && (e.code === 'Backquote' || e.key === '`')) {
             e.preventDefault();
-            runFormatAction(() => wrapOrUnwrap('`', '`'));
+            runFormatAction(() => wrapOrUnwrap('`', '`', { lineWiseOnMultiline: true }));
             return;
         }
 
@@ -3293,10 +4441,11 @@
 })();
 (function(){
     const exportBtn = document.getElementById('exportHtmlBtn');
+    const exportTemplateBtn = document.getElementById('exportTemplateBtn');
     const copyHtmlBtn = document.getElementById('copyHtmlBtn');
     const copyMdBtn = document.getElementById('copyMdBtn');
     const preview = document.getElementById('preview');
-    if (!exportBtn && !copyHtmlBtn && !copyMdBtn) return;
+    if (!exportBtn && !exportTemplateBtn && !copyHtmlBtn && !copyMdBtn) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const editor = document.getElementById('editor');
@@ -3312,6 +4461,18 @@
         const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         const v = s && typeof s.copy_html_mode === 'string' ? s.copy_html_mode.trim() : '';
         return (v === 'wet' || v === 'dry' || v === 'medium') ? v : 'dry';
+    };
+    const normalizeExportClassPrefix = (value) => {
+        let out = String(value || '').trim();
+        out = out.replace(/[^A-Za-z0-9_-]+/g, '');
+        if (out.length > 24) out = out.slice(0, 24);
+        return out;
+    };
+    const readExportClassPrefixSetting = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = s && typeof s.export_class_prefix === 'string' ? s.export_class_prefix : '';
+        return normalizeExportClassPrefix(raw);
     };
     const normalizeCustomCss = (value) => {
         let css = String(value || '');
@@ -3440,15 +4601,85 @@
         if (!rootEl || !(rootEl instanceof HTMLElement)) return;
         rootEl.querySelectorAll('.md-meta').forEach(el => el.remove());
     };
-
-    const stripCssAttributes = (rootEl) => {
+    const stripSourceMapAttrs = (rootEl) => {
         if (!(rootEl instanceof Element)) return;
         const strip = (el) => {
-            el.removeAttribute('class');
+            el.removeAttribute('data-mdw-src-start');
+            el.removeAttribute('data-mdw-src-end');
+        };
+        strip(rootEl);
+        rootEl.querySelectorAll('[data-mdw-src-start], [data-mdw-src-end]').forEach((el) => strip(el));
+    };
+
+    const stripCssAttributes = (rootEl, preserveClasses) => {
+        if (!(rootEl instanceof Element)) return;
+        const keepSet = preserveClasses instanceof Set ? preserveClasses : null;
+        const strip = (el) => {
+            const raw = String(el.getAttribute('class') || '').trim();
+            if (raw && keepSet && keepSet.size) {
+                const keep = raw
+                    .split(/\s+/)
+                    .map((c) => String(c || '').trim())
+                    .filter((c) => c && keepSet.has(c));
+                if (keep.length) el.setAttribute('class', keep.join(' '));
+                else el.removeAttribute('class');
+            } else {
+                el.removeAttribute('class');
+            }
             el.removeAttribute('style');
         };
         strip(rootEl);
         rootEl.querySelectorAll('[class], [style]').forEach((el) => strip(el));
+    };
+
+    const remapMdClassesInDom = (rootEl, prefix) => {
+        if (!(rootEl instanceof Element)) return;
+        const nextPrefix = normalizeExportClassPrefix(prefix);
+        if (nextPrefix === 'md-') return;
+        const remapOne = (el) => {
+            const raw = String(el.getAttribute('class') || '').trim();
+            if (!raw) return;
+            const mapped = [];
+            raw.split(/\s+/).forEach((cls) => {
+                if (!cls) return;
+                if (cls.startsWith('md-')) mapped.push(nextPrefix + cls.slice(3));
+                else mapped.push(cls);
+            });
+            const dedup = Array.from(new Set(mapped.filter(Boolean)));
+            if (dedup.length) el.setAttribute('class', dedup.join(' '));
+            else el.removeAttribute('class');
+        };
+        remapOne(rootEl);
+        rootEl.querySelectorAll('[class]').forEach((el) => remapOne(el));
+    };
+
+    const normalizeFootnotesForPlainExport = (rootEl) => {
+        if (!(rootEl instanceof Element)) return;
+        const allLists = Array.from(rootEl.querySelectorAll('ol'));
+        allLists.forEach((list) => {
+            if (!(list instanceof HTMLOListElement)) return;
+            const items = Array.from(list.children).filter((el) =>
+                el instanceof HTMLLIElement && /^fn-/.test(String(el.id || ''))
+            );
+            if (!items.length) return;
+            list.classList.add('fn-section');
+            items.forEach((li) => {
+                const markers = li.querySelectorAll('.md-footnote-marker, .fn-marker');
+                if (markers.length) {
+                    markers.forEach((el) => el.remove());
+                    return;
+                }
+                const first = li.firstElementChild;
+                if (
+                    first instanceof HTMLSpanElement &&
+                    /^\s*\[[A-Za-z0-9_-]+\]\s*$/.test(String(first.textContent || ''))
+                ) {
+                    first.remove();
+                }
+            });
+        });
+        rootEl.querySelectorAll('sup.md-footnote').forEach((el) => el.classList.add('fn'));
+        rootEl.querySelectorAll('a.md-footnote-ref').forEach((el) => el.classList.add('fn'));
     };
 
     const stripInlineStyles = (rootEl) => {
@@ -3507,19 +4738,23 @@
         }
     };
 
-    const applyHtmlMode = (targetRoot, htmlMode, allowedClasses) => {
+    const applyHtmlMode = (targetRoot, htmlMode, allowedClasses, exportClassPrefix) => {
         if (!(targetRoot instanceof Element)) return;
         if (htmlMode === 'dry') {
+            normalizeFootnotesForPlainExport(targetRoot);
             stripCssAttributes(targetRoot);
             return;
         }
         if (htmlMode === 'medium') {
+            normalizeFootnotesForPlainExport(targetRoot);
             stripInlineStyles(targetRoot);
             filterClassesByAllowlist(targetRoot, allowedClasses);
+            remapMdClassesInDom(targetRoot, exportClassPrefix);
             return;
         }
         if (htmlMode === 'wet') {
             filterClassesByAllowlist(targetRoot, allowedClasses);
+            remapMdClassesInDom(targetRoot, exportClassPrefix);
             return;
         }
         if (htmlMode !== 'wet') return;
@@ -3542,13 +4777,14 @@
         });
     };
 
-    const getPreviewSnapshot = (stripMeta, htmlMode, allowedClasses) => {
+    const getPreviewSnapshot = (stripMeta, htmlMode, allowedClasses, exportClassPrefix) => {
         if (!(preview instanceof HTMLElement)) return null;
         const clone = preview.cloneNode(true);
         if (clone instanceof HTMLElement) clone.removeAttribute('id');
         if (stripMeta) stripMetaHtml(clone);
+        stripSourceMapAttrs(clone);
         normalizeTocLayoutForExport(clone, htmlMode);
-        applyHtmlMode(clone, htmlMode, allowedClasses);
+        applyHtmlMode(clone, htmlMode, allowedClasses, exportClassPrefix);
         return clone instanceof HTMLElement ? clone.outerHTML : null;
     };
 
@@ -3586,7 +4822,7 @@
     };
     window.__mdwInitCodeCopyButtons = initCodeCopyButtons;
 
-    const buildPreviewWrapper = (html, stripMeta, htmlMode, allowedClasses) => {
+    const buildPreviewWrapper = (html, stripMeta, htmlMode, allowedClasses, exportClassPrefix) => {
         const wrapper = document.createElement(preview instanceof HTMLElement ? preview.tagName : 'div');
         if (preview instanceof HTMLElement && preview.className) {
             wrapper.className = preview.className;
@@ -3595,7 +4831,8 @@
         }
         wrapper.innerHTML = html || '';
         if (stripMeta) stripMetaHtml(wrapper);
-        applyHtmlMode(wrapper, htmlMode, allowedClasses);
+        stripSourceMapAttrs(wrapper);
+        applyHtmlMode(wrapper, htmlMode, allowedClasses, exportClassPrefix);
         return wrapper.outerHTML;
     };
  
@@ -3650,6 +4887,12 @@
     };
 
     const sanitizeCssForStyleTag = (css) => String(css || '').replace(/<\/style/gi, '<\\/style');
+    const remapMdClassPrefixInCss = (css, prefix) => {
+        const nextPrefix = normalizeExportClassPrefix(prefix);
+        const raw = String(css || '');
+        if (!raw || nextPrefix === 'md-') return raw;
+        return raw.replace(/(?<=\.)md-([A-Za-z0-9_-]+)/g, `${nextPrefix}$1`);
+    };
 
     const sanitizeExportSelector = (selector, allowedClasses) => {
         let s = String(selector || '').trim();
@@ -3657,7 +4900,10 @@
         s = s.replace(/\.preview-content\b/g, ' ').replace(/\s+/g, ' ');
         s = s.replace(/^\s*[>+~]\s*/, '').trim();
         if (!s) s = 'body';
-        if (s.includes('.md-') && !/\.md-toc\b|\.md-toc-/.test(s)) return null;
+        if (
+            s.includes('.md-') &&
+            !/\.md-toc\b|\.md-toc-|\.md-footnote\b|\.md-footnote-|\.md-footnotes\b/.test(s)
+        ) return null;
         if (allowedClasses instanceof Set) {
             const classMatches = s.match(/\.([A-Za-z0-9_-]+)/g) || [];
             for (const match of classMatches) {
@@ -3722,7 +4968,7 @@
         return output.join('\n').trim();
     };
 
-    const collectExportCss = async (htmlMode, allowedClasses) => {
+    const collectExportCss = async (htmlMode, allowedClasses, exportClassPrefix) => {
         const chunks = [];
         if (htmlMode === 'wet') {
             const baseCss = await readCssFromLink(findBasePreviewStylesheet());
@@ -3741,7 +4987,8 @@
         }
         const combined = chunks.filter((c) => String(c || '').trim() !== '').join('\n\n');
         const sanitized = sanitizeExportCss(combined, allowedClasses);
-        return sanitizeCssForStyleTag(sanitized);
+        const mapped = remapMdClassPrefixInCss(sanitized, exportClassPrefix);
+        return sanitizeCssForStyleTag(mapped);
     };
 
     const getServerRenderedHtml = async (markdownOverride) => {
@@ -3763,6 +5010,32 @@
         return await res.text();
     };
 
+    const buildAllowedClassesSet = (markdownSource, htmlMode) => {
+        const allow = htmlMode !== 'dry' ? collectAttrListClasses(markdownSource) : null;
+        if (!(allow instanceof Set)) return allow;
+        [
+            'md-toc-layout',
+            'md-toc-inline',
+            'md-toc-left',
+            'md-toc-right',
+            'md-toc-side',
+            'md-toc-body',
+            'md-toc-wrap',
+            'md-toc',
+            'md-toc-item',
+            'is-active',
+            'md-footnotes',
+            'md-footnote',
+            'md-footnote-ref',
+            'md-footnote-item',
+            'md-footnote-marker',
+            'md-footnote-text',
+            'fn-section',
+            'fn',
+        ].forEach((cls) => allow.add(cls));
+        return allow;
+    };
+
     const buildExportHtml = async (opts = {}) => {
         const includeMeta = opts.includeMeta !== false;
         const stripMeta = !includeMeta;
@@ -3770,30 +5043,17 @@
         const title = (document.querySelector('.app-title')?.textContent || '').trim() || 'Markdown export';
         const src = getBasename(window.CURRENT_FILE || 'export.md').replace(/\.md$/i, '');
         const filename = `${src || 'export'}.html`;
+        const exportClassPrefix = readExportClassPrefixSetting();
         const markdownSource = getMarkdownSource();
-        const allowedClasses = htmlMode !== 'dry' ? collectAttrListClasses(markdownSource) : null;
-        if (htmlMode === 'wet' && allowedClasses instanceof Set) {
-            [
-                'md-toc-layout',
-                'md-toc-inline',
-                'md-toc-left',
-                'md-toc-right',
-                'md-toc-side',
-                'md-toc-body',
-                'md-toc-wrap',
-                'md-toc',
-                'md-toc-item',
-                'is-active',
-            ].forEach((cls) => allowedClasses.add(cls));
-        }
-        let bodyHtml = getPreviewSnapshot(stripMeta, htmlMode, allowedClasses);
-        const exportCss = await collectExportCss(htmlMode, allowedClasses);
+        const allowedClasses = buildAllowedClassesSet(markdownSource, htmlMode);
+        let bodyHtml = getPreviewSnapshot(stripMeta, htmlMode, allowedClasses, exportClassPrefix);
+        const exportCss = await collectExportCss(htmlMode, allowedClasses, exportClassPrefix);
         const fontLinks = buildThemeFontLinks(htmlMode);
         if (!bodyHtml) {
             const rendered = (typeof markdownSource === 'string')
                 ? await getServerRenderedHtml(markdownSource)
                 : await getServerRenderedHtml();
-            bodyHtml = buildPreviewWrapper(rendered, stripMeta, htmlMode, allowedClasses);
+            bodyHtml = buildPreviewWrapper(rendered, stripMeta, htmlMode, allowedClasses, exportClassPrefix);
         }
 
         const cssBlock = exportCss ? `\n  <style data-mdw-export-css>\n${exportCss}\n  </style>\n` : '';
@@ -3810,6 +5070,25 @@ ${bodyHtml}
 </html>`;
 
         return { filename, html };
+    };
+
+    const buildTemplateFilename = () => {
+        const src = getBasename(window.CURRENT_FILE || 'export.md').replace(/\.md$/i, '');
+        return `${src || 'export'}.html`;
+    };
+
+    const fetchJinjaTemplate = async (markdownSource) => {
+        if (!window.CURRENT_FILE) throw new Error('No file selected');
+        const fd = new FormData();
+        fd.set('content', typeof markdownSource === 'string' ? markdownSource : '');
+        const url = 'edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1&template=jinja';
+        if (mdmApi && typeof mdmApi.form === 'function') {
+            const data = await mdmApi.form(url, fd);
+            return String(data || '');
+        }
+        const res = await fetch(url, { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Template export request failed');
+        return await res.text();
     };
 
     const downloadTextFile = (filename, text, mime) => {
@@ -3885,6 +5164,33 @@ ${bodyHtml}
                     mdmUi.busy(exportBtn, false);
                 } else {
                     exportBtn.disabled = false;
+                }
+            }
+        });
+    }
+
+    if (exportTemplateBtn) {
+        exportTemplateBtn.addEventListener('click', async () => {
+            if (!window.CURRENT_FILE) return;
+            if (mdmUi && typeof mdmUi.busy === 'function') {
+                mdmUi.busy(exportTemplateBtn, true, { label: t('js.exporting', 'Exporting…') });
+            } else {
+                exportTemplateBtn.disabled = true;
+            }
+            try {
+                const markdownSource = getMarkdownSource();
+                const markdown = typeof markdownSource === 'string' ? markdownSource : '';
+                const template = await fetchJinjaTemplate(markdown);
+                const filename = buildTemplateFilename();
+                downloadTextFile(filename, template, 'text/plain;charset=utf-8');
+            } catch (e) {
+                console.error('Template export failed', e);
+                alert(t('js.template_export_failed', 'Template export failed. Check the console for details.'));
+            } finally {
+                if (mdmUi && typeof mdmUi.busy === 'function') {
+                    mdmUi.busy(exportTemplateBtn, false);
+                } else {
+                    exportTemplateBtn.disabled = false;
                 }
             }
         });

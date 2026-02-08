@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8
+
+- AW-SSG integration: added optional `aw_ssg_template_export` plugin (`plugins/aw_ssg_template_export_plugin.php`) so instances without the plugin continue to work unchanged.
+- Editor export UI: added `Template download` next to HTML download (same `pi-download` icon) for Jinja-ready exports.
+- Export endpoint: `edit.php?file=...&preview=1&template=jinja` now returns an immediate AW-SSG template export for the active markdown.
+- Template structure: export now emits `{% extends "base.html" %}` by default, maps metadata to Jinja `{% set ... %}` values, and wraps body in `{% block content %}...{% endblock content %}`.
+- Metadata mapping/settings: added configurable Jinja metafield prefix mapping (`page_` default, e.g. `post_`) plus support for required/obligatory metadata with default values in WPM.
+- WPM defaults: obligatory metafields can be auto-injected into new notes; `active_page` is derived from the markdown folder path (root stays unset).
+- Template body smart cleanup: removes duplicate H1/H2 when already covered by metadata, suppresses the metadata cover image duplicate, and converts following images/links to Jinja token form (`{{image.ext}}`, `{{subdir/page.html}}`).
+- Export class behavior: fixed empty export-class-prefix handling so unwanted `md_` classes are no longer injected.
+- Footnote/template cleanup: removed double numbering in footnote export and split class semantics so `fn` is inline-reference only, while the footnote section uses `fn-section`.
+
 ## 0.7
 
 - Explorer: WPM publish badges now include state icons (lightbulb/certificate/checked certificate).

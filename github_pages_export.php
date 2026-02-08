@@ -360,6 +360,7 @@ try {
     $themePreset = isset($settings['theme_preset']) ? trim((string)$settings['theme_preset']) : 'default';
     $overrides = isset($settings['theme_overrides']) && is_array($settings['theme_overrides']) ? $settings['theme_overrides'] : [];
     $customCss = isset($settings['custom_css']) ? (string)$settings['custom_css'] : '';
+    $exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_prefix'] ?? '');
 
     $baseCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/htmlpreview.css');
     $popiconCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/popicon.css');
@@ -376,13 +377,17 @@ try {
     $repoFooter = ghpx_build_repo_footer($repoUrl, $repoLabel);
     $repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
     $cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
-    $css = ghpx_sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
+    $cssCombined = implode("\n\n", $cssChunks);
+    $cssCombined = mdw_rewrite_md_class_prefix_in_css($cssCombined, $exportClassPrefix);
+    $css = ghpx_sanitize_css_for_style_tag($cssCombined);
     $cssBlock = $css !== '' ? "\n  <style data-mdw-export-css>\n{$css}\n  </style>\n" : '';
     $baseTag = $baseHref !== '' ? '  <base href="' . htmlspecialchars($baseHref, ENT_QUOTES, 'UTF-8') . '">' . "\n" : '';
 
     $title = extract_title($rawMd);
-    $body = md_to_html($rawMd, $file, 'view');
+    $body = md_to_html($rawMd, $file, 'view', ['source_map' => false]);
+    $body = mdw_html_strip_source_map_attrs($body);
     $body = '<article class="preview-content">' . $body . '</article>';
+    $body = mdw_rewrite_md_class_prefix_in_html($body, $exportClassPrefix);
     $body = ghpx_rewrite_internal_links($body, $outRelFile, $baseHref !== '');
     $hasMermaid = (strpos($body, 'class="mermaid"') !== false)
         || (preg_match('/^```\\s*mermaid\\b/im', $rawMd) === 1);

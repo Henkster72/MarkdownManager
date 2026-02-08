@@ -514,9 +514,10 @@
     }, { passive: false });
 })();
 
-// +MD panel toggle (index.php + edit.php)
+// +MD modal toggle (index.php + edit.php)
 (function(){
     const newMdToggle = document.getElementById('newMdToggle');
+    const newMdOverlay = document.getElementById('newMdOverlay');
     const newMdPanel = document.getElementById('newMdPanel');
     const newMdClose = document.getElementById('newMdClose');
     const newMdPrefixDate = document.getElementById('newMdPrefixDate');
@@ -526,7 +527,9 @@
     const newMdSlugHint = document.getElementById('newMdFileHint');
     const newMdPreview = document.getElementById('newMdFilePreview');
     const newMdPreviewValue = document.getElementById('newMdFilePreviewValue');
-    const newMdForm = newMdSlug?.closest?.('form');
+    const newMdForm = (newMdPanel instanceof HTMLFormElement)
+        ? newMdPanel
+        : (newMdSlug?.closest?.('form') || null);
     const newMdContent = newMdForm?.querySelector?.('textarea[name="new_content"]') || null;
     const newFolderBtn = document.getElementById('newFolderBtn');
     const newFolderForm = document.getElementById('newFolderForm');
@@ -535,30 +538,30 @@
     if (!newMdToggle) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
-    const inferFolderFromUrl = () => {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const folder = params.get('folder');
-            if (folder) return folder;
-            const file = params.get('file');
-            if (file && file.includes('/')) return file.split('/')[0];
-        } catch {}
-        return null;
-    };
-
-    const redirectToIndex = () => {
-        const folder = inferFolderFromUrl();
-        const url = folder ? `index.php?new=1&folder=${encodeURIComponent(folder)}` : 'index.php?new=1';
-        window.location.href = url;
-    };
-
     if (!newMdPanel) {
-        newMdToggle.addEventListener('click', redirectToIndex);
+        newMdToggle.addEventListener('click', () => {
+            window.location.href = 'index.php?new=1';
+        });
         return;
     }
 
+    const newMdModalBinding = (typeof window.__mdwBindModal === 'function')
+        ? window.__mdwBindModal({
+            modal: newMdPanel,
+            overlay: newMdOverlay,
+            closeButtons: [newMdClose],
+            closeOnOverlay: true,
+            closeOnEsc: true,
+        })
+        : null;
+
+    const isOpen = () => newMdModalBinding ? newMdModalBinding.isOpen() : !newMdPanel.hidden;
     const open = () => {
-        newMdPanel.style.display = 'block';
+        if (newMdModalBinding) newMdModalBinding.open({ source: 'toggle' });
+        else {
+            if (newMdOverlay) newMdOverlay.hidden = false;
+            newMdPanel.hidden = false;
+        }
         setSlugReadonly();
         const focusTarget = (newMdTitle instanceof HTMLInputElement) ? newMdTitle : newMdSlug;
         if (focusTarget instanceof HTMLInputElement) {
@@ -566,15 +569,32 @@
             if (focusTarget.value) focusTarget.setSelectionRange(focusTarget.value.length, focusTarget.value.length);
         }
     };
-    const close = () => { newMdPanel.style.display = 'none'; };
-    const toggle = () => {
-        const show = (newMdPanel.style.display === 'none' || newMdPanel.style.display === '');
-        if (show) open();
-        else close();
+    const close = () => {
+        if (newMdModalBinding) newMdModalBinding.close({ source: 'toggle' });
+        else {
+            newMdPanel.hidden = true;
+            if (newMdOverlay) newMdOverlay.hidden = true;
+        }
     };
+    const toggle = () => {
+        if (isOpen()) close();
+        else open();
+    };
+    window.__mdwOpenNewMdModal = open;
+    window.__mdwCloseNewMdModal = close;
 
     newMdToggle.addEventListener('click', toggle);
-    newMdClose?.addEventListener('click', close);
+    if (!newMdModalBinding) {
+        newMdClose?.addEventListener('click', close);
+        newMdOverlay?.addEventListener('click', close);
+        document.addEventListener('keydown', (e) => {
+            if (!isOpen()) return;
+            if (e.key === 'Escape' || e.key === 'Esc') {
+                e.preventDefault();
+                close();
+            }
+        });
+    }
 
     const supportsUnicodeProps = (() => {
         try { new RegExp('\\p{L}', 'u'); return true; } catch { return false; }
@@ -800,7 +820,7 @@
         });
     }
 
-    if (newMdPanel.style.display !== 'none' && newMdPanel.style.display !== '') {
+    if (newMdPanel.dataset.initialOpen === '1') {
         open();
     }
     setSlugReadonly();
@@ -862,38 +882,36 @@
     });
 })();
 
-// Ctrl/Cmd-Shift-N: create new markdown (opens +MD panel or redirects to index)
+// Create new markdown shortcut (respects shortcut modifier setting)
 (function(){
-    const inferFolderFromUrl = () => {
+    const getShortcutMod = () => {
         try {
-            const params = new URLSearchParams(window.location.search);
-            const folder = params.get('folder');
-            if (folder) return folder;
-            const file = params.get('file');
-            if (file && file.includes('/')) return file.split('/')[0];
-        } catch {}
-        return null;
+            const fn = window.__mdwReadShortcutMod;
+            const v = (typeof fn === 'function') ? fn() : null;
+            return (v === 'command' || v === 'option') ? v : 'option';
+        } catch {
+            return 'option';
+        }
     };
+    const isConfiguredShortcut = (e) => {
+        if (!e.ctrlKey) return false;
+        const mod = getShortcutMod();
+        if (mod === 'command') return e.metaKey && !e.altKey;
+        return e.altKey && !e.metaKey;
+    };
+    const isLegacyShortcut = (e) => (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey;
 
     document.addEventListener('keydown', (e) => {
-        if (!((e.ctrlKey || e.metaKey) && e.shiftKey)) return;
         if (!(e.key === 'n' || e.key === 'N')) return;
+        if (!isConfiguredShortcut(e) && !isLegacyShortcut(e)) return;
 
-        const newMdPanel = document.getElementById('newMdPanel');
-        const newMdTitle = document.getElementById('newMdTitle');
-        const newMdFile = document.getElementById('newMdFile');
-        const focusTarget = (newMdTitle instanceof HTMLInputElement) ? newMdTitle : newMdFile;
-        if (newMdPanel && focusTarget instanceof HTMLInputElement) {
+        if (typeof window.__mdwOpenNewMdModal === 'function') {
             e.preventDefault();
-            newMdPanel.style.display = 'block';
-            focusTarget.focus();
-            if (focusTarget.value) focusTarget.setSelectionRange(focusTarget.value.length, focusTarget.value.length);
+            window.__mdwOpenNewMdModal();
             return;
         }
 
-        // Fallback: navigate to index and open panel.
-        const folder = inferFolderFromUrl();
-        const url = folder ? `index.php?new=1&folder=${encodeURIComponent(folder)}` : 'index.php?new=1';
+        const url = 'index.php?new=1';
         window.location.href = url;
     });
 })();
@@ -1397,9 +1415,15 @@
     openFromQuery();
 
     const normalizeSort = (value) => String(value || '').trim().toLowerCase();
+    const isPublisherMode = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(settings && settings.publisher_mode);
+    };
     const sortNoteItems = (mode) => {
         const lists = Array.from(overview.querySelectorAll('.notes-list'));
         if (!lists.length) return;
+        const statePriorityOn = isPublisherMode();
 
         const compare = (a, b) => {
             const dateA = String(a.dataset.date || '');
@@ -1408,6 +1432,20 @@
             const titleB = normalizeSort(b.dataset.title || '');
             const slugA = normalizeSort(a.dataset.slug || '');
             const slugB = normalizeSort(b.dataset.slug || '');
+            const stateRank = (item) => {
+                if (!item || item.dataset.kind !== 'md') return 1;
+                const state = normalizeSort(item.dataset.publishState || '');
+                if (state === 'concept') return 0;
+                if (state === 'processing') return 1;
+                if (state === 'published') return 2;
+                return 3;
+            };
+
+            if (statePriorityOn) {
+                const rankA = stateRank(a);
+                const rankB = stateRank(b);
+                if (rankA !== rankB) return rankA - rankB;
+            }
 
             if (mode === 'title') {
                 if (titleA !== titleB) return titleA.localeCompare(titleB);
@@ -1434,6 +1472,7 @@
             if (empty) list.appendChild(empty);
         }
     };
+    window.__mdwSortOverviewNotes = sortNoteItems;
 
     (function(){
         if (!(navSortSelect instanceof HTMLSelectElement)) return;

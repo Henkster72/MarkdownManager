@@ -202,6 +202,23 @@
         mdmModalOpen(false);
         setStatus('', 'info');
     };
+    const closeWithoutSave = () => {
+        if (overlay.hidden) return;
+        hide();
+    };
+    const wpmModalBinding = (typeof window.__mdwBindModal === 'function')
+        ? window.__mdwBindModal({
+            modal,
+            overlay,
+            closeOnOverlay: true,
+            closeOnEsc: true,
+            manageVisibility: false,
+            isOpen: () => !overlay.hidden,
+            onClose: () => {
+                closeWithoutSave();
+            },
+        })
+        : null;
 
     const save = () => {
         const author = (authorInput instanceof HTMLInputElement) ? String(authorInput.value || '').trim() : '';
@@ -248,6 +265,11 @@
         applyAuthorToForms(next);
         return next;
     };
+    window.__mdwCloseWpmUserModal = () => {
+        if (wpmModalBinding) return wpmModalBinding.close({ source: 'api', force: true });
+        closeWithoutSave();
+        return true;
+    };
 
     switchBtn?.addEventListener('click', () => {
         try {
@@ -282,12 +304,26 @@
         !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey;
 
     modal?.addEventListener('keydown', (e) => {
+        if (!wpmModalBinding && (e.key === 'Escape' || e.key === 'Esc')) {
+            e.preventDefault();
+            closeWithoutSave();
+            return;
+        }
         if (!isPlainEnter(e)) return;
         const target = e.target;
         if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return;
         e.preventDefault();
         save();
     });
+    if (!wpmModalBinding) {
+        overlay.addEventListener('click', closeWithoutSave);
+        document.addEventListener('keydown', (e) => {
+            if (overlay.hidden) return;
+            if (e.key !== 'Escape' && e.key !== 'Esc') return;
+            e.preventDefault();
+            closeWithoutSave();
+        });
+    }
     if (authorInput instanceof HTMLInputElement) authorInput.value = getAuthor();
     syncLangSelect();
     syncShortcutMod();
@@ -789,16 +825,32 @@
     const langSelect = document.getElementById('langSelect');
     const metaSaveBtn = document.getElementById('metaSettingsSaveBtn');
     const metaStatus = document.getElementById('metaSettingsStatus');
-    const metaInputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-meta-key][data-meta-field][data-meta-scope]'))
+    const metaInputs = Array.from(document.querySelectorAll('input[data-meta-key][data-meta-field][data-meta-scope]'))
         .filter(el => el instanceof HTMLInputElement);
     const baseMetaInputs = metaInputs.filter(el => String(el.dataset.metaScope || '') === 'base');
     const publisherMetaInputs = metaInputs.filter(el => String(el.dataset.metaScope || '') === 'publisher');
+    const baseMetaToggleInputs = baseMetaInputs.filter((el) => {
+        if (!(el instanceof HTMLInputElement) || el.type !== 'checkbox') return false;
+        const field = String(el.dataset.metaField || '').trim();
+        return field === 'markdown' || field === 'html';
+    });
+    const publisherMetaToggleInputs = publisherMetaInputs.filter((el) => {
+        if (!(el instanceof HTMLInputElement) || el.type !== 'checkbox') return false;
+        const field = String(el.dataset.metaField || '').trim();
+        return field === 'markdown' || field === 'html';
+    });
     const publisherModeToggle = document.getElementById('publisherModeToggle');
     const publisherAuthorInput = document.getElementById('publisherAuthorInput');
     const publisherRequireH2Toggle = document.getElementById('publisherRequireH2Toggle');
+    const jinjaMetaPrefixInput = document.getElementById('jinjaMetaPrefixInput');
+    const jinjaMetaPrefixSaveBtn = document.getElementById('jinjaMetaPrefixSaveBtn');
+    const jinjaMetaPrefixStatus = document.getElementById('jinjaMetaPrefixStatus');
     const appTitleInput = document.getElementById('appTitleInput');
     const appTitleSaveBtn = document.getElementById('appTitleSaveBtn');
     const appTitleStatus = document.getElementById('appTitleStatus');
+    const internalLinkPrefixInput = document.getElementById('internalLinkPrefixInput');
+    const internalLinkPrefixSaveBtn = document.getElementById('internalLinkPrefixSaveBtn');
+    const internalLinkPrefixStatus = document.getElementById('internalLinkPrefixStatus');
     const deleteAfterOverview = document.getElementById('deleteAfterOverview');
     const deleteAfterNext = document.getElementById('deleteAfterNext');
     const offlineDelaySelect = document.getElementById('offlineDelaySelect');
@@ -808,6 +860,9 @@
     const copyButtonsToggle = document.getElementById('copyButtonsToggle');
     const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
     const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
+    const exportClassPrefixInput = document.getElementById('exportClassPrefixInput');
+    const exportClassPrefixSaveBtn = document.getElementById('exportClassPrefixSaveBtn');
+    const exportClassPrefixStatus = document.getElementById('exportClassPrefixStatus');
     const copySettingsStatus = document.getElementById('copySettingsStatus');
     const tocMenuSelect = document.getElementById('tocMenuSelect');
     const tocMenuStatus = document.getElementById('tocMenuStatus');
@@ -875,6 +930,13 @@
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
+    const setInternalLinkPrefixStatus = (msg, kind = 'info') => {
+        if (!(internalLinkPrefixStatus instanceof HTMLElement)) return;
+        internalLinkPrefixStatus.textContent = String(msg || '');
+        internalLinkPrefixStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
 
     const setAllowUserDeleteStatus = (msg, kind = 'info') => {
         if (!(allowUserDeleteStatus instanceof HTMLElement)) return;
@@ -888,6 +950,20 @@
         if (!(copySettingsStatus instanceof HTMLElement)) return;
         copySettingsStatus.textContent = String(msg || '');
         copySettingsStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+    const setExportClassPrefixStatus = (msg, kind = 'info') => {
+        if (!(exportClassPrefixStatus instanceof HTMLElement)) return;
+        exportClassPrefixStatus.textContent = String(msg || '');
+        exportClassPrefixStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+    const setJinjaMetaPrefixStatus = (msg, kind = 'info') => {
+        if (!(jinjaMetaPrefixStatus instanceof HTMLElement)) return;
+        jinjaMetaPrefixStatus.textContent = String(msg || '');
+        jinjaMetaPrefixStatus.style.color = kind === 'error'
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
@@ -934,6 +1010,18 @@
         const s = getSettings();
         return s && typeof s.app_title === 'string' ? s.app_title.trim() : '';
     };
+    const readInternalLinkPrefixSetting = () => {
+        const s = getSettings();
+        return s && typeof s.internal_link_prefix === 'string' ? s.internal_link_prefix.trim() : '';
+    };
+    const normalizeInternalLinkPrefix = (value) => {
+        let out = String(value || '').trim();
+        if (!out) return '';
+        if (!/[\/?#=&]$/.test(out)) out += '/';
+        return out;
+    };
+    const readInternalLinkPrefix = () => normalizeInternalLinkPrefix(readInternalLinkPrefixSetting());
+    window.__mdwReadInternalLinkPrefix = readInternalLinkPrefix;
     const readAllowUserPublishSetting = () => {
         const s = getSettings();
         if (!s || typeof s !== 'object') return false;
@@ -959,6 +1047,34 @@
         const v = s && typeof s.copy_html_mode === 'string' ? s.copy_html_mode.trim() : '';
         return (v === 'wet' || v === 'dry' || v === 'medium') ? v : 'dry';
     };
+    const normalizeExportClassPrefix = (value) => {
+        let out = String(value || '').trim();
+        out = out.replace(/[^A-Za-z0-9_-]+/g, '');
+        if (out.length > 24) out = out.slice(0, 24);
+        return out;
+    };
+    const readExportClassPrefixSetting = () => {
+        const s = getSettings();
+        const raw = s && typeof s.export_class_prefix === 'string' ? s.export_class_prefix : '';
+        return normalizeExportClassPrefix(raw);
+    };
+    window.__mdwReadExportClassPrefix = readExportClassPrefixSetting;
+    const normalizeJinjaMetaPrefix = (value) => {
+        let out = String(value || '').trim().toLowerCase();
+        out = out.replace(/[^a-z0-9_]+/g, '_');
+        if (!out) out = 'page_';
+        if (/^[0-9]/.test(out)) out = `p_${out}`;
+        if (!out.endsWith('_')) out += '_';
+        if (out.length > 24) out = out.slice(0, 24);
+        if (!/[a-z]/.test(out)) out = 'page_';
+        return out;
+    };
+    const readJinjaMetaPrefixSetting = () => {
+        const s = getSettings();
+        const raw = s && typeof s.jinja_meta_prefix === 'string' ? s.jinja_meta_prefix : 'page_';
+        return normalizeJinjaMetaPrefix(raw);
+    };
+    window.__mdwReadJinjaMetaPrefix = readJinjaMetaPrefixSetting;
     const readTocMenuSetting = () => {
         const s = getSettings();
         const v = s && typeof s.toc_menu === 'string' ? s.toc_menu.trim().toLowerCase() : '';
@@ -1188,6 +1304,9 @@
         if (appTitleInput instanceof HTMLInputElement) {
             appTitleInput.value = readAppTitleSetting();
         }
+        if (internalLinkPrefixInput instanceof HTMLInputElement) {
+            internalLinkPrefixInput.value = readInternalLinkPrefixSetting();
+        }
         if (allowUserPublishToggle instanceof HTMLInputElement) {
             allowUserPublishToggle.checked = readAllowUserPublishSetting();
         }
@@ -1202,6 +1321,12 @@
         }
         if (copyHtmlModeSelect instanceof HTMLSelectElement) {
             copyHtmlModeSelect.value = readCopyHtmlModeSetting();
+        }
+        if (exportClassPrefixInput instanceof HTMLInputElement) {
+            exportClassPrefixInput.value = readExportClassPrefixSetting();
+        }
+        if (jinjaMetaPrefixInput instanceof HTMLInputElement) {
+            jinjaMetaPrefixInput.value = readJinjaMetaPrefixSetting();
         }
         if (tocMenuSelect instanceof HTMLSelectElement) {
             tocMenuSelect.value = readTocMenuSetting();
@@ -1225,9 +1350,12 @@
             offlineDelaySelect.value = hasOption ? desired : '30';
         }
         setAppTitleStatus(t('theme.app_title.hint', 'Leave blank to use the default.'), 'info');
+        setInternalLinkPrefixStatus(t('theme.internal_links.prefix_hint', 'Prefix is added before index.php?file= (leave empty for relative links).'), 'info');
         syncDeleteAfterUi();
         setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
         setCopySettingsStatus(t('theme.copy.hint', 'Saved for all users.'), 'info');
+        setExportClassPrefixStatus(t('theme.copy.class_prefix_hint', 'Applies to medium/wet HTML export; dry export removes all classes.'), 'info');
+        setJinjaMetaPrefixStatus(t('theme.metadata.jinja_prefix_hint', 'Maps metadata keys like page_picture -> blog_picture in Template download (default: page_).'), 'info');
         setPostDateFormatStatus(t('theme.post_date_format.hint', 'Saved for all users.'), 'info');
         setPostDateAlignStatus(t('theme.post_date_align.hint', 'Saved for all users.'), 'info');
         setFolderIconStyleStatus(t('theme.folder_icons.hint', 'Saved for all users.'), 'info');
@@ -1327,6 +1455,33 @@
                 ? e.message.trim()
                 : t('theme.app_title.save_failed', 'Save failed');
             setAppTitleStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveInternalLinkPrefixSetting = async (value) => {
+        setInternalLinkPrefixStatus(t('theme.internal_links.prefix_saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setInternalLinkPrefixStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const nextValue = String(value || '').trim();
+            const result = await saveSettingsToServer({ internal_link_prefix: nextValue });
+            if (!result.ok) throw new Error(result.message || t('theme.internal_links.prefix_save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.internal_link_prefix = nextValue;
+            }
+            setInternalLinkPrefixStatus(t('theme.internal_links.prefix_saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('internal link prefix save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.internal_links.prefix_save_failed', 'Save failed');
+            setInternalLinkPrefixStatus(msg, 'error');
             return false;
         }
     };
@@ -1465,6 +1620,64 @@
                 ? e.message.trim()
                 : t('theme.copy.save_failed', 'Save failed');
             setCopySettingsStatus(msg, 'error');
+            return false;
+        }
+    };
+    const saveExportClassPrefixSetting = async (nextValue) => {
+        setExportClassPrefixStatus(t('theme.copy.class_prefix_saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setExportClassPrefixStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = normalizeExportClassPrefix(nextValue);
+            const result = await saveSettingsToServer({ export_class_prefix: value });
+            if (!result.ok) throw new Error(result.message || t('theme.copy.class_prefix_save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.export_class_prefix = value;
+            }
+            if (exportClassPrefixInput instanceof HTMLInputElement && exportClassPrefixInput.value !== value) {
+                exportClassPrefixInput.value = value;
+            }
+            setExportClassPrefixStatus(t('theme.copy.class_prefix_saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('export class prefix save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.copy.class_prefix_save_failed', 'Save failed');
+            setExportClassPrefixStatus(msg, 'error');
+            return false;
+        }
+    };
+    const saveJinjaMetaPrefixSetting = async (nextValue) => {
+        setJinjaMetaPrefixStatus(t('theme.metadata.jinja_prefix_saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setJinjaMetaPrefixStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = normalizeJinjaMetaPrefix(nextValue);
+            const result = await saveSettingsToServer({ jinja_meta_prefix: value });
+            if (!result.ok) throw new Error(result.message || t('theme.metadata.jinja_prefix_save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.jinja_meta_prefix = value;
+            }
+            if (jinjaMetaPrefixInput instanceof HTMLInputElement && jinjaMetaPrefixInput.value !== value) {
+                jinjaMetaPrefixInput.value = value;
+            }
+            setJinjaMetaPrefixStatus(t('theme.metadata.jinja_prefix_saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('jinja meta prefix save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.metadata.jinja_prefix_save_failed', 'Save failed');
+            setJinjaMetaPrefixStatus(msg, 'error');
             return false;
         }
     };
@@ -1684,6 +1897,18 @@
             const nextTitle = String(appTitleInput.value || '').trim();
             await saveAppTitleSetting(nextTitle);
         });
+        internalLinkPrefixSaveBtn?.addEventListener('click', async () => {
+            if (!(internalLinkPrefixInput instanceof HTMLInputElement)) return;
+            const nextValue = String(internalLinkPrefixInput.value || '').trim();
+            await saveInternalLinkPrefixSetting(nextValue);
+        });
+        internalLinkPrefixInput?.addEventListener('keydown', async (e) => {
+            if (e.key !== 'Enter') return;
+            if (!(internalLinkPrefixInput instanceof HTMLInputElement)) return;
+            e.preventDefault();
+            const nextValue = String(internalLinkPrefixInput.value || '').trim();
+            await saveInternalLinkPrefixSetting(nextValue);
+        });
 
         const onDeleteAfterChange = (e) => {
             const input = e.target;
@@ -1729,6 +1954,30 @@
             if (!(copyHtmlModeSelect instanceof HTMLSelectElement)) return;
             const next = String(copyHtmlModeSelect.value || '').trim();
             await saveCopyHtmlModeSetting(next);
+        });
+        exportClassPrefixSaveBtn?.addEventListener('click', async () => {
+            if (!(exportClassPrefixInput instanceof HTMLInputElement)) return;
+            const next = String(exportClassPrefixInput.value || '').trim();
+            await saveExportClassPrefixSetting(next);
+        });
+        exportClassPrefixInput?.addEventListener('keydown', async (e) => {
+            if (e.key !== 'Enter') return;
+            if (!(exportClassPrefixInput instanceof HTMLInputElement)) return;
+            e.preventDefault();
+            const next = String(exportClassPrefixInput.value || '').trim();
+            await saveExportClassPrefixSetting(next);
+        });
+        jinjaMetaPrefixSaveBtn?.addEventListener('click', async () => {
+            if (!(jinjaMetaPrefixInput instanceof HTMLInputElement)) return;
+            const next = String(jinjaMetaPrefixInput.value || '').trim();
+            await saveJinjaMetaPrefixSetting(next);
+        });
+        jinjaMetaPrefixInput?.addEventListener('keydown', async (e) => {
+            if (e.key !== 'Enter') return;
+            if (!(jinjaMetaPrefixInput instanceof HTMLInputElement)) return;
+            e.preventDefault();
+            const next = String(jinjaMetaPrefixInput.value || '').trim();
+            await saveJinjaMetaPrefixSetting(next);
         });
 
         tocMenuSelect?.addEventListener('change', async () => {
@@ -1917,11 +2166,20 @@
                 const field = String(input.dataset.metaField || '').trim();
                 if (!key || !field) return;
                 cfg[key] = cfg[key] || {};
+                if (field === 'default_value') {
+                    cfg[key].default_value = String(input.value || '').trim();
+                    return;
+                }
+                if (input.type !== 'checkbox') return;
                 if (field === 'markdown') cfg[key].markdown_visible = input.checked;
                 if (field === 'html') cfg[key].html_visible = input.checked;
+                if (field === 'obligatory') cfg[key].obligatory = input.checked;
             });
             Object.entries(cfg).forEach(([key, v]) => {
                 if (!v.markdown_visible && !allowHtmlWithoutMarkdown(key)) v.html_visible = false;
+                if (!Object.prototype.hasOwnProperty.call(v, 'obligatory')) v.obligatory = false;
+                if (!Object.prototype.hasOwnProperty.call(v, 'default_value')) v.default_value = '';
+                v.default_value = String(v.default_value || '').trim();
             });
             return cfg;
         };
@@ -1932,11 +2190,15 @@
         const requireH2 = (publisherRequireH2Toggle instanceof HTMLInputElement)
             ? !!publisherRequireH2Toggle.checked
             : true;
-        return {
+        const out = {
             publisher_mode: mode,
             publisher_default_author: author,
             publisher_require_h2: requireH2,
         };
+        if (jinjaMetaPrefixInput instanceof HTMLInputElement) {
+            out.jinja_meta_prefix = normalizeJinjaMetaPrefix(jinjaMetaPrefixInput.value || '');
+        }
+        return out;
         };
 
         const syncPublisherUi = () => {
@@ -1974,36 +2236,41 @@
                 window.__mdwSetWpmAuthor(String(publisherAuthorInput.value || '').trim());
             }
         });
+        jinjaMetaPrefixInput?.addEventListener('input', () => setMetaStatus('', 'info'));
         syncPublisherUi();
 
-        if (baseMetaInputs.length) {
-            baseMetaInputs.forEach((input) => {
-                input.addEventListener('change', () => {
-                    syncMetaUiRules(baseMetaInputs);
+        const bindMetaInputs = (inputs, toggleInputs) => {
+            if (!inputs.length) return;
+            inputs.forEach((input) => {
+                const onAnyChange = () => {
+                    syncMetaUiRules(toggleInputs);
                     setMetaStatus('', 'info');
-                });
+                };
+                input.addEventListener('change', onAnyChange);
+                if (input.type !== 'checkbox') {
+                    input.addEventListener('input', onAnyChange);
+                }
             });
-            syncMetaUiRules(baseMetaInputs);
-        }
-        if (publisherMetaInputs.length) {
-            publisherMetaInputs.forEach((input) => {
-                input.addEventListener('change', () => {
-                    syncMetaUiRules(publisherMetaInputs);
-                    setMetaStatus('', 'info');
-                });
-            });
-            syncMetaUiRules(publisherMetaInputs);
-        }
+            syncMetaUiRules(toggleInputs);
+        };
+        bindMetaInputs(baseMetaInputs, baseMetaToggleInputs);
+        bindMetaInputs(publisherMetaInputs, publisherMetaToggleInputs);
 
         const readVisibilityFromConfig = (inputs, fields) => {
             const out = {};
+            const keys = new Set();
             inputs.forEach((input) => {
                 const key = String(input.dataset.metaKey || '').trim();
-                if (!key || out[key]) return;
+                if (!key) return;
+                keys.add(key);
+            });
+            keys.forEach((key) => {
                 const f = (fields && typeof fields === 'object') ? fields[key] : null;
                 const mdVis = f ? !!f.markdown_visible : true;
                 const htmlVis = f ? (!!f.html_visible && (mdVis || allowHtmlWithoutMarkdown(key))) : false;
-                out[key] = { markdown_visible: mdVis, html_visible: htmlVis };
+                const obligatory = f ? !!f.obligatory : false;
+                const defaultValue = f ? String(f.default_value || '').trim() : '';
+                out[key] = { markdown_visible: mdVis, html_visible: htmlVis, obligatory, default_value: defaultValue };
             });
             return out;
         };
@@ -2015,6 +2282,8 @@
                 const n = next[key] || {};
                 if (!!c.markdown_visible !== !!n.markdown_visible) return true;
                 if (!!c.html_visible !== !!n.html_visible) return true;
+                if (!!c.obligatory !== !!n.obligatory) return true;
+                if (String(c.default_value || '').trim() !== String(n.default_value || '').trim()) return true;
             }
             return false;
         };
@@ -2042,6 +2311,9 @@
             if (!!s.publisher_mode !== !!nextSettings.publisher_mode) return true;
             if (String(s.publisher_default_author || '') !== String(nextSettings.publisher_default_author || '')) return true;
             if (!!s.publisher_require_h2 !== !!nextSettings.publisher_require_h2) return true;
+            if (jinjaMetaPrefixInput instanceof HTMLInputElement) {
+                if (normalizeJinjaMetaPrefix(s.jinja_meta_prefix || '') !== normalizeJinjaMetaPrefix(nextSettings.jinja_meta_prefix || '')) return true;
+            }
             return false;
         };
 

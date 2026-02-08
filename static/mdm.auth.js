@@ -88,6 +88,36 @@
             try { loginPassword.focus(); } catch {}
         }
     };
+    const canDismissAuthModal = () => {
+        const { role, token } = getStoredAuth();
+        const needsSetup = !meta.has_user && !meta.has_superuser;
+        return !!(role && token) && !needsSetup;
+    };
+    const closeAuthModal = ({ force = false } = {}) => {
+        if (!overlay || overlay.hidden) return true;
+        if (!force && !canDismissAuthModal()) return false;
+        setStatus('', 'info');
+        setLocked(false);
+        return true;
+    };
+    const authModalBinding = (typeof window.__mdwBindModal === 'function')
+        ? window.__mdwBindModal({
+            modal,
+            overlay,
+            closeOnOverlay: true,
+            closeOnEsc: true,
+            manageVisibility: false,
+            isOpen: () => !!overlay && !overlay.hidden,
+            canClose: ({ force }) => !!force || canDismissAuthModal(),
+            onClose: () => {
+                closeAuthModal({ force: true });
+            },
+        })
+        : null;
+    window.__mdwCloseAuthModal = ({ force = false } = {}) => {
+        if (authModalBinding) return authModalBinding.close({ source: 'api', force: !!force });
+        return closeAuthModal({ force: !!force });
+    };
 
     const updateAuthButton = () => {
         if (!(authBtn instanceof HTMLElement)) return;
@@ -335,6 +365,17 @@
             } catch {}
         }
     });
+    if (!authModalBinding) {
+        overlay?.addEventListener('click', () => {
+            closeAuthModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (!overlay || overlay.hidden) return;
+            if (e.key !== 'Escape' && e.key !== 'Esc') return;
+            if (!closeAuthModal()) return;
+            e.preventDefault();
+        });
+    }
 
     authBtn?.addEventListener('click', () => {
         const { role, token } = getStoredAuth();

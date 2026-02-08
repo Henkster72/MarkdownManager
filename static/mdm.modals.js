@@ -25,6 +25,7 @@
     const insertBtn = document.getElementById('linkModalInsert');
     const editor = document.getElementById('editor');
     if (!btn || !modal || !overlay || !insertBtn || !editor) return;
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const internalSection = document.getElementById('linkModalInternal');
     const externalSection = document.getElementById('linkModalExternal');
@@ -38,6 +39,9 @@
     const footnoteText = document.getElementById('footnoteLinkText');
     const footnoteUrl = document.getElementById('footnoteLinkUrl');
     const footnoteTitle = document.getElementById('footnoteLinkTitle');
+    const footnoteStyleSelect = document.getElementById('footnoteStyleSelect');
+    const footnoteNextLabel = document.getElementById('footnoteNextLabel');
+    const footnoteStyleHint = document.getElementById('footnoteStyleHint');
     const youtubeInput = document.getElementById('youtubeLinkInput');
 
     const normalizePath = (p) => String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
@@ -46,10 +50,32 @@
         const idx = p.lastIndexOf('/');
         return idx === -1 ? '' : p.slice(0, idx);
     };
+    const normalizeInternalLinkPrefixLocal = (value) => {
+        let out = String(value || '').trim();
+        if (!out) return '';
+        if (!/[\/?#=&]$/.test(out)) out += '/';
+        return out;
+    };
+    const readInternalLinkPrefixLocal = () => {
+        if (typeof window.__mdwReadInternalLinkPrefix === 'function') {
+            return normalizeInternalLinkPrefixLocal(window.__mdwReadInternalLinkPrefix());
+        }
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        const raw = settings && typeof settings.internal_link_prefix === 'string' ? settings.internal_link_prefix.trim() : '';
+        return normalizeInternalLinkPrefixLocal(raw);
+    };
 
     const buildInternalHref = (fromFile, path) => {
         const clean = normalizePath(path);
         if (!clean) return '';
+        const configuredPrefix = readInternalLinkPrefixLocal();
+        if (configuredPrefix) {
+            if (/index\.php\?file=?$/i.test(configuredPrefix)) {
+                return `${configuredPrefix}${encodeURIComponent(clean)}`;
+            }
+            return `${configuredPrefix}index.php?file=${encodeURIComponent(clean)}`;
+        }
         const fromDir = dirname(fromFile);
         const depth = fromDir ? fromDir.split('/').filter(Boolean).length : 0;
         const prefix = depth > 0 ? '../'.repeat(depth) : '';
@@ -59,6 +85,7 @@
     let mode = 'internal';
     let selectedPath = null;
     let selectedTitle = null;
+    const FOOTNOTE_STYLE_VALUES = ['decimal', 'roman-upper', 'roman-lower', 'alpha-lower', 'alpha-upper'];
 
     const setMode = (next) => {
         mode = (next === 'external' || next === 'youtube' || next === 'footnote') ? next : 'internal';
@@ -70,6 +97,7 @@
         if (mode === 'external') {
             externalUrl?.focus();
         } else if (mode === 'footnote') {
+            syncFootnoteModalState({ autodetectStyle: true });
             footnoteUrl?.focus();
         } else if (mode === 'youtube') {
             youtubeInput?.focus();
@@ -112,6 +140,8 @@
         if (footnoteText) footnoteText.value = '';
         if (footnoteUrl) footnoteUrl.value = '';
         if (footnoteTitle) footnoteTitle.value = '';
+        if (footnoteNextLabel instanceof HTMLInputElement) footnoteNextLabel.value = '1';
+        if (footnoteStyleHint instanceof HTMLElement) footnoteStyleHint.textContent = '';
         if (youtubeInput) youtubeInput.value = '';
         validate();
         btn.focus();
@@ -189,6 +219,12 @@
 
     externalUrl?.addEventListener('input', validate);
     footnoteUrl?.addEventListener('input', validate);
+    footnoteStyleSelect?.addEventListener('change', () => {
+        if (!(footnoteStyleSelect instanceof HTMLSelectElement)) return;
+        if (mode !== 'footnote') return;
+        const selected = isValidFootnoteStyle(footnoteStyleSelect.value) ? footnoteStyleSelect.value : 'decimal';
+        applyFootnoteStyleToEditor(selected);
+    });
     youtubeInput?.addEventListener('input', validate);
 
     picker?.addEventListener('click', (e) => {
@@ -288,6 +324,86 @@
         return id;
     };
 
+    const isValidFootnoteStyle = (style) => FOOTNOTE_STYLE_VALUES.includes(String(style || ''));
+    const normalizeFootnoteLabel = (label) => String(label || '').trim();
+
+    const indexToAlpha = (index, upper) => {
+        let n = Number(index) || 1;
+        if (n < 1) n = 1;
+        let out = '';
+        while (n > 0) {
+            n -= 1;
+            out = String.fromCharCode((upper ? 65 : 97) + (n % 26)) + out;
+            n = Math.floor(n / 26);
+        }
+        return out;
+    };
+
+    const toRoman = (index) => {
+        let n = Number(index) || 1;
+        if (n < 1 || n > 3999) return String(index);
+        const map = [
+            [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+            [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+            [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+        ];
+        let out = '';
+        for (const [value, token] of map) {
+            while (n >= value) {
+                out += token;
+                n -= value;
+            }
+        }
+        return out;
+    };
+
+    const fromRoman = (raw) => {
+        const v = String(raw || '').trim().toUpperCase();
+        if (!v) return 0;
+        const vals = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+        let total = 0;
+        for (let i = 0; i < v.length; i++) {
+            const cur = vals[v[i]];
+            const next = vals[v[i + 1]] || 0;
+            if (!cur) return 0;
+            total += cur < next ? -cur : cur;
+        }
+        return total > 0 && toRoman(total) === v ? total : 0;
+    };
+
+    const footnoteLabelForIndex = (index, style) => {
+        let n = Number(index) || 1;
+        if (n < 1) n = 1;
+        switch (style) {
+            case 'roman-upper':
+                return toRoman(n).toUpperCase();
+            case 'roman-lower':
+                return toRoman(n).toLowerCase();
+            case 'alpha-upper':
+                return indexToAlpha(n, true);
+            case 'alpha-lower':
+                return indexToAlpha(n, false);
+            case 'decimal':
+            default:
+                return String(n);
+        }
+    };
+
+    const detectSingleLabelStyle = (label) => {
+        const v = normalizeFootnoteLabel(label);
+        if (!v) return 'decimal';
+        if (/^\d+$/.test(v)) return 'decimal';
+        if (/^[A-Z]+$/.test(v)) {
+            if (fromRoman(v) > 0) return 'roman-upper';
+            return 'alpha-upper';
+        }
+        if (/^[a-z]+$/.test(v)) {
+            if (fromRoman(v) > 0) return 'roman-lower';
+            return 'alpha-lower';
+        }
+        return 'decimal';
+    };
+
     const extractFootnotes = (text) => {
         const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
         const body = [];
@@ -300,10 +416,13 @@
                 continue;
             }
             if (!inCode) {
-                const m = line.match(/^\s*\[(\d+)\]:\s*(.+)$/);
+                const m = line.match(/^\s*\[([^\]]+)\]:\s*(.+)$/);
                 if (m) {
-                    defs.push({ label: m[1], content: String(m[2] || '').trim() });
-                    continue;
+                    const label = normalizeFootnoteLabel(m[1]);
+                    if (label) {
+                        defs.push({ label, content: String(m[2] || '').trim() });
+                        continue;
+                    }
                 }
             }
             body.push(line);
@@ -311,67 +430,257 @@
         return { body: body.join('\n'), defs };
     };
 
-    const findFootnoteMax = (text) => {
-        const re = /\[(\d+)\]:|\[[^\]]+\]\[(\d+)\]/g;
-        let max = 0;
-        let match;
-        while ((match = re.exec(text))) {
-            const num = match[1] || match[2];
-            if (!num) continue;
-            const n = parseInt(num, 10);
-            if (Number.isFinite(n) && n > max) max = n;
-        }
-        return max;
-    };
-
-    const renumberFootnotes = (text) => {
-        const { body, defs } = extractFootnotes(text);
-        const defMap = new Map();
-        defs.forEach((d) => {
-            if (d && !defMap.has(d.label)) defMap.set(d.label, d.content);
-        });
-
-        const refRe = /\[([^\]]+)\]\[(\d+)\]/g;
+    const collectFootnoteRefOrder = (body) => {
         const order = [];
-        const mapping = new Map();
-        let m;
-        while ((m = refRe.exec(body))) {
-            const oldLabel = m[2];
-            if (!mapping.has(oldLabel)) {
-                mapping.set(oldLabel, String(order.length + 1));
-                order.push(oldLabel);
+        const seen = new Set();
+        const lines = String(body || '').split('\n');
+        let inCode = false;
+        for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) continue;
+            const refRe = /\[([^\]]+)\]\[([^\]]+)\]/g;
+            let m;
+            while ((m = refRe.exec(line))) {
+                const label = normalizeFootnoteLabel(m[2]);
+                if (!label || seen.has(label)) continue;
+                seen.add(label);
+                order.push(label);
             }
         }
+        return order;
+    };
 
-        const replaced = body.replace(refRe, (full, label, oldLabel) => {
-            const next = mapping.get(oldLabel) || oldLabel;
-            return `[${label}][${next}]`;
+    const collectFootnoteRefsWithPositions = (text) => {
+        const refs = [];
+        const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+        let inCode = false;
+        let offset = 0;
+        for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+                inCode = !inCode;
+                offset += line.length + 1;
+                continue;
+            }
+            if (!inCode) {
+                const refRe = /\[([^\]]+)\]\[([^\]]+)\]/g;
+                let m;
+                while ((m = refRe.exec(line))) {
+                    const label = normalizeFootnoteLabel(m[2]);
+                    if (!label) continue;
+                    refs.push({
+                        label,
+                        start: offset + m.index,
+                    });
+                }
+            }
+            offset += line.length + 1;
+        }
+        return refs;
+    };
+
+    const resolveFootnoteInsertionIndex = (text, cursorPos) => {
+        const refs = collectFootnoteRefsWithPositions(text);
+        if (!refs.length) return 1;
+
+        const cursor = Math.max(0, Number(cursorPos) || 0);
+        const seen = new Set();
+        let uniqueBeforeCursor = 0;
+        for (const ref of refs) {
+            if (seen.has(ref.label)) continue;
+            seen.add(ref.label);
+            if (ref.start < cursor) uniqueBeforeCursor += 1;
+        }
+        return uniqueBeforeCursor + 1;
+    };
+
+    const makeTemporaryFootnoteLabel = (text) => {
+        const src = String(text || '');
+        let i = 1;
+        let label = `mdw-new-footnote-${i}`;
+        while (src.includes(`[${label}]`) || src.includes(`[${label}]:`)) {
+            i += 1;
+            label = `mdw-new-footnote-${i}`;
+        }
+        return label;
+    };
+
+    const detectFootnoteStyle = (labels) => {
+        const clean = (Array.isArray(labels) ? labels : [])
+            .map((label) => normalizeFootnoteLabel(label))
+            .filter(Boolean);
+        if (!clean.length) return 'decimal';
+
+        let bestStyle = 'decimal';
+        let bestScore = -1;
+        for (const style of FOOTNOTE_STYLE_VALUES) {
+            let score = 0;
+            const max = Math.min(clean.length, 12);
+            for (let i = 0; i < max; i++) {
+                if (clean[i] === footnoteLabelForIndex(i + 1, style)) score += 2;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestStyle = style;
+            }
+        }
+        if (bestScore > 0) return bestStyle;
+        return detectSingleLabelStyle(clean[0]);
+    };
+
+    const inspectFootnotes = (text) => {
+        const parsed = extractFootnotes(text);
+        const refOrder = collectFootnoteRefOrder(parsed.body);
+        const defOrder = parsed.defs.map((d) => normalizeFootnoteLabel(d.label)).filter(Boolean);
+        const style = detectFootnoteStyle(refOrder.length ? refOrder : defOrder);
+        const count = Math.max(refOrder.length, defOrder.length);
+        return {
+            body: parsed.body,
+            defs: parsed.defs,
+            refOrder,
+            style,
+            count,
+            nextIndex: count + 1,
+            nextLabel: footnoteLabelForIndex(count + 1, style),
+        };
+    };
+
+    const renumberFootnotes = (text, style) => {
+        const info = inspectFootnotes(text);
+        const nextStyle = isValidFootnoteStyle(style) ? style : info.style;
+        const mapping = new Map();
+        info.refOrder.forEach((oldLabel, idx) => {
+            mapping.set(oldLabel, footnoteLabelForIndex(idx + 1, nextStyle));
+        });
+
+        const lines = String(info.body || '').split('\n');
+        const replacedLines = [];
+        let inCode = false;
+        for (const line of lines) {
+            if (/^\s*```/.test(line)) {
+                inCode = !inCode;
+                replacedLines.push(line);
+                continue;
+            }
+            if (inCode) {
+                replacedLines.push(line);
+                continue;
+            }
+            replacedLines.push(line.replace(/\[([^\]]+)\]\[([^\]]+)\]/g, (full, textLabel, oldRaw) => {
+                const oldLabel = normalizeFootnoteLabel(oldRaw);
+                if (!oldLabel) return full;
+                const nextLabel = mapping.get(oldLabel) || oldLabel;
+                return `[${textLabel}][${nextLabel}]`;
+            }));
+        }
+        const replacedBody = replacedLines.join('\n');
+
+        const defMap = new Map();
+        info.defs.forEach((d) => {
+            const label = normalizeFootnoteLabel(d?.label);
+            if (!label || defMap.has(label)) return;
+            defMap.set(label, String(d?.content || '').trim());
         });
 
         const used = new Set(mapping.keys());
         const newDefs = [];
-        order.forEach((oldLabel) => {
-            const def = defMap.get(oldLabel);
-            if (!def) return;
-            const next = mapping.get(oldLabel) || oldLabel;
-            newDefs.push(`[${next}]: ${def}`);
+        info.refOrder.forEach((oldLabel) => {
+            const content = defMap.get(oldLabel);
+            if (!content) return;
+            const nextLabel = mapping.get(oldLabel) || oldLabel;
+            newDefs.push(`[${nextLabel}]: ${content}`);
         });
-        const extraDefs = defs
-            .filter((d) => d && !used.has(d.label))
-            .map((d) => `[${d.label}]: ${d.content}`);
+        const extraDefs = info.defs
+            .filter((d) => {
+                const label = normalizeFootnoteLabel(d?.label);
+                return !!label && !used.has(label);
+            })
+            .map((d) => `[${normalizeFootnoteLabel(d.label)}]: ${String(d.content || '').trim()}`);
 
         const allDefs = newDefs.concat(extraDefs);
-        if (!allDefs.length) return { text: replaced, mapping };
+        if (!allDefs.length) {
+            return { text: replacedBody, mapping, style: nextStyle, count: info.count };
+        }
 
-        const trimmed = replaced.replace(/\s*$/, '');
+        const trimmed = replacedBody.replace(/\s*$/, '');
         const sep = trimmed.trim() ? '\n\n' : '';
-        return { text: trimmed + sep + allDefs.join('\n') + '\n', mapping };
+        return {
+            text: trimmed + sep + allDefs.join('\n') + '\n',
+            mapping,
+            style: nextStyle,
+            count: info.count,
+        };
     };
 
     const appendFootnoteDefinition = (text, line) => {
         const trimmed = String(text || '').replace(/\s*$/, '');
         const sep = trimmed.trim() ? '\n\n' : '';
         return trimmed + sep + line + '\n';
+    };
+
+    const footnoteStyleLabel = (style) => {
+        switch (style) {
+            case 'roman-upper': return 'I, II, III';
+            case 'roman-lower': return 'i, ii, iii';
+            case 'alpha-upper': return 'A, B, C';
+            case 'alpha-lower': return 'a, b, c';
+            case 'decimal':
+            default: return '1, 2, 3';
+        }
+    };
+
+    const setFootnoteStyleHint = (msg) => {
+        if (!(footnoteStyleHint instanceof HTMLElement)) return;
+        footnoteStyleHint.textContent = String(msg || '');
+    };
+
+    const syncFootnoteModalState = ({ autodetectStyle = false } = {}) => {
+        const source = editor.value || '';
+        const info = inspectFootnotes(source);
+        const insertionIndex = resolveFootnoteInsertionIndex(source, editor.selectionStart ?? 0);
+        let style = info.style;
+        if (footnoteStyleSelect instanceof HTMLSelectElement) {
+            if (autodetectStyle || !isValidFootnoteStyle(footnoteStyleSelect.value)) {
+                footnoteStyleSelect.value = style;
+            }
+            style = isValidFootnoteStyle(footnoteStyleSelect.value) ? footnoteStyleSelect.value : style;
+        }
+        const nextLabel = footnoteLabelForIndex(insertionIndex, style);
+        if (footnoteNextLabel instanceof HTMLInputElement) {
+            footnoteNextLabel.value = nextLabel;
+        }
+        if (info.count > 0) {
+            setFootnoteStyleHint(t(
+                'link_modal.footnote_style_detected',
+                'Detected style: {style}. Existing footnotes: {count}.',
+                { style: footnoteStyleLabel(style), count: info.count }
+            ));
+        } else {
+            setFootnoteStyleHint(t(
+                'link_modal.footnote_style_empty',
+                'No footnotes found yet. Next label: {label}.',
+                { label: nextLabel }
+            ));
+        }
+        return { ...info, style, nextLabel, nextIndex: insertionIndex };
+    };
+
+    const applyFootnoteStyleToEditor = (style) => {
+        const chosenStyle = isValidFootnoteStyle(style) ? style : 'decimal';
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        const scrollTop = editor.scrollTop;
+        const renumbered = renumberFootnotes(editor.value || '', chosenStyle);
+        if (renumbered.text !== editor.value) {
+            editor.value = renumbered.text;
+            const maxPos = editor.value.length;
+            editor.setSelectionRange(Math.min(start, maxPos), Math.min(end, maxPos));
+            editor.scrollTop = scrollTop;
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return syncFootnoteModalState({ autodetectStyle: false });
     };
 
     const insertLink = () => {
@@ -401,22 +710,25 @@
         if (mode === 'footnote') {
             const url = String(footnoteUrl?.value || '').trim();
             if (!url) return;
+            const modalState = syncFootnoteModalState({ autodetectStyle: false });
+            const style = isValidFootnoteStyle(modalState.style) ? modalState.style : 'decimal';
             const selection = getEditorSelectionText();
             const text = selection || String(footnoteText?.value || '').trim() || url;
             const titleRaw = String(footnoteTitle?.value || '').trim();
             const titleSafe = titleRaw.replace(/"/g, "'");
-            const nextLabel = findFootnoteMax(editor.value) + 1;
-            const ref = `[${text}][${nextLabel}]`;
-            const def = `[${nextLabel}]: ${url}${titleSafe ? ` "${titleSafe}"` : ''}`;
-
             const start = editor.selectionStart ?? 0;
             const end = editor.selectionEnd ?? 0;
             const before = editor.value.slice(0, start);
             const after = editor.value.slice(end);
+            const tempLabel = makeTemporaryFootnoteLabel(editor.value || '');
+            const ref = `[${text}][${tempLabel}]`;
+            const def = `[${tempLabel}]: ${url}${titleSafe ? ` "${titleSafe}"` : ''}`;
             let nextValue = before + ref + after;
             nextValue = appendFootnoteDefinition(nextValue, def);
-            const renumbered = renumberFootnotes(nextValue);
-            const newLabel = renumbered.mapping.get(String(nextLabel)) || String(nextLabel);
+            const renumbered = renumberFootnotes(nextValue, style);
+            const newLabel = renumbered.mapping.get(normalizeFootnoteLabel(tempLabel))
+                || modalState.nextLabel
+                || footnoteLabelForIndex(modalState.nextIndex || 1, style);
             const refFinal = `[${text}][${newLabel}]`;
 
             editor.value = renumbered.text;
@@ -427,6 +739,7 @@
             editor.setSelectionRange(caret, caret);
             editor.dispatchEvent(new Event('input', { bubbles: true }));
             editor.focus();
+            syncFootnoteModalState({ autodetectStyle: false });
             close();
             return;
         }

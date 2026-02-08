@@ -83,6 +83,12 @@
     background-color: color-mix(in srgb, var(--editor-bracket-bracket, #38bdf8) 28%, transparent);
 }
 
+.editor-selection {
+    background-color: color-mix(in srgb, var(--accent, #38bdf8) 24%, transparent);
+    color: transparent;
+    border-radius: 0.12rem;
+}
+
 .editor-textarea:focus {
     outline: none;
 }

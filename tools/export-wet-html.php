@@ -286,6 +286,7 @@ $overrides = isset($settings['theme_overrides']) && is_array($settings['theme_ov
     ? $settings['theme_overrides']
     : [];
 $customCss = (string)($settings['custom_css'] ?? '');
+$exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_prefix'] ?? '');
 $appTitle = trim((string)($settings['app_title'] ?? ''));
 $siteTitle = $appTitle !== '' ? $appTitle : 'Markdown Manager';
 
@@ -448,10 +449,13 @@ $indexCss = <<<CSS
 }
 CSS;
 $cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
-$cssBase = sanitize_css_for_style_tag(implode("\n\n", $cssChunks));
+$cssBaseRaw = implode("\n\n", $cssChunks);
+$cssBaseRaw = mdw_rewrite_md_class_prefix_in_css($cssBaseRaw, $exportClassPrefix);
+$cssBase = sanitize_css_for_style_tag($cssBaseRaw);
 $cssBlock = $cssBase !== '' ? "\n  <style data-mdw-export-css>\n{$cssBase}\n  </style>\n" : '';
 
-$cssIndex = trim($indexCss) !== '' ? sanitize_css_for_style_tag($cssBase . "\n\n" . $indexCss) : $cssBase;
+$cssIndexRaw = trim($indexCss) !== '' ? ($cssBaseRaw . "\n\n" . $indexCss) : $cssBaseRaw;
+$cssIndex = sanitize_css_for_style_tag($cssIndexRaw);
 $cssIndexBlock = $cssIndex !== '' ? "\n  <style data-mdw-export-css>\n{$cssIndex}\n  </style>\n" : '';
 
 $baseTag = $baseHref !== '' ? '  <base href="' . htmlspecialchars($baseHref, ENT_QUOTES, 'UTF-8') . '">' . "\n" : '';
@@ -463,8 +467,10 @@ foreach ($mdFiles as $mdRel) {
     if ($raw === '') continue;
 
     $title = extract_title($raw);
-    $body = md_to_html($raw, $mdRel, 'view');
+    $body = md_to_html($raw, $mdRel, 'view', ['source_map' => false]);
+    $body = mdw_html_strip_source_map_attrs($body);
     $body = '<article class="preview-content">' . $body . '</article>';
+    $body = mdw_rewrite_md_class_prefix_in_html($body, $exportClassPrefix);
 
     $outRelFile = preg_replace('/\\.md$/i', '.html', $map[$mdRel]);
     $outRelFile = ltrim(str_replace("\\", "/", $outRelFile), '/');

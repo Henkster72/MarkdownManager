@@ -204,11 +204,16 @@ foreach ($cfgFields as $k => $in) {
     if ($label === '') $label = $k;
     $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
     $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
+    $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($cur['obligatory'] ?? false);
+    $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($cur['default_value'] ?? ''));
+    $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
     if (!$mdVis && $k !== 'author') $htmlVis = false;
     $fields[$k] = [
         'label' => $label,
         'markdown_visible' => $mdVis,
         'html_visible' => $htmlVis,
+        'obligatory' => $obligatory,
+        'default_value' => $defaultValue,
     ];
 }
 
@@ -282,6 +287,25 @@ if (is_array($settingsIn)) {
         $appTitle = substr($appTitle, 0, 80);
     }
 
+    $internalLinkPrefix = array_key_exists('internal_link_prefix', $settingsIn)
+        ? trim((string)($settingsIn['internal_link_prefix'] ?? ''))
+        : trim((string)($curSettings['internal_link_prefix'] ?? ''));
+    $internalLinkPrefix = preg_replace('/[\r\n]+/', '', $internalLinkPrefix);
+    if (is_string($internalLinkPrefix) && strlen($internalLinkPrefix) > 240) {
+        $internalLinkPrefix = substr($internalLinkPrefix, 0, 240);
+    }
+    $exportClassPrefix = array_key_exists('export_class_prefix', $settingsIn)
+        ? trim((string)($settingsIn['export_class_prefix'] ?? ''))
+        : trim((string)($curSettings['export_class_prefix'] ?? ''));
+    $exportClassPrefix = preg_replace('/[^A-Za-z0-9_-]+/', '', (string)$exportClassPrefix);
+    if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) {
+        $exportClassPrefix = substr($exportClassPrefix, 0, 24);
+    }
+    $jinjaMetaPrefix = array_key_exists('jinja_meta_prefix', $settingsIn)
+        ? trim((string)($settingsIn['jinja_meta_prefix'] ?? ''))
+        : trim((string)($curSettings['jinja_meta_prefix'] ?? 'page_'));
+    $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($jinjaMetaPrefix);
+
     if ($publisherMode && $defaultAuthor === '') {
         json(['ok' => false, 'error' => 'publisher_author_required'], 400);
     }
@@ -310,6 +334,9 @@ if (is_array($settingsIn)) {
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
         'app_title' => $appTitle,
+        'internal_link_prefix' => $internalLinkPrefix,
+        'export_class_prefix' => $exportClassPrefix,
+        'jinja_meta_prefix' => $jinjaMetaPrefix,
     ]);
 }
 
@@ -329,11 +356,16 @@ foreach ($publisherFieldsIn as $k => $in) {
     if ($label === '') $label = $k;
     $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($cur['markdown_visible'] ?? true);
     $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($cur['html_visible'] ?? false);
+    $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($cur['obligatory'] ?? false);
+    $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($cur['default_value'] ?? ''));
+    $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
     if (!$mdVis && $k !== 'author') $htmlVis = false;
     $pubFields[$k] = [
         'label' => $label,
         'markdown_visible' => $mdVis,
         'html_visible' => $htmlVis,
+        'obligatory' => $obligatory,
+        'default_value' => $defaultValue,
     ];
 }
 $outPub = $currentPub;
