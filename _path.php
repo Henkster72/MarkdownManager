@@ -77,7 +77,7 @@ function sanitize_md_path($path) {
     if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}\p{Sk}\p{M}\x{200D}\x{FE0E}\x{FE0F}\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]+$/u', $p)) return null;
     }
 
     if (!preg_match('/\.md$/i', end($parts))) return null;
@@ -103,7 +103,7 @@ function sanitize_md_path_like($path) {
     if (count($parts) > 3) return null;
     foreach ($parts as $p) {
         if ($p === '') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-() \p{L}\p{N}\p{So}\p{Sk}\p{M}\x{200D}\x{FE0E}\x{FE0F}\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]+$/u', $p)) return null;
     }
     if (!preg_match('/\.md$/i', end($parts))) return null;
     return $path;
@@ -127,7 +127,7 @@ function sanitize_new_md_path($path) {
     foreach ($parts as $p) {
         if ($p === '') return null;
         $p = preg_replace('/\s+/u', '-', $p);
-        $p = preg_replace('/[^A-Za-z0-9._\-\p{L}\p{N}\p{So}]+/u', '', $p);
+        $p = preg_replace('/[^A-Za-z0-9._\-\p{L}\p{N}\p{So}\p{Sk}\p{M}\x{200D}\x{FE0E}\x{FE0F}\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]+/u', '', $p);
         $p = preg_replace('/-+/', '-', $p);
         $p = trim($p, '-');
         if ($p === '' || $p === '.' || $p === '..') return null;
@@ -166,7 +166,7 @@ function sanitize_folder_name($folder) {
     if (count($parts) > 2) return null;
     foreach ($parts as $p) {
         if ($p === '' || $p === '.' || $p === '..') return null;
-        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}]+$/u', $p)) return null;
+        if (!preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}\p{So}\p{Sk}\p{M}\x{200D}\x{FE0E}\x{FE0F}\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]+$/u', $p)) return null;
     }
     return implode('/', $parts);
 }

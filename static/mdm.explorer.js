@@ -614,6 +614,13 @@
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
     };
+    const emojiRe = (() => {
+        try {
+            return /\p{Extended_Pictographic}/u;
+        } catch {
+            return null;
+        }
+    })();
 
     const setHint = (el, msg, variant) => {
         if (!(el instanceof HTMLElement)) return;
@@ -1395,6 +1402,59 @@
 
     const folderSections = Array.from(document.querySelectorAll('[data-folder-section]'))
         .filter(el => el instanceof HTMLElement);
+    const folderHasEmoji = (() => {
+        try {
+            const re = /\p{Extended_Pictographic}/u;
+            return (text) => re.test(String(text || ''));
+        } catch {
+            return () => false;
+        }
+    })();
+    const folderHash = (value) => {
+        const text = String(value || '');
+        let hash = 2166136261;
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+    };
+    const toHsla = (h, s, l, a) => `hsla(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%, ${a})`;
+    const applyFolderAccents = () => {
+        if (!folderSections.length) return;
+        for (const section of folderSections) {
+            const folderPath = String(section.getAttribute('data-folder-section') || '').trim();
+            if (!folderPath) continue;
+
+            if (folderPath === 'root') {
+                section.style.setProperty('--folder-accent', 'var(--text-muted)');
+                section.style.setProperty('--folder-accent-border', 'var(--border-soft)');
+                section.style.setProperty('--folder-accent-bg', 'transparent');
+                continue;
+            }
+
+            const labelText = String(section.querySelector('.breadcrumb-link')?.textContent || folderPath).trim();
+            const hash = folderHash(folderPath.toLowerCase());
+            const hue = hash % 360;
+            const emojiBoost = folderHasEmoji(labelText) ? 1 : 0;
+
+            const sat = emojiBoost ? 78 : 64;
+            const light = emojiBoost ? 48 : 44;
+            const accent = toHsla(hue, sat, light, 1);
+            const border = toHsla(hue, Math.max(42, sat - 8), Math.min(72, light + 20), 0.72);
+            const bg = toHsla(hue, Math.max(36, sat - 24), Math.min(84, light + 36), emojiBoost ? 0.2 : 0.14);
+
+            section.style.setProperty('--folder-accent', accent);
+            section.style.setProperty('--folder-accent-border', border);
+            section.style.setProperty('--folder-accent-bg', bg);
+            if (emojiBoost) {
+                section.setAttribute('data-folder-emoji', '1');
+            } else {
+                section.removeAttribute('data-folder-emoji');
+            }
+        }
+    };
+    applyFolderAccents();
     const docEntries = Array.from(overview.querySelectorAll('.doclink'))
         .filter(el => el instanceof HTMLElement)
         .map(el => {

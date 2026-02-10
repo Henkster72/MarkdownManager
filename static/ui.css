@@ -376,6 +376,36 @@ a:hover {
   overflow: auto;
 }
 
+.theme-modal .theme-modal-summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.theme-modal .theme-modal-summary::-webkit-details-marker {
+  display: none;
+}
+
+.theme-modal .theme-modal-summary::marker {
+  content: "";
+}
+
+.theme-modal .theme-modal-summary .modal-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(180deg);
+  transition: transform 0.16s ease;
+}
+
+.theme-modal details[open] > .theme-modal-summary .modal-caret {
+  transform: rotate(270deg);
+}
+
 @media (min-width: 960px) {
   .theme-modal .modal-body {
     display: grid;
@@ -978,6 +1008,10 @@ body.folder-icons-caret .content-list {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  border-left: 0.17rem solid var(--folder-accent-border);
+  border-radius: calc(var(--default-br) - 2px);
+  padding: 0.08rem 0.38rem 0.08rem 0.26rem;
+  background: var(--folder-accent-bg);
 }
 
 .note-group-title[draggable="true"] {
@@ -1015,6 +1049,7 @@ body.folder-icons-caret .content-list {
 
 .note-group-title.folder-drop-target {
   background: var(--hover-bg);
+  background: color-mix(in srgb, var(--folder-accent-bg) 55%, var(--hover-bg));
   border-radius: var(--default-br);
 }
 
@@ -1040,13 +1075,16 @@ body.folder-icons-caret .content-list {
 }
 
 .nav-section {
+  --folder-accent: var(--text-muted);
+  --folder-accent-border: transparent;
+  --folder-accent-bg: transparent;
   scroll-margin-top: calc(var(--app-header-height) + 1rem);
 }
 
 .note-group-title .folder-toggle {
   border: 1px solid transparent;
   background: transparent;
-  color: inherit;
+  color: var(--folder-accent);
   cursor: pointer;
 }
 
@@ -1095,7 +1133,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   justify-content: center;
   border: 1px solid transparent;
   background: transparent;
-  color: inherit;
+  color: var(--folder-accent);
   text-decoration: none;
 }
 
@@ -1103,6 +1141,14 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   border-color: transparent;
   background: transparent;
   text-decoration: none;
+}
+
+.nav-section[data-folder-emoji="1"] > .note-group-title {
+  border-left-width: 0.2rem;
+}
+
+.nav-section[data-folder-section] > .note-group-title .breadcrumb-link:hover {
+  color: var(--folder-accent);
 }
 
 .note-group-title .folder-back:focus-visible {

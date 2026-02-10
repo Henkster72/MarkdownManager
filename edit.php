@@ -1719,8 +1719,8 @@ window.mermaid = mermaid;
 				        </button>
 				    </div>
 				    <div class="modal-body">
-				        <details style="margin-bottom: 0.8rem;">
-				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.ui.title','User interface'))?></summary>
+				        <details class="theme-modal-section" style="margin-bottom: 0.8rem;">
+				            <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.ui.title','User interface'))?></span></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 				                <div class="modal-field">
 				                    <div class="modal-label"><?=h(mdw_t('theme.editor_view.title','Editor view'))?></div>
@@ -1846,72 +1846,84 @@ window.mermaid = mermaid;
 				                </div>
 				            </div>
 
-				            <div class="modal-field" data-auth-superuser="1">
-				                <div class="modal-label"><?=h(mdw_t('theme.copy.title','Copy buttons'))?></div>
-				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
-				                    <input id="copyButtonsToggle" type="checkbox" <?= $copyButtonsEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
-				                    <span class="status-text"><?=h(mdw_t('theme.copy.show_buttons','Show preview copy buttons'))?></span>
-				                </label>
-				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
-				                    <input id="copyIncludeMetaToggle" type="checkbox" <?= $copyIncludeMeta ? 'checked' : '' ?> data-auth-superuser-enable="1">
-				                    <span class="status-text"><?=h(mdw_t('theme.copy.include_meta','Include metadata in copy'))?></span>
-				                </label>
-				                <label class="modal-label" for="copyHtmlModeSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.html_mode_label','HTML copy mode'))?></label>
-				                <select id="copyHtmlModeSelect" class="input" data-auth-superuser-enable="1">
-				                    <option value="dry" <?= $copyHtmlMode === 'dry' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_dry','Dry HTML (no classes/styles)'))?></option>
-				                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
-				                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
-				                </select>
-				                <label class="modal-label" for="exportClassPrefixInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.class_prefix_label','Export class prefix'))?></label>
-				                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
-				                    <input id="exportClassPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.copy.class_prefix_placeholder','md-'))?>" value="<?=h($exportClassPrefix)?>" data-auth-superuser-enable="1">
-				                    <button type="button" class="btn btn-ghost btn-small" id="exportClassPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.copy.class_prefix_save','Save prefix'))?></button>
-				                </div>
-				                <div id="exportClassPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
-				                    <?=h(mdw_t('theme.copy.class_prefix_hint','Applies to medium/wet HTML export; dry export removes all classes.'))?>
-				                </div>
-				                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
-				                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
-				                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
-				                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
-				                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
-				                </select>
-				                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
-				                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
-				                </div>
-				                <div id="tocMenuStatus" class="status-text" style="margin-top: 0.35rem;">
-				                    <?=h(mdw_t('theme.toc_menu.hint','Side menu appears in preview/view and only exports in wet HTML.'))?>
-				                </div>
-				            </div>
+					            <div class="modal-field" data-auth-superuser="1">
+					                <div class="modal-label"><?=h(mdw_t('theme.copy.title','Copy buttons'))?></div>
+					                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+					                    <input id="copyButtonsToggle" type="checkbox" <?= $copyButtonsEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+					                    <span class="status-text"><?=h(mdw_t('theme.copy.show_buttons','Show preview copy buttons'))?></span>
+					                </label>
+					            </div>
+					        </div>
+					    </details>
 
-				            <div class="modal-field" data-auth-superuser="1">
-				                <label class="modal-label" for="postDateFormatSelect"><?=h(mdw_t('theme.post_date_format.label','Post date format'))?></label>
-				                <select id="postDateFormatSelect" class="input" data-auth-superuser-enable="1">
-				                    <option value="mdy_short" <?= $postDateFormat === 'mdy_short' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_mdy_short','Nov 20, 2025'))?></option>
-				                    <option value="dmy_long" <?= $postDateFormat === 'dmy_long' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_dmy_long','16 December 2025'))?></option>
-				                </select>
-				                <div id="postDateFormatStatus" class="status-text" style="margin-top: 0.35rem;">
-				                    <?=h(mdw_t('theme.post_date_format.hint','Saved for all users.'))?>
-				                </div>
-				            </div>
-				            <div class="modal-field" data-auth-superuser="1">
-				                <label class="modal-label" for="postDateAlignSelect"><?=h(mdw_t('theme.post_date_align.label','Post date alignment'))?></label>
-				                <select id="postDateAlignSelect" class="input" data-auth-superuser-enable="1">
-				                    <option value="left" <?= $postDateAlign === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_left','Left'))?></option>
-				                    <option value="center" <?= $postDateAlign === 'center' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_center','Center'))?></option>
-				                    <option value="right" <?= $postDateAlign === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_right','Right'))?></option>
-				                </select>
-				                <div id="postDateAlignStatus" class="status-text" style="margin-top: 0.35rem;">
-				                    <?=h(mdw_t('theme.post_date_align.hint','Saved for all users.'))?>
-				                </div>
-				            </div>
-				        </div>
-				    </details>
+					    <details class="theme-modal-section" style="margin-top: 0.8rem;">
+					        <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.html_preview.title','HTML preview settings'))?></span></summary>
+					        <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+					            <div class="modal-field" data-auth-superuser="1">
+					                <div class="modal-label"><?=h(mdw_t('theme.copy.title','Copy buttons'))?></div>
+					                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+					                    <input id="copyIncludeMetaToggle" type="checkbox" <?= $copyIncludeMeta ? 'checked' : '' ?> data-auth-superuser-enable="1">
+					                    <span class="status-text"><?=h(mdw_t('theme.copy.include_meta','Include metadata in copy'))?></span>
+					                </label>
+					                <label class="modal-label" for="copyHtmlModeSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.html_mode_label','HTML copy mode'))?></label>
+					                <select id="copyHtmlModeSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="dry" <?= $copyHtmlMode === 'dry' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_dry','Dry HTML (no classes/styles)'))?></option>
+					                    <option value="medium" <?= $copyHtmlMode === 'medium' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_medium','Medium dry HTML (classes only)'))?></option>
+					                    <option value="wet" <?= $copyHtmlMode === 'wet' ? 'selected' : '' ?>><?=h(mdw_t('theme.copy.html_mode_wet','Wet HTML (inline styles)'))?></option>
+					                </select>
+					                <label class="modal-label" for="exportClassPrefixInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.copy.class_prefix_label','Export class prefix'))?></label>
+					                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
+					                    <input id="exportClassPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.copy.class_prefix_placeholder','md-'))?>" value="<?=h($exportClassPrefix)?>" data-auth-superuser-enable="1">
+					                    <button type="button" class="btn btn-ghost btn-small" id="exportClassPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.copy.class_prefix_save','Save prefix'))?></button>
+					                </div>
+					                <div id="exportClassPrefixStatus" class="status-text" style="margin-top: 0.35rem;">
+					                    <?=h(mdw_t('theme.copy.class_prefix_hint','Applies to medium/wet HTML export; dry export removes all classes.'))?>
+					                </div>
+					                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
+					                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
+					                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
+					                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
+					                </select>
+					                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
+					                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
+					                </div>
+					                <div id="tocMenuStatus" class="status-text" style="margin-top: 0.35rem;">
+					                    <?=h(mdw_t('theme.toc_menu.hint','Side menu appears in preview/view and only exports in wet HTML.'))?>
+					                </div>
+					            </div>
 
-					        <div class="modal-field">
-						            <label class="modal-label" for="themePreset"><?=h(mdw_t('theme.preset','Theme'))?></label>
-					            <div style="display:flex; align-items:center; gap:0.6rem;">
-						            <select id="themePreset" class="input" style="flex: 1 1 auto;">
+					            <div class="modal-field" data-auth-superuser="1">
+					                <label class="modal-label" for="postDateFormatSelect"><?=h(mdw_t('theme.post_date_format.label','Post date format'))?></label>
+					                <select id="postDateFormatSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="mdy_short" <?= $postDateFormat === 'mdy_short' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_mdy_short','Nov 20, 2025'))?></option>
+					                    <option value="dmy_long" <?= $postDateFormat === 'dmy_long' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_format.option_dmy_long','16 December 2025'))?></option>
+					                </select>
+					                <div id="postDateFormatStatus" class="status-text" style="margin-top: 0.35rem;">
+					                    <?=h(mdw_t('theme.post_date_format.hint','Saved for all users.'))?>
+					                </div>
+					            </div>
+					            <div class="modal-field" data-auth-superuser="1">
+					                <label class="modal-label" for="postDateAlignSelect"><?=h(mdw_t('theme.post_date_align.label','Post date alignment'))?></label>
+					                <select id="postDateAlignSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="left" <?= $postDateAlign === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_left','Left'))?></option>
+					                    <option value="center" <?= $postDateAlign === 'center' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_center','Center'))?></option>
+					                    <option value="right" <?= $postDateAlign === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.post_date_align.option_right','Right'))?></option>
+					                </select>
+					                <div id="postDateAlignStatus" class="status-text" style="margin-top: 0.35rem;">
+					                    <?=h(mdw_t('theme.post_date_align.hint','Saved for all users.'))?>
+					                </div>
+					            </div>
+					        </div>
+					    </details>
+
+					    <details class="theme-modal-section" style="margin-top: 0.8rem;">
+					        <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.theme_settings.title','Theme settings'))?></span></summary>
+					        <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
+						        <div class="modal-field">
+							            <label class="modal-label" for="themePreset"><?=h(mdw_t('theme.preset','Theme'))?></label>
+						            <div style="display:flex; align-items:center; gap:0.6rem;">
+							            <select id="themePreset" class="input" style="flex: 1 1 auto;">
 					                <option value="default"><?=h(mdw_t('theme.default','Default'))?></option>
 					                <?php foreach ($themesList as $t): ?>
 					                    <?php
@@ -1929,12 +1941,12 @@ window.mermaid = mermaid;
 				            <div class="status-text" style="margin-top: 0.4rem;">
 				                <?=h(mdw_t('theme.applies_hint','Applies only to the Markdown editor + HTML preview.'))?>
 				            </div>
-				        </div>
+					        </div>
 
-				        <details style="margin-top: 0.8rem;">
-					            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.overrides.summary','Theme adjustments (optional)'))?></summary>
-				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
-				                <div class="status-text">
+					        <div style="margin-top: 0.35rem;">
+						            <div class="modal-label" style="font-weight: 600;"><?=h(mdw_t('theme.overrides.summary','Theme adjustments (optional)'))?></div>
+					            <div style="margin-top: 0.55rem; display:flex; flex-direction:column; gap: 0.75rem;">
+					                <div class="status-text">
 					                    <?=h(mdw_t('theme.overrides.saved_auto','Theme adjustments are saved in your browser (localStorage) automatically as you type.'))?>
 				                    <span id="themeOverridesStatus" class="chip theme-overrides-status" hidden aria-live="polite"></span>
 				                </div>
@@ -1972,11 +1984,13 @@ window.mermaid = mermaid;
 					                    <button type="button" class="btn btn-ghost btn-small" id="themeSaveOverridesBtn" title="<?=h(mdw_t('theme.overrides.save_title','Save theme adjustments now'))?>"><?=h(mdw_t('theme.overrides.save_btn','Save theme adjustments'))?></button>
 					                    <button type="button" class="btn btn-ghost btn-small" id="themeResetBtn" title="<?=h(mdw_t('theme.overrides.reset_title','Clear theme adjustments'))?>"><?=h(mdw_t('theme.overrides.reset_btn','Reset theme adjustments'))?></button>
 				                </div>
-				            </div>
-				        </details>
+					            </div>
+					        </div>
+					        </div>
+					    </details>
 
-				        <details style="margin-top: 0.8rem;">
-				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.metadata.title','Metadata'))?></summary>
+				        <details class="theme-modal-section" style="margin-top: 0.8rem;">
+				            <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.metadata.title','Metadata'))?></span></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 				                <?php
 				                    $publisherMode = !empty(($META_CFG['_settings']['publisher_mode'] ?? false));
@@ -2084,8 +2098,8 @@ window.mermaid = mermaid;
 				            </div>
 				        </details>
                         <?php if ($github_pages_plugin_loaded): ?>
-                        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
-                            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.github_pages.title','GitHub Pages export'))?></summary>
+                        <details class="theme-modal-section" style="margin-top: 0.8rem;" data-auth-superuser="1">
+                            <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.github_pages.title','GitHub Pages export'))?></span></summary>
                             <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.6rem;">
                                 <div class="status-text"><?=h(mdw_t('theme.github_pages.hint','Run a configuration check before exporting.'))?></div>
                                 <div style="display:flex; align-items:center; gap: 0.6rem; flex-wrap: wrap;">
@@ -2096,8 +2110,8 @@ window.mermaid = mermaid;
                             </div>
                         </details>
                         <?php endif; ?>
-				        <details style="margin-top: 0.8rem;" data-auth-superuser="1">
-				            <summary style="cursor:pointer; user-select:none; font-weight: 600;"><?=h(mdw_t('theme.settings_io.title','Settings import/export'))?></summary>
+				        <details class="theme-modal-section" style="margin-top: 0.8rem;" data-auth-superuser="1">
+				            <summary class="theme-modal-summary"><span class="pi pi-leftcaret modal-caret" aria-hidden="true"></span><span><?=h(mdw_t('theme.settings_io.title','Settings import/export'))?></span></summary>
 				            <div style="margin-top: 0.75rem; display:flex; flex-direction:column; gap: 0.75rem;">
 				                <div class="settings-io-grid">
 				                    <div class="modal-field" style="margin: 0;">

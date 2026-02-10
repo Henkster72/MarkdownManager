@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.81
+
+- Explorer root behavior: the `Root` section no longer auto-opens on every page load; it now opens only when `folder=root` is selected or when the current file is in root, reducing noisy explorer resets while navigating.
+- Explorer visual scanability: added deterministic per-folder accent coloring (path-hash based) with colored folder controls, subtle section background/border accents, and stronger emphasis for emoji-labeled folders.
+- Folder accent rendering fix: moved section accent CSS variable defaults to the folder section scope so runtime JS-assigned accents are actually inherited and visible.
+- Folder emoji compatibility: expanded folder/path sanitization to accept modern emoji composition patterns (including variation selectors, emoji ranges, combining marks/modifiers, and ZWJ), fixing inconsistent cases where some emoji worked and others were rejected.
+- WPM/normal-mode folder creation guardrails: added a safe JS emoji detector fallback used by folder creation checks, preventing undefined-regex edge errors.
+- Explorer interactions: preserved existing drag/drop and folder action behavior while improving visual affordances for folder headers and icon states.
+- Settings modal IA refresh: reorganized settings into clearer collapsible groups, including a dedicated **HTML preview settings** section (copy/html mode/class prefix/TOC/post date controls) and a dedicated **Theme settings** section.
+- Theme settings simplification: removed the nested collapsible under Theme settings so “Theme adjustments (optional)” is immediately visible when opening the parent Theme section.
+- Collapsible affordance refresh: replaced default `<summary>` markers with Popicon `pi-leftcaret` indicators and animated rotation for open/close state so section toggles are visually consistent across settings panels.
+- UI consistency updates: aligned both `index.php` and `edit.php` settings modals to the same section structure, control grouping, and caret behavior.
+
 ## 0.8
 
 - AW-SSG integration: added optional `aw_ssg_template_export` plugin (`plugins/aw_ssg_template_export_plugin.php`) so instances without the plugin continue to work unchanged.
