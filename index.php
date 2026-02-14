@@ -144,6 +144,7 @@ if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign
 $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
+$indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -360,6 +361,79 @@ function list_md_by_subdir_sorted(){
     return $map;
 }
 
+function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode) {
+    if (!is_array($entry)) return null;
+    $p = isset($entry['path']) ? trim((string)$entry['path']) : '';
+    if ($p === '') return null;
+    $basename = isset($entry['basename']) && is_string($entry['basename']) && $entry['basename'] !== ''
+        ? $entry['basename']
+        : basename($p);
+    $wantMeta = $publisherMode
+        ? ['publishstate', 'page_title', 'post_date', 'published_date']
+        : ['post_date', 'published_date'];
+    $info = explorer_view_extract_md_title_and_meta_from_file(
+        __DIR__ . '/' . $p,
+        $basename,
+        $wantMeta
+    );
+    $metaTitle = $publisherMode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
+    $title = $publisherMode
+        ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $basename))
+        : (string)($info['title'] ?? $basename);
+
+    $publishState = '';
+    if ($publisherMode) {
+        $rawState = (string)(($info['meta']['publishstate'] ?? '') ?: '');
+        $publishState = function_exists('mdw_publisher_normalize_publishstate')
+            ? mdw_publisher_normalize_publishstate($rawState)
+            : ($rawState !== '' ? $rawState : 'Concept');
+        if ($publishState === '') $publishState = 'Concept';
+    }
+
+    $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
+    if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+    [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
+        $rawDate,
+        $entry['yy'] ?? null,
+        $entry['mm'] ?? null,
+        $entry['dd'] ?? null
+    );
+
+    $folder = folder_from_path($p);
+    if (!is_string($folder) || $folder === '') $folder = 'root';
+
+    return [
+        'path' => $p,
+        'basename' => $basename,
+        'folder' => $folder,
+        'title' => $title,
+        'date_key' => $dateKey,
+        'date_label' => $dateLabel,
+        'publish_state' => $publisherMode ? strtolower((string)$publishState) : '',
+        'is_secret' => isset($secretMap[$p]),
+    ];
+}
+
+function mdw_explorer_collect_notes_payload($rootList, $dirMap, $secretMap, $publisherMode) {
+    $notes = [];
+    if (is_array($rootList)) {
+        foreach ($rootList as $entry) {
+            $row = mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode);
+            if (is_array($row)) $notes[] = $row;
+        }
+    }
+    if (is_array($dirMap)) {
+        foreach ($dirMap as $list) {
+            if (!is_array($list)) continue;
+            foreach ($list as $entry) {
+                $row = mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode);
+                if (is_array($row)) $notes[] = $row;
+            }
+        }
+    }
+    return $notes;
+}
+
 function list_existing_folders_sorted($excludeNames = []) {
     $exclude = [];
     if (is_array($excludeNames)) {
@@ -440,6 +514,26 @@ function mdw_new_md_return_url_from_post() {
         }
     }
     return 'index.php?new=1';
+}
+
+function mdw_folder_return_url_from_post($folder = null) {
+    $folderName = sanitize_folder_name((string)$folder);
+    if ($folderName === 'root') $folderName = null;
+    $returnPage = isset($_POST['return_page']) ? strtolower(trim((string)$_POST['return_page'])) : 'index';
+    if ($returnPage === 'edit') {
+        $returnFileRaw = isset($_POST['return_file']) ? (string)$_POST['return_file'] : '';
+        $returnFile = sanitize_md_path($returnFileRaw);
+        if ($returnFile) {
+            $params = ['file' => $returnFile];
+            if ($folderName) $params['folder'] = $folderName;
+            return 'edit.php?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        }
+        return 'edit.php';
+    }
+    if ($folderName) {
+        return 'index.php?folder=' . rawurlencode($folderName);
+    }
+    return 'index.php';
 }
 
 /* LINKS FROM CSV (shortcuts at top) */
@@ -540,8 +634,30 @@ function try_secret_login($passwordInput) {
     return hash_equals($SECRET_MDS_PASSWORD, $passwordInput);
 }
 
-		/* ACTIONS (create/delete) */
-		$open_new_panel = isset($_GET['new']) && $_GET['new'] === '1';
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json'] === 'explorer_tree')) {
+    $rootListForJson = list_md_root_sorted();
+    $dirMapForJson = list_md_by_subdir_sorted();
+    $secretMapForJson = load_secret_mds();
+    $publisherModeForJson = !empty($MDW_PUBLISHER_MODE);
+    $notes = mdw_explorer_collect_notes_payload(
+        $rootListForJson,
+        $dirMapForJson,
+        $secretMapForJson,
+        $publisherModeForJson
+    );
+    header('Cache-Control: private, max-age=120');
+    header('Vary: Accept-Encoding');
+    json([
+        'ok' => true,
+        'count' => count($notes),
+        'publisher_mode' => $publisherModeForJson,
+        'generated_at' => time(),
+        'notes' => $notes,
+    ]);
+}
+
+			/* ACTIONS (create/delete) */
+			$open_new_panel = isset($_GET['new']) && $_GET['new'] === '1';
         $new_md_draft = null;
         if (isset($_SESSION['new_md_draft']) && is_array($_SESSION['new_md_draft'])) {
             $new_md_draft = $_SESSION['new_md_draft'];
@@ -673,7 +789,7 @@ function try_secret_login($passwordInput) {
                     : false;
                 if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
                     $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
-                    redirect('index.php');
+                    redirect(mdw_folder_return_url_from_post());
                 }
 
                 $fileRaw = isset($_POST['file']) ? (string)$_POST['file'] : '';
@@ -741,7 +857,7 @@ function try_secret_login($passwordInput) {
                     : false;
                 if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
                     $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
-                    redirect('index.php');
+                    redirect(mdw_folder_return_url_from_post());
                 }
 
                 $folderRaw = isset($_POST['folder']) ? (string)$_POST['folder'] : '';
@@ -800,7 +916,7 @@ function try_secret_login($passwordInput) {
                     : false;
                 if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
                     $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
-                    redirect('index.php');
+                    redirect(mdw_folder_return_url_from_post());
                 }
 
                 $folderRaw = isset($_POST['folder']) ? (string)$_POST['folder'] : '';
@@ -843,24 +959,24 @@ function try_secret_login($passwordInput) {
                     : false;
                 if ($authRequired && !mdw_auth_verify_token('superuser', $authToken)) {
                     $_SESSION['flash_error'] = mdw_t('flash.auth_required', 'Superuser login required.');
-                    redirect('index.php');
+                    redirect(mdw_folder_return_url_from_post());
                 }
 
 		        $nameRaw = isset($_POST['folder_name']) ? (string)$_POST['folder_name'] : '';
 		        $name = sanitize_folder_name($nameRaw);
 		        if (!$name) {
 		            $_SESSION['flash_error'] = mdw_t('flash.invalid_folder_name', 'Invalid folder name.');
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 		        $segments = explode('/', $name);
 		        $isNested = count($segments) > 1;
 		        if (!empty($MDW_PUBLISHER_MODE) && $isNested) {
 		            $_SESSION['flash_error'] = mdw_t('flash.nested_folder_not_allowed', 'Nested folders are disabled in WPM mode.');
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 		        if (!empty($MDW_PUBLISHER_MODE) && preg_match('/\\p{So}/u', $name)) {
 		            $_SESSION['flash_error'] = mdw_t('flash.folder_emoji_not_allowed', 'Emoji are not allowed in folder names when WPM is enabled.');
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 
 		        $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
@@ -878,7 +994,7 @@ function try_secret_login($passwordInput) {
 		        $reservedHit = isset($reserved[$segments[0] ?? '']);
 		        if ($reservedHit) {
 		            $_SESSION['flash_error'] = mdw_t('flash.reserved_folder_name', 'This folder name is reserved.');
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 
 		        $full = __DIR__ . '/' . $name;
@@ -890,15 +1006,15 @@ function try_secret_login($passwordInput) {
 		                'Fix by making this directory writable for the web server/PHP user (chown/chmod; on SELinux also set the right context).'
 		            );
 		            $_SESSION['flash_error'] = $msg;
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 		        if (is_dir($full)) {
 		            $_SESSION['flash_error'] = mdw_t('flash.folder_exists_prefix', 'Folder already exists:') . ' ' . $name;
-		            redirect('index.php?folder=' . rawurlencode($name));
+		            redirect(mdw_folder_return_url_from_post($name));
 		        }
 		        if (file_exists($full)) {
 	            $_SESSION['flash_error'] = mdw_t('flash.path_exists_not_folder_prefix', 'Path already exists (not a folder):') . ' ' . $name;
-		            redirect('index.php');
+		            redirect(mdw_folder_return_url_from_post());
 		        }
 
 			        $oldUmask = umask(0002);
@@ -911,13 +1027,13 @@ function try_secret_login($passwordInput) {
 			                $msg .= ' (' . mdw_t('flash.no_write_permissions', 'no write permissions') . ': ' . __DIR__ . ')';
 			            }
 			            $_SESSION['flash_error'] = $msg;
-			            redirect('index.php');
+			            redirect(mdw_folder_return_url_from_post());
 			        }
 			        umask($oldUmask);
 		        @chmod($full, 0775);
 
 		        $_SESSION['flash_ok'] = mdw_t('flash.folder_created_prefix', 'Folder created:') . ' ' . $name;
-		        redirect('index.php?folder=' . rawurlencode($name));
+		        redirect(mdw_folder_return_url_from_post($name));
             } else if ($_POST['action'] === 'create') {
             $returnAfterCreateError = mdw_new_md_return_url_from_post();
             $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
@@ -1140,7 +1256,9 @@ if (isset($_GET['file'])) {
 	$secret_error  = null;
 	$requested_is_secret = $requested ? is_secret_file($requested) : false;
 	$folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
+    if ($folder_filter === 'root') $folder_filter = null;
 	$active_folder_for_breadcrumb = $requested ? folder_from_path($requested) : ($folder_filter ?: null);
+    if ($active_folder_for_breadcrumb === 'root') $active_folder_for_breadcrumb = null;
     $view_prev = null;
     $view_next = null;
 
@@ -1210,11 +1328,30 @@ if ($requested) {
         }
     }
 
-	/* LOAD DATA FOR INDEX */
-	$rootList  = $mode==='index' ? list_md_root_sorted()        : [];
-	$dirMap    = $mode==='index' ? list_md_by_subdir_sorted()   : [];
-	$secretMap = load_secret_mds(); // voor index-weergave
-		$existingFolders = [];
+		/* LOAD DATA FOR INDEX */
+		$needExplorerTree = ($mode === 'index') || ($indexDualPaneEnabled && $mode === 'view');
+		$rootList  = $needExplorerTree ? list_md_root_sorted()      : [];
+		$dirMap    = $needExplorerTree ? list_md_by_subdir_sorted() : [];
+		$secretMap = load_secret_mds(); // voor index-weergave
+        $explorerTotalNotes = count($rootList);
+        foreach ($dirMap as $list) {
+            if (is_array($list)) $explorerTotalNotes += count($list);
+        }
+        $explorerLazyThreshold = isset($MDW_SETTINGS['lazy_explorer_threshold'])
+            ? (int)$MDW_SETTINGS['lazy_explorer_threshold']
+            : 450;
+        if ($explorerLazyThreshold < 50) $explorerLazyThreshold = 50;
+        $explorerUseLazyNotes = $needExplorerTree && ($explorerTotalNotes >= $explorerLazyThreshold);
+        if (isset($_GET['lazy'])) {
+            $lazyOverride = strtolower(trim((string)$_GET['lazy']));
+            if ($lazyOverride === '1' || $lazyOverride === 'true' || $lazyOverride === 'yes') {
+                $explorerUseLazyNotes = true;
+            } else if ($lazyOverride === '0' || $lazyOverride === 'false' || $lazyOverride === 'no') {
+                $explorerUseLazyNotes = false;
+            }
+        }
+        $explorerLazyEndpoint = 'index.php?json=explorer_tree';
+			$existingFolders = [];
 		$default_new_folder = 'root';
 		$today_prefix = date('y-m-d-');
 			if ($mode === 'index') {
@@ -1240,6 +1377,13 @@ if ($requested) {
             $new_md_content_value = (string)($new_md_draft['content'] ?? '');
             $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
         }
+
+        $indexSplitLayout = $indexDualPaneEnabled && $mode !== 'secret_prompt';
+        $indexSplitHasFile = $mode === 'view' && is_string($requested) && $requested !== '';
+        $indexSplitColStorageKey = 'mdw_index_split_col_widths';
+        $indexSplitColStorageLegacyKey = 'mdw_index_col_widths';
+        $indexSplitRowStorageKey = 'mdw_index_split_row_heights';
+        $indexSplitRowStorageLegacyKey = 'mdw_index_row_heights';
 
 	?>
 <!DOCTYPE html>
@@ -1271,6 +1415,57 @@ if ($requested) {
     };
 })();
 </script>
+
+<?php if ($indexSplitLayout): ?>
+<script>
+// Bootstrap index split pane widths early (pre-CSS) to avoid layout shift.
+(function(){
+    try {
+        const storageKey = <?= json_encode($indexSplitColStorageKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        const legacyKey = <?= json_encode($indexSplitColStorageLegacyKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        const parseState = (raw) => {
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object') ? parsed : null;
+        };
+        let raw = window.__mdwStorageGet(storageKey);
+        let saved = parseState(raw);
+        if (!saved) {
+            raw = window.__mdwStorageGet(legacyKey);
+            saved = parseState(raw);
+            if (!saved) return;
+        }
+        const toPct = (value) => {
+            if (typeof value !== 'string') return null;
+            const n = parseFloat(value.replace('%', '').trim());
+            return Number.isFinite(n) ? n : null;
+        };
+        let left = toPct(saved.left);
+        let right = toPct(saved.right);
+        if (!Number.isFinite(left) && !Number.isFinite(right)) return;
+        if (!Number.isFinite(left) && Number.isFinite(right)) {
+            left = 100 - right;
+        } else if (!Number.isFinite(right) && Number.isFinite(left)) {
+            right = 100 - left;
+        }
+        if (!Number.isFinite(left) || !Number.isFinite(right)) return;
+        const total = left + right;
+        if (!(total > 0)) return;
+        left = (left / total) * 100;
+        left = Math.max(15, Math.min(85, left));
+        right = 100 - left;
+        const normalized = {
+            left: `${left.toFixed(2)}%`,
+            right: `${right.toFixed(2)}%`,
+        };
+        const root = document.documentElement;
+        root.style.setProperty('--index-col-left', normalized.left);
+        root.style.setProperty('--index-col-right', normalized.right);
+        window.__mdwStorageSet(storageKey, JSON.stringify(normalized));
+    } catch {}
+})();
+</script>
+<?php endif; ?>
 
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
 <link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
@@ -1321,7 +1516,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body index-page <?=h($folderIconClass)?>">
+<body class="app-body index-page <?=h($folderIconClass)?> <?= $indexSplitLayout ? 'index-split-layout' : '' ?>">
 
 	<header class="app-header">
 	    <div class="app-header-inner">
@@ -1361,8 +1556,8 @@ window.mermaid = mermaid;
 	                <a class="breadcrumb-link" href="index.php">/index</a>
 		                <?php if ($active_folder_for_breadcrumb): ?>
 		                    <span class="breadcrumb-sep">/</span>
-		                    <a class="breadcrumb-link" href="index.php?folder=<?=rawurlencode($active_folder_for_breadcrumb)?>#contentList">
-	                        <?=h($active_folder_for_breadcrumb)?>
+		                    <a class="breadcrumb-link" href="<?= 'index.php?folder=' . rawurlencode($active_folder_for_breadcrumb) . '#contentList' ?>">
+	                        <?= h($active_folder_for_breadcrumb) ?>
 	                    </a>
 	                <?php endif; ?>
 	                <?php if ($mode==='view' && $requested): ?>
@@ -1374,19 +1569,14 @@ window.mermaid = mermaid;
 	        </div>
 	        <div class="app-header-actions">
 	            <span id="offlineIndicator" class="chip offline-chip" hidden aria-live="polite" title="<?=h(mdw_t('common.offline_hint','Offline: changes are stored locally until you are back online.'))?>"><?=h(mdw_t('common.offline','Offline'))?></span>
-	            <?php if ($mode==='index'): ?>
-	            <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
-	            <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=h(mdw_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
-		                <span class="pi pi-folder"></span>
-		                <span>+</span>
-		            </button>
-	            <form id="newFolderForm" method="post" style="display:none;">
-	                <input type="hidden" name="action" value="create_folder">
-	                <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-	                <input type="hidden" name="folder_name" id="newFolderName" value="">
-	            </form>
-	            <?php endif; ?>
-	            <?php if ($mode==='view' && $requested): ?>
+		            <?php if ($mode==='index' || $indexSplitLayout): ?>
+		            <form id="newFolderForm" method="post" style="display:none;">
+		                <input type="hidden" name="action" value="create_folder">
+		                <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+		                <input type="hidden" name="folder_name" id="newFolderName" value="">
+		            </form>
+		            <?php endif; ?>
+	            <?php if ($mode==='view' && $requested && !$indexSplitLayout): ?>
             <?php $hdrFolder = folder_from_path($requested); ?>
 	            <a href="edit.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($hdrFolder)?>" class="btn btn-ghost icon-button" title="<?=h(mdw_t('common.edit','Edit'))?>">
 	                <span class="pi pi-edit"></span>
@@ -1412,6 +1602,199 @@ window.mermaid = mermaid;
 	</header>
 
 <main class="app-main">
+<?php if ($indexSplitLayout): ?>
+<div class="index-split-root">
+    <script>
+window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_next], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+<?php if ($indexSplitHasFile && isset($raw)): ?>
+window.CURRENT_FILE = <?= json_encode($requested, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
+<?php endif; ?>
+    </script>
+
+    <?php if ($flash_ok || $flash_error): ?>
+    <section style="margin: 0 0 0.85rem;">
+        <div class="editor-pane" style="padding: 0.65rem 0.9rem;">
+            <?php if ($flash_ok): ?>
+                <div style="font-size: 0.8rem; color: #16a34a;"><?=h($flash_ok)?></div>
+            <?php else: ?>
+                <div style="font-size: 0.8rem; color: var(--danger);"><?=h($flash_error)?></div>
+            <?php endif; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+
+	<?php
+	require_once __DIR__ . '/explorer_view.php';
+    ob_start();
+    $indexHeaderPluginRendered = explorer_view_render_plugin_hook('header', [
+        'page' => 'index',
+        'project_dir' => __DIR__,
+        'plugins_enabled' => true,
+        'links_csv' => $LINKS_CSV,
+        'links_variant' => 'index_split',
+    ]);
+    $indexHeaderPluginHtml = trim((string)ob_get_clean());
+	?>
+    <?php if ($indexHeaderPluginRendered && $indexHeaderPluginHtml !== ''): ?>
+    <div id="indexShortcutsPanel" class="index-shortcuts-panel"
+         data-shortcuts-storage-key="mdw_index_shortcuts_panel_height"
+         data-shortcuts-min-height="0"
+         data-shortcuts-default-desktop-vh="31"
+         data-shortcuts-default-mobile-vh="24"
+         data-shortcuts-max-desktop-ratio="0.44"
+         data-shortcuts-max-mobile-ratio="0.34"
+         data-shortcuts-title-hide-scale="0.24">
+        <?=$indexHeaderPluginHtml?>
+    </div>
+    <div id="indexShortcutsResizer"
+         class="index-shortcuts-resizer"
+         role="separator"
+         aria-orientation="horizontal"
+         tabindex="0"
+         aria-label="<?=h(mdw_t('index.shortcuts.resize','Resize shortcuts area'))?>">
+        <span class="pi pi-linkchain" aria-hidden="true"></span>
+    </div>
+    <?php endif; ?>
+
+    <div class="editor-shell">
+        <div class="editor-grid index-split-grid" id="editorGrid"
+             data-split-mode="two"
+             data-split-storage-key="<?=h($indexSplitColStorageKey)?>"
+             data-split-storage-legacy-key="<?=h($indexSplitColStorageLegacyKey)?>"
+             data-split-row-storage-key="<?=h($indexSplitRowStorageKey)?>"
+             data-split-row-storage-legacy-key="<?=h($indexSplitRowStorageLegacyKey)?>"
+             data-split-mobile-resizer="right"
+             data-split-left-var="--index-col-left"
+             data-split-right-var="--index-col-right"
+             data-split-focus-lock-classes="mdw-pane-focus-md,mdw-pane-focus-preview">
+            <section class="editor-pane" id="links_md_overview" tabindex="0">
+                <div class="editor-pane-inner">
+                    <header class="pane-header">
+                        <div class="pane-title-row">
+                            <div class="pane-title">
+                                <span class="pi pi-notebook"></span>
+                                <span><?=h(mdw_t('common.notes','Notes'))?></span>
+                            </div>
+                            <div class="pane-title-actions">
+                                <div class="pane-subtitle" id="navCount">0 <?=h(mdw_t('common.items','items'))?></div>
+                            </div>
+                        </div>
+                        <div class="status-text" style="margin-top: 0.35rem;">
+                            <?=h(mdw_t('index.filter_desc','Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).'))?>
+                        </div>
+                    </header>
+                    <div class="pane-body nav-body">
+                    <?php
+                        explorer_view_render_tree([
+                            'page' => 'index',
+                            'rootList' => $rootList,
+                            'dirMap' => $dirMap,
+                            'secretMap' => $secretMap,
+                            'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+                            'folder_filter' => $folder_filter,
+                            'current_file' => $indexSplitHasFile ? $requested : null,
+                            'csrf_token' => $CSRF_TOKEN,
+                            'show_actions' => true,
+                            'show_filter_row' => true,
+                            'show_filter_reset' => true,
+                            'sticky_controls' => true,
+                            'lazy_notes' => $explorerUseLazyNotes,
+                            'lazy_endpoint' => $explorerLazyEndpoint,
+                            'lazy_cache_ttl_ms' => 300000,
+                        ]);
+                    ?>
+                    </div>
+                </div>
+                <button type="button" class="pane-focus-toggle" data-focus-target="markdown" aria-label="<?=h(mdw_t('index.pane_focus_overview','Focus overview pane'))?>" title="<?=h(mdw_t('index.pane_focus_overview','Focus overview pane'))?>">
+                    <span class="pi pi-downcaret"></span>
+                </button>
+            </section>
+
+            <div class="col-resizer" data-resizer="right"></div>
+
+            <?php
+            $indexSplitEditHref = 'edit.php';
+            if ($indexSplitHasFile && $requested) {
+                $indexSplitEditFolder = folder_from_path($requested);
+                if (!$indexSplitEditFolder) $indexSplitEditFolder = 'root';
+                $indexSplitEditHref = 'edit.php?file=' . rawurlencode($requested) . '&folder=' . rawurlencode($indexSplitEditFolder);
+            }
+            ?>
+            <section class="editor-pane" id="panePreview">
+                <div class="editor-pane-inner">
+                    <header class="pane-header">
+                        <div class="pane-title-row">
+                            <div class="pane-title">
+                                <span class="pi pi-eye"></span>
+                                <span><?=h(mdw_t('edit.preview_title','HTML preview'))?></span>
+                            </div>
+                            <div class="pane-header-actions">
+                                <a id="previewEditBtn" href="<?=h($indexSplitEditHref)?>" class="btn btn-ghost<?= $indexSplitHasFile ? '' : ' is-disabled' ?>" title="<?=h(mdw_t('common.edit','Edit'))?>" aria-label="<?=h(mdw_t('common.edit','Edit'))?>" data-base-href="edit.php" <?= $indexSplitHasFile ? '' : 'aria-disabled="true" tabindex="-1"' ?>>
+                                    <span class="pi pi-edit"></span>
+                                    <span class="btn-label"><?=h(mdw_t('common.edit','Edit'))?></span>
+                                </a>
+                                <?php if ($github_pages_plugin_loaded && $github_pages_env_ready && $indexSplitHasFile): ?>
+                                    <button type="button" id="githubPagesExportBtn" class="btn btn-ghost" title="<?=h(mdw_t('index.preview.github_pages_title','Export this note to GitHub Pages'))?>" data-auth-superuser="1">
+                                        <span class="pi pi-upload"></span>
+                                        <span class="btn-label"><?=h(mdw_t('index.preview.github_pages_btn','GitHub Pages'))?></span>
+                                    </button>
+                                <?php endif; ?>
+                                <button type="button" id="copyMdBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_md_title','Copy Markdown to clipboard'))?>" <?= ($copyButtonsEnabled && $indexSplitHasFile) ? '' : 'hidden' ?> <?= $indexSplitHasFile ? '' : 'disabled' ?> data-copy-buttons="1">
+                                    <span class="btn-icon-stack">
+                                        <span class="pi pi-copy copy-icon"></span>
+                                        <span class="pi pi-checkmark copy-check"></span>
+                                    </span>
+                                    <span class="btn-label"><?=h(mdw_t('index.preview.copy_md_btn','Copy MD'))?></span>
+                                </button>
+                                <button type="button" id="copyHtmlBtn" class="btn btn-ghost copy-btn" title="<?=h(mdw_t('index.preview.copy_html_title','Copy HTML to clipboard'))?>" <?= ($copyButtonsEnabled && $indexSplitHasFile) ? '' : 'hidden' ?> <?= $indexSplitHasFile ? '' : 'disabled' ?> data-copy-buttons="1" data-auth-superuser="1">
+                                    <span class="btn-icon-stack">
+                                        <span class="pi pi-copy copy-icon"></span>
+                                        <span class="pi pi-checkmark copy-check"></span>
+                                    </span>
+                                    <span class="btn-label"><?=h(mdw_t('index.preview.copy_html_btn','Copy HTML'))?></span>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="pane-body preview-body">
+                        <article id="preview" class="preview-content">
+                        <?php if ($indexSplitHasFile): ?>
+                            <?=$article_html?>
+                        <?php else: ?>
+                            <p class="status-text" style="font-size: 0.8rem; margin: 0.25rem 0 0;">
+                                <?=h(mdw_t('index.split.select_note_hint','Select a note in the overview to preview it here.'))?>
+                            </p>
+                        <?php endif; ?>
+                        </article>
+                    </div>
+                </div>
+                <button type="button" class="pane-focus-toggle" data-focus-target="preview" aria-label="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>" title="<?=h(mdw_t('edit.pane_focus_preview','Focus preview pane'))?>">
+                    <span class="pi pi-upcaret"></span>
+                </button>
+            </section>
+        </div>
+    </div>
+
+    <?php if ($mode === 'index' || $indexSplitLayout): ?>
+    <?php
+    mdw_render_new_md_modal([
+        'open' => $open_new_panel,
+        'csrf' => $CSRF_TOKEN,
+        'form_action' => 'index.php',
+        'existing_folders' => $existingFolders,
+        'default_folder' => $default_new_folder,
+        'today_prefix' => $today_prefix,
+        'title' => $new_md_title_value,
+        'slug' => $new_md_slug_value,
+        'content' => $new_md_content_value,
+        'prefix_checked' => $new_md_prefix_checked,
+        'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
+    ]);
+    ?>
+    <?php endif; ?>
+</div>
+<?php else: ?>
 <div class="app-main-inner" id="links_md_overview" tabindex="0">
 
 <?php if ($mode==='index'): ?>
@@ -1455,17 +1838,20 @@ window.mermaid = mermaid;
 </section>
 
 	<?php
-	explorer_view_render_tree([
-	    'page' => 'index',
-	    'rootList' => $rootList,
-	    'dirMap' => $dirMap,
-	    'secretMap' => $secretMap,
-	    'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
-	    'folder_filter' => $folder_filter,
-	    'csrf_token' => $CSRF_TOKEN,
-	    'show_actions' => true,
-	]);
-	?>
+		explorer_view_render_tree([
+		    'page' => 'index',
+		    'rootList' => $rootList,
+		    'dirMap' => $dirMap,
+		    'secretMap' => $secretMap,
+		    'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+		    'folder_filter' => $folder_filter,
+		    'csrf_token' => $CSRF_TOKEN,
+		    'show_actions' => true,
+            'lazy_notes' => $explorerUseLazyNotes,
+            'lazy_endpoint' => $explorerLazyEndpoint,
+            'lazy_cache_ttl_ms' => 300000,
+		]);
+		?>
 
     <?php
     mdw_render_new_md_modal([
@@ -1551,6 +1937,7 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 <?php endif; ?>
 
 </div>
+<?php endif; ?>
 </main>
 
 	<footer class="app-footer">
@@ -1728,6 +2115,17 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 			                </select>
 			                <div id="folderIconStyleStatus" class="status-text" style="margin-top: 0.35rem;">
 			                    <?=h(mdw_t('theme.folder_icons.hint','Saved for all users.'))?>
+			                </div>
+			            </div>
+
+			            <div class="modal-field" data-auth-superuser="1">
+			                <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>
+			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+			                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+			                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
+			                </label>
+			                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
+			                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
 			                </div>
 			            </div>
 
@@ -2051,6 +2449,7 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.ui.js"></script>
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.auth.js"></script>
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.settings.js"></script>
+	<script defer src="<?=h($STATIC_DIR)?>/mdm.splitter.js"></script>
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.editor.js"></script>
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.explorer.js"></script>
 	<script defer src="<?=h($STATIC_DIR)?>/mdm.modals.js"></script>

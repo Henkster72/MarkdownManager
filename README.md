@@ -7,7 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
-- v0.81: smarter Explorer folder UX (root/open state + per-folder color accents), broader emoji-safe folder/path handling, and a reorganized settings modal with clearer HTML-preview/theme sections and popicon carets.
+- v0.81: major Explorer/index overhaul with lazy-loaded + cached note trees, sticky and unified explorer controls, keyboard/focus and SPA navigation fixes, smarter focused-file rename behavior, split-view layout controls, and broader UI/settings polish.
 - v0.8: optional AW-SSG template export plugin (Jinja), smarter WPM metafield mapping/defaults, and cleaner class/footnote template output.
 - v0.7: toolbar sizing/icon polish, WPM publish badges/icons, list-item class attributes, preview/meta fixes (author defaults), and active note icon sync.
 - v0.6.3: editor bracket-pair highlight, HTML-only author metadata in WPM, and drag/drop internal link insertion.
@@ -163,7 +163,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
-- 0.81: Explorer root/folder behavior and visual accents were refined (including emoji-aware styling), folder/path emoji support was expanded, and the settings modal was regrouped into clearer collapsible sections with popicon caret toggles.
+- 0.81: Explorer/index got lazy-loading + caching, sticky and unified explorer controls, improved keyboard/focus flow and SPA loading, focused-file rename upgrades (including optional date-prefix keep in non-WPM), split-view layout controls, and broader settings/UI cleanup.
 - 0.6.2: JS refactor into `mdm.*` modules with shared helpers and core bootstrap.
 - 0.6: TOC sidebar option, wet export font links, safer auth hashes, and mobile pane focus fixes.
 - 0.5.1: Foldered export index, Mermaid in exports, optional repo footer, and Pages workflow polish.

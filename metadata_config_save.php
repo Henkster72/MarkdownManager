@@ -259,6 +259,9 @@ if (is_array($settingsIn)) {
         ? strtolower(trim((string)($settingsIn['folder_icon_style'] ?? '')))
         : strtolower(trim((string)($curSettings['folder_icon_style'] ?? 'folder')));
     if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
+    $indexDualPaneOverview = array_key_exists('index_dual_pane_overview', $settingsIn)
+        ? (bool)$settingsIn['index_dual_pane_overview']
+        : (!array_key_exists('index_dual_pane_overview', $curSettings) ? true : (bool)$curSettings['index_dual_pane_overview']);
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -328,6 +331,7 @@ if (is_array($settingsIn)) {
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,
+        'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,

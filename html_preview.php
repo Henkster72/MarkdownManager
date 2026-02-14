@@ -1127,6 +1127,8 @@ function mdw_metadata_default_config() {
             'toc_menu' => 'inline',
             'post_date_format' => 'mdy_short',
             'post_date_align' => 'left',
+            'folder_icon_style' => 'folder',
+            'index_dual_pane_overview' => true,
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
@@ -1205,6 +1207,9 @@ function mdw_metadata_normalize_config($cfg) {
     if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
     $postDateAlign = isset($inSettings['post_date_align']) ? trim((string)$inSettings['post_date_align']) : 'left';
     if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
+    $folderIconStyle = isset($inSettings['folder_icon_style']) ? strtolower(trim((string)$inSettings['folder_icon_style'])) : 'folder';
+    if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
+    $indexDualPaneOverview = !array_key_exists('index_dual_pane_overview', $inSettings) ? true : (bool)$inSettings['index_dual_pane_overview'];
     $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
     if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
@@ -1237,6 +1242,8 @@ function mdw_metadata_normalize_config($cfg) {
         'toc_menu' => $tocMenu,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
+        'folder_icon_style' => $folderIconStyle,
+        'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
@@ -1492,6 +1499,8 @@ function mdw_metadata_settings() {
         'toc_menu' => isset($s['toc_menu']) ? strtolower(trim((string)$s['toc_menu'])) : 'inline',
         'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
         'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
+        'folder_icon_style' => isset($s['folder_icon_style']) ? strtolower(trim((string)$s['folder_icon_style'])) : 'folder',
+        'index_dual_pane_overview' => !array_key_exists('index_dual_pane_overview', $s) ? true : (bool)$s['index_dual_pane_overview'],
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
@@ -1504,6 +1513,7 @@ function mdw_metadata_settings() {
     ];
     if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
     if (!in_array($out['post_date_align'], ['left', 'center', 'right'], true)) $out['post_date_align'] = 'left';
+    if (!in_array($out['folder_icon_style'], ['folder', 'caret'], true)) $out['folder_icon_style'] = 'folder';
     if (!in_array($out['copy_html_mode'], ['dry', 'medium', 'wet'], true)) $out['copy_html_mode'] = 'dry';
     if (!in_array($out['toc_menu'], ['inline', 'left', 'right'], true)) $out['toc_menu'] = 'inline';
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';

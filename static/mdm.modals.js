@@ -1297,10 +1297,18 @@
     const closeBtn = document.getElementById('renameModalClose');
     const cancelBtn = document.getElementById('renameModalCancel');
     const form = document.getElementById('renameModalForm');
+    const fileInput = document.getElementById('renameModalFile');
     const input = document.getElementById('renameModalSlug');
+    const fieldLabel = document.getElementById('renameModalFieldLabel');
+    const prefixHintWrap = document.getElementById('renameModalPrefixHintWrap');
+    const prefixValue = document.getElementById('renameModalPrefixValue');
+    const keepDateWrap = document.getElementById('renameModalKeepDateWrap');
+    const keepDateToggle = document.getElementById('renameModalKeepDatePrefix');
+    const keepDateValue = document.getElementById('renameModalKeepDateValue');
     const statusEl = document.getElementById('renameModalStatus');
     const authRoleInput = document.getElementById('renameAuthRole');
     const authTokenInput = document.getElementById('renameAuthToken');
+    const overview = document.getElementById('links_md_overview');
     if (!btn || !modal || !overlay || !form || !input) return;
 
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
@@ -1313,8 +1321,13 @@
     const invalidCharsRe = supportsUnicodeProps
         ? /[^\p{L}\p{N}._-]+/gu
         : /[^A-Za-z0-9._-]+/g;
-    const emojiRe = supportsUnicodeProps ? /\p{So}/u : null;
     const whitespaceRe = /\s+/g;
+
+    const isPublisherMode = () => {
+        const cfg = (window && typeof window === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = (cfg && typeof cfg === 'object') ? cfg._settings : null;
+        return !!(settings && settings.publisher_mode);
+    };
 
     const setStatus = (msg, kind = 'info') => {
         if (!(statusEl instanceof HTMLElement)) return;
@@ -1322,6 +1335,104 @@
         statusEl.style.color = kind === 'error'
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const splitFileName = (filePath) => {
+        const file = String(filePath || '').trim().split('/').pop() || '';
+        const stem = file.replace(/\.md$/i, '');
+        const m = stem.match(/^(\d{2}-\d{2}-\d{2}-)(.+)$/);
+        if (m) {
+            return {
+                prefix: String(m[1] || ''),
+                name: String(m[2] || ''),
+            };
+        }
+        return {
+            prefix: '',
+            name: stem,
+        };
+    };
+
+    const getFocusedOverviewFile = () => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+            const activeRow = active.closest('.note-item[data-kind="md"][data-file]');
+            if (activeRow instanceof HTMLElement) {
+                const fromActive = String(activeRow.dataset.file || '').trim();
+                if (fromActive) return fromActive;
+            }
+        }
+        if (overview instanceof HTMLElement) {
+            const wanderRow = overview.querySelector('.note-item[data-kind="md"].kbd-wander-current[data-file]');
+            if (wanderRow instanceof HTMLElement) {
+                const fromWander = String(wanderRow.dataset.file || '').trim();
+                if (fromWander) return fromWander;
+            }
+            const currentRow = overview.querySelector('.note-item[data-kind="md"].nav-item-current[data-file]');
+            if (currentRow instanceof HTMLElement) {
+                const fromCurrent = String(currentRow.dataset.file || '').trim();
+                if (fromCurrent) return fromCurrent;
+            }
+        }
+        return '';
+    };
+
+    const syncFieldCopy = () => {
+        const useSlug = isPublisherMode();
+        const labelSlug = String(input.dataset.labelSlug || t('rename_modal.slug_label', 'New slug')).trim();
+        const labelFilename = String(input.dataset.labelFilename || t('rename_modal.filename_label', 'New filename')).trim();
+        const placeholderSlug = String(input.dataset.placeholderSlug || t('rename_modal.slug_placeholder', 'new-title')).trim();
+        const placeholderFilename = String(input.dataset.placeholderFilename || t('rename_modal.filename_placeholder', 'new-filename')).trim();
+        if (fieldLabel instanceof HTMLElement) {
+            fieldLabel.textContent = useSlug ? labelSlug : labelFilename;
+        }
+        input.placeholder = useSlug ? placeholderSlug : placeholderFilename;
+    };
+
+    const syncTargetFile = (fallbackFile = '') => {
+        const focused = getFocusedOverviewFile();
+        const file = String(focused || fallbackFile || window.CURRENT_FILE || '').trim();
+
+        if (fileInput instanceof HTMLInputElement) {
+            fileInput.value = file;
+        }
+        if (btn instanceof HTMLButtonElement) {
+            btn.disabled = !file;
+        }
+
+        const parts = splitFileName(file);
+        const hasPrefix = parts.prefix !== '';
+        const useSlug = isPublisherMode();
+        input.dataset.prefix = parts.prefix;
+        input.value = parts.name;
+
+        if (useSlug) {
+            if (prefixValue instanceof HTMLElement) {
+                prefixValue.textContent = parts.prefix;
+            }
+            if (prefixHintWrap instanceof HTMLElement) {
+                prefixHintWrap.hidden = !hasPrefix;
+            }
+            if (keepDateWrap instanceof HTMLElement) {
+                keepDateWrap.hidden = true;
+            }
+        } else {
+            if (keepDateValue instanceof HTMLElement) {
+                keepDateValue.textContent = parts.prefix;
+            }
+            if (keepDateWrap instanceof HTMLElement) {
+                keepDateWrap.hidden = !hasPrefix;
+            }
+            if (keepDateToggle instanceof HTMLInputElement) {
+                keepDateToggle.disabled = !hasPrefix;
+                keepDateToggle.checked = hasPrefix;
+            }
+            if (prefixHintWrap instanceof HTMLElement) {
+                prefixHintWrap.hidden = true;
+            }
+        }
+
+        return file;
     };
 
     const slugify = (raw) => {
@@ -1349,7 +1460,7 @@
             slug = slug.slice(0, Math.max(0, slugMax)).replace(/[-.]+$/g, '');
         }
         if (slug.length < slugMin) {
-            const msg = t('js.new_md.slug_too_short', 'Slug is too short (min {min}).', { min: slugMin });
+            const msg = t('rename_modal.value_too_short', 'Value is too short (min {min}).', { min: slugMin });
             input.setCustomValidity(msg);
             setStatus(msg, 'error');
             return false;
@@ -1365,10 +1476,17 @@
             alert(t('auth.superuser_required', 'Superuser login required.'));
             return;
         }
+        syncFieldCopy();
+        const targetFile = syncTargetFile();
+        if (!targetFile) {
+            setStatus(t('rename_modal.no_file_selected', 'No markdown file selected.'), 'error');
+            return;
+        }
         overlay.hidden = false;
         modal.hidden = false;
         mdmModalOpen(true);
         setStatus('');
+        validate();
         setTimeout(() => {
             input.focus();
             input.select();
@@ -1388,6 +1506,12 @@
     overlay.addEventListener('click', close);
 
     form.addEventListener('submit', (e) => {
+        const targetFile = String((fileInput instanceof HTMLInputElement) ? fileInput.value : '').trim();
+        if (!targetFile) {
+            e.preventDefault();
+            setStatus(t('rename_modal.no_file_selected', 'No markdown file selected.'), 'error');
+            return;
+        }
         if (!validate()) {
             e.preventDefault();
             try { input.focus(); } catch {}
@@ -1401,6 +1525,20 @@
     input.addEventListener('input', () => {
         validate();
     });
+
+    if (overview instanceof HTMLElement) {
+        const syncSoon = () => requestAnimationFrame(() => syncTargetFile());
+        overview.addEventListener('focusin', syncSoon);
+        overview.addEventListener('click', syncSoon);
+        overview.addEventListener('keydown', (e) => {
+            const key = String(e.key || '');
+            if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End' || key === 'PageUp' || key === 'PageDown' || key === 'Enter') {
+                syncSoon();
+            }
+        });
+    }
+    syncFieldCopy();
+    syncTargetFile();
 
     document.addEventListener('keydown', (e) => {
         if (modal.hidden) return;

@@ -930,26 +930,204 @@
 
     const isEditorPage = !!document.getElementById('editor');
     const isIndexPage = document.body.classList.contains('index-page');
+    const isIndexSplitLayout = isIndexPage && document.body.classList.contains('index-split-layout');
     const isIndexOverviewMode = (() => {
         if (!isIndexPage) return false;
         const params = new URLSearchParams(window.location.search);
-        return !params.get('file');
+        return !params.get('file') || isIndexSplitLayout;
     })();
-    const getItems = () => Array.from(overview.querySelectorAll('a.kbd-item'))
-        .filter(a => a instanceof HTMLAnchorElement)
-        .filter(a => a.offsetParent !== null);
+    const getNoteItems = () => Array.from(overview.querySelectorAll('a.kbd-item'))
+        .filter((a) => a instanceof HTMLAnchorElement)
+        .filter((a) => a.offsetParent !== null);
+    const isFolderTreeLink = (el) => {
+        if (!(el instanceof HTMLAnchorElement)) return false;
+        if (!el.classList.contains('breadcrumb-link')) return false;
+        return !!el.closest('.note-group-title');
+    };
+    const isFolderBackLink = (el) => {
+        if (!(el instanceof HTMLAnchorElement)) return false;
+        if (!el.classList.contains('folder-back')) return false;
+        return !!el.closest('.note-group-title');
+    };
+    const getTreeItems = () => Array.from(overview.querySelectorAll('a.kbd-item, .note-group-title .folder-back, .note-group-title .breadcrumb-link'))
+        .filter((a) => a instanceof HTMLAnchorElement)
+        .filter((a) => a.offsetParent !== null);
+
+    const getActiveKbdItem = (activeEl = document.activeElement) => {
+        if (!(activeEl instanceof HTMLElement)) return null;
+        if (activeEl instanceof HTMLAnchorElement && activeEl.classList.contains('kbd-item')) return activeEl;
+        const candidate = activeEl.closest('a.kbd-item');
+        return candidate instanceof HTMLAnchorElement ? candidate : null;
+    };
+    const getActiveTreeItem = (activeEl = document.activeElement) => {
+        if (!(activeEl instanceof HTMLElement)) return null;
+        if (activeEl instanceof HTMLAnchorElement && (activeEl.classList.contains('kbd-item') || isFolderTreeLink(activeEl) || isFolderBackLink(activeEl))) {
+            return activeEl;
+        }
+        const candidate = activeEl.closest('a');
+        if (!(candidate instanceof HTMLAnchorElement)) return null;
+        if (candidate.classList.contains('kbd-item') || isFolderTreeLink(candidate) || isFolderBackLink(candidate)) return candidate;
+        return null;
+    };
+    const getSectionForAnchor = (anchor) => {
+        if (!(anchor instanceof HTMLAnchorElement)) return null;
+        if (isFolderTreeLink(anchor)) {
+            const section = anchor.closest('.nav-section[data-folder-section]');
+            return section instanceof HTMLElement ? section : null;
+        }
+        const row = anchor.closest('.note-item[data-kind="md"]');
+        const section = row?.closest('.nav-section[data-folder-section]');
+        return section instanceof HTMLElement ? section : null;
+    };
+    const getFolderLinkForSection = (section) => {
+        if (!(section instanceof HTMLElement)) return null;
+        const link = section.querySelector(':scope > .note-group-title .breadcrumb-link');
+        return link instanceof HTMLAnchorElement ? link : null;
+    };
+    const getBackLinkForSection = (section) => {
+        if (!(section instanceof HTMLElement)) return null;
+        const link = section.querySelector(':scope > .note-group-title .folder-back');
+        return link instanceof HTMLAnchorElement && link.offsetParent !== null ? link : null;
+    };
+    const followBackLink = (link) => {
+        if (!(link instanceof HTMLAnchorElement)) return false;
+        const href = String(link.getAttribute('href') || '').trim();
+        if (!href) return false;
+        window.location.href = href;
+        return true;
+    };
+    const getFolderToggleForSection = (section) => {
+        if (!(section instanceof HTMLElement)) return null;
+        const btn = section.querySelector(':scope > .note-group-title .folder-toggle');
+        return btn instanceof HTMLButtonElement ? btn : null;
+    };
+    const getFolderChildrenForSection = (section) => {
+        const btn = getFolderToggleForSection(section);
+        const id = btn?.getAttribute('aria-controls') || '';
+        if (!id) return null;
+        const el = document.getElementById(id);
+        return el instanceof HTMLElement ? el : null;
+    };
+    const isFolderOpen = (section) => {
+        const btn = getFolderToggleForSection(section);
+        if (btn instanceof HTMLButtonElement) {
+            return btn.getAttribute('aria-expanded') === 'true';
+        }
+        const children = getFolderChildrenForSection(section);
+        return children instanceof HTMLElement ? !children.hidden : true;
+    };
+    const setFolderOpen = (section, open) => {
+        const btn = getFolderToggleForSection(section);
+        if (!(btn instanceof HTMLButtonElement)) return false;
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        if (expanded === !!open) return true;
+        btn.click();
+        return true;
+    };
+    const toggleFolderOpen = (section) => {
+        const expanded = isFolderOpen(section);
+        return setFolderOpen(section, !expanded);
+    };
+    const openFolder = (section) => setFolderOpen(section, true);
+    const closeFolder = (section) => setFolderOpen(section, false);
+    const getVisibleChildrenItems = (section) => {
+        const children = getFolderChildrenForSection(section);
+        if (!(children instanceof HTMLElement)) return [];
+        return Array.from(children.querySelectorAll('a.kbd-item, .note-group-title .breadcrumb-link'))
+            .filter((el) => el instanceof HTMLAnchorElement)
+            .filter((el) => el.offsetParent !== null);
+    };
+    const getFirstVisibleChildItem = (section) => {
+        const items = getVisibleChildrenItems(section);
+        return items.length ? items[0] : null;
+    };
+    const getParentFolderLink = (section) => {
+        if (!(section instanceof HTMLElement)) return null;
+        const parentSection = section.parentElement?.closest?.('.nav-section[data-folder-section]') || null;
+        if (!(parentSection instanceof HTMLElement)) return null;
+        return getFolderLinkForSection(parentSection);
+    };
+    const getBackLinkForAnchor = (anchor) => {
+        const section = getSectionForAnchor(anchor);
+        if (!(section instanceof HTMLElement)) return null;
+        return getBackLinkForSection(section);
+    };
+    const focusFolderForAnchor = (anchor) => {
+        const section = getSectionForAnchor(anchor);
+        if (!(section instanceof HTMLElement)) return null;
+        return getFolderLinkForSection(section);
+    };
+    const shouldFocusFolderOnArrowUp = (anchor) => {
+        if (!(anchor instanceof HTMLAnchorElement)) return false;
+        if (isFolderTreeLink(anchor)) return false;
+        const section = getSectionForAnchor(anchor);
+        if (!(section instanceof HTMLElement)) return false;
+        const visibleChildren = getVisibleChildrenItems(section);
+        if (visibleChildren.length === 0) return false;
+        return visibleChildren[0] === anchor;
+    };
+    const clearWanderMarkers = () => {
+        overview.querySelectorAll('.kbd-wander-current').forEach((el) => el.classList.remove('kbd-wander-current'));
+        overview.querySelectorAll('.kbd-wander-folder-link').forEach((el) => el.classList.remove('kbd-wander-folder-link'));
+        overview.querySelectorAll('.kbd-wander-back-link').forEach((el) => el.classList.remove('kbd-wander-back-link'));
+        overview.querySelectorAll('.kbd-wander-folder').forEach((el) => el.classList.remove('kbd-wander-folder'));
+        overview.querySelectorAll('.kbd-wander-parent').forEach((el) => el.classList.remove('kbd-wander-parent'));
+    };
+    const markWanderState = (anchor) => {
+        clearWanderMarkers();
+        if (!(anchor instanceof HTMLAnchorElement)) return;
+        if (isFolderBackLink(anchor)) {
+            anchor.classList.add('kbd-wander-back-link');
+            const section = anchor.closest('.nav-section[data-folder-section]');
+            if (section instanceof HTMLElement) {
+                section.classList.add('kbd-wander-folder');
+                section.classList.add('kbd-wander-parent');
+            }
+            return;
+        }
+        if (isFolderTreeLink(anchor)) {
+            anchor.classList.add('kbd-wander-folder-link');
+            const section = anchor.closest('.nav-section[data-folder-section]');
+            if (section instanceof HTMLElement) {
+                section.classList.add('kbd-wander-folder');
+                const parentSection = section.parentElement?.closest?.('.nav-section[data-folder-section]') || null;
+                if (parentSection instanceof HTMLElement) {
+                    parentSection.classList.add('kbd-wander-parent');
+                }
+            }
+            return;
+        }
+
+        const row = anchor.closest('.note-item[data-kind="md"]');
+        if (row instanceof HTMLElement) {
+            row.classList.add('kbd-wander-current');
+            const section = row.closest('.nav-section[data-folder-section]');
+            if (section instanceof HTMLElement) {
+                section.classList.add('kbd-wander-folder');
+                const parentSection = section.parentElement?.closest?.('.nav-section[data-folder-section]') || null;
+                if (parentSection instanceof HTMLElement) {
+                    parentSection.classList.add('kbd-wander-parent');
+                }
+            }
+        }
+    };
 
     let lastFocusedItem = null;
+    let lastFocusedTreeItem = null;
     const scrollFocus = (el) => {
         try { el.focus({preventScroll: true}); } catch { el.focus(); }
         el.scrollIntoView({block: 'nearest', inline: 'nearest'});
-        lastFocusedItem = el;
+        if (el.classList.contains('kbd-item')) {
+            lastFocusedItem = el;
+        }
+        lastFocusedTreeItem = el;
+        markWanderState(el);
     };
 
     const focusRelative = (delta) => {
-        const items = getItems();
+        const items = getTreeItems();
         if (items.length === 0) return;
-        const active = document.activeElement;
+        const active = getActiveTreeItem(document.activeElement) || lastFocusedTreeItem;
         let idx = items.findIndex(el => el === active);
         if (idx === -1) {
             idx = delta > 0 ? -1 : items.length;
@@ -1016,8 +1194,8 @@
     const focusFromQuery = () => {
         if (!isIndexPage) return;
         const params = new URLSearchParams(window.location.search);
-        if (params.get('file')) return;
-        const focusFile = params.get('focus');
+        if (params.get('file') && !isIndexSplitLayout) return;
+        const focusFile = params.get('focus') || (isIndexSplitLayout ? params.get('file') : '');
         if (!focusFile) return;
         const el = overview.querySelector(`[data-file="${CSS.escape(focusFile)}"] a.kbd-item`);
         if (el instanceof HTMLAnchorElement) {
@@ -1026,6 +1204,23 @@
     };
 
     focusFromQuery();
+    overview.addEventListener('focusin', (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLElement)) return;
+        const anchor = getActiveTreeItem(el);
+        if (anchor instanceof HTMLAnchorElement) {
+            markWanderState(anchor);
+            lastFocusedTreeItem = anchor;
+            if (anchor.classList.contains('kbd-item')) lastFocusedItem = anchor;
+        }
+    });
+    document.addEventListener('click', (e) => {
+        const anchor = e.target instanceof Element ? e.target.closest('#links_md_overview a.kbd-item, #links_md_overview .note-group-title .breadcrumb-link') : null;
+        if (!(anchor instanceof HTMLAnchorElement)) return;
+        markWanderState(anchor);
+        lastFocusedTreeItem = anchor;
+        if (anchor.classList.contains('kbd-item')) lastFocusedItem = anchor;
+    });
 
     document.addEventListener('keydown', (e) => {
         const active = document.activeElement;
@@ -1041,19 +1236,27 @@
         if (active.matches('input, textarea, [contenteditable="true"]')) return;
 
         if (e.key === 'Enter') {
-            const items = getItems();
+            const items = getTreeItems();
             if (items.length === 0) return;
             if (!overview.contains(active) && isIndexOverviewMode) {
                 // Let Enter keep default behavior outside overview on index page
                 return;
             }
             e.preventDefault();
-            const a = (active instanceof HTMLAnchorElement && active.classList.contains('kbd-item'))
-                ? active
-                : active.closest?.('a.kbd-item');
-            const toOpen = (a instanceof HTMLAnchorElement) ? a : lastFocusedItem;
+            const a = getActiveTreeItem(active);
+            const toOpen = (a instanceof HTMLAnchorElement) ? a : (lastFocusedTreeItem || lastFocusedItem);
             if (toOpen instanceof HTMLAnchorElement) {
-                toOpen.click();
+                if (isFolderBackLink(toOpen)) {
+                    followBackLink(toOpen);
+                } else if (isFolderTreeLink(toOpen)) {
+                    const section = getSectionForAnchor(toOpen);
+                    if (section instanceof HTMLElement) {
+                        toggleFolderOpen(section);
+                        markWanderState(toOpen);
+                    }
+                } else {
+                    toOpen.click();
+                }
             } else {
                 scrollFocus(items[0]);
             }
@@ -1063,8 +1266,8 @@
         if (e.key === 'ArrowDown') {
             if (isIndexOverviewMode && !overview.contains(active)) {
                 e.preventDefault();
-                const items = getItems();
-                if (items.length) scrollFocus(lastFocusedItem || items[0]);
+                const items = getTreeItems();
+                if (items.length) scrollFocus(lastFocusedTreeItem || lastFocusedItem || items[0]);
                 return;
             }
             e.preventDefault();
@@ -1074,9 +1277,102 @@
         if (e.key === 'ArrowUp') {
             if (isIndexOverviewMode && !overview.contains(active)) {
                 e.preventDefault();
-                const items = getItems();
-                if (items.length) scrollFocus(lastFocusedItem || items[items.length - 1]);
+                const items = getTreeItems();
+                if (items.length) scrollFocus(lastFocusedTreeItem || lastFocusedItem || items[items.length - 1]);
                 return;
+            }
+            const treeActive = getActiveTreeItem(active) || lastFocusedTreeItem || lastFocusedItem;
+            if (isFolderBackLink(treeActive)) {
+                e.preventDefault();
+                const section = getSectionForAnchor(treeActive);
+                const folderLink = getFolderLinkForSection(section);
+                if (folderLink instanceof HTMLAnchorElement) {
+                    scrollFocus(folderLink);
+                } else {
+                    focusRelative(-1);
+                }
+                return;
+            }
+            if (isFolderTreeLink(treeActive)) {
+                const backLink = getBackLinkForAnchor(treeActive);
+                if (backLink instanceof HTMLAnchorElement) {
+                    e.preventDefault();
+                    scrollFocus(backLink);
+                    return;
+                }
+            }
+            const activeItem = getActiveKbdItem(active) || lastFocusedItem;
+            if (shouldFocusFolderOnArrowUp(activeItem)) {
+                e.preventDefault();
+                const folderLink = focusFolderForAnchor(activeItem);
+                if (folderLink instanceof HTMLAnchorElement) {
+                    scrollFocus(folderLink);
+                    return;
+                }
+            }
+            e.preventDefault();
+            focusRelative(-1);
+            return;
+        }
+        if (e.key === 'ArrowRight') {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (!overview.contains(active)) return;
+            const activeItem = getActiveTreeItem(active) || lastFocusedTreeItem || lastFocusedItem;
+            if (isFolderTreeLink(activeItem)) {
+                e.preventDefault();
+                const section = getSectionForAnchor(activeItem);
+                if (!(section instanceof HTMLElement)) return;
+                if (!isFolderOpen(section)) {
+                    openFolder(section);
+                    markWanderState(activeItem);
+                    return;
+                }
+                const child = getFirstVisibleChildItem(section);
+                if (child instanceof HTMLAnchorElement) {
+                    scrollFocus(child);
+                }
+                return;
+            }
+            e.preventDefault();
+            focusRelative(1);
+            return;
+        }
+        if (e.key === 'ArrowLeft') {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (!overview.contains(active)) return;
+            const activeItem = getActiveTreeItem(active) || lastFocusedTreeItem || lastFocusedItem;
+            if (isFolderBackLink(activeItem)) {
+                e.preventDefault();
+                if (followBackLink(activeItem)) return;
+            }
+            if (isFolderTreeLink(activeItem)) {
+                const backLink = getBackLinkForAnchor(activeItem);
+                if (backLink instanceof HTMLAnchorElement) {
+                    e.preventDefault();
+                    scrollFocus(backLink);
+                    return;
+                }
+                e.preventDefault();
+                const section = getSectionForAnchor(activeItem);
+                if (!(section instanceof HTMLElement)) return;
+                if (isFolderOpen(section)) {
+                    closeFolder(section);
+                    markWanderState(activeItem);
+                    return;
+                }
+                const parentLink = getParentFolderLink(section);
+                if (parentLink instanceof HTMLAnchorElement) {
+                    scrollFocus(parentLink);
+                }
+                return;
+            }
+            if (activeItem instanceof HTMLAnchorElement && activeItem.classList.contains('kbd-item')) {
+                const folderLink = focusFolderForAnchor(activeItem);
+                if (folderLink instanceof HTMLAnchorElement) {
+                    e.preventDefault();
+                    scrollFocus(folderLink);
+                    return;
+                }
             }
             e.preventDefault();
             focusRelative(-1);
@@ -1104,20 +1400,43 @@
     const params = new URLSearchParams(window.location.search);
     const file = params.get('file');
     if (!file) return;
+    const overview = document.getElementById('links_md_overview');
 
     const folderParam = params.get('folder');
     const inferredFolder = file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : 'root';
     const folder = folderParam || inferredFolder;
     const focus = params.get('focus') || file;
+    const folderParamOut = folder === 'root' ? '' : folder;
+    const buildIndexUrl = (targetFile, targetFocus) => {
+        const next = new URLSearchParams();
+        if (targetFile) next.set('file', targetFile);
+        if (folderParamOut) next.set('folder', folderParamOut);
+        if (targetFocus) next.set('focus', targetFocus);
+        const query = next.toString();
+        return query ? `index.php?${query}` : 'index.php';
+    };
+    const buildEditUrl = (targetFile) => {
+        const next = new URLSearchParams();
+        if (targetFile) next.set('file', targetFile);
+        if (folderParamOut) next.set('folder', folderParamOut);
+        const query = next.toString();
+        return query ? `edit.php?${query}` : 'edit.php';
+    };
     const nav = (window.MDW_VIEW_NAV && typeof window.MDW_VIEW_NAV === 'object') ? window.MDW_VIEW_NAV : null;
 
     document.addEventListener('keydown', (e) => {
         const t = e.target;
         if (t instanceof HTMLElement && t.matches('input, textarea, [contenteditable="true"]')) return;
+        const activeEl = document.activeElement;
+        const inExplorerTree = activeEl instanceof HTMLElement && !!activeEl.closest?.('#contentList');
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && inExplorerTree) {
+            return;
+        }
 
         if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             if (typeof window.__mdwCanDelete === 'function' && !window.__mdwCanDelete()) return;
-            const form = document.querySelector('form.deleteForm');
+            const form = document.querySelector(`form.deleteForm[data-file="${CSS.escape(file)}"]`)
+                || document.querySelector('form.deleteForm');
             if (!(form instanceof HTMLFormElement)) return;
             e.preventDefault();
             if (typeof form.requestSubmit === 'function') {
@@ -1135,14 +1454,14 @@
 
         if ((e.key === 'Backspace' || e.key === 'Escape' || e.key === 'Esc') && !e.ctrlKey && !e.metaKey && !e.altKey) {
             e.preventDefault();
-            const url = `index.php?folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(focus)}`;
+            const url = buildIndexUrl('', focus);
             window.location.href = url;
             return;
         }
 
 	        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
 	            e.preventDefault();
-	            const url = `edit.php?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder)}`;
+	            const url = buildEditUrl(file);
 	            window.location.href = url;
 	        }
 
@@ -1150,7 +1469,7 @@
             const targetFile = (e.key === 'ArrowLeft') ? (nav?.prev || null) : (nav?.next || null);
             if (!targetFile) return;
             e.preventDefault();
-            const url = `index.php?file=${encodeURIComponent(targetFile)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(targetFile)}`;
+            const url = buildIndexUrl(targetFile, targetFile);
             window.location.href = url;
         }
     });
@@ -1195,7 +1514,7 @@
 
         const targetFile = dx < 0 ? (nav?.next || null) : (nav?.prev || null);
         if (!targetFile) return;
-        const url = `index.php?file=${encodeURIComponent(targetFile)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(targetFile)}`;
+        const url = buildIndexUrl(targetFile, targetFile);
         window.location.href = url;
     }, { passive: true });
 })();
@@ -1224,6 +1543,110 @@
     const filterClear = document.getElementById('filterClear');
     const explorerCollapseToggle = document.getElementById('explorerCollapseToggle');
     const params = new URLSearchParams(window.location.search);
+    const focusParam = params.get('focus');
+    const allowFocusWithFile = document.body.classList.contains('index-split-layout');
+    const previewEditBtn = document.getElementById('previewEditBtn');
+    const explorerEditBtn = document.getElementById('explorerEditBtn');
+    const explorerDeleteForm = document.getElementById('explorerDeleteForm');
+    const explorerDeleteFileInput = document.getElementById('explorerDeleteFileInput');
+    const previewEditBaseHref = (() => {
+        if (!(previewEditBtn instanceof HTMLAnchorElement)) return 'edit.php';
+        const raw = String(previewEditBtn.dataset.baseHref || previewEditBtn.getAttribute('href') || 'edit.php').trim();
+        return raw || 'edit.php';
+    })();
+    const explorerEditBaseHref = (() => {
+        if (!(explorerEditBtn instanceof HTMLAnchorElement)) return 'edit.php';
+        const raw = String(explorerEditBtn.dataset.baseHref || explorerEditBtn.getAttribute('href') || 'edit.php').trim();
+        return raw || 'edit.php';
+    })();
+    const previewEditBasePath = String(previewEditBaseHref.split('?')[0] || 'edit.php').trim() || 'edit.php';
+    const explorerEditBasePath = String(explorerEditBaseHref.split('?')[0] || 'edit.php').trim() || 'edit.php';
+    const previewEditFolderFromFile = (filePath) => {
+        const file = String(filePath || '').trim();
+        if (!file) return 'root';
+        const idx = file.lastIndexOf('/');
+        return idx === -1 ? 'root' : file.slice(0, idx);
+    };
+    const previewEditHrefForFile = (filePath) => {
+        const file = String(filePath || '').trim();
+        if (!file) return previewEditBaseHref;
+        const folder = previewEditFolderFromFile(file);
+        return `${previewEditBasePath}?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder || 'root')}`;
+    };
+    const explorerEditHrefForFile = (filePath) => {
+        const file = String(filePath || '').trim();
+        if (!file) return explorerEditBaseHref;
+        const folder = previewEditFolderFromFile(file);
+        return `${explorerEditBasePath}?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder || 'root')}`;
+    };
+    const setPreviewEditTarget = (filePath) => {
+        if (!(previewEditBtn instanceof HTMLAnchorElement)) return;
+        const file = String(filePath || '').trim();
+        if (!file) {
+            previewEditBtn.href = previewEditBaseHref;
+            previewEditBtn.classList.add('is-disabled');
+            previewEditBtn.setAttribute('aria-disabled', 'true');
+            previewEditBtn.setAttribute('tabindex', '-1');
+            return;
+        }
+        previewEditBtn.href = previewEditHrefForFile(file);
+        previewEditBtn.classList.remove('is-disabled');
+        previewEditBtn.removeAttribute('aria-disabled');
+        previewEditBtn.removeAttribute('tabindex');
+    };
+    const setExplorerTopActionTarget = (filePath) => {
+        const file = String(filePath || '').trim();
+        if (explorerEditBtn instanceof HTMLAnchorElement) {
+            if (!file) {
+                explorerEditBtn.href = explorerEditBaseHref;
+                explorerEditBtn.classList.add('is-disabled');
+                explorerEditBtn.setAttribute('aria-disabled', 'true');
+                explorerEditBtn.setAttribute('tabindex', '-1');
+            } else {
+                explorerEditBtn.href = explorerEditHrefForFile(file);
+                explorerEditBtn.classList.remove('is-disabled');
+                explorerEditBtn.removeAttribute('aria-disabled');
+                explorerEditBtn.removeAttribute('tabindex');
+            }
+        }
+        if (explorerDeleteForm instanceof HTMLFormElement) {
+            explorerDeleteForm.dataset.file = file;
+            if (explorerDeleteFileInput instanceof HTMLInputElement) {
+                explorerDeleteFileInput.value = file;
+            }
+            const deleteBtn = explorerDeleteForm.querySelector('button[type="submit"]');
+            if (deleteBtn instanceof HTMLButtonElement) {
+                deleteBtn.disabled = !file;
+            }
+        }
+    };
+    const getFocusedOverviewFile = () => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+            const activeRow = active.closest('.note-item[data-kind="md"][data-file]');
+            if (activeRow instanceof HTMLElement) {
+                const fromActive = String(activeRow.dataset.file || '').trim();
+                if (fromActive) return fromActive;
+            }
+        }
+        const wanderRow = overview.querySelector('.note-item[data-kind="md"].kbd-wander-current[data-file]');
+        if (wanderRow instanceof HTMLElement) {
+            const fromWander = String(wanderRow.dataset.file || '').trim();
+            if (fromWander) return fromWander;
+        }
+        const currentRow = overview.querySelector('.note-item[data-kind="md"].nav-item-current[data-file]');
+        if (currentRow instanceof HTMLElement) {
+            const fromCurrent = String(currentRow.dataset.file || '').trim();
+            if (fromCurrent) return fromCurrent;
+        }
+        return '';
+    };
+    const syncPreviewEditTarget = (fallbackFile = '') => {
+        const focused = getFocusedOverviewFile();
+        const file = String(focused || fallbackFile || window.CURRENT_FILE || '').trim();
+        setPreviewEditTarget(file);
+        setExplorerTopActionTarget(file);
+    };
 
     if (!filterInput) return;
 
@@ -1231,6 +1654,28 @@
     if (navSortRow && navSortPlaceholder && navSortRow.parentNode) {
         navSortPlaceholder.dataset.navSortPlaceholder = '1';
         navSortRow.parentNode.insertBefore(navSortPlaceholder, navSortRow);
+    }
+    if (previewEditBtn instanceof HTMLAnchorElement || explorerEditBtn instanceof HTMLAnchorElement || explorerDeleteForm instanceof HTMLFormElement) {
+        const syncSoon = () => requestAnimationFrame(() => syncPreviewEditTarget());
+        previewEditBtn?.addEventListener('click', (e) => {
+            if (previewEditBtn.classList.contains('is-disabled') || previewEditBtn.getAttribute('aria-disabled') === 'true') {
+                e.preventDefault();
+            }
+        });
+        explorerEditBtn?.addEventListener('click', (e) => {
+            if (explorerEditBtn.classList.contains('is-disabled') || explorerEditBtn.getAttribute('aria-disabled') === 'true') {
+                e.preventDefault();
+            }
+        });
+        overview.addEventListener('focusin', syncSoon);
+        overview.addEventListener('click', syncSoon);
+        overview.addEventListener('keydown', (e) => {
+            const key = String(e.key || '');
+            if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End' || key === 'PageUp' || key === 'PageDown' || key === 'Enter') {
+                syncSoon();
+            }
+        });
+        syncPreviewEditTarget();
     }
 
     // Explorer collapse/expand (edit.php, desktop)
@@ -1345,6 +1790,7 @@
         }
     };
 
+    let onFolderToggle = null;
     document.querySelectorAll('[data-folder-section]').forEach(section => {
         const btn = section.querySelector('button.folder-toggle');
         if (!(btn instanceof HTMLButtonElement)) return;
@@ -1352,6 +1798,7 @@
             const next = !getFolderOpen(section);
             section.setAttribute('data-user-open', next ? '1' : '0');
             setFolderOpen(section, next);
+            if (typeof onFolderToggle === 'function') onFolderToggle(section, next);
         });
         setFolderOpen(section, getFolderOpen(section));
     });
@@ -1455,24 +1902,69 @@
         }
     };
     applyFolderAccents();
-    const docEntries = Array.from(overview.querySelectorAll('.doclink'))
-        .filter(el => el instanceof HTMLElement)
-        .map(el => {
-            const text = String(el.textContent || '').toLowerCase();
-            const section = el.closest?.('[data-folder-section]') || null;
-            return { el, text, section };
-        });
+    let docEntries = [];
+    const refreshDocEntries = () => {
+        docEntries = Array.from(overview.querySelectorAll('.doclink'))
+            .filter(el => el instanceof HTMLElement)
+            .map(el => {
+                const text = String(el.textContent || '').toLowerCase();
+                const section = el.closest?.('[data-folder-section]') || null;
+                return { el, text, section };
+            });
+        return docEntries;
+    };
+    refreshDocEntries();
 
+    const openFolderPath = (folderPath) => {
+        const path = String(folderPath || '').trim();
+        if (!path) return null;
+        const section = overview.querySelector(`[data-folder-section="${CSS.escape(path)}"]`);
+        if (!(section instanceof HTMLElement)) return null;
+        let current = section;
+        while (current instanceof HTMLElement) {
+            current.setAttribute('data-user-open', '1');
+            setFolderOpen(current, true);
+            current = findParentFolderSection(current);
+        }
+        return section;
+    };
     const openFromQuery = () => {
         const openParam = params.get('open') || '';
         if (!openParam) return;
-        const section = overview.querySelector(`[data-folder-section="${CSS.escape(openParam)}"]`);
-        if (section instanceof HTMLElement) {
-            section.setAttribute('data-user-open', '1');
-            setFolderOpen(section, true);
-        }
+        openFolderPath(openParam);
+    };
+    const focusFolderFromQuery = () => {
+        const focusFolder = String(params.get('focus_folder') || '').trim();
+        if (!focusFolder) return;
+        const section = openFolderPath(focusFolder);
+        if (!(section instanceof HTMLElement)) return;
+        const link = section.querySelector(':scope > .note-group-title .breadcrumb-link');
+        if (!(link instanceof HTMLAnchorElement)) return;
+        requestAnimationFrame(() => {
+            try { link.focus({ preventScroll: true }); } catch { link.focus(); }
+            link.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        });
     };
     openFromQuery();
+    focusFolderFromQuery();
+
+    const lazyRequested = contentList?.dataset.lazyNotes === '1';
+    const lazyEndpoint = String(contentList?.dataset.lazyEndpoint || 'index.php?json=explorer_tree');
+    const lazyCacheTtlMs = (() => {
+        const raw = parseInt(String(contentList?.dataset.lazyCacheTtlMs || '300000'), 10);
+        return Number.isFinite(raw) && raw >= 0 ? raw : 300000;
+    })();
+    const showNoteActions = contentList?.dataset.noteActions === '1';
+    const csrfToken = String(window.MDW_CSRF || '');
+    const lazyListsByFolder = new Map();
+    if (lazyRequested) {
+        overview.querySelectorAll('.notes-list[data-folder-notes]').forEach((listEl) => {
+            if (!(listEl instanceof HTMLElement)) return;
+            const folder = String(listEl.getAttribute('data-folder-notes') || '').trim() || 'root';
+            lazyListsByFolder.set(folder, listEl);
+        });
+    }
+    const lazyNotesMode = lazyRequested && lazyListsByFolder.size > 0;
 
     const normalizeSort = (value) => String(value || '').trim().toLowerCase();
     const isPublisherMode = () => {
@@ -1480,11 +1972,46 @@
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
     };
-    const sortNoteItems = (mode) => {
+    const stateRank = (stateRaw) => {
+        const state = normalizeSort(stateRaw || '');
+        if (state === 'concept') return 0;
+        if (state === 'processing') return 1;
+        if (state === 'published') return 2;
+        return 3;
+    };
+    const compareNoteData = (a, b, mode) => {
+        const dateA = String(a?.date_key || '');
+        const dateB = String(b?.date_key || '');
+        const titleA = normalizeSort(a?.title || '');
+        const titleB = normalizeSort(b?.title || '');
+        const slugA = normalizeSort(a?.basename || '');
+        const slugB = normalizeSort(b?.basename || '');
+
+        if (isPublisherMode()) {
+            const rankA = stateRank(a?.publish_state || '');
+            const rankB = stateRank(b?.publish_state || '');
+            if (rankA !== rankB) return rankA - rankB;
+        }
+
+        if (mode === 'title') {
+            if (titleA !== titleB) return titleA.localeCompare(titleB);
+            return slugA.localeCompare(slugB);
+        }
+        if (mode === 'slug') {
+            if (slugA !== slugB) return slugA.localeCompare(slugB);
+            return titleA.localeCompare(titleB);
+        }
+
+        if (dateA && dateB && dateA !== dateB) return dateB.localeCompare(dateA);
+        if (dateA && !dateB) return -1;
+        if (!dateA && dateB) return 1;
+        if (titleA !== titleB) return titleA.localeCompare(titleB);
+        return slugA.localeCompare(slugB);
+    };
+
+    const sortNoteItemsDom = (mode) => {
         const lists = Array.from(overview.querySelectorAll('.notes-list'));
         if (!lists.length) return;
-        const statePriorityOn = isPublisherMode();
-
         const compare = (a, b) => {
             const dateA = String(a.dataset.date || '');
             const dateB = String(b.dataset.date || '');
@@ -1492,21 +2019,11 @@
             const titleB = normalizeSort(b.dataset.title || '');
             const slugA = normalizeSort(a.dataset.slug || '');
             const slugB = normalizeSort(b.dataset.slug || '');
-            const stateRank = (item) => {
-                if (!item || item.dataset.kind !== 'md') return 1;
-                const state = normalizeSort(item.dataset.publishState || '');
-                if (state === 'concept') return 0;
-                if (state === 'processing') return 1;
-                if (state === 'published') return 2;
-                return 3;
-            };
-
-            if (statePriorityOn) {
-                const rankA = stateRank(a);
-                const rankB = stateRank(b);
+            if (isPublisherMode()) {
+                const rankA = stateRank(a.dataset.publishState || '');
+                const rankB = stateRank(b.dataset.publishState || '');
                 if (rankA !== rankB) return rankA - rankB;
             }
-
             if (mode === 'title') {
                 if (titleA !== titleB) return titleA.localeCompare(titleB);
                 return slugA.localeCompare(slugB);
@@ -1515,14 +2032,12 @@
                 if (slugA !== slugB) return slugA.localeCompare(slugB);
                 return titleA.localeCompare(titleB);
             }
-
             if (dateA && dateB && dateA !== dateB) return dateB.localeCompare(dateA);
             if (dateA && !dateB) return -1;
             if (!dateA && dateB) return 1;
             if (titleA !== titleB) return titleA.localeCompare(titleB);
             return slugA.localeCompare(slugB);
         };
-
         for (const list of lists) {
             const items = Array.from(list.querySelectorAll('li.note-item'));
             if (items.length < 2) continue;
@@ -1531,6 +2046,347 @@
             for (const item of items) list.appendChild(item);
             if (empty) list.appendChild(empty);
         }
+    };
+
+    const lazyNotesByFolder = new Map();
+    let lazyTotalItems = 0;
+    let lazyDataReady = !lazyNotesMode;
+    let currentSortMode = 'date';
+    const lazyRenderState = new WeakMap();
+    const lazyFolderPathForSection = (section) => String(section?.getAttribute?.('data-folder-section') || '').trim() || 'root';
+    const lazyFolderFromNote = (note) => {
+        const direct = String(note?.folder || '').trim();
+        if (direct) return direct;
+        const path = String(note?.path || '').trim();
+        if (!path) return 'root';
+        const idx = path.lastIndexOf('/');
+        return idx === -1 ? 'root' : path.slice(0, idx);
+    };
+    const lazyPublishUi = (stateRaw) => {
+        const state = normalizeSort(stateRaw || '');
+        if (state === 'published') {
+            return { cls: 'publish-published', icon: 'pi-checkedcertificate', label: t('edit.publish_state.published', 'Published') };
+        }
+        if (state === 'processing' || state === 'to publish' || state === 'topublish' || state === 'to-publish') {
+            return { cls: 'publish-processing', icon: 'pi-certificate', label: t('edit.publish_state.processing', 'Processing') };
+        }
+        return { cls: 'publish-concept', icon: 'pi-lightbulb', label: t('edit.publish_state.concept', 'Concept') };
+    };
+    const lazyBuildHref = (note) => {
+        const file = String(note?.path || '');
+        if (!file) return 'index.php';
+        const folder = lazyFolderFromNote(note);
+        if (isEditorPage) {
+            return `edit.php?file=${encodeURIComponent(file)}`;
+        }
+        const next = new URLSearchParams();
+        next.set('file', file);
+        next.set('folder', folder || 'root');
+        next.set('focus', file);
+        return `index.php?${next.toString()}`;
+    };
+    const lazyCreateRow = (note) => {
+        const file = String(note?.path || '');
+        const folder = lazyFolderFromNote(note);
+        const title = String(note?.title || note?.basename || file || 'Untitled');
+        const basename = String(note?.basename || '');
+        const dateLabel = String(note?.date_label || '');
+        const publishState = normalizeSort(note?.publish_state || '');
+        const isSecret = !!note?.is_secret;
+        const isCurrent = String(window.CURRENT_FILE || '') === file;
+
+        const li = document.createElement('li');
+        li.className = `note-item doclink note-row${isCurrent ? ' nav-item-current' : ''}`;
+        li.dataset.kind = 'md';
+        li.dataset.file = file;
+        li.dataset.secret = isSecret ? 'true' : 'false';
+        li.dataset.title = title;
+        li.dataset.slug = basename;
+        li.dataset.date = String(note?.date_key || '');
+        li.dataset.publishState = publishState;
+
+        const link = document.createElement('a');
+        link.href = lazyBuildHref(note);
+        link.className = `note-link note-link-main kbd-item${isCurrent ? ' active' : ''}`;
+        link.draggable = true;
+
+        const leading = document.createElement('span');
+        leading.className = 'note-leading';
+        const spacer = document.createElement('span');
+        spacer.className = 'note-caret-spacer';
+        spacer.setAttribute('aria-hidden', 'true');
+        const icon = document.createElement('span');
+        icon.className = `note-icon pi ${isCurrent ? 'pi-documentlabel' : 'pi-document'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        leading.appendChild(spacer);
+        leading.appendChild(icon);
+
+        const noteText = document.createElement('span');
+        noteText.className = 'note-text';
+        const noteTitle = document.createElement('span');
+        noteTitle.className = 'note-title';
+        const titleText = document.createElement('span');
+        titleText.textContent = title;
+        noteTitle.appendChild(titleText);
+        const badges = document.createElement('span');
+        badges.className = 'note-badges';
+        if (isPublisherMode()) {
+            const publish = lazyPublishUi(publishState);
+            const publishBadge = document.createElement('span');
+            publishBadge.className = `badge-publish ${publish.cls}`;
+            if (publish.icon) {
+                const publishIcon = document.createElement('span');
+                publishIcon.className = `pi ${publish.icon}`;
+                publishIcon.setAttribute('aria-hidden', 'true');
+                publishBadge.appendChild(publishIcon);
+            }
+            const publishLabel = document.createElement('span');
+            publishLabel.textContent = publish.label;
+            publishBadge.appendChild(publishLabel);
+            badges.appendChild(publishBadge);
+        }
+        if (isSecret) {
+            const secretBadge = document.createElement('span');
+            secretBadge.className = 'badge-secret';
+            secretBadge.textContent = t('common.secret', 'secret');
+            badges.appendChild(secretBadge);
+        }
+        noteTitle.appendChild(badges);
+        noteText.appendChild(noteTitle);
+
+        const pathWrap = document.createElement('span');
+        pathWrap.className = 'nav-item-path';
+        const slugEl = document.createElement('span');
+        slugEl.className = 'nav-item-slug';
+        slugEl.textContent = file;
+        pathWrap.appendChild(slugEl);
+        if (dateLabel) {
+            const dateEl = document.createElement('span');
+            dateEl.className = 'nav-item-date';
+            dateEl.textContent = dateLabel;
+            pathWrap.appendChild(dateEl);
+        }
+        noteText.appendChild(pathWrap);
+
+        link.appendChild(leading);
+        link.appendChild(noteText);
+        li.appendChild(link);
+
+        if (showNoteActions && csrfToken) {
+            const actions = document.createElement('div');
+            actions.className = 'note-actions';
+            const editLink = document.createElement('a');
+            editLink.href = `edit.php?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder || 'root')}`;
+            editLink.className = 'btn btn-ghost icon-button';
+            editLink.title = t('common.edit', 'Edit');
+            const editIcon = document.createElement('span');
+            editIcon.className = 'pi pi-edit';
+            editLink.appendChild(editIcon);
+            actions.appendChild(editLink);
+
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.className = 'deleteForm';
+            form.dataset.file = file;
+            const hidden = (name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = String(value || '');
+                form.appendChild(input);
+            };
+            hidden('action', 'delete');
+            hidden('file', file);
+            hidden('csrf', csrfToken);
+            const delBtn = document.createElement('button');
+            delBtn.type = 'submit';
+            delBtn.className = 'btn btn-ghost icon-button';
+            delBtn.title = t('common.delete', 'Delete');
+            const delIcon = document.createElement('span');
+            delIcon.className = 'pi pi-bin';
+            delBtn.appendChild(delIcon);
+            form.appendChild(delBtn);
+            actions.appendChild(form);
+            li.appendChild(actions);
+        }
+
+        return li;
+    };
+    const lazyRenderList = (listEl, notes, signature) => {
+        if (!(listEl instanceof HTMLElement)) return;
+        const prev = lazyRenderState.get(listEl);
+        if (prev && prev.signature === signature) return;
+        if (prev && prev.token) prev.token.cancelled = true;
+
+        listEl.innerHTML = '';
+        const arr = Array.isArray(notes) ? notes : [];
+        if (!arr.length) {
+            const empty = document.createElement('li');
+            empty.className = 'nav-empty';
+            empty.textContent = t('nav.no_notes_yet', 'No notes yet.');
+            listEl.appendChild(empty);
+            lazyRenderState.set(listEl, { signature, token: null });
+            refreshDocEntries();
+            if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+            return;
+        }
+
+        const token = { cancelled: false };
+        lazyRenderState.set(listEl, { signature, token });
+        const chunk = 120;
+        let idx = 0;
+        const push = () => {
+            if (token.cancelled) return;
+            const frag = document.createDocumentFragment();
+            const end = Math.min(idx + chunk, arr.length);
+            for (; idx < end; idx++) frag.appendChild(lazyCreateRow(arr[idx]));
+            listEl.appendChild(frag);
+            if (idx < arr.length) {
+                requestAnimationFrame(push);
+                return;
+            }
+            refreshDocEntries();
+            if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+        };
+        push();
+    };
+    const lazySortAll = (mode) => {
+        for (const [folder, list] of lazyNotesByFolder.entries()) {
+            if (!Array.isArray(list)) continue;
+            list.sort((a, b) => compareNoteData(a, b, mode));
+            lazyNotesByFolder.set(folder, list);
+        }
+    };
+    const lazyCacheKey = 'mdw_explorer_dataset_v1';
+    const lazyReadCache = () => {
+        try {
+            const raw = mdwStorageGet(lazyCacheKey);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') return null;
+            if (String(parsed.endpoint || '') !== lazyEndpoint) return null;
+            const savedAt = Number(parsed.saved_at || 0);
+            if (!Number.isFinite(savedAt) || savedAt <= 0) return null;
+            if (lazyCacheTtlMs > 0 && (Date.now() - savedAt) > lazyCacheTtlMs) return null;
+            return Array.isArray(parsed.notes) ? parsed.notes : null;
+        } catch {
+            return null;
+        }
+    };
+    const lazyWriteCache = (notes) => {
+        if (!Array.isArray(notes)) return;
+        try {
+            mdwStorageSet(lazyCacheKey, JSON.stringify({
+                endpoint: lazyEndpoint,
+                saved_at: Date.now(),
+                notes,
+            }));
+        } catch {}
+    };
+    const lazyApplyNotes = (notes) => {
+        lazyNotesByFolder.clear();
+        for (const folder of lazyListsByFolder.keys()) {
+            lazyNotesByFolder.set(folder, []);
+        }
+        let total = 0;
+        if (Array.isArray(notes)) {
+            for (const raw of notes) {
+                const path = String(raw?.path || '').trim();
+                if (!path) continue;
+                const folder = lazyFolderFromNote(raw);
+                if (!lazyNotesByFolder.has(folder)) continue;
+                const row = {
+                    path,
+                    basename: String(raw?.basename || ''),
+                    folder,
+                    title: String(raw?.title || raw?.basename || path),
+                    date_key: String(raw?.date_key || ''),
+                    date_label: String(raw?.date_label || ''),
+                    publish_state: normalizeSort(raw?.publish_state || ''),
+                    is_secret: !!raw?.is_secret,
+                };
+                row.search = `${row.title}\n${row.basename}\n${row.path}`.toLowerCase();
+                lazyNotesByFolder.get(folder)?.push(row);
+                total++;
+            }
+        }
+        lazyTotalItems = total;
+        lazySortAll(currentSortMode);
+        lazyDataReady = true;
+    };
+    const lazySig = (kind, mode, query, notes) => {
+        const arr = Array.isArray(notes) ? notes : [];
+        const first = arr[0]?.path || '';
+        const last = arr[arr.length - 1]?.path || '';
+        return `${kind}|${mode}|${query}|${arr.length}|${first}|${last}`;
+    };
+    const lazyRender = (query) => {
+        const q = String(query || '').trim().toLowerCase();
+        const filtering = q.length > 0;
+        if (!lazyDataReady) {
+            navCount.textContent = t('common.loading', 'Loading…');
+            if (filterReset) filterReset.disabled = true;
+            if (filterClear) filterClear.style.display = filtering ? '' : 'none';
+            syncPreviewEditTarget();
+            return;
+        }
+
+        let visible = 0;
+        const visibleBySection = new Map();
+        const bumpVisible = (section, amount) => {
+            if (!(section instanceof HTMLElement) || amount <= 0) return;
+            let current = section;
+            while (current) {
+                visibleBySection.set(current, (visibleBySection.get(current) || 0) + amount);
+                current = findParentFolderSection(current);
+            }
+        };
+
+        for (const section of folderSections) {
+            const folder = lazyFolderPathForSection(section);
+            const listEl = lazyListsByFolder.get(folder);
+            if (!(listEl instanceof HTMLElement)) continue;
+            const source = lazyNotesByFolder.get(folder) || [];
+
+            if (filtering) {
+                const matches = source.filter((note) => note.search.includes(q));
+                visible += matches.length;
+                bumpVisible(section, matches.length);
+                lazyRenderList(listEl, matches, lazySig('f', currentSortMode, q, matches));
+                continue;
+            }
+
+            if (getFolderOpen(section)) {
+                lazyRenderList(listEl, source, lazySig('a', currentSortMode, '', source));
+            }
+        }
+
+        navCount.textContent = filtering
+            ? (visible === 1
+                ? t('common.item_count_one', '{n} item', { n: visible })
+                : t('common.item_count_other', '{n} items', { n: visible }))
+            : t('common.total_items', '{n} total items', { n: lazyTotalItems });
+
+        if (filterReset) filterReset.disabled = !filtering;
+        if (filterClear) filterClear.style.display = filtering ? '' : 'none';
+
+        for (const section of folderSections) {
+            if (!filtering) {
+                setFolderOpen(section, getFolderOpen(section));
+                continue;
+            }
+            setFolderOpen(section, (visibleBySection.get(section) || 0) > 0);
+        }
+        syncPreviewEditTarget();
+    };
+    const sortNoteItems = (mode) => {
+        const next = ['date', 'title', 'slug'].includes(mode) ? mode : 'date';
+        currentSortMode = next;
+        if (lazyNotesMode) {
+            lazySortAll(next);
+            return;
+        }
+        sortNoteItemsDom(next);
     };
     window.__mdwSortOverviewNotes = sortNoteItems;
 
@@ -1544,15 +2400,22 @@
         const initial = options.includes(stored) ? stored : (navSortSelect.value || 'date');
         navSortSelect.value = initial;
         sortNoteItems(initial);
+        if (lazyNotesMode) lazyRender(String(filterInput.value || '').trim());
         navSortSelect.addEventListener('change', () => {
             const next = options.includes(navSortSelect.value) ? navSortSelect.value : 'date';
             try { mdwStorageSet(SORT_KEY, next); } catch {}
             sortNoteItems(next);
+            if (lazyNotesMode) lazyRender(String(filterInput.value || '').trim());
         });
     })();
 
     const updateNavSortPlacement = () => {
-        if (!isEditorPage || !navSortRow || !navFilterRow || !navSortPlaceholder) return;
+        if (!isEditorPage || !navSortRow) return;
+        if (navSortRow.closest('.nav-toolbar-row')) {
+            navSortRow.classList.remove('nav-sort-inline');
+            return;
+        }
+        if (!navFilterRow || !navSortPlaceholder) return;
         if (navMql.matches) {
             navSortRow.classList.add('nav-sort-inline');
             navFilterRow.appendChild(navSortRow);
@@ -1572,6 +2435,10 @@
 
     function update() {
         const q = String(filterInput.value || '').trim().toLowerCase();
+        if (lazyNotesMode) {
+            lazyRender(q);
+            return;
+        }
         const filtering = q.length > 0;
 
         let visible = 0;
@@ -1583,13 +2450,13 @@
             if (el.style.display !== nextDisplay) el.style.display = nextDisplay;
             if (!match) continue;
             visible++;
-        if (section instanceof HTMLElement) {
-            let current = section;
-            while (current) {
-                visibleBySection.set(current, (visibleBySection.get(current) || 0) + 1);
-                current = findParentFolderSection(current);
+            if (section instanceof HTMLElement) {
+                let current = section;
+                while (current) {
+                    visibleBySection.set(current, (visibleBySection.get(current) || 0) + 1);
+                    current = findParentFolderSection(current);
+                }
             }
-        }
         }
 
         navCount.textContent = filtering
@@ -1608,12 +2475,23 @@
             }
             setFolderOpen(section, (visibleBySection.get(section) || 0) > 0);
         }
+        syncPreviewEditTarget();
     }
 
     // q parameter uit URL
     const qParam = params.get('q');
     if (qParam) {
         filterInput.value = qParam;
+    }
+
+    function focusRequestedRow() {
+        if (!focusParam || (params.get('file') && !allowFocusWithFile)) return true;
+        const el = overview.querySelector(`[data-file="${CSS.escape(focusParam)}"] a.kbd-item`);
+        if (!(el instanceof HTMLAnchorElement)) return false;
+        try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        syncPreviewEditTarget(focusParam);
+        return true;
     }
 
     let filterTimer = null;
@@ -1632,6 +2510,42 @@
     };
     filterReset?.addEventListener('click', clearFilter);
     filterClear?.addEventListener('click', clearFilter);
+
+    onFolderToggle = () => {
+        if (!lazyNotesMode) return;
+        scheduleUpdate();
+    };
+
+    if (lazyNotesMode) {
+        const cached = lazyReadCache();
+        if (cached) {
+            lazyApplyNotes(cached);
+            update();
+            focusRequestedRow();
+        } else {
+            navCount.textContent = t('common.loading', 'Loading…');
+        }
+        (async () => {
+            try {
+                if (!mdmApi || typeof mdmApi.get !== 'function') return;
+                const data = await mdmApi.get(lazyEndpoint);
+                if (!data || data.ok === false || !Array.isArray(data.notes)) return;
+                lazyApplyNotes(data.notes);
+                lazyWriteCache(data.notes);
+                update();
+                focusRequestedRow();
+            } catch (err) {
+                if (!cached) {
+                    lazyDataReady = true;
+                    lazyTotalItems = 0;
+                    update();
+                }
+                if (typeof window.__mdwReportNetworkError === 'function') {
+                    window.__mdwReportNetworkError(err);
+                }
+            }
+        })();
+    }
 
     // Editor: SPA-achtige navigatie (only markdown items)
     if (isEditorPage) {
@@ -1709,6 +2623,9 @@
     }
 
     async function loadDocument(file) {
+        const hadTreeFocus = document.activeElement instanceof HTMLElement
+            ? overview.contains(document.activeElement)
+            : false;
         try {
             if (!mdmApi || typeof mdmApi.get !== 'function') {
                 throw new Error('load_failed');
@@ -1760,13 +2677,26 @@
             if (pathSegment) {
                 pathSegment.textContent = data.file;
                 if (pathSegment instanceof HTMLAnchorElement) {
-                    pathSegment.href = `index.php?file=${encodeURIComponent(data.file)}&folder=${encodeURIComponent(folder)}&focus=${encodeURIComponent(data.file)}`;
+                    const next = new URLSearchParams();
+                    next.set('file', data.file);
+                    if (folder !== 'root') next.set('folder', folder);
+                    next.set('focus', data.file);
+                    pathSegment.href = `index.php?${next.toString()}`;
                 }
             }
+            const folderCrumbWrap = document.querySelector('.app-breadcrumb [data-crumb="folder-wrap"]');
             const folderCrumb = document.querySelector('.app-breadcrumb [data-crumb="folder"]');
             if (folderCrumb instanceof HTMLAnchorElement) {
-                folderCrumb.textContent = folder;
-                folderCrumb.href = `index.php?folder=${encodeURIComponent(folder)}#contentList`;
+                if (folder === 'root') {
+                    folderCrumb.textContent = '';
+                    folderCrumb.href = 'index.php#contentList';
+                } else {
+                    folderCrumb.textContent = folder;
+                    folderCrumb.href = `index.php?folder=${encodeURIComponent(folder)}#contentList`;
+                }
+            }
+            if (folderCrumbWrap instanceof HTMLElement) {
+                folderCrumbWrap.hidden = (folder === 'root');
             }
 
             const mdSubtitle = document.querySelector('#paneMarkdown .pane-subtitle.small');
@@ -1797,6 +2727,10 @@
             if (deleteForm) deleteForm.dataset.file = data.file;
             const deleteBtn = deleteForm?.querySelector('button[type="submit"]');
             if (deleteBtn) deleteBtn.disabled = !data.file;
+            const newFolderReturnFileInput = document.querySelector('#newFolderForm input[name="return_file"]');
+            if (newFolderReturnFileInput instanceof HTMLInputElement) {
+                newFolderReturnFileInput.value = data.file;
+            }
 
             if (window.MathJax?.typesetPromise) {
                 try { await window.MathJax.typesetPromise([preview]); } catch {}
@@ -1824,6 +2758,16 @@
                 publishOverride.value = '0';
             }
 
+            const activeAnchor = overview.querySelector(`[data-file="${CSS.escape(String(data.file || ''))}"] a.kbd-item`);
+            if (activeAnchor instanceof HTMLAnchorElement) {
+                if (hadTreeFocus) {
+                    try { activeAnchor.focus({ preventScroll: true }); } catch { activeAnchor.focus(); }
+                    activeAnchor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                } else {
+                    activeAnchor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }
+            }
+
         } catch (error) {
             console.error('Failed to load document:', error);
             const statusEl = document.getElementById('liveStatus');
@@ -1839,14 +2783,15 @@
     }
 
     update();
-
-    const focusParam = params.get('focus');
-    if (focusParam && !params.get('file')) {
-        const el = overview.querySelector(`[data-file="${CSS.escape(focusParam)}"] a.kbd-item`);
-        if (el instanceof HTMLAnchorElement) {
-            try { el.focus({ preventScroll: true }); } catch { el.focus(); }
-            el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-        }
+    if (!focusRequestedRow() && lazyNotesMode) {
+        let attempts = 0;
+        const pollFocus = () => {
+            if (focusRequestedRow()) return;
+            attempts += 1;
+            if (attempts > 80) return;
+            requestAnimationFrame(pollFocus);
+        };
+        requestAnimationFrame(pollFocus);
     }
 })();
     };

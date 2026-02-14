@@ -43,23 +43,28 @@ return [
             if (empty($shortcuts)) return false;
 
             $esc = $ctx['escape'] ?? fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-            $variant = $ctx['links_variant'] ?? 'default';
-            $titleStyle = ($variant === 'index')
-                ? ' style="justify-content: center; margin-bottom: 1rem; font-size: 1.25rem;"'
-                : '';
+            $variant = strtolower(trim((string)($ctx['links_variant'] ?? 'default')));
+            if ($variant === '') $variant = 'default';
+            $sectionClass = 'nav-section nav-shortcuts-section';
+            if ($variant === 'index') $sectionClass .= ' nav-shortcuts-section-index';
+            if ($variant === 'index_split') $sectionClass .= ' nav-shortcuts-section-index-split';
+
+            $titleClass = 'nav-section-title nav-shortcuts-title';
+            if ($variant === 'index') $titleClass .= ' nav-shortcuts-title-index';
+            if ($variant === 'index_split') $titleClass .= ' nav-shortcuts-title-index-split';
             ?>
-            <section class="nav-section">
-                <div class="nav-section-title"<?=$titleStyle?>>
+            <section class="<?=$esc($sectionClass)?>">
+                <div class="<?=$esc($titleClass)?>">
                     <span class="pi pi-linkchain"></span>
                     <span>Shortcuts</span>
                 </div>
-                <ul class="nav-list">
+                <ul class="nav-list nav-shortcuts-list">
                 <?php foreach ($shortcuts as $lnk): ?>
-                    <li class="nav-item">
-                        <a href="<?=$esc($lnk['url'])?>" target="_blank" rel="noopener noreferrer" class="note-link kbd-item">
-                            <div class="note-title" style="justify-content: space-between;">
+                    <li class="nav-item nav-shortcut-item">
+                        <a href="<?=$esc($lnk['url'])?>" target="_blank" rel="noopener noreferrer" class="note-link nav-shortcut-link kbd-item">
+                            <div class="note-title nav-shortcut-row">
                                 <span><?=$esc($lnk['shortcut'])?></span>
-                                <span class="pi pi-externallink" style="font-size: 0.8em; opacity: 0.6;"></span>
+                                <span class="pi pi-externallink nav-shortcut-icon"></span>
                             </div>
                             <div class="nav-item-path"><?=$esc($lnk['url'])?></div>
                         </a>
@@ -72,4 +77,3 @@ return [
         },
     ],
 ];
-

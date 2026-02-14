@@ -2,6 +2,19 @@
 
 ## 0.81
 
+- Explorer performance (large libraries): added lazy explorer tree loading with JSON note payloads, client-side cache/TTL reuse, and reduced initial index payload pressure for very large note sets.
+- Transfer-size reduction: enabled gzip response buffering in bootstrap when supported to shrink first-load page transfer.
+- Metadata/title extraction speedups: added explorer metadata cache persistence to avoid repeatedly re-reading unchanged markdown files.
+- Index layout controls: introduced configurable dual-pane overview mode for `index.php` (with settings persistence and runtime toggle support).
+- Split layout persistence: added dedicated split storage keys, normalized/validated restored widths, and introduced `static/mdm.splitter.js` handling for index/edit split states.
+- Index shortcuts panel UX: added a draggable vertical resizer with per-device defaults, saved height, and adaptive scaling/title-collapse behavior.
+- Explorer control consistency: moved and unified top explorer actions across edit/index (new note/folder + edit/rename/delete), and consolidated shared rendering in `explorer_view.php`.
+- Sticky explorer controls: added a shared sticky control stack so sort + filter controls remain visible while scrolling notes in split/edit overview panes.
+- Keyboard/focus and SPA fixes: improved arrow-key tree navigation, folder open/close behavior, focus retention across SPA note loads, and fixed regression errors (`focusParam` / `scrollFocus`-related runtime issues).
+- Rename modal targeting: rename now follows the currently focused explorer markdown (not stale state), updates hidden target file reliably, and syncs label/placeholder text by mode.
+- Rename semantics cleanup: switched rename field naming to neutral `new_name` (with backward-compatible `new_slug` fallback), and clarified non-WPM behavior as filename-based.
+- Non-WPM date-prefix control: added a default-on “keep date prefix” checkbox in rename modal (hidden in WPM), allowing optional removal of `yy-mm-dd-` from filenames.
+- Explorer/filter UX cleanup: removed redundant edit hint text and standardized filter row placement under toolbar controls in shared explorer layouts.
 - Explorer root behavior: the `Root` section no longer auto-opens on every page load; it now opens only when `folder=root` is selected or when the current file is in root, reducing noisy explorer resets while navigating.
 - Explorer visual scanability: added deterministic per-folder accent coloring (path-hash based) with colored folder controls, subtle section background/border accents, and stronger emphasis for emoji-labeled folders.
 - Folder accent rendering fix: moved section accent CSS variable defaults to the folder section scope so runtime JS-assigned accents are actually inherited and visible.

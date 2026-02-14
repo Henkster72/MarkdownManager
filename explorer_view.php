@@ -38,6 +38,79 @@ function explorer_view_folder_anchor_id($folder) {
     return 'folder-anchor-' . substr(sha1('folder:' . $folder), 0, 10);
 }
 
+function &explorer_view_meta_cache_state() {
+    static $state = null;
+    if ($state === null) {
+        $state = [
+            'loaded' => false,
+            'dirty' => false,
+            'path' => null,
+            'items' => [],
+            'registered' => false,
+        ];
+    }
+    return $state;
+}
+
+function explorer_view_meta_cache_path() {
+    $tmp = (string)sys_get_temp_dir();
+    if ($tmp === '') return null;
+    $tmp = rtrim($tmp, "/\\");
+    if ($tmp === '') return null;
+    $root = realpath(__DIR__);
+    if (!is_string($root) || $root === '') $root = __DIR__;
+    $hash = substr(sha1($root), 0, 16);
+    return $tmp . '/mdw-explorer-meta-' . $hash . '.json';
+}
+
+function explorer_view_meta_cache_flush() {
+    $state =& explorer_view_meta_cache_state();
+    if (empty($state['dirty'])) return;
+    $path = is_string($state['path']) ? $state['path'] : null;
+    if (!$path) $path = explorer_view_meta_cache_path();
+    if (!$path) return;
+
+    $payload = json_encode([
+        'v' => 1,
+        'items' => $state['items'],
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($payload) || $payload === '') return;
+
+    $tmp = $path . '.tmp';
+    if (@file_put_contents($tmp, $payload, LOCK_EX) === false) {
+        return;
+    }
+    if (!@rename($tmp, $path)) {
+        @unlink($tmp);
+        return;
+    }
+    $state['dirty'] = false;
+}
+
+function explorer_view_meta_cache_boot() {
+    $state =& explorer_view_meta_cache_state();
+    if (!empty($state['loaded'])) return;
+    $state['loaded'] = true;
+    $state['path'] = explorer_view_meta_cache_path();
+    $state['items'] = [];
+
+    $path = $state['path'];
+    if (is_string($path) && $path !== '' && is_file($path) && is_readable($path)) {
+        $raw = @file_get_contents($path);
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded) && (int)($decoded['v'] ?? 0) === 1 && isset($decoded['items']) && is_array($decoded['items'])) {
+                $state['items'] = $decoded['items'];
+            }
+        }
+    }
+
+    if (empty($state['registered'])) {
+        register_shutdown_function('explorer_view_meta_cache_flush');
+        $state['registered'] = true;
+    }
+}
+
 function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) {
     if (function_exists('extract_title_from_file')) {
         return extract_title_from_file($fullPath, $fallbackBasename);
@@ -80,6 +153,8 @@ function explorer_view_extract_md_title_from_file($fullPath, $fallbackBasename) 
 }
 
 function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackBasename, $wantMetaKeys = []) {
+    explorer_view_meta_cache_boot();
+
     $want = [];
     if (is_array($wantMetaKeys)) {
         foreach ($wantMetaKeys as $k) {
@@ -87,17 +162,47 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
             $want[strtolower($k)] = true;
         }
     }
+    $wantCount = count($want);
 
     if (!is_string($fullPath) || $fullPath === '' || !is_file($fullPath)) {
         return ['title' => (string)$fallbackBasename, 'meta' => []];
     }
+
+    $state =& explorer_view_meta_cache_state();
+    $cacheKey = str_replace("\\", '/', $fullPath);
+    $stat = @stat($fullPath);
+    $sig = null;
+    if (is_array($stat)) {
+        $mtime = isset($stat['mtime']) ? (int)$stat['mtime'] : 0;
+        $size = isset($stat['size']) ? (int)$stat['size'] : 0;
+        $sig = $mtime . ':' . $size;
+    }
+    if ($cacheKey !== '' && $sig !== null) {
+        $cached = $state['items'][$cacheKey] ?? null;
+        if (is_array($cached) && (string)($cached['sig'] ?? '') === $sig) {
+            $cachedTitle = (string)($cached['title'] ?? '');
+            if ($cachedTitle === '') $cachedTitle = (string)$fallbackBasename;
+            $cachedMeta = isset($cached['meta']) && is_array($cached['meta']) ? $cached['meta'] : [];
+            $outMeta = [];
+            if (!empty($want)) {
+                foreach ($want as $k => $_) {
+                    if (array_key_exists($k, $cachedMeta)) {
+                        $outMeta[$k] = $cachedMeta[$k];
+                    }
+                }
+            }
+            return ['title' => $cachedTitle, 'meta' => $outMeta];
+        }
+    }
+
     $h = @fopen($fullPath, 'rb');
     if (!$h) return ['title' => (string)$fallbackBasename, 'meta' => []];
 
     $firstNonEmpty = null;
     $title = null;
-    $meta = [];
-    $maxLines = 260;
+    $metaAll = [];
+    $foundWant = [];
+    $maxLines = 120;
     $inMeta = true;
     $seenMeta = false;
     while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
@@ -105,24 +210,25 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
         if ($inMeta) {
             $k = null; $v = null;
             if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
-                if ($k !== null && isset($want[$k])) {
-                    $meta[$k] = $v;
+                if ($k !== null) {
+                    $key = strtolower(trim((string)$k));
+                    if ($key !== '') {
+                        $metaAll[$key] = (string)$v;
+                        if (isset($want[$key])) $foundWant[$key] = true;
+                    }
                 }
                 $seenMeta = true;
                 continue;
             }
-            if (!empty($want)) {
-                if (preg_match('/^\s*(?:_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*|\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*)$/u', $line, $m)) {
-                    $key = strtolower(trim((string)($m[1] ?? $m[3] ?? '')));
-                    $val = trim((string)($m[2] ?? $m[4] ?? ''));
-                    if ($key !== '') {
-                        if (isset($want[$key])) {
-                            $meta[$key] = $val;
-                        }
-                        $seenMeta = true;
-                        continue;
+            if (preg_match('/^\s*(?:_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*|\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*)$/u', $line, $m)) {
+                $key = strtolower(trim((string)($m[1] ?? $m[3] ?? '')));
+                $val = trim((string)($m[2] ?? $m[4] ?? ''));
+                if ($key !== '') {
+                    $metaAll[$key] = $val;
+                    if (isset($want[$key])) $foundWant[$key] = true;
+                    $seenMeta = true;
+                    continue;
                     }
-                }
             }
             if (!$seenMeta && trim((string)$line) === '') {
                 continue;
@@ -137,17 +243,45 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
         if ($firstNonEmpty === null && trim($line) !== '') {
             $firstNonEmpty = $line;
         }
+
+        if ($title !== null && !$inMeta) {
+            if ($wantCount === 0 || count($foundWant) >= $wantCount) {
+                break;
+            }
+        }
     }
     fclose($h);
 
+    $resolvedTitle = null;
     if ($title !== null && $title !== '') {
-        return ['title' => $title, 'meta' => $meta];
+        $resolvedTitle = $title;
+    } else if ($firstNonEmpty !== null) {
+        $resolvedTitle = trim($firstNonEmpty);
+    } else {
+        $fallbackBasename = (string)$fallbackBasename;
+        $resolvedTitle = ($fallbackBasename !== '' ? $fallbackBasename : 'Untitled');
     }
-    if ($firstNonEmpty !== null) {
-        return ['title' => trim($firstNonEmpty), 'meta' => $meta];
+
+    $outMeta = [];
+    if (!empty($want)) {
+        foreach ($want as $k => $_) {
+            if (array_key_exists($k, $metaAll)) {
+                $outMeta[$k] = $metaAll[$k];
+            }
+        }
     }
-    $fallbackBasename = (string)$fallbackBasename;
-    return ['title' => ($fallbackBasename !== '' ? $fallbackBasename : 'Untitled'), 'meta' => $meta];
+
+    if ($cacheKey !== '' && $sig !== null) {
+        $state['items'][$cacheKey] = [
+            'sig' => $sig,
+            'title' => $resolvedTitle,
+            'meta' => $metaAll,
+            'updated' => time(),
+        ];
+        $state['dirty'] = true;
+    }
+
+    return ['title' => $resolvedTitle, 'meta' => $outMeta];
 }
 
 function explorer_view_parse_date_value($value) {
@@ -297,16 +431,42 @@ function explorer_view_render_tree($opts) {
     $secretMap = $opts['secretMap'] ?? [];
     $publisher_mode = !empty($opts['publisher_mode']);
     $folder_filter = $opts['folder_filter'] ?? null;
+    $folder_filter = is_string($folder_filter) ? trim($folder_filter) : null;
+    if ($folder_filter === '' || $folder_filter === 'root') $folder_filter = null;
     $current_file = $opts['current_file'] ?? null;
     $csrf_token = $opts['csrf_token'] ?? null;
     $show_actions = !empty($opts['show_actions']);
+    $show_filter_row = !empty($opts['show_filter_row']);
+    $show_filter_reset = !empty($opts['show_filter_reset']);
+    $sticky_controls = !empty($opts['sticky_controls']);
+    $filter_placeholder = isset($opts['filter_placeholder']) ? trim((string)$opts['filter_placeholder']) : '';
+    if ($filter_placeholder === '') $filter_placeholder = explorer_view_t('common.filter_placeholder', 'Filter…');
+    $lazy_notes = !empty($opts['lazy_notes']);
+    $lazy_endpoint = isset($opts['lazy_endpoint']) ? trim((string)$opts['lazy_endpoint']) : '';
+    $lazy_cache_ttl_ms = isset($opts['lazy_cache_ttl_ms']) ? (int)$opts['lazy_cache_ttl_ms'] : 300000;
+    if ($lazy_cache_ttl_ms < 0) $lazy_cache_ttl_ms = 0;
+    $current_file_path = is_string($current_file) ? trim($current_file) : '';
+    $current_folder_path = $current_file_path !== '' ? explorer_view_folder_from_path($current_file_path) : 'root';
+    if (!is_string($current_folder_path) || $current_folder_path === '') $current_folder_path = 'root';
+    $current_edit_href = 'edit.php';
+    if ($current_file_path !== '') {
+        $current_edit_href = 'edit.php?file=' . rawurlencode($current_file_path) . '&folder=' . rawurlencode($current_folder_path);
+    }
+    $has_current_file = ($current_file_path !== '');
 
     $folderLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
     $fileLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
 
     $folderLink = static function($folder) use ($folderLinkBase, $page, $current_file) {
+        $folder = trim((string)$folder);
         $anchor = explorer_view_folder_anchor_id($folder);
         $frag = ($page === 'index' && $anchor) ? ('#' . $anchor) : '';
+        if ($folder === '' || $folder === 'root') {
+            if ($page === 'edit' && $current_file) {
+                return $folderLinkBase . '?file=' . rawurlencode($current_file) . $frag;
+            }
+            return $folderLinkBase . $frag;
+        }
         if ($page === 'edit' && $current_file) {
             return $folderLinkBase . '?file=' . rawurlencode($current_file) . '&folder=' . rawurlencode($folder) . $frag;
         }
@@ -325,10 +485,7 @@ function explorer_view_render_tree($opts) {
 
     $allowedPluginFolders = null; // null = all
     if ($folder_filter) {
-        if ($folder_filter === 'root') {
-            $dirMap = [];
-            $allowedPluginFolders = [];
-        } else if (isset($pluginFolderKeys[$folder_filter])) {
+        if (isset($pluginFolderKeys[$folder_filter])) {
             $rootList = [];
             $dirMap = [];
             $allowedPluginFolders = [$folder_filter];
@@ -357,11 +514,26 @@ function explorer_view_render_tree($opts) {
     $pluginCtx['folder_anchor_id'] = fn($f) => explorer_view_folder_anchor_id($f);
     $pluginCtx['show_back'] = (bool)$folder_filter;
     if ($folder_filter) {
-        if ($page === 'edit' && $current_file) {
-            $pluginCtx['back_href'] = 'edit.php?file=' . rawurlencode($current_file);
-        } else {
-            $pluginCtx['back_href'] = 'index.php';
+        $parentFilter = null;
+        $slashPos = strrpos($folder_filter, '/');
+        if ($slashPos !== false) {
+            $parentFilter = substr($folder_filter, 0, $slashPos);
+            if ($parentFilter === '') $parentFilter = null;
         }
+        $basePath = ($page === 'edit' && $current_file) ? 'edit.php' : 'index.php';
+        $params = [];
+        if ($page === 'edit' && $current_file) {
+            $params['file'] = $current_file;
+        }
+        if ($parentFilter !== null) {
+            $params['folder'] = $parentFilter;
+        }
+        $params['open'] = $folder_filter;
+        $params['focus_folder'] = $folder_filter;
+        $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        $pluginCtx['back_href'] = $basePath
+            . ($query !== '' ? ('?' . $query) : '')
+            . '#' . explorer_view_folder_anchor_id($folder_filter);
     } else {
         $pluginCtx['back_href'] = null;
     }
@@ -370,17 +542,34 @@ function explorer_view_render_tree($opts) {
     if (!empty($pluginCtx['back_href'])) {
         $backHrefAttr = ' data-back-href="' . explorer_view_escape($pluginCtx['back_href']) . '"';
     }
+    $lazyAttrs = '';
+    if ($lazy_notes) {
+        $lazyAttrs .= ' data-lazy-notes="1"';
+        if ($lazy_endpoint !== '') {
+            $lazyAttrs .= ' data-lazy-endpoint="' . explorer_view_escape($lazy_endpoint) . '"';
+        }
+        $lazyAttrs .= ' data-lazy-cache-ttl-ms="' . (int)$lazy_cache_ttl_ms . '"';
+    }
+    if ($show_actions && $csrf_token) {
+        $lazyAttrs .= ' data-note-actions="1"';
+    }
     $current_folder = $current_file ? explorer_view_folder_from_path($current_file) : null;
 
-    $renderNotes = function($list, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token) {
+    $renderNotes = function($list, $folderPath, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token, $lazy_notes) {
+        $folderPath = trim((string)$folderPath);
+        if ($folderPath === '') $folderPath = 'root';
     ?>
-        <ul class="notes-list">
+        <ul class="notes-list" data-folder-notes="<?=explorer_view_escape($folderPath)?>">
+        <?php if (!$lazy_notes): ?>
         <?php foreach($list as $entry):
             $p   = $entry['path'];
+            $wantMeta = $publisher_mode
+                ? ['publishstate', 'page_title', 'post_date', 'published_date']
+                : ['post_date', 'published_date'];
             $info = explorer_view_extract_md_title_and_meta_from_file(
                 __DIR__ . '/' . $p,
                 $entry['basename'],
-                ['publishstate', 'page_title', 'post_date', 'published_date']
+                $wantMeta
             );
             $metaTitle = $publisher_mode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
             $t   = $publisher_mode
@@ -473,6 +662,10 @@ function explorer_view_render_tree($opts) {
             <?php endif; ?>
         </li>
         <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ($lazy_notes): ?>
+            <li class="nav-empty nav-lazy-placeholder" hidden><?=explorer_view_escape(explorer_view_t('common.loading','Loading…'))?></li>
+        <?php endif; ?>
         <?php if (empty($list) && $showEmpty): ?>
             <li class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.no_notes_yet','No notes yet.'))?></li>
         <?php endif; ?>
@@ -574,7 +767,7 @@ function explorer_view_render_tree($opts) {
         </h2>
 
     <div id="<?=explorer_view_escape($dir_children_id)?>" class="folder-children" <?= $defaultOpen ? '' : 'hidden' ?>>
-        <?php $renderNotes($list, !$hasChildren); ?>
+        <?php $renderNotes($list, $dirname, !$hasChildren); ?>
         <?php if ($hasChildren): ?>
         <div class="folder-tree">
             <?php foreach ($children as $child): ?>
@@ -587,22 +780,86 @@ function explorer_view_render_tree($opts) {
     <?php
     };
 
+    $contentListClass = 'content-list';
+    if ($sticky_controls) $contentListClass .= ' content-list-sticky-controls';
     ?>
-    <div id="contentList" class="content-list"<?=$backHrefAttr?>>
-    <div class="nav-sort-row">
-        <span class="nav-sort-label"><?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?></span>
-        <select id="navSortSelect" class="input nav-sort-select" aria-label="<?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?>">
-            <option value="date"><?=explorer_view_escape(explorer_view_t('nav.sort_date','Date'))?></option>
-            <option value="title"><?=explorer_view_escape(explorer_view_t('nav.sort_title','Title'))?></option>
-            <option value="slug"><?=explorer_view_escape(explorer_view_t('nav.sort_slug','Filename'))?></option>
-        </select>
+    <div id="contentList" class="<?=explorer_view_escape($contentListClass)?>"<?=$backHrefAttr?><?=$lazyAttrs?>>
+    <div class="nav-controls-stack<?= $sticky_controls ? ' is-sticky' : '' ?>">
+        <div class="nav-toolbar-row">
+            <div class="nav-sort-row">
+                <span class="nav-sort-label"><?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?></span>
+                <select id="navSortSelect" class="input nav-sort-select" aria-label="<?=explorer_view_escape(explorer_view_t('nav.sort_label','Sort'))?>">
+                    <option value="date"><?=explorer_view_escape(explorer_view_t('nav.sort_date','Date'))?></option>
+                    <option value="title"><?=explorer_view_escape(explorer_view_t('nav.sort_title','Title'))?></option>
+                    <option value="slug"><?=explorer_view_escape(explorer_view_t('nav.sort_slug','Filename'))?></option>
+                </select>
+            </div>
+
+            <?php if ($page === 'index' || $page === 'edit'): ?>
+            <div class="nav-file-actions nav-file-actions-right nav-toolbar-actions">
+                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
+                <?php if ($csrf_token): ?>
+                <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
+                    <span class="pi pi-folder"></span>
+                    <span>+</span>
+                </button>
+                <?php endif; ?>
+
+                <?php if ($page === 'index'): ?>
+                <a id="explorerEditBtn" href="<?=explorer_view_escape($current_edit_href)?>" class="btn btn-ghost btn-small<?= $has_current_file ? '' : ' is-disabled' ?>" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>" data-base-href="edit.php" <?= $has_current_file ? '' : 'aria-disabled="true" tabindex="-1"' ?>>
+                    <span class="pi pi-edit"></span>
+                    <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?></span>
+                </a>
+                <?php if ($csrf_token): ?>
+                <form method="post" action="index.php" id="explorerDeleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="file" id="explorerDeleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="submit" class="btn btn-ghost btn-small" <?= $has_current_file ? '' : 'disabled' ?>>
+                        <span class="pi pi-bin"></span>
+                        <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?></span>
+                    </button>
+                </form>
+                <?php endif; ?>
+                <?php else: ?>
+                <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" data-auth-superuser="1" <?= $has_current_file ? '' : 'disabled' ?>>
+                    <span class="pi pi-edit"></span>
+                    <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.rename','Rename'))?></span>
+                </button>
+                <?php if ($csrf_token): ?>
+                <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>" data-auth-superuser="1">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="file" id="deleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
+                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
+                    <button type="submit" class="btn btn-ghost btn-small" <?= $has_current_file ? '' : 'disabled' ?>>
+                        <span class="pi pi-bin"></span>
+                        <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.delete','Delete'))?></span>
+                    </button>
+                </form>
+                <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($show_filter_row): ?>
+        <div class="nav-filter-row">
+            <input id="filterInput" class="input" type="text" placeholder="<?=explorer_view_escape($filter_placeholder)?>">
+            <?php if ($show_filter_reset): ?>
+            <button id="filterClear" type="button" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('index.filter_clear','Clear filter'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.filter_clear','Clear filter'))?>" style="display:none;">
+                <span class="pi pi-cross"></span>
+            </button>
+            <button id="filterReset" type="button" class="btn btn-ghost btn-small filter-reset"><?=explorer_view_escape(explorer_view_t('common.reset','Reset'))?></button>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Root files -->
     <?php if (!empty($rootList)): ?>
     <?php
         $root_children_id = 'folder-children-' . substr(sha1('md:root'), 0, 10);
-        $root_default_open = ($folder_filter === 'root') || ($current_folder === 'root');
+        $root_default_open = ($folder_filter === null) || ($current_folder === 'root');
     ?>
 	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id('root'))?>" class="nav-section" data-folder-section="root" data-default-open="<?= $root_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
@@ -615,10 +872,10 @@ function explorer_view_render_tree($opts) {
                 <span class="pi <?= $root_default_open ? 'pi-downcaret' : 'pi-rightcaret' ?> folder-caret"></span>
                 <span class="pi <?= $root_default_open ? 'pi-openfolder' : 'pi-folder' ?> folder-icon"></span>
             </button>
-            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink('root'))?>"><?=explorer_view_escape(explorer_view_t('common.root','Root'))?></a>
+            <a class="breadcrumb-link" href="<?=explorer_view_escape($folderLink('root'))?>">/</a>
         </h2>
     <div id="<?=explorer_view_escape($root_children_id)?>" class="folder-children" <?= $root_default_open ? '' : 'hidden' ?>>
-        <?php $renderNotes($rootList, true); ?>
+        <?php $renderNotes($rootList, 'root', true); ?>
     </div>
     </section>
     <?php endif; ?>

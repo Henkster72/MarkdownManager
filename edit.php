@@ -179,6 +179,7 @@ if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign
 $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
+$indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
 $internalLinkPrefix = isset($MDW_SETTINGS['internal_link_prefix']) ? trim((string)$MDW_SETTINGS['internal_link_prefix']) : '';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
@@ -440,6 +441,24 @@ $secretMap  = load_secret_mds();
 $rootList   = list_md_root_sorted();
 $dirMap     = list_md_by_subdir_sorted();
 $folder_filter = sanitize_folder_name($_GET['folder'] ?? '') ?? null;
+$explorerTotalNotes = count($rootList);
+foreach ($dirMap as $list) {
+    if (is_array($list)) $explorerTotalNotes += count($list);
+}
+$explorerLazyThreshold = isset($MDW_SETTINGS['lazy_explorer_threshold'])
+    ? (int)$MDW_SETTINGS['lazy_explorer_threshold']
+    : 450;
+if ($explorerLazyThreshold < 50) $explorerLazyThreshold = 50;
+$explorerUseLazyNotes = $explorerTotalNotes >= $explorerLazyThreshold;
+if (isset($_GET['lazy'])) {
+    $lazyOverride = strtolower(trim((string)$_GET['lazy']));
+    if ($lazyOverride === '1' || $lazyOverride === 'true' || $lazyOverride === 'yes') {
+        $explorerUseLazyNotes = true;
+    } else if ($lazyOverride === '0' || $lazyOverride === 'false' || $lazyOverride === 'no') {
+        $explorerUseLazyNotes = false;
+    }
+}
+$explorerLazyEndpoint = 'index.php?json=explorer_tree';
 
 $save_error = null;
 $save_error_details = null;
@@ -573,7 +592,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!$san) {
                 $save_error = mdw_t('flash.invalid_file_path', 'Invalid file path.');
             } else {
-                $rawSlug = isset($_POST['new_slug']) ? (string)$_POST['new_slug'] : '';
+                $rawSlug = isset($_POST['new_name']) ? (string)$_POST['new_name'] : '';
+                if ($rawSlug === '' && isset($_POST['new_slug'])) {
+                    // Backward compatibility with older clients.
+                    $rawSlug = (string)$_POST['new_slug'];
+                }
                 $slug = sanitize_new_md_slug($rawSlug);
                 $slugLen = $slug ? mdw_strlen($slug) : 0;
                 if (!$slug || $slugLen < MDW_NEW_MD_SLUG_MIN) {
@@ -590,7 +613,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     if (preg_match('/^\\d{2}-\\d{2}-\\d{2}-/', $base, $m)) {
                         $prefix = $m[0];
                     }
-                    $newBase = $prefix . $slug . '.md';
+                    $keepDatePrefix = !empty($MDW_PUBLISHER_MODE);
+                    if (!$keepDatePrefix && $prefix !== '') {
+                        $rawKeep = isset($_POST['keep_date_prefix']) ? strtolower(trim((string)$_POST['keep_date_prefix'])) : '';
+                        $keepDatePrefix = in_array($rawKeep, ['1', 'true', 'yes', 'on'], true);
+                    }
+                    $nextPrefix = ($keepDatePrefix && $prefix !== '') ? $prefix : '';
+                    if ($nextPrefix !== '' && str_starts_with($slug, $nextPrefix)) {
+                        $newBase = $slug . '.md';
+                    } else {
+                        $newBase = $nextPrefix . $slug . '.md';
+                    }
                     $newPath = $dir ? ($dir . '/' . $newBase) : $newBase;
                     if ($newPath === $san) {
                         $save_error = mdw_t('flash.rename_no_change', 'Filename did not change.');
@@ -898,6 +931,11 @@ $current_publish_state_lower = strtolower($current_publish_state);
 
 $rename_slug_value = '';
 $rename_prefix_value = '';
+$rename_field_is_slug = !empty($MDW_PUBLISHER_MODE);
+$rename_field_label_key = $rename_field_is_slug ? 'rename_modal.slug_label' : 'rename_modal.filename_label';
+$rename_field_label_fallback = $rename_field_is_slug ? 'New slug' : 'New filename';
+$rename_field_placeholder_key = $rename_field_is_slug ? 'rename_modal.slug_placeholder' : 'rename_modal.filename_placeholder';
+$rename_field_placeholder_fallback = $rename_field_is_slug ? 'new-title' : 'new-filename';
 if ($requested) {
     $base = basename($requested);
     if (preg_match('/^\\d{2}-\\d{2}-\\d{2}-/', $base, $m)) {
@@ -907,6 +945,11 @@ if ($requested) {
     $base = preg_replace('/\\.md$/i', '', $base);
     $rename_slug_value = $base;
 }
+
+$editSplitColStorageKey = 'mdw_edit_split_col_widths';
+$editSplitColStorageLegacyKey = 'mdw_editor_col_widths';
+$editSplitRowStorageKey = 'mdw_edit_split_row_heights';
+$editSplitRowStorageLegacyKey = 'mdw_editor_row_heights';
 
 ?>
 <!DOCTYPE html>
@@ -943,15 +986,54 @@ if ($requested) {
 // Bootstrap editor pane widths early (pre-CSS) to avoid layout shift on reload/save.
 (function(){
     try {
-        const raw = window.__mdwStorageGet('mdw_editor_col_widths');
-        if (!raw) return;
-        const saved = JSON.parse(raw);
-        const ok = (v) => (typeof v === 'string') && /^\d+(\.\d+)?%$/.test(v);
-        if (!saved || !ok(saved.left) || !ok(saved.mid) || !ok(saved.right)) return;
+        const storageKey = <?= json_encode($editSplitColStorageKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        const legacyKey = <?= json_encode($editSplitColStorageLegacyKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        const parseState = (raw) => {
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object') ? parsed : null;
+        };
+        let raw = window.__mdwStorageGet(storageKey);
+        let saved = parseState(raw);
+        if (!saved) {
+            raw = window.__mdwStorageGet(legacyKey);
+            saved = parseState(raw);
+            if (!saved) return;
+        }
+        const toPct = (value) => {
+            if (typeof value !== 'string') return null;
+            const n = parseFloat(value.replace('%', '').trim());
+            return Number.isFinite(n) ? n : null;
+        };
+        let left = toPct(saved.left);
+        let mid = toPct(saved.mid);
+        let right = toPct(saved.right);
+        if (!Number.isFinite(left) || !Number.isFinite(mid) || !Number.isFinite(right)) return;
+        const total = left + mid + right;
+        if (!(total > 0)) return;
+        const scale = 100 / total;
+        left *= scale;
+        mid *= scale;
+        right *= scale;
+        const minPct = 10;
+        left = Math.max(minPct, Math.min(100 - (minPct * 2), left));
+        mid = Math.max(minPct, Math.min(100 - left - minPct, mid));
+        right = 100 - left - mid;
+        if (right < minPct) {
+            right = minPct;
+            mid = Math.max(minPct, 100 - left - right);
+            left = 100 - mid - right;
+        }
+        const normalized = {
+            left: `${left.toFixed(2)}%`,
+            mid: `${mid.toFixed(2)}%`,
+            right: `${right.toFixed(2)}%`,
+        };
         const root = document.documentElement;
-        root.style.setProperty('--col-left', saved.left);
-        root.style.setProperty('--col-mid', saved.mid);
-        root.style.setProperty('--col-right', saved.right);
+        root.style.setProperty('--col-left', normalized.left);
+        root.style.setProperty('--col-mid', normalized.mid);
+        root.style.setProperty('--col-right', normalized.right);
+        window.__mdwStorageSet(storageKey, JSON.stringify(normalized));
     } catch {}
 })();
 </script>
@@ -1063,12 +1145,21 @@ window.mermaid = mermaid;
 	                    <a class="breadcrumb-link" href="index.php">/index</a>
 	                    <?php if ($requested): ?>
 	                        <?php $crumbFolder = folder_from_path($requested); ?>
+                            <?php $showFolderCrumb = ($crumbFolder && $crumbFolder !== 'root'); ?>
+                            <?php $crumbFolderHref = $showFolderCrumb
+                                ? ('index.php?folder=' . rawurlencode($crumbFolder) . '#contentList')
+                                : 'index.php#contentList'; ?>
+                            <?php $crumbFileHref = $showFolderCrumb
+                                ? ('index.php?file=' . rawurlencode($requested) . '&folder=' . rawurlencode($crumbFolder) . '&focus=' . rawurlencode($requested))
+                                : ('index.php?file=' . rawurlencode($requested) . '&focus=' . rawurlencode($requested)); ?>
+                            <span data-crumb="folder-wrap"<?= $showFolderCrumb ? '' : ' hidden' ?>>
 	                        <span class="breadcrumb-sep">/</span>
-                        <a class="breadcrumb-link" data-crumb="folder" href="index.php?folder=<?=rawurlencode($crumbFolder)?>#contentList">
-                            <?=h($crumbFolder)?>
+                        <a class="breadcrumb-link" data-crumb="folder" href="<?=h($crumbFolderHref)?>">
+                            <?=h($showFolderCrumb ? $crumbFolder : '')?>
                         </a>
+                            </span>
 	                        <span class="breadcrumb-sep">/</span>
-	                        <a class="breadcrumb-link app-path-segment" data-crumb="file" href="index.php?file=<?=rawurlencode($requested)?>&folder=<?=rawurlencode($crumbFolder)?>&focus=<?=rawurlencode($requested)?>">
+	                        <a class="breadcrumb-link app-path-segment" data-crumb="file" href="<?=h($crumbFileHref)?>">
                                 <?=h(basename($requested))?>
                             </a>
 	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>"><?=h(mdw_t('common.secret','secret'))?></span>
@@ -1083,18 +1174,24 @@ window.mermaid = mermaid;
                     <div class="chip" style="background-color: var(--danger); color: white;"<?= $save_error_details ? ' title="' . h($save_error_details) . '"' : '' ?>><?=h($save_error)?></div>
                 <?php endif; ?>
 
-                    <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
                     <button id="mobileNavToggle" type="button" class="btn btn-ghost icon-button mobile-nav-toggle" aria-label="<?=h(mdw_t('edit.nav.open_files_aria','Show files'))?>">
                         <span class="pi pi-openfolder"></span>
                     </button>
-		                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('theme.settings_title','Settings'))?>" aria-label="<?=h(mdw_t('theme.settings_title','Settings'))?>" data-auth-superuser="1">
-		                    <span class="pi pi-gear"></span>
+			                <button id="themeSettingsBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('theme.settings_title','Settings'))?>" aria-label="<?=h(mdw_t('theme.settings_title','Settings'))?>" data-auth-superuser="1">
+			                    <span class="pi pi-gear"></span>
 		                </button>
 		                <button id="authToggleBtn" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('auth.logout','Logout'))?>" aria-label="<?=h(mdw_t('auth.logout','Logout'))?>">
 		                    <span class="pi pi-upload auth-logout-icon"></span>
 		                </button>
-		                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
-		            </div>
+			                <button id="themeToggle" type="button" class="btn btn-ghost icon-button"><span class="pi pi-sun" id="themeIcon"></span></button>
+                    <form id="newFolderForm" method="post" action="index.php" style="display:none;">
+                        <input type="hidden" name="action" value="create_folder">
+                        <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
+                        <input type="hidden" name="folder_name" id="newFolderName" value="">
+                        <input type="hidden" name="return_page" value="edit">
+                        <input type="hidden" name="return_file" value="<?=h((string)($requested ?? ''))?>">
+                    </form>
+			            </div>
 	        </div>
 	    </header>
 
@@ -1102,7 +1199,14 @@ window.mermaid = mermaid;
 
 <main class="app-main">
     <div class="editor-shell">
-        <div class="editor-grid" id="editorGrid">
+        <div class="editor-grid" id="editorGrid"
+             data-split-mode="three"
+             data-split-storage-key="<?=h($editSplitColStorageKey)?>"
+             data-split-storage-legacy-key="<?=h($editSplitColStorageLegacyKey)?>"
+             data-split-row-storage-key="<?=h($editSplitRowStorageKey)?>"
+             data-split-row-storage-legacy-key="<?=h($editSplitRowStorageLegacyKey)?>"
+             data-split-mobile-resizer="right"
+             data-split-focus-lock-classes="mdw-pane-focus-md,mdw-pane-focus-preview">
 
             <!-- LINKERPANE: index / filter -->
             <section class="editor-pane" id="links_md_overview" tabindex="0">
@@ -1123,45 +1227,28 @@ window.mermaid = mermaid;
 	                                </button>
 	                            </div>
 	                        </div>
-                            <?php if ($requested): ?>
-                            <div class="nav-file-actions">
-                                <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" data-auth-superuser="1" <?= $requested ? '' : 'disabled' ?>>
-                                    <span class="pi pi-edit"></span>
-                                    <span class="btn-label"><?=h(mdw_t('edit.toolbar.rename','Rename'))?></span>
-                                </button>
-                                <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=h($requested ?? '')?>" data-auth-superuser="1">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="file" id="deleteFileInput" value="<?=h($requested ?? '')?>">
-                                    <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
-                                    <button type="submit" class="btn btn-ghost btn-small" <?= $requested ? '' : 'disabled' ?>>
-                                        <span class="pi pi-bin"></span>
-                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.delete','Delete'))?></span>
-                                    </button>
-                                </form>
-                            </div>
-                            <?php endif; ?>
-	                        <div class="nav-filter-row">
-	                            <input id="filterInput" class="input" type="text" placeholder="<?=h(mdw_t('common.filter_placeholder','Filter…'))?>">
-	                        </div>
-                        <div class="status-text" style="margin-top: 0.35rem;">
-                            <?=h(mdw_t('edit.new_md_hint','Use +MD in the top bar to create a new markdown file.'))?>
-                        </div>
 	                    </header>
 	                    <div class="pane-body nav-body">
 	                        <?php
 	                            require_once __DIR__ . '/explorer_view.php';
-		                            explorer_view_render_tree([
-		                                'page' => 'edit',
-		                                'rootList' => $rootList,
-		                                'dirMap' => $dirMap,
-		                                'secretMap' => $secretMap,
-		                                'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
-		                                'folder_filter' => $folder_filter,
-		                                'current_file' => $requested,
-		                                'show_actions' => false,
-		                                'plugins_enabled' => false,
-		                            ]);
-	                        ?>
+			                            explorer_view_render_tree([
+			                                'page' => 'edit',
+			                                'rootList' => $rootList,
+			                                'dirMap' => $dirMap,
+			                                'secretMap' => $secretMap,
+			                                'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+			                                'folder_filter' => $folder_filter,
+			                                'current_file' => $requested,
+			                                'show_actions' => false,
+			                                'plugins_enabled' => false,
+                                            'show_filter_row' => true,
+                                            'show_filter_reset' => false,
+                                            'sticky_controls' => true,
+                                            'lazy_notes' => $explorerUseLazyNotes,
+                                            'lazy_endpoint' => $explorerLazyEndpoint,
+                                            'lazy_cache_ttl_ms' => 300000,
+			                            ]);
+		                        ?>
 	                    </div>
 	                </div>
 	            </section>
@@ -1386,19 +1473,25 @@ window.mermaid = mermaid;
             </div>
             <form method="post" action="edit.php" id="renameModalForm">
                 <input type="hidden" name="action" value="rename">
-                <input type="hidden" name="file" value="<?=h($requested ?? '')?>">
+                <input type="hidden" name="file" id="renameModalFile" value="<?=h($requested ?? '')?>">
                 <input type="hidden" name="csrf" value="<?=h($CSRF_TOKEN)?>">
                 <input type="hidden" name="auth_role" id="renameAuthRole" value="">
                 <input type="hidden" name="auth_token" id="renameAuthToken" value="">
                 <div class="modal-body">
-                    <?php if ($rename_prefix_value !== ''): ?>
-                        <div class="status-text" style="margin-bottom: 0.35rem;">
-                            <?=h(mdw_t('rename_modal.prefix_hint','Date prefix kept:'))?> <code><?=h($rename_prefix_value)?></code>
-                        </div>
+                    <?php if ($rename_field_is_slug): ?>
+                    <div id="renameModalPrefixHintWrap" class="status-text" style="margin-bottom: 0.35rem;"<?= $rename_prefix_value !== '' ? '' : ' hidden' ?>>
+                        <?=h(mdw_t('rename_modal.prefix_hint','Date prefix kept:'))?> <code id="renameModalPrefixValue"><?=h($rename_prefix_value)?></code>
+                    </div>
+                    <?php else: ?>
+                    <label id="renameModalKeepDateWrap" class="status-text" style="display:flex; align-items:center; gap:0.35rem; margin-bottom: 0.35rem;"<?= $rename_prefix_value !== '' ? '' : ' hidden' ?> title="<?=h(mdw_t('rename_modal.keep_date_title','Keep the yy-mm-dd- prefix in the filename'))?>">
+                        <input id="renameModalKeepDatePrefix" type="checkbox" name="keep_date_prefix" value="1"<?= $rename_prefix_value !== '' ? ' checked' : '' ?>>
+                        <span><?=h(mdw_t('rename_modal.keep_date_prefix','Keep date prefix'))?></span>
+                        <code id="renameModalKeepDateValue"><?=h($rename_prefix_value)?></code>
+                    </label>
                     <?php endif; ?>
-                    <label class="modal-label" for="renameModalSlug"><?=h(mdw_t('rename_modal.slug_label','New slug'))?></label>
+                    <label id="renameModalFieldLabel" class="modal-label" for="renameModalSlug"><?=h(mdw_t($rename_field_label_key, $rename_field_label_fallback))?></label>
                     <div style="display:flex; align-items:center; gap: 0.4rem;">
-                        <input id="renameModalSlug" name="new_slug" class="input" type="text" value="<?=h($rename_slug_value)?>" placeholder="<?=h(mdw_t('rename_modal.slug_placeholder','new-title'))?>" data-slug-min="<?=MDW_NEW_MD_SLUG_MIN?>" data-slug-max="<?=MDW_NEW_MD_SLUG_MAX?>" data-prefix="<?=h($rename_prefix_value)?>" required>
+                        <input id="renameModalSlug" name="new_name" class="input" type="text" value="<?=h($rename_slug_value)?>" placeholder="<?=h(mdw_t($rename_field_placeholder_key, $rename_field_placeholder_fallback))?>" data-slug-min="<?=MDW_NEW_MD_SLUG_MIN?>" data-slug-max="<?=MDW_NEW_MD_SLUG_MAX?>" data-prefix="<?=h($rename_prefix_value)?>" data-label-slug="<?=h(mdw_t('rename_modal.slug_label','New slug'))?>" data-label-filename="<?=h(mdw_t('rename_modal.filename_label','New filename'))?>" data-placeholder-slug="<?=h(mdw_t('rename_modal.slug_placeholder','new-title'))?>" data-placeholder-filename="<?=h(mdw_t('rename_modal.filename_placeholder','new-filename'))?>" required>
                         <span class="status-text">.md</span>
                     </div>
                     <div id="renameModalStatus" class="status-text" style="margin-top: 0.35rem;"></div>
@@ -1832,6 +1925,17 @@ window.mermaid = mermaid;
 				            </div>
 
 				            <div class="modal-field" data-auth-superuser="1">
+				                <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>
+				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
+				                </label>
+				                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
+				                </div>
+				            </div>
+
+				            <div class="modal-field" data-auth-superuser="1">
 				                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
 				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                    <input id="allowUserPublishToggle" type="checkbox" <?= !empty($MDW_SETTINGS['allow_user_publish']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
@@ -2156,6 +2260,7 @@ window.mermaid = mermaid;
 <script defer src="<?=h($STATIC_DIR)?>/mdm.ui.js"></script>
 <script defer src="<?=h($STATIC_DIR)?>/mdm.auth.js"></script>
 <script defer src="<?=h($STATIC_DIR)?>/mdm.settings.js"></script>
+<script defer src="<?=h($STATIC_DIR)?>/mdm.splitter.js"></script>
 <script defer src="<?=h($STATIC_DIR)?>/mdm.editor.js"></script>
 <script defer src="<?=h($STATIC_DIR)?>/mdm.explorer.js"></script>
 <script defer src="<?=h($STATIC_DIR)?>/mdm.modals.js"></script>

@@ -876,6 +876,8 @@
     const postDateAlignStatus = document.getElementById('postDateAlignStatus');
     const folderIconStyleSelect = document.getElementById('folderIconStyleSelect');
     const folderIconStyleStatus = document.getElementById('folderIconStyleStatus');
+    const indexDualPaneToggle = document.getElementById('indexDualPaneToggle');
+    const indexLayoutStatus = document.getElementById('indexLayoutStatus');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -1005,6 +1007,13 @@
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
+    const setIndexLayoutStatus = (msg, kind = 'info') => {
+        if (!(indexLayoutStatus instanceof HTMLElement)) return;
+        indexLayoutStatus.textContent = String(msg || '');
+        indexLayoutStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
 
     const readAppTitleSetting = () => {
         const s = getSettings();
@@ -1094,6 +1103,11 @@
         const s = getSettings();
         const v = s && typeof s.folder_icon_style === 'string' ? s.folder_icon_style.trim().toLowerCase() : '';
         return (v === 'caret' || v === 'folder') ? v : 'folder';
+    };
+    const readIndexDualPaneSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'index_dual_pane_overview') ? true : !!s.index_dual_pane_overview;
     };
     const readUiLanguageSetting = () => {
         const s = getSettings();
@@ -1340,6 +1354,9 @@
         if (folderIconStyleSelect instanceof HTMLSelectElement) {
             folderIconStyleSelect.value = readFolderIconStyleSetting();
         }
+        if (indexDualPaneToggle instanceof HTMLInputElement) {
+            indexDualPaneToggle.checked = readIndexDualPaneSetting();
+        }
         if (langSelect instanceof HTMLSelectElement) {
             const uiLang = readUiLanguageSetting();
             if (uiLang) langSelect.value = uiLang;
@@ -1359,6 +1376,7 @@
         setPostDateFormatStatus(t('theme.post_date_format.hint', 'Saved for all users.'), 'info');
         setPostDateAlignStatus(t('theme.post_date_align.hint', 'Saved for all users.'), 'info');
         setFolderIconStyleStatus(t('theme.folder_icons.hint', 'Saved for all users.'), 'info');
+        setIndexLayoutStatus(t('theme.index_layout.hint', 'Turn off to use the classic overview-only index page.'), 'info');
         setSettingsIoStatus('', 'info');
 
         overlay.hidden = false;
@@ -1800,6 +1818,32 @@
             return false;
         }
     };
+    const saveIndexDualPaneSetting = async (nextValue) => {
+        setIndexLayoutStatus(t('theme.index_layout.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setIndexLayoutStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = !!nextValue;
+            const result = await saveSettingsToServer({ index_dual_pane_overview: value });
+            if (!result.ok) throw new Error(result.message || t('theme.index_layout.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.index_dual_pane_overview = value;
+            }
+            setIndexLayoutStatus(t('theme.index_layout.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('index layout save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.index_layout.save_failed', 'Save failed');
+            setIndexLayoutStatus(msg, 'error');
+            return false;
+        }
+    };
 
     const resetOverrides = () => {
         const next = { preview: {}, editor: {} };
@@ -2088,6 +2132,18 @@
             if (!(folderIconStyleSelect instanceof HTMLSelectElement)) return;
             const next = String(folderIconStyleSelect.value || '').trim();
             await saveFolderIconStyleSetting(next);
+        });
+        indexDualPaneToggle?.addEventListener('change', async () => {
+            if (!(indexDualPaneToggle instanceof HTMLInputElement)) return;
+            const next = !!indexDualPaneToggle.checked;
+            const ok = await saveIndexDualPaneSetting(next);
+            if (!ok) {
+                indexDualPaneToggle.checked = readIndexDualPaneSetting();
+                return;
+            }
+            if (document.body?.classList.contains('index-page')) {
+                window.location.reload();
+            }
         });
 
         const onKbdModChange = (e) => {
@@ -2524,6 +2580,13 @@
                 const next = String(folderIconStyleSelect.value || '').trim();
                 if (next !== readFolderIconStyleSetting()) {
                     const ok = await saveFolderIconStyleSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (indexDualPaneToggle instanceof HTMLInputElement) {
+                const next = !!indexDualPaneToggle.checked;
+                if (next !== readIndexDualPaneSetting()) {
+                    const ok = await saveIndexDualPaneSetting(next);
                     if (!ok) return false;
                 }
             }

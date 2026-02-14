@@ -378,7 +378,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
     const init = () => {
         if (module._init) return;
         module._init = true;
-        const order = ['auth', 'settings', 'editor', 'explorer', 'modals', 'layout'];
+        const order = ['auth', 'settings', 'splitter', 'editor', 'explorer', 'modals', 'layout'];
         order.forEach((name) => {
             const mod = MDM[name];
             if (mod && typeof mod.init === 'function') mod.init();
