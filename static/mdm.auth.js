@@ -366,7 +366,8 @@
         }
     });
     if (!authModalBinding) {
-        overlay?.addEventListener('click', () => {
+        overlay?.addEventListener('click', (e) => {
+            if (e.target !== overlay) return;
             closeAuthModal();
         });
         document.addEventListener('keydown', (e) => {

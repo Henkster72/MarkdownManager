@@ -1489,11 +1489,17 @@
     const publishStateSelect = document.getElementById('publishStateSelect');
     const publishStateOverride = document.getElementById('publishStateOverride');
     let currentPublishState = '';
+    const isProcessingLikeState = (raw) => {
+        const s = String(raw || '').trim().toLowerCase();
+        return s === 'processing'
+            || s === 'to publish' || s === 'topublish' || s === 'to-publish'
+            || s === 'to delete' || s === 'todelete' || s === 'to-delete';
+    };
     const normalizePublishState = (raw) => {
         const s = String(raw || '').trim().toLowerCase();
         if (!s) return '';
         if (s === 'published') return 'Published';
-        if (s === 'processing' || s === 'to publish' || s === 'topublish' || s === 'to-publish') return 'Processing';
+        if (isProcessingLikeState(s)) return 'Processing';
         return 'Concept';
     };
     currentPublishState = normalizePublishState(
@@ -1502,19 +1508,19 @@
     const publishStateLabel = (state) => {
         const s = String(state || '').trim().toLowerCase();
         if (s === 'published') return t('edit.publish_state.published', 'Published');
-        if (s === 'processing') return t('edit.publish_state.processing', 'Processing');
+        if (isProcessingLikeState(s)) return t('edit.publish_state.processing', 'Processing');
         return t('edit.publish_state.concept', 'Concept');
     };
     const publishStateIcon = (state) => {
         const s = String(state || '').trim().toLowerCase();
         if (s === 'published') return 'pi-checkedcertificate';
-        if (s === 'processing') return 'pi-certificate';
+        if (isProcessingLikeState(s)) return 'pi-certificate';
         return 'pi-lightbulb';
     };
     const publishStateClass = (state) => {
         const s = String(state || '').trim().toLowerCase();
         if (s === 'published') return 'publish-published';
-        if (s === 'processing') return 'publish-processing';
+        if (isProcessingLikeState(s)) return 'publish-processing';
         return 'publish-concept';
     };
     const updatePublishBadge = (state) => {
@@ -1794,14 +1800,35 @@
     }
 
     let previewTimer = null;
+    const cancelScheduledPreview = () => {
+        if (!previewTimer) return;
+        clearTimeout(previewTimer);
+        previewTimer = null;
+    };
     function schedulePreview() {
         if (!window.CURRENT_FILE) return;
-        clearTimeout(previewTimer);
+        cancelScheduledPreview();
         previewTimer = setTimeout(sendPreview, 350);
         if (status && !statusHold.isHeld()) {
             status.textContent = t('js.preview_updating', 'Updating preview…');
         }
     }
+    window.__mdwCancelScheduledPreview = cancelScheduledPreview;
+    window.__mdwSyncEditorUiAfterExternalLoad = (previewSource = null) => {
+        cancelScheduledPreview();
+        updateLineNumbers();
+        ln.scrollTop = ta.scrollTop;
+        syncOverlayMetrics();
+        syncOverlayScroll();
+        scheduleBracketOverlay();
+        scheduleLinkSuggest();
+        if (typeof window.__mdwResetSelectionSync === 'function') {
+            const source = (typeof previewSource === 'string')
+                ? previewSource
+                : ((typeof window.__mdwBuildPreviewContent === 'function') ? window.__mdwBuildPreviewContent() : ta.value);
+            window.__mdwResetSelectionSync(source);
+        }
+    };
 
     const applyTocHotKeyword = (previewEl, rawText) => {
         if (!(previewEl instanceof HTMLElement)) return;
@@ -2842,7 +2869,6 @@
 
     const wrapToggle = document.getElementById('wrapToggle');
     const lineNumbersToggle = document.getElementById('lineNumbersToggle');
-    const WRAP_KEY = 'mdw_editor_wrap';
     const LINES_KEY = 'mdw_editor_lines';
 
     const MAX_UNDO_STEPS = 25;
@@ -2880,6 +2906,22 @@
 
     const isWrapOn = () => document.documentElement.classList.contains('mdw-wrap-on');
     const isLinesOn = () => !document.documentElement.classList.contains('mdw-lines-off');
+    const readWrapSetting = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(s && s.editor_wrap);
+    };
+    let wrapSaveSeq = 0;
+    const saveWrapSetting = async (enabled) => {
+        const saveFn = window.__mdwSaveSettingsToServer;
+        if (typeof saveFn !== 'function') return;
+        const seq = ++wrapSaveSeq;
+        const result = await saveFn({ editor_wrap: !!enabled });
+        if (seq !== wrapSaveSeq) return;
+        if (!result || result.ok !== true) {
+            console.warn('editor wrap setting save failed', result);
+        }
+    };
     const applyWrapUi = () => {
         if (!(wrapToggle instanceof HTMLButtonElement)) return;
         const on = isWrapOn();
@@ -2891,12 +2933,15 @@
         lineNumbersToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
     };
 
+    document.documentElement.classList.toggle('mdw-wrap-on', readWrapSetting());
     applyWrapUi();
     applyLinesUi();
     wrapToggle?.addEventListener('click', () => {
         const on = !isWrapOn();
         document.documentElement.classList.toggle('mdw-wrap-on', on);
-        try { mdwStorageSet(WRAP_KEY, on ? '1' : '0'); } catch {}
+        saveWrapSetting(on).catch((err) => {
+            console.warn('editor wrap setting save error', err);
+        });
         applyWrapUi();
         ta.focus();
     });
@@ -3071,6 +3116,66 @@
         const open = `<${info.tag}${attrText}>`;
         const close = `</${info.tag}>`;
         return { text: open + close, caretOffset: open.length };
+    };
+
+    const changeLineIndent = (direction) => {
+        const indentText = '  ';
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? 0;
+        const effectiveEnd = selEnd > selStart && value[selEnd - 1] === '\n' ? selEnd - 1 : selEnd;
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', effectiveEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+
+        const block = value.slice(blockStart, blockEnd);
+        const lines = block.split('\n');
+        let offset = 0;
+        const deltas = [];
+        let changed = false;
+        const newLines = lines.map((line) => {
+            const absStart = blockStart + offset;
+            offset += line.length + 1;
+
+            if (direction > 0) {
+                const out = indentText + line;
+                deltas.push({ absStart, delta: indentText.length });
+                changed = true;
+                return out;
+            }
+
+            let removeLen = 0;
+            if (line.startsWith('\t')) {
+                removeLen = 1;
+            } else {
+                const m = line.match(/^ {1,2}/);
+                removeLen = m ? m[0].length : 0;
+            }
+            if (removeLen <= 0) {
+                deltas.push({ absStart, delta: 0 });
+                return line;
+            }
+
+            changed = true;
+            deltas.push({ absStart, delta: -removeLen });
+            return line.slice(removeLen);
+        });
+
+        if (!changed) return false;
+
+        const replacement = newLines.join('\n');
+        replaceRange(blockStart, blockEnd, replacement);
+
+        const shiftPos = (pos) => {
+            let out = pos;
+            for (const d of deltas) {
+                if (pos > d.absStart) out += d.delta;
+            }
+            return Math.max(blockStart, out);
+        };
+
+        setSelection(shiftPos(selStart), shiftPos(selEnd));
+        return true;
     };
 
     const wrapOrUnwrap = (left, right, { singleCharSafe, lineWiseOnMultiline = false } = {}) => {
@@ -3991,19 +4096,25 @@
     refreshCustomCssSelect(true);
 
     ta.addEventListener('keydown', (e) => {
-        if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
         if (ta.selectionStart == null || ta.selectionEnd == null) return;
-        if (ta.selectionStart !== ta.selectionEnd) return;
-        const tokenInfo = findHtmlTabToken();
-        if (!tokenInfo) return;
-        const info = parseHtmlTabToken(tokenInfo.token);
-        if (!info) return;
-        const snippet = buildHtmlSnippet(info);
-        if (!snippet) return;
+
+        if (!e.shiftKey && ta.selectionStart === ta.selectionEnd) {
+            const tokenInfo = findHtmlTabToken();
+            const info = tokenInfo ? parseHtmlTabToken(tokenInfo.token) : null;
+            const snippet = info ? buildHtmlSnippet(info) : null;
+            if (tokenInfo && snippet) {
+                e.preventDefault();
+                replaceRange(tokenInfo.start, tokenInfo.end, snippet.text);
+                const caret = tokenInfo.start + snippet.caretOffset;
+                setSelection(caret, caret);
+                ta.focus();
+                return;
+            }
+        }
+
         e.preventDefault();
-        replaceRange(tokenInfo.start, tokenInfo.end, snippet.text);
-        const caret = tokenInfo.start + snippet.caretOffset;
-        setSelection(caret, caret);
+        changeLineIndent(e.shiftKey ? -1 : 1);
         ta.focus();
     });
 

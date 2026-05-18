@@ -394,7 +394,7 @@ function mdw_extract_footnotes($text, $lineMapIn = null, &$lineMapOut = null) {
     return [implode("\n", $out), $footnotes];
 }
 
-function mdw_collect_footnote_refs($text) {
+function mdw_collect_footnote_refs($text, $footnotes = null) {
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
     $lines = explode("\n", $text);
     $order = [];
@@ -409,30 +409,155 @@ function mdw_collect_footnote_refs($text) {
         }
         if ($in_codeblock) continue;
 
-        if (preg_match_all('/\[([^\]]+)\]\[([A-Za-z0-9_-]+)\]/', $line, $m, PREG_SET_ORDER)) {
-            foreach ($m as $match) {
-                $label = trim((string)($match[1] ?? ''));
-                $ref = (string)($match[2] ?? '');
-                if ($ref === '') continue;
-                if (!isset($labels[$ref]) && $label !== '') $labels[$ref] = $label;
-                if (isset($seen[$ref])) continue;
-                $seen[$ref] = true;
-                $order[] = $ref;
-            }
-        }
-
-        if (preg_match_all('/\[\^([A-Za-z0-9_-]+)\]/', $line, $m, PREG_SET_ORDER)) {
-            foreach ($m as $match) {
-                $ref = (string)($match[1] ?? '');
-                if ($ref === '') continue;
-                if (isset($seen[$ref])) continue;
-                $seen[$ref] = true;
-                $order[] = $ref;
-            }
+        foreach (mdw_scan_inline_footnote_refs($line, $footnotes) as $match) {
+            $ref = (string)($match['ref'] ?? '');
+            if ($ref === '') continue;
+            $label = trim((string)($match['label'] ?? ''));
+            if (!isset($labels[$ref]) && $label !== '') $labels[$ref] = $label;
+            if (isset($seen[$ref])) continue;
+            $seen[$ref] = true;
+            $order[] = $ref;
         }
     }
 
     return ['order' => $order, 'labels' => $labels];
+}
+
+function mdw_scan_inline_footnote_refs($text, $footnotes = null) {
+    $text = (string)$text;
+    $len = strlen($text);
+    if ($len === 0) return [];
+
+    $matches = [];
+    $validKey = static function($value) {
+        return is_string($value) && preg_match('/^[A-Za-z0-9_-]+$/', $value);
+    };
+    $hasFootnote = static function($key) use ($footnotes) {
+        if (!is_array($footnotes) || $key === '') return false;
+        return isset($footnotes[$key]);
+    };
+
+    for ($i = 0; $i < $len; $i++) {
+        if ($text[$i] !== '[') continue;
+        if ($i > 0 && $text[$i - 1] === '\\') continue;
+
+        $close1 = strpos($text, ']', $i + 1);
+        if ($close1 === false) break;
+
+        $inner1 = substr($text, $i + 1, $close1 - $i - 1);
+        if ($inner1 === '') {
+            $i = $close1;
+            continue;
+        }
+
+        if ($inner1[0] === '^') {
+            $ref = substr($inner1, 1);
+            if ($validKey($ref) && ($footnotes === null || $hasFootnote($ref))) {
+                $matches[] = [
+                    'type' => 'caret',
+                    'start' => $i,
+                    'end' => $close1 + 1,
+                    'ref' => $ref,
+                    'label' => '',
+                ];
+                $i = $close1;
+                continue;
+            }
+        }
+
+        $next = $close1 + 1;
+        if ($next < $len && $text[$next] === '[') {
+            $close2 = strpos($text, ']', $next + 1);
+            if ($close2 !== false) {
+                $inner2 = substr($text, $next + 1, $close2 - $next - 1);
+                $ref2 = trim($inner2);
+                $label1 = trim($inner1);
+                if ($validKey($ref2) && ($footnotes === null || $hasFootnote($ref2))) {
+                    if ($validKey($label1) && $hasFootnote($label1)) {
+                        $matches[] = [
+                            'type' => 'bare',
+                            'start' => $i,
+                            'end' => $close1 + 1,
+                            'ref' => $label1,
+                            'label' => '',
+                        ];
+                        $i = $close1;
+                        continue;
+                    }
+
+                    $matches[] = [
+                        'type' => 'pair',
+                        'start' => $i,
+                        'end' => $close2 + 1,
+                        'ref' => $ref2,
+                        'label' => $label1,
+                    ];
+                    $i = $close2;
+                    continue;
+                }
+            }
+        }
+
+        $ref1 = trim($inner1);
+        if ($validKey($ref1) && ($footnotes === null || $hasFootnote($ref1))) {
+            $matches[] = [
+                'type' => 'bare',
+                'start' => $i,
+                'end' => $close1 + 1,
+                'ref' => $ref1,
+                'label' => '',
+            ];
+        }
+        $i = $close1;
+    }
+
+    return $matches;
+}
+
+function mdw_render_inline_footnote_refs($text, $footnotes) {
+    if (!is_array($footnotes) || empty($footnotes)) return $text;
+
+    $matches = mdw_scan_inline_footnote_refs($text, $footnotes);
+    if (empty($matches)) return $text;
+
+    $renderRef = static function($ref, $label = '') use ($footnotes) {
+        $key = trim((string)$ref);
+        if ($key === '' || !isset($footnotes[$key])) return null;
+
+        $fn = $footnotes[$key];
+        $type = isset($fn['type']) ? (string)$fn['type'] : '';
+        $hover = '';
+        if ($label !== '') {
+            $hover = trim((string)$label);
+        } else if ($type === 'link') {
+            $titleRaw = trim((string)($fn['title'] ?? ''));
+            $urlRaw = trim((string)($fn['url'] ?? ''));
+            $hover = $titleRaw !== '' ? $titleRaw : $urlRaw;
+        } else {
+            $textRaw = trim((string)($fn['text'] ?? ''));
+            $hover = trim(strip_tags($textRaw));
+        }
+
+        $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
+        $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+        return '<sup class="md-footnote fn"><a class="md-footnote-ref fn" href="#fn-'.$keyEsc.'"'.$titleAttr.'>'.$keyEsc.'</a></sup>';
+    };
+
+    $out = '';
+    $offset = 0;
+    foreach ($matches as $match) {
+        $start = isset($match['start']) ? (int)$match['start'] : 0;
+        $end = isset($match['end']) ? (int)$match['end'] : $start;
+        if ($start < $offset) continue;
+
+        $out .= substr($text, $offset, $start - $offset);
+        $html = $renderRef($match['ref'] ?? '', (string)($match['label'] ?? ''));
+        $out .= $html !== null ? $html : substr($text, $start, $end - $start);
+        $offset = $end;
+    }
+    $out .= substr($text, $offset);
+
+    return $out;
 }
 
 function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
@@ -521,51 +646,7 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
         $text
     );
 
-    // [text][label] footnotes
-    $text = preg_replace_callback(
-        "/\\[([^\\]]+)\\]\\[([A-Za-z0-9_-]+)\\]/",
-        function($m) use ($footnotes){
-            $labelEsc = $m[1];
-            $key = (string)($m[2] ?? '');
-            if (!isset($footnotes[$key])) return $m[0];
-
-            $labelRaw = html_entity_decode($labelEsc, ENT_QUOTES, 'UTF-8');
-            $labelRaw = trim($labelRaw);
-            $titleRaw = trim((string)($footnotes[$key]['title'] ?? ''));
-            $urlRaw = trim((string)($footnotes[$key]['url'] ?? ''));
-
-            $hover = $labelRaw !== '' ? $labelRaw : ($titleRaw !== '' ? $titleRaw : $urlRaw);
-            $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
-            $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
-
-            return '<sup class="md-footnote fn"><a class="md-footnote-ref fn" href="#fn-'.$keyEsc.'"'.$titleAttr.'>'.$keyEsc.'</a></sup>';
-        },
-        $text
-    );
-
-    // [^1] (caret footnotes)
-    $text = preg_replace_callback(
-        "/\\[\\^([A-Za-z0-9_-]+)\\]/",
-        function($m) use ($footnotes){
-            $key = (string)($m[1] ?? '');
-            if ($key === '' || !isset($footnotes[$key])) return $m[0];
-            $fn = $footnotes[$key];
-            $hover = '';
-            $type = isset($fn['type']) ? (string)$fn['type'] : '';
-            if ($type === 'link') {
-                $titleRaw = trim((string)($fn['title'] ?? ''));
-                $urlRaw = trim((string)($fn['url'] ?? ''));
-                $hover = $titleRaw !== '' ? $titleRaw : $urlRaw;
-            } else {
-                $textRaw = trim((string)($fn['text'] ?? ''));
-                $hover = trim(strip_tags($textRaw));
-            }
-            $titleAttr = $hover !== '' ? ' title="'.htmlspecialchars($hover, ENT_QUOTES, 'UTF-8').'"' : '';
-            $numEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
-            return '<sup class="md-footnote fn"><a class="md-footnote-ref fn" href="#fn-'.$numEsc.'"'.$titleAttr.'>'.$numEsc.'</a></sup>';
-        },
-        $text
-    );
+    $text = mdw_render_inline_footnote_refs($text, $footnotes);
 
     // Restore protected inline code spans.
     if (!empty($codeSpans)) {
@@ -1121,6 +1202,7 @@ function mdw_metadata_default_config() {
             'publisher_require_h2' => true,
             'allow_user_publish' => false,
             'allow_user_delete' => true,
+            'editor_wrap' => false,
             'copy_buttons_enabled' => true,
             'copy_include_meta' => true,
             'copy_html_mode' => 'dry',
@@ -1197,6 +1279,7 @@ function mdw_metadata_normalize_config($cfg) {
     $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
     $allowUserPublish = !array_key_exists('allow_user_publish', $inSettings) ? false : (bool)$inSettings['allow_user_publish'];
     $allowUserDelete = !array_key_exists('allow_user_delete', $inSettings) ? true : (bool)$inSettings['allow_user_delete'];
+    $editorWrap = !array_key_exists('editor_wrap', $inSettings) ? false : (bool)$inSettings['editor_wrap'];
     $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $inSettings) ? true : (bool)$inSettings['copy_buttons_enabled'];
     $copyIncludeMeta = !array_key_exists('copy_include_meta', $inSettings) ? true : (bool)$inSettings['copy_include_meta'];
     $copyHtmlMode = isset($inSettings['copy_html_mode']) ? trim((string)$inSettings['copy_html_mode']) : 'dry';
@@ -1236,6 +1319,7 @@ function mdw_metadata_normalize_config($cfg) {
         'publisher_require_h2' => (bool)$publisherRequireH2,
         'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'editor_wrap' => (bool)$editorWrap,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
@@ -1493,6 +1577,7 @@ function mdw_metadata_settings() {
         'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
         'allow_user_publish' => !array_key_exists('allow_user_publish', $s) ? false : (bool)$s['allow_user_publish'],
         'allow_user_delete' => !array_key_exists('allow_user_delete', $s) ? true : (bool)$s['allow_user_delete'],
+        'editor_wrap' => !array_key_exists('editor_wrap', $s) ? false : (bool)$s['editor_wrap'],
         'copy_buttons_enabled' => !array_key_exists('copy_buttons_enabled', $s) ? true : (bool)$s['copy_buttons_enabled'],
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
         'copy_html_mode' => isset($s['copy_html_mode']) ? trim((string)$s['copy_html_mode']) : 'dry',
@@ -2223,6 +2308,7 @@ function mdw_publisher_normalize_publishstate($raw) {
     if ($l === 'concept') return 'Concept';
     if ($l === 'processing' || $l === 'in progress' || $l === 'in-progress') return 'Processing';
     if ($l === 'to publish' || $l === 'topublish' || $l === 'to-publish') return 'Processing';
+    if ($l === 'to delete' || $l === 'todelete' || $l === 'to-delete') return 'ToDelete';
     if ($l === 'published') return 'Published';
     return $v;
 }
@@ -2447,7 +2533,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $attrs = $srcAttrsFor($startLine, $endLine);
         return $attrs ? mdw_html_insert_attrs($html, $attrs) : $html;
     };
-    $footnoteInfo = mdw_collect_footnote_refs($text);
+    $footnoteInfo = mdw_collect_footnote_refs($text, $footnotes);
     $footnoteRefs = (is_array($footnoteInfo) && isset($footnoteInfo['order']) && is_array($footnoteInfo['order']))
         ? $footnoteInfo['order']
         : [];

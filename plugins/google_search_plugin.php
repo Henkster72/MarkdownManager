@@ -9,8 +9,19 @@ function google_search_plugin_clean_base($raw) {
     if (!is_string($raw)) return null;
     $raw = trim($raw);
     if ($raw === '') return null;
+    // Be tolerant of encoded values like `site%3Aexample.com` or `%253A`.
+    for ($i = 0; $i < 2; $i++) {
+        $decoded = rawurldecode($raw);
+        if ($decoded === $raw) break;
+        $raw = $decoded;
+    }
+    $raw = preg_replace('~^\s*site\s*:\s*~i', '', $raw);
     $raw = preg_replace('~^https?://~i', '', $raw);
+    $raw = preg_replace('~^/+~', '', $raw);
+    $raw = preg_replace('~[?#].*$~', '', $raw);
     $raw = rtrim($raw, "/");
+    // Keep only host/path-safe characters for `site:` queries.
+    $raw = preg_replace('#[^A-Za-z0-9._~:/-]#', '', $raw);
     return $raw !== '' ? $raw : null;
 }
 
@@ -60,7 +71,25 @@ return [
                 if (!form || form.dataset.bound === '1') return;
                 form.dataset.bound = '1';
                 var input = document.getElementById('<?= $esc($inputId) ?>');
-                var base = form.getAttribute('data-base') || '';
+                var normalizeBase = function(value) {
+                    var baseValue = (value || '').trim();
+                    for (var i = 0; i < 2; i++) {
+                        try {
+                            var decoded = decodeURIComponent(baseValue);
+                            if (decoded === baseValue) break;
+                            baseValue = decoded;
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                    baseValue = baseValue.replace(/^\s*site\s*:\s*/i, '');
+                    baseValue = baseValue.replace(/^https?:\/\//i, '');
+                    baseValue = baseValue.replace(/^\/+/, '');
+                    baseValue = baseValue.replace(/[?#].*$/, '');
+                    baseValue = baseValue.replace(/\/+$/, '');
+                    return baseValue;
+                };
+                var base = normalizeBase(form.getAttribute('data-base') || '');
                 var encodeQuery = function(value) {
                     return encodeURIComponent(value.trim()).replace(/%20/g, '+');
                 };
@@ -72,7 +101,7 @@ return [
                         input.focus();
                         return;
                     }
-                    var q = encodeQuery(query + ' site:' + base);
+                    var q = encodeQuery(query) + '+site:' + base;
                     var url = 'https://www.google.com/search?q=' + q;
                     window.open(url, '_blank', 'noopener,noreferrer');
                 });

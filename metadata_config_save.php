@@ -233,6 +233,9 @@ if (is_array($settingsIn)) {
     $allowUserDelete = array_key_exists('allow_user_delete', $settingsIn)
         ? (bool)$settingsIn['allow_user_delete']
         : (!array_key_exists('allow_user_delete', $curSettings) ? true : (bool)$curSettings['allow_user_delete']);
+    $editorWrap = array_key_exists('editor_wrap', $settingsIn)
+        ? (bool)$settingsIn['editor_wrap']
+        : (!array_key_exists('editor_wrap', $curSettings) ? false : (bool)$curSettings['editor_wrap']);
     $copyButtonsEnabled = array_key_exists('copy_buttons_enabled', $settingsIn)
         ? (bool)$settingsIn['copy_buttons_enabled']
         : (!array_key_exists('copy_buttons_enabled', $curSettings) ? true : (bool)$curSettings['copy_buttons_enabled']);
@@ -324,6 +327,7 @@ if (is_array($settingsIn)) {
         'publisher_require_h2' => (bool)$requireH2,
         'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'editor_wrap' => (bool)$editorWrap,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,

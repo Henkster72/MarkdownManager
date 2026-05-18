@@ -316,7 +316,10 @@
         save();
     });
     if (!wpmModalBinding) {
-        overlay.addEventListener('click', closeWithoutSave);
+        overlay.addEventListener('click', (e) => {
+            if (e.target !== overlay) return;
+            closeWithoutSave();
+        });
         document.addEventListener('keydown', (e) => {
             if (overlay.hidden) return;
             if (e.key !== 'Escape' && e.key !== 'Esc') return;

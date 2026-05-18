@@ -89,6 +89,7 @@ if ($WPM_BASE_DOMAIN !== null) {
 }
 
 require_once __DIR__ . '/explorer_view.php';
+require_once __DIR__ . '/explorer_view_basic.php';
 $github_pages_plugin_loaded = false;
 $aw_ssg_template_plugin_loaded = false;
 $github_pages_env_ready = false;
@@ -504,16 +505,53 @@ function mdw_delete_md_folder($full, &$error) {
     return true;
 }
 
+function mdw_basic_request_enabled() {
+    $fromPost = array_key_exists('basic', $_POST) ? mdw_parse_basic_mode_value($_POST['basic']) : null;
+    if ($fromPost !== null) return $fromPost;
+    $fromGet = array_key_exists('basic', $_GET) ? mdw_parse_basic_mode_value($_GET['basic']) : null;
+    if ($fromGet !== null) return $fromGet;
+    global $MDW_BASIC_MODE;
+    return !empty($MDW_BASIC_MODE);
+}
+
+function mdw_url_with_basic($script, $params = []) {
+    if (!is_array($params)) $params = [];
+    if (mdw_basic_request_enabled() && !array_key_exists('basic', $params)) {
+        $params['basic'] = '1';
+    }
+    $q = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    return $script . ($q !== '' ? ('?' . $q) : '');
+}
+
+function mdw_ensure_basic_in_url($url) {
+    $url = (string)$url;
+    if ($url === '' || !mdw_basic_request_enabled()) return $url;
+    $parts = @parse_url($url);
+    if (!is_array($parts)) return $url;
+    $path = isset($parts['path']) ? (string)$parts['path'] : '';
+    $query = isset($parts['query']) ? (string)$parts['query'] : '';
+    $params = [];
+    if ($query !== '') parse_str($query, $params);
+    if (!array_key_exists('basic', $params)) {
+        $params['basic'] = '1';
+    }
+    $q = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    $frag = isset($parts['fragment']) && (string)$parts['fragment'] !== ''
+        ? ('#' . (string)$parts['fragment'])
+        : '';
+    return $path . ($q !== '' ? ('?' . $q) : '') . $frag;
+}
+
 function mdw_new_md_return_url_from_post() {
     $returnPage = isset($_POST['return_page']) ? strtolower(trim((string)$_POST['return_page'])) : 'index';
     if ($returnPage === 'edit') {
         $returnFileRaw = isset($_POST['return_file']) ? (string)$_POST['return_file'] : '';
         $returnFile = sanitize_md_path($returnFileRaw);
         if ($returnFile) {
-            return 'edit.php?file=' . rawurlencode($returnFile) . '&new=1';
+            return mdw_url_with_basic('edit.php', ['file' => $returnFile, 'new' => '1']);
         }
     }
-    return 'index.php?new=1';
+    return mdw_url_with_basic('index.php', ['new' => '1']);
 }
 
 function mdw_folder_return_url_from_post($folder = null) {
@@ -526,14 +564,14 @@ function mdw_folder_return_url_from_post($folder = null) {
         if ($returnFile) {
             $params = ['file' => $returnFile];
             if ($folderName) $params['folder'] = $folderName;
-            return 'edit.php?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+            return mdw_url_with_basic('edit.php', $params);
         }
-        return 'edit.php';
+        return mdw_url_with_basic('edit.php', []);
     }
     if ($folderName) {
-        return 'index.php?folder=' . rawurlencode($folderName);
+        return mdw_url_with_basic('index.php', ['folder' => $folderName]);
     }
-    return 'index.php';
+    return mdw_url_with_basic('index.php', []);
 }
 
 /* LINKS FROM CSV (shortcuts at top) */
@@ -634,6 +672,40 @@ function try_secret_login($passwordInput) {
     return hash_equals($SECRET_MDS_PASSWORD, $passwordInput);
 }
 
+function mdw_parse_basic_mode_value($raw) {
+    if ($raw === null) return null;
+    if (is_bool($raw)) return $raw;
+    $v = strtolower(trim((string)$raw));
+    if ($v === '') return true;
+    if (in_array($v, ['1', 'true', 'yes', 'on', 'basic'], true)) return true;
+    if (in_array($v, ['0', 'false', 'no', 'off', 'modern'], true)) return false;
+    return null;
+}
+
+function mdw_detect_opera_mini_ua() {
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? (string)$_SERVER['HTTP_USER_AGENT'] : '';
+    if ($ua === '') return false;
+    return stripos($ua, 'Opera Mini') !== false;
+}
+
+$mdw_basic_from_query = array_key_exists('basic', $_GET) ? mdw_parse_basic_mode_value($_GET['basic']) : null;
+$mdw_basic_from_post = array_key_exists('basic', $_POST) ? mdw_parse_basic_mode_value($_POST['basic']) : null;
+$mdw_opera_mini_detected = mdw_detect_opera_mini_ua();
+
+$MDW_BASIC_REASON = 'default';
+if ($mdw_basic_from_query !== null) {
+    $MDW_BASIC_MODE = $mdw_basic_from_query;
+    $MDW_BASIC_REASON = 'query';
+} else if ($mdw_basic_from_post !== null) {
+    $MDW_BASIC_MODE = $mdw_basic_from_post;
+    $MDW_BASIC_REASON = 'post';
+} else if ($mdw_opera_mini_detected) {
+    $MDW_BASIC_MODE = true;
+    $MDW_BASIC_REASON = 'opera-mini';
+} else {
+    $MDW_BASIC_MODE = false;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json'] === 'explorer_tree')) {
     $rootListForJson = list_md_root_sorted();
     $dirMapForJson = list_md_by_subdir_sorted();
@@ -672,7 +744,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
             if ($postAction === 'create') {
                 redirect(mdw_new_md_return_url_from_post());
             }
-            redirect('index.php');
+            redirect(mdw_url_with_basic('index.php', []));
 	    } else if ($_POST['action'] === 'delete') {
         $postedFile = isset($_POST['file']) ? (string)$_POST['file'] : '';
         $san = sanitize_md_path($postedFile);
@@ -727,7 +799,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
                 } else if ($returnFocus) {
                     $redirect = 'index.php?focus=' . rawurlencode($returnFocus);
                 }
-                redirect($redirect);
+                redirect(mdw_ensure_basic_in_url($redirect));
             }
         }
 
@@ -739,18 +811,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
             $full = mdw_safe_full_path($san, true);
             if (!$full || !is_file($full)) {
                 $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
-            } else if (@unlink($full)) {
-                $_SESSION['flash_ok'] = mdw_t('flash.deleted_prefix', 'Deleted:') . ' ' . $san;
             } else {
-                $err = error_get_last();
-                $msg = mdw_t('flash.delete_failed', 'Could not delete file.');
-                if ($err && !empty($err['message'])) {
-                    $msg .= ' (' . $err['message'] . ')';
+                if (!empty($MDW_PUBLISHER_MODE)) {
+                    $raw = @file_get_contents($full);
+                    if (!is_string($raw)) {
+                        $err = error_get_last();
+                        $msg = mdw_t('flash.delete_failed', 'Could not delete file.');
+                        if ($err && !empty($err['message'])) {
+                            $msg .= ' (' . $err['message'] . ')';
+                        }
+                        $_SESSION['flash_error'] = $msg;
+                    } else {
+                        $nextRaw = mdw_hidden_meta_ensure_block($raw, $san, [
+                            'set' => ['publishstate' => 'ToDelete'],
+                        ]);
+                        if (@file_put_contents($full, $nextRaw, LOCK_EX) === false) {
+                            $err = error_get_last();
+                            $msg = mdw_t('flash.delete_failed', 'Could not delete file.');
+                            if ($err && !empty($err['message'])) {
+                                $msg .= ' (' . $err['message'] . ')';
+                            }
+                            if (!is_writable($full)) {
+                                $msg .= ' (' . mdw_t('flash.no_write_permissions', 'no write permissions') . ')';
+                            }
+                            $_SESSION['flash_error'] = $msg;
+                        } else {
+                            $_SESSION['flash_ok'] = mdw_t('flash.delete_marked_processing_prefix', 'Marked for deletion (Processing):') . ' ' . $san;
+                        }
+                    }
+                } else if (@unlink($full)) {
+                    $_SESSION['flash_ok'] = mdw_t('flash.deleted_prefix', 'Deleted:') . ' ' . $san;
+                } else {
+                    $err = error_get_last();
+                    $msg = mdw_t('flash.delete_failed', 'Could not delete file.');
+                    if ($err && !empty($err['message'])) {
+                        $msg .= ' (' . $err['message'] . ')';
+                    }
+                    if (!is_writable($full)) {
+                        $msg .= ' (' . mdw_t('flash.no_write_permissions', 'no write permissions') . ')';
+                    }
+                    $_SESSION['flash_error'] = $msg;
                 }
-                if (!is_writable($full)) {
-                    $msg .= ' (' . mdw_t('flash.no_write_permissions', 'no write permissions') . ')';
-                }
-                $_SESSION['flash_error'] = $msg;
             }
         }
 
@@ -781,7 +882,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
             }
         }
 
-        redirect($redirect);
+        redirect(mdw_ensure_basic_in_url($redirect));
 	    } else if ($_POST['action'] === 'move_file') {
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
                 $authRequired = function_exists('mdw_auth_has_role')
@@ -849,7 +950,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
 
                 $redirect = 'index.php';
                 if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
-                redirect($redirect);
+                redirect(mdw_ensure_basic_in_url($redirect));
 		    } else if ($_POST['action'] === 'rename_folder') {
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
                 $authRequired = function_exists('mdw_auth_has_role')
@@ -908,7 +1009,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
 
                 $redirect = 'index.php';
                 if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
-                redirect($redirect);
+                redirect(mdw_ensure_basic_in_url($redirect));
 		    } else if ($_POST['action'] === 'delete_folder') {
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
                 $authRequired = function_exists('mdw_auth_has_role')
@@ -950,7 +1051,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
 
                 $redirect = 'index.php';
                 if ($returnFilter) $redirect = 'index.php?folder=' . rawurlencode($returnFilter);
-                redirect($redirect);
+                redirect(mdw_ensure_basic_in_url($redirect));
 		    } else if ($_POST['action'] === 'create_folder') {
                 $authRole = isset($_POST['auth_role']) ? (string)$_POST['auth_role'] : '';
                 $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
@@ -1220,7 +1321,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
 	                    if ($err && !empty($err['message'])) $msg .= ' (' . $err['message'] . ')';
 	                    $_SESSION['flash_error'] = $msg;
 	                } else {
-	                    redirect('edit.php?file=' . rawurlencode($sanNew));
+	                    redirect(mdw_url_with_basic('edit.php', ['file' => $sanNew]));
 	                }
 		            }
                 }
@@ -1329,7 +1430,7 @@ if ($requested) {
     }
 
 		/* LOAD DATA FOR INDEX */
-		$needExplorerTree = ($mode === 'index') || ($indexDualPaneEnabled && $mode === 'view');
+		$needExplorerTree = ($mode === 'index') || (!$MDW_BASIC_MODE && $indexDualPaneEnabled && $mode === 'view');
 		$rootList  = $needExplorerTree ? list_md_root_sorted()      : [];
 		$dirMap    = $needExplorerTree ? list_md_by_subdir_sorted() : [];
 		$secretMap = load_secret_mds(); // voor index-weergave
@@ -1349,6 +1450,9 @@ if ($requested) {
             } else if ($lazyOverride === '0' || $lazyOverride === 'false' || $lazyOverride === 'no') {
                 $explorerUseLazyNotes = false;
             }
+        }
+        if ($MDW_BASIC_MODE) {
+            $explorerUseLazyNotes = false;
         }
         $explorerLazyEndpoint = 'index.php?json=explorer_tree';
 			$existingFolders = [];
@@ -1378,12 +1482,17 @@ if ($requested) {
             $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
         }
 
-        $indexSplitLayout = $indexDualPaneEnabled && $mode !== 'secret_prompt';
+        $indexSplitLayout = !$MDW_BASIC_MODE && $indexDualPaneEnabled && $mode !== 'secret_prompt';
         $indexSplitHasFile = $mode === 'view' && is_string($requested) && $requested !== '';
         $indexSplitColStorageKey = 'mdw_index_split_col_widths';
         $indexSplitColStorageLegacyKey = 'mdw_index_col_widths';
         $indexSplitRowStorageKey = 'mdw_index_split_row_heights';
         $indexSplitRowStorageLegacyKey = 'mdw_index_row_heights';
+
+        if ($MDW_BASIC_MODE) {
+            require __DIR__ . '/index_basic_view.php';
+            exit;
+        }
 
 	?>
 <!DOCTYPE html>
@@ -1647,14 +1756,12 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
          data-shortcuts-title-hide-scale="0.24">
         <?=$indexHeaderPluginHtml?>
     </div>
-    <div id="indexShortcutsResizer"
-         class="index-shortcuts-resizer"
+    <div id="pluginsResizerHandle"
+         class="index-shortcuts-resizer plugins-resizer-handle"
          role="separator"
          aria-orientation="horizontal"
          tabindex="0"
-         aria-label="<?=h(mdw_t('index.shortcuts.resize','Resize shortcuts area'))?>">
-        <span class="pi pi-linkchain" aria-hidden="true"></span>
-    </div>
+         aria-label="<?=h(mdw_t('index.plugins.resize_handle','Plugins resizer handle'))?>"></div>
     <?php endif; ?>
 
     <div class="editor-shell">

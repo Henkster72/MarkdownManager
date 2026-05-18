@@ -1528,6 +1528,21 @@
     if (!overview) return;
 
     const isEditorPage = !!document.getElementById('editor');
+    const isIndexSplitLayout = document.body.classList.contains('index-split-layout');
+    const canInlineLoad = isEditorPage || isIndexSplitLayout;
+    const initialInlineFile = String(window.CURRENT_FILE || '').trim();
+    const canRestoreEmptyState = isIndexSplitLayout && !isEditorPage && initialInlineFile === '';
+    const initialDocumentTitle = String(document.title || '').trim();
+    const previewRoot = document.getElementById('preview');
+    const initialPreviewHtml = previewRoot instanceof HTMLElement ? previewRoot.innerHTML : '';
+    const readFileFromLocation = () => {
+        try {
+            const p = new URLSearchParams(window.location.search);
+            return String(p.get('file') || '').trim();
+        } catch {
+            return '';
+        }
+    };
 
     const filterInput = document.getElementById('filterInput');
     const editorForm = document.querySelector('.editor-form');
@@ -1647,6 +1662,17 @@
         setPreviewEditTarget(file);
         setExplorerTopActionTarget(file);
     };
+
+    if (canInlineLoad) {
+        try {
+            const state = (history.state && typeof history.state === 'object') ? history.state : {};
+            const stateFile = String(state.file || '').trim();
+            const currentFile = String(window.CURRENT_FILE || readFileFromLocation() || '').trim();
+            if (stateFile !== currentFile) {
+                history.replaceState({ ...state, file: currentFile }, '', window.location.href);
+            }
+        } catch {}
+    }
 
     if (!filterInput) return;
 
@@ -1975,7 +2001,11 @@
     const stateRank = (stateRaw) => {
         const state = normalizeSort(stateRaw || '');
         if (state === 'concept') return 0;
-        if (state === 'processing') return 1;
+        if (
+            state === 'processing'
+            || state === 'to publish' || state === 'topublish' || state === 'to-publish'
+            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
+        ) return 1;
         if (state === 'published') return 2;
         return 3;
     };
@@ -2067,7 +2097,11 @@
         if (state === 'published') {
             return { cls: 'publish-published', icon: 'pi-checkedcertificate', label: t('edit.publish_state.published', 'Published') };
         }
-        if (state === 'processing' || state === 'to publish' || state === 'topublish' || state === 'to-publish') {
+        if (
+            state === 'processing'
+            || state === 'to publish' || state === 'topublish' || state === 'to-publish'
+            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
+        ) {
             return { cls: 'publish-processing', icon: 'pi-certificate', label: t('edit.publish_state.processing', 'Processing') };
         }
         return { cls: 'publish-concept', icon: 'pi-lightbulb', label: t('edit.publish_state.concept', 'Concept') };
@@ -2547,39 +2581,52 @@
         })();
     }
 
-    // Editor: SPA-achtige navigatie (only markdown items)
-    if (isEditorPage) {
-        const setCurrentItem = (item) => {
-            if (!(item instanceof HTMLElement)) return;
-            document.querySelectorAll('.nav-item-current').forEach(el => {
-                el.classList.remove('nav-item-current', 'dirty');
-                const a = el.querySelector('a.kbd-item');
-                if (a) a.classList.remove('active');
-                const icon = el.querySelector('.note-icon');
-                if (icon) {
-                    icon.classList.remove('pi-documentlabel');
-                    if (!icon.classList.contains('pi-document')) {
-                        icon.classList.add('pi-document');
-                    }
-                }
-            });
-            item.classList.add('nav-item-current');
-            const a = item.querySelector('a.kbd-item');
-            if (a) a.classList.add('active');
-            const icon = item.querySelector('.note-icon');
+    const setCurrentItem = (item) => {
+        if (!(item instanceof HTMLElement)) return;
+        document.querySelectorAll('.nav-item-current').forEach(el => {
+            el.classList.remove('nav-item-current', 'dirty');
+            const a = el.querySelector('a.kbd-item');
+            if (a) a.classList.remove('active');
+            const icon = el.querySelector('.note-icon');
             if (icon) {
-                icon.classList.remove('pi-document');
-                icon.classList.add('pi-documentlabel');
+                icon.classList.remove('pi-documentlabel');
+                if (!icon.classList.contains('pi-document')) {
+                    icon.classList.add('pi-document');
+                }
             }
-        };
-
-        const focusCurrentInExplorer = () => {
-            const a = overview.querySelector('.nav-item-current a.kbd-item');
-            if (a instanceof HTMLAnchorElement) {
-                a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        });
+        item.classList.add('nav-item-current');
+        const a = item.querySelector('a.kbd-item');
+        if (a) a.classList.add('active');
+        const icon = item.querySelector('.note-icon');
+        if (icon) {
+            icon.classList.remove('pi-document');
+            icon.classList.add('pi-documentlabel');
+        }
+    };
+    const clearCurrentItem = () => {
+        document.querySelectorAll('.nav-item-current').forEach(el => {
+            el.classList.remove('nav-item-current', 'dirty');
+            const a = el.querySelector('a.kbd-item');
+            if (a) a.classList.remove('active');
+            const icon = el.querySelector('.note-icon');
+            if (icon) {
+                icon.classList.remove('pi-documentlabel');
+                if (!icon.classList.contains('pi-document')) {
+                    icon.classList.add('pi-document');
+                }
             }
-        };
+        });
+    };
 
+    const focusCurrentInExplorer = () => {
+        const a = overview.querySelector('.nav-item-current a.kbd-item');
+        if (a instanceof HTMLAnchorElement) {
+            a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    };
+
+    if (canInlineLoad) {
         const initialCurrent = overview.querySelector('.note-item.nav-item-current');
         if (initialCurrent instanceof HTMLElement) {
             setCurrentItem(initialCurrent);
@@ -2605,27 +2652,33 @@
                 return;
             }
 
-            if (window.__mdDirty) {
+            if (isEditorPage && window.__mdDirty) {
                 if (!confirm(t('js.unsaved_confirm', 'You have unsaved changes. Discard them and continue?'))) {
                     return;
                 }
             }
 
-            if (isSecret && !window.IS_SECRET_AUTHENTICATED) {
+            if (isSecret && window.IS_SECRET_AUTHENTICATED === false) {
                 window.location.href = link.href.replace('edit.php', 'index.php');
                 return;
             }
 
             setCurrentItem(item);
+            syncPreviewEditTarget(file);
             loadDocument(file);
             closeNav();
         });
     }
 
-    async function loadDocument(file) {
+    async function loadDocument(file, opts = {}) {
+        const options = (opts && typeof opts === 'object') ? opts : {};
+        const pushHistory = options.pushHistory !== false;
         const hadTreeFocus = document.activeElement instanceof HTMLElement
             ? overview.contains(document.activeElement)
             : false;
+        if (typeof window.__mdwCancelScheduledPreview === 'function') {
+            window.__mdwCancelScheduledPreview();
+        }
         try {
             if (!mdmApi || typeof mdmApi.get !== 'function') {
                 throw new Error('load_failed');
@@ -2658,6 +2711,7 @@
 
             // Update globale variabelen
             window.CURRENT_FILE = data.file;
+            window.MDW_CURRENT_MD = normalizeNewlines(data.content);
             window.initialContent = normalizeNewlines(data.content);
             window.__mdDirty = false;
             if (typeof data.secret_authenticated === 'boolean') {
@@ -2665,8 +2719,21 @@
             }
 
             // Update UI
-            document.title = `${data.title} • md edit`;
-            document.querySelector('.app-title').textContent = data.title;
+            const titlePrefix = (() => {
+                const raw = String(document.title || '').trim();
+                if (!raw) return '';
+                const idx = raw.indexOf('•');
+                return idx === -1 ? raw : raw.slice(0, idx).trim();
+            })();
+            if (isEditorPage) {
+                document.title = `${data.title} • md edit`;
+            } else {
+                document.title = titlePrefix ? `${titlePrefix} • ${data.title}` : data.title;
+            }
+            const appTitle = document.querySelector('.app-title');
+            if (appTitle instanceof HTMLElement && !appTitle.querySelector('.app-title-text')) {
+                appTitle.textContent = data.title;
+            }
             const folder = (() => {
                 const filePath = String(data.file || '');
                 if (!filePath) return 'root';
@@ -2675,7 +2742,13 @@
             })();
             const pathSegment = document.querySelector('.app-path-segment');
             if (pathSegment) {
-                pathSegment.textContent = data.file;
+                const fileLabel = (() => {
+                    const filePath = String(data.file || '');
+                    if (!filePath) return '';
+                    const idx = filePath.lastIndexOf('/');
+                    return idx === -1 ? filePath : filePath.slice(idx + 1);
+                })();
+                pathSegment.textContent = fileLabel;
                 if (pathSegment instanceof HTMLAnchorElement) {
                     const next = new URLSearchParams();
                     next.set('file', data.file);
@@ -2709,9 +2782,14 @@
             
             const editorTextarea = document.getElementById('editor');
             const preview = document.getElementById('preview');
-            const fileInput = editorForm.querySelector('input[name="file"]');
+            if (!(preview instanceof HTMLElement)) throw new Error('preview_missing');
+            const fileInput = (editorForm instanceof HTMLFormElement)
+                ? editorForm.querySelector('input[name="file"]')
+                : null;
+            const hasEditorSurface = editorTextarea instanceof HTMLTextAreaElement
+                && editorForm instanceof HTMLFormElement
+                && fileInput instanceof HTMLInputElement;
 
-            editorTextarea.value = normalizeNewlines(data.content);
             preview.innerHTML = data.html;
             if (typeof window.__mdwApplyTocHotKeyword === 'function') {
                 window.__mdwApplyTocHotKeyword(preview, data.content);
@@ -2719,7 +2797,10 @@
             if (typeof window.__mdwInitTocSideMenus === 'function') {
                 window.__mdwInitTocSideMenus(preview);
             }
-            fileInput.value = data.file;
+            if (hasEditorSurface) {
+                editorTextarea.value = normalizeNewlines(data.content);
+                fileInput.value = data.file;
+            }
 
             const deleteFileInput = document.getElementById('deleteFileInput');
             if (deleteFileInput) deleteFileInput.value = data.file;
@@ -2727,6 +2808,11 @@
             if (deleteForm) deleteForm.dataset.file = data.file;
             const deleteBtn = deleteForm?.querySelector('button[type="submit"]');
             if (deleteBtn) deleteBtn.disabled = !data.file;
+            document.querySelectorAll('#panePreview button[data-copy-buttons="1"]').forEach((btn) => {
+                if (btn instanceof HTMLButtonElement) {
+                    btn.disabled = !data.file;
+                }
+            });
             const newFolderReturnFileInput = document.querySelector('#newFolderForm input[name="return_file"]');
             if (newFolderReturnFileInput instanceof HTMLInputElement) {
                 newFolderReturnFileInput.value = data.file;
@@ -2740,15 +2826,26 @@
             }
 
             // Update browser history
-            history.pushState({file: data.file}, '', `?file=${encodeURIComponent(data.file)}`);
-            
-            // Trigger line number update en andere afhankelijke functies
-            if (typeof window.__mdwResetMetaStore === 'function') {
-                window.__mdwResetMetaStore();
+            if (pushHistory) {
+                history.pushState({file: data.file}, '', `?file=${encodeURIComponent(data.file)}`);
             }
-            editorTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-            if (typeof window.__mdwResetDirty === 'function') {
-                window.__mdwResetDirty();
+            
+            if (hasEditorSurface) {
+                // Sync editor chrome without scheduling a second preview render.
+                if (typeof window.__mdwResetMetaStore === 'function') {
+                    window.__mdwResetMetaStore();
+                }
+                if (typeof window.__mdwSyncEditorUiAfterExternalLoad === 'function') {
+                    const previewSource = (typeof window.__mdwBuildPreviewContent === 'function')
+                        ? window.__mdwBuildPreviewContent()
+                        : normalizeNewlines(data.content);
+                    window.__mdwSyncEditorUiAfterExternalLoad(previewSource);
+                } else {
+                    editorTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                if (typeof window.__mdwResetDirty === 'function') {
+                    window.__mdwResetDirty();
+                }
             }
             if (data && data.publish_state && typeof window.__mdwApplyPublishStateUi === 'function') {
                 window.__mdwApplyPublishStateUi(data.publish_state);
@@ -2757,6 +2854,7 @@
             if (publishOverride instanceof HTMLInputElement) {
                 publishOverride.value = '0';
             }
+            syncPreviewEditTarget(data.file);
 
             const activeAnchor = overview.querySelector(`[data-file="${CSS.escape(String(data.file || ''))}"] a.kbd-item`);
             if (activeAnchor instanceof HTMLAnchorElement) {
@@ -2780,6 +2878,52 @@
                 window.__mdwReportNetworkError(error);
             }
         }
+    }
+
+    let ignoreNextPopstate = false;
+    if (canInlineLoad) {
+        window.addEventListener('popstate', (event) => {
+            if (ignoreNextPopstate) {
+                ignoreNextPopstate = false;
+                return;
+            }
+
+            const fromState = (event && event.state && typeof event.state === 'object')
+                ? String(event.state.file || '').trim()
+                : '';
+            const targetFile = fromState || readFileFromLocation();
+            const currentFile = String(window.CURRENT_FILE || '').trim();
+
+            if (!targetFile) {
+                if (canRestoreEmptyState) {
+                    clearCurrentItem();
+                    window.CURRENT_FILE = '';
+                    window.MDW_CURRENT_MD = '';
+                    if (previewRoot instanceof HTMLElement) previewRoot.innerHTML = initialPreviewHtml;
+                    if (initialDocumentTitle) document.title = initialDocumentTitle;
+                    syncPreviewEditTarget('');
+                    closeNav();
+                    return;
+                }
+                window.location.reload();
+                return;
+            }
+            if (targetFile === currentFile) return;
+
+            if (isEditorPage && window.__mdDirty) {
+                if (!confirm(t('js.unsaved_confirm', 'You have unsaved changes. Discard them and continue?'))) {
+                    ignoreNextPopstate = true;
+                    history.go(1);
+                    return;
+                }
+            }
+
+            const row = overview.querySelector(`.doclink[data-kind="md"][data-file="${CSS.escape(targetFile)}"]`);
+            if (row instanceof HTMLElement) setCurrentItem(row);
+            syncPreviewEditTarget(targetFile);
+            loadDocument(targetFile, { pushHistory: false });
+            closeNav();
+        });
     }
 
     update();

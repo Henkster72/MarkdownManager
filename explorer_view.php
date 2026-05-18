@@ -603,7 +603,11 @@ function explorer_view_render_tree($opts) {
                     $publishClass = 'publish-published';
                     $publishIcon = 'pi-checkedcertificate';
                     $publishStateLabel = explorer_view_t('edit.publish_state.published', 'Published');
-                } else if ($s === 'processing' || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish') {
+                } else if (
+                    $s === 'processing'
+                    || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish'
+                    || $s === 'to delete' || $s === 'todelete' || $s === 'to-delete'
+                ) {
                     $publishClass = 'publish-processing';
                     $publishIcon = 'pi-certificate';
                     $publishStateLabel = explorer_view_t('edit.publish_state.processing', 'Processing');

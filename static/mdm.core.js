@@ -347,7 +347,8 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
             });
         });
         if (closeOnOverlay && overlay instanceof Element) {
-            overlay.addEventListener('click', () => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target !== overlay) return;
                 close({ source: 'overlay' });
             });
         }

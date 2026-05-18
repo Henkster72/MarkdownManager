@@ -248,7 +248,8 @@
 })();
 (function(){
     const panel = document.getElementById('indexShortcutsPanel');
-    const resizer = document.getElementById('indexShortcutsResizer');
+    const resizer = document.getElementById('pluginsResizerHandle')
+        || document.getElementById('indexShortcutsResizer');
     if (!(panel instanceof HTMLElement) || !(resizer instanceof HTMLElement)) return;
 
     const root = document.documentElement;
@@ -332,7 +333,8 @@
         if (save) writeStorage(storageKey, String(next));
     };
     const syncToViewport = () => {
-        const current = panel.getBoundingClientRect().height || defaultHeight();
+        const measured = panel.getBoundingClientRect().height;
+        const current = Number.isFinite(measured) ? measured : defaultHeight();
         applyHeight(current, false);
     };
     const restore = () => {

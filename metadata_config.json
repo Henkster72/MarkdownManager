@@ -10,6 +10,7 @@
     "publisher_mode": false,
     "publisher_default_author": "",
     "publisher_require_h2": true,
+    "editor_wrap": false,
     "copy_html_mode": "dry",
     "toc_menu": "inline",
     "ui_language": "",

@@ -72,6 +72,7 @@ if ($WPM_BASE_DOMAIN !== null) {
 }
 
 require_once __DIR__ . '/explorer_view.php';
+require_once __DIR__ . '/explorer_view_basic.php';
 $github_pages_plugin_loaded = false;
 $aw_ssg_template_plugin_loaded = false;
 $github_pages_env_ready = false;
@@ -157,6 +158,7 @@ require_once __DIR__ . '/themes_lib.php';
 $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
 $IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
 $THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
+$TOOLS_DIR = 'tools';
 $themesList = list_available_themes($THEMES_DIR);
 $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
@@ -427,6 +429,50 @@ function try_secret_login($passwordInput) {
     return hash_equals($SECRET_MDS_PASSWORD, $passwordInput);
 }
 
+function mdw_parse_basic_mode_value($raw) {
+    if ($raw === null) return null;
+    if (is_bool($raw)) return $raw;
+    $v = strtolower(trim((string)$raw));
+    if ($v === '') return true;
+    if (in_array($v, ['1', 'true', 'yes', 'on', 'basic'], true)) return true;
+    if (in_array($v, ['0', 'false', 'no', 'off', 'modern'], true)) return false;
+    return null;
+}
+
+function mdw_detect_opera_mini_ua() {
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? (string)$_SERVER['HTTP_USER_AGENT'] : '';
+    if ($ua === '') return false;
+    return stripos($ua, 'Opera Mini') !== false;
+}
+
+$mdw_basic_from_query = array_key_exists('basic', $_GET) ? mdw_parse_basic_mode_value($_GET['basic']) : null;
+$mdw_basic_from_post = array_key_exists('basic', $_POST) ? mdw_parse_basic_mode_value($_POST['basic']) : null;
+$mdw_opera_mini_detected = mdw_detect_opera_mini_ua();
+
+$MDW_BASIC_REASON = 'default';
+if ($mdw_basic_from_query !== null) {
+    $MDW_BASIC_MODE = $mdw_basic_from_query;
+    $MDW_BASIC_REASON = 'query';
+} else if ($mdw_basic_from_post !== null) {
+    $MDW_BASIC_MODE = $mdw_basic_from_post;
+    $MDW_BASIC_REASON = 'post';
+} else if ($mdw_opera_mini_detected) {
+    $MDW_BASIC_MODE = true;
+    $MDW_BASIC_REASON = 'opera-mini';
+} else {
+    $MDW_BASIC_MODE = false;
+}
+
+function mdw_basic_url($script, $params = []) {
+    global $MDW_BASIC_MODE;
+    if (!is_array($params)) $params = [];
+    if (!empty($MDW_BASIC_MODE) && !array_key_exists('basic', $params)) {
+        $params['basic'] = '1';
+    }
+    $query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+    return $script . ($query !== '' ? ('?' . $query) : '');
+}
+
 /* ROUTING: determine requested file */
 $requested = null;
 if (isset($_GET['file'])) {
@@ -457,6 +503,9 @@ if (isset($_GET['lazy'])) {
     } else if ($lazyOverride === '0' || $lazyOverride === 'false' || $lazyOverride === 'no') {
         $explorerUseLazyNotes = false;
     }
+}
+if ($MDW_BASIC_MODE) {
+    $explorerUseLazyNotes = false;
 }
 $explorerLazyEndpoint = 'index.php?json=explorer_tree';
 
@@ -642,7 +691,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                             $save_error = mdw_t('flash.rename_failed', 'Could not rename file.');
                             if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
                         } else {
-                            redirect('edit.php?file=' . rawurlencode($newPath));
+                            redirect(mdw_basic_url('edit.php', ['file' => $newPath]));
                         }
                     }
                 }
@@ -668,7 +717,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if ($isAjax) {
                 json(['ok' => false, 'error' => 'forbidden'], 403);
             }
-            redirect('index.php?file=' . rawurlencode($san));
+            redirect(mdw_basic_url('index.php', ['file' => $san]));
         }
             $full = mdw_safe_full_path($san, true);
             if (!$full || !is_file($full)) {
@@ -838,7 +887,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     if ($isAjax) {
                                         json($save_ok_payload);
                                     }
-                                    redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                    redirect(mdw_basic_url('edit.php', ['file' => $san, 'saved' => '1']));
                                 }
                                 $save_error = 'Kon tijdelijke file niet schrijven.';
                                 if ($err && !empty($err['message'])) $save_error .= ' (' . $err['message'] . ')';
@@ -855,7 +904,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     if ($isAjax) {
                                         json($save_ok_payload);
                                     }
-                                    redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                    redirect(mdw_basic_url('edit.php', ['file' => $san, 'saved' => '1']));
                                 }
                             }
                         } else {
@@ -869,7 +918,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 if ($isAjax) {
                                     json($save_ok_payload);
                                 }
-                                redirect('edit.php?file=' . rawurlencode($san) . '&saved=1');
+                                redirect(mdw_basic_url('edit.php', ['file' => $san, 'saved' => '1']));
                             }
                         }
                 }
@@ -897,7 +946,7 @@ $is_secret_req   = $requested ? is_secret_file($requested) : false;
 if ($requested) {
     if ($is_secret_req && !is_secret_authenticated()) {
         // eerst via index.php wachtwoord laten invoeren
-        redirect('index.php?file=' . rawurlencode($requested));
+        redirect(mdw_basic_url('index.php', ['file' => $requested]));
     }
 
 	$full = mdw_safe_full_path($requested, true);
@@ -927,7 +976,8 @@ if (!empty($MDW_PUBLISHER_MODE)) {
     $current_publish_state = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
     if ($current_publish_state === '') $current_publish_state = 'Concept';
 }
-$current_publish_state_lower = strtolower($current_publish_state);
+$current_publish_state_ui = ($current_publish_state === 'ToDelete') ? 'Processing' : $current_publish_state;
+$current_publish_state_lower = strtolower($current_publish_state_ui);
 
 $rename_slug_value = '';
 $rename_prefix_value = '';
@@ -944,6 +994,11 @@ if ($requested) {
     }
     $base = preg_replace('/\\.md$/i', '', $base);
     $rename_slug_value = $base;
+}
+
+if ($MDW_BASIC_MODE) {
+    require __DIR__ . '/edit_basic_view.php';
+    exit;
 }
 
 $editSplitColStorageKey = 'mdw_edit_split_col_widths';
@@ -1042,7 +1097,7 @@ $editSplitRowStorageLegacyKey = 'mdw_editor_row_heights';
 // Bootstrap editor word wrap early (pre-CSS) to avoid layout shift on reload/save.
 (function(){
     try {
-        if (window.__mdwStorageGet('mdw_editor_wrap') === '1') {
+        if (<?= !empty($MDW_SETTINGS['editor_wrap']) ? 'true' : 'false' ?>) {
             document.documentElement.classList.add('mdw-wrap-on');
         }
     } catch {}
@@ -1281,7 +1336,7 @@ window.mermaid = mermaid;
 			                                                'Published' => mdw_t('edit.publish_state.published', 'Published'),
 			                                            ];
 			                                            foreach ($stateOptions as $val => $label):
-			                                                $selected = ($current_publish_state === $val) ? 'selected' : '';
+			                                                $selected = ($current_publish_state_ui === $val) ? 'selected' : '';
 			                                        ?>
 			                                            <option value="<?=h($val)?>" <?= $selected ?>><?=h($label)?></option>
 			                                        <?php endforeach; ?>
