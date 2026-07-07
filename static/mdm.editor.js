@@ -4124,7 +4124,7 @@
             const pos = Math.min(match.index, next.length);
             setSelection(pos, pos);
             dispatchInput();
-            return;
+            return true;
         }
 
         const hasTocTarget = value.split('\n').some((line) => {
@@ -4134,7 +4134,7 @@
         });
         if (!hasTocTarget) {
             alert(t('edit.toolbar.toc_no_headings', 'No H3 headings yet.'));
-            return;
+            return false;
         }
 
         const lines = value.split('\n');
@@ -4154,6 +4154,7 @@
         const pos = (before ? before.length + 1 : 0);
         setSelection(pos, pos + 5);
         dispatchInput();
+        return true;
     };
 
     const CUSTOM_CSS_CURSOR = '__MDW_CUSTOM_CSS_CURSOR__';
@@ -4705,8 +4706,9 @@
     });
     tocBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
-            if (typeof syncVisualPreviewToTextarea === 'function') syncVisualPreviewToTextarea();
-            runFormatAction(() => toggleToc());
+            let changed = false;
+            runFormatAction(() => { changed = toggleToc(); });
+            if (!changed) return;
             cancelScheduledPreview();
             sendPreview();
             prev.focus();
