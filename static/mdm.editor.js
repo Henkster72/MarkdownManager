@@ -410,6 +410,9 @@
         };
         btn.addEventListener('click', () => {
             if (!document.body?.classList.contains('hide-markdown-editor')) return;
+            if (!document.body.classList.contains('mdw-show-markdown-source') && typeof syncVisualPreviewToTextarea === 'function') {
+                syncVisualPreviewToTextarea();
+            }
             document.body.classList.toggle('mdw-show-markdown-source');
             sync();
             if (document.body.classList.contains('mdw-show-markdown-source')) {
@@ -2261,6 +2264,24 @@
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
         if (!(node instanceof Element)) return '';
         if (node.matches('.md-meta, [data-mdw-generated="metadata"]')) return '';
+        if (node.matches('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]')) return '';
+        if (node.matches('.md-toc-layout')) {
+            const body = node.querySelector(':scope > .md-toc-body');
+            const bodyBlocks = body instanceof Element
+                ? Array.from(body.childNodes)
+                    .map((child) => blockMarkdown(child, depth))
+                    .map((s) => String(s || '').trim())
+                    .filter(Boolean)
+                : [];
+            return ['{TOC}', ...bodyBlocks].join('\n\n');
+        }
+        if (node.matches('.md-toc-body')) {
+            return Array.from(node.childNodes)
+                .map((child) => blockMarkdown(child, depth))
+                .map((s) => String(s || '').trim())
+                .filter(Boolean)
+                .join('\n\n');
+        }
         const tag = node.tagName.toLowerCase();
         if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
