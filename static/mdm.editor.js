@@ -2081,20 +2081,13 @@
         layout.appendChild(nav);
         layout.appendChild(body);
 
-        if (layoutMode === 'inline') {
-            let node = placeholder.nextSibling;
-            while (node) {
-                const next = node.nextSibling;
-                body.appendChild(node);
-                node = next;
-            }
-            placeholder.replaceWith(layout);
-        } else {
-            placeholder.remove();
-            const nodes = Array.from(previewEl.childNodes);
-            nodes.forEach((node) => body.appendChild(node));
-            previewEl.appendChild(layout);
+        let node = placeholder.nextSibling;
+        while (node) {
+            const next = node.nextSibling;
+            body.appendChild(node);
+            node = next;
         }
+        placeholder.replaceWith(layout);
     };
     window.__mdwApplyTocHotKeyword = applyTocHotKeyword;
 
