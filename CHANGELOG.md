@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.91
+
+- TOC layout stability: fixed the right-side TOC preview layout so the TOC rail and article body stay in the same two-column grid row instead of slipping above or below the title/content block.
+- TOC editor behavior: the generated TOC shell is now non-editable in visual/WPM mode, while the article body remains editable as before.
+- TOC sticky behavior: restored the in-editor sticky TOC behavior with a local low offset so the menu stays visible while scrolling the article preview without drifting over the title block.
+- TOC marker anchoring: tightened `{TOC}` anchoring so server-rendered and client-updated previews keep the TOC mounted at the placeholder position during toggles and refreshes.
+- Regression coverage: added a TOC layout regression test that checks the rendered two-column structure and the critical CSS rules that keep the TOC row-locked and sticky in editor preview mode.
+
 ## 0.9
 
 - WPM visual editing: added a hide-markdown editor mode that lets authors work in the preview surface while keeping the Markdown textarea available as an underwater/source mode.
