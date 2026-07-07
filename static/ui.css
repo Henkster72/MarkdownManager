@@ -1085,7 +1085,8 @@ a:hover {
 
 .edit-page #panePreview .preview-content .md-toc-side,
 .index-page.index-split-layout #panePreview .preview-content .md-toc-side {
-  top: 0.75rem;
+  position: relative;
+  top: auto;
   max-height: none;
   overflow: visible;
 }
