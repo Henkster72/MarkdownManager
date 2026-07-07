@@ -155,10 +155,12 @@
 
 .preview-content .md-toc-layout.md-toc-right .md-toc-side {
     grid-column: 2;
+    grid-row: 1;
 }
 
 .preview-content .md-toc-layout.md-toc-right .md-toc-body {
     grid-column: 1;
+    grid-row: 1;
 }
 
 .preview-content .md-toc-side {
