@@ -2649,6 +2649,10 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   .edit-page .pane-header-actions .btn {
     padding: 0.3rem 0.4rem;
   }
+
+  .app-footer {
+    display: none;
+  }
 }
 
 /* Basic mode (no-JS fallback) */
