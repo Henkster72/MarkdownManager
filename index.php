@@ -2130,12 +2130,8 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 <!-- Filter + heading -->
 <section style="text-align: center; margin-bottom: 2rem;">
     <h1 style="font-size: 1.875rem; font-weight: 700; margin-bottom: 0.75rem;"><?=h(mdw_t('index.contents','Contents'))?></h1>
-		    <p style="font-size: 0.8rem; color: var(--text-muted); max-width: 42em; margin: 0 auto; line-height: 1.6;">
-		        <?=h(mdw_t('index.filter_desc','Filter by title. Newest dates first (based on filename prefix yy-mm-dd-).'))?>
-		        <?=h(mdw_t('index.title_rule.prefix','First'))?> <code># Heading</code> <?=h(mdw_t('index.title_rule.middle','in each .md becomes the title; HTML uses'))?> <code>&lt;title&gt;</code> <?=h(mdw_t('index.title_rule.or','(or'))?> <code>&lt;h1&gt;</code><?=h(mdw_t('index.title_rule.suffix',').'))?>
-		    </p>
 		    <div id="filterWrap" style="position: relative; max-width: 20rem; margin: 1rem auto 0;">
-		        <input id="filterInput" class="input notes-filter-input" style="margin: 0; padding-right: 2.25rem;" type="text" placeholder="<?=h(mdw_t('index.filter_placeholder','Type to filter...'))?>">
+		        <input id="filterInput" class="input notes-filter-input" style="margin: 0; padding-right: 2.25rem;" type="text" placeholder="<?=h(mdw_t('index.filter_placeholder','Type to search...'))?>">
 		        <button id="filterClear" type="button" class="btn btn-ghost icon-button" title="<?=h(mdw_t('index.filter_clear','Clear filter'))?>" aria-label="<?=h(mdw_t('index.filter_clear','Clear filter'))?>" style="display: none; position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%);">
 		            <span class="pi pi-cross"></span>
 	        </button>
