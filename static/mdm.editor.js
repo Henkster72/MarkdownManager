@@ -2284,12 +2284,26 @@
                 .join('\n\n');
         }
         const tag = node.tagName.toLowerCase();
+        const alignClassFor = (el) => {
+            if (!(el instanceof HTMLElement)) return '';
+            if (el.classList.contains('right') || el.classList.contains('align-right')) return 'right';
+            if (el.classList.contains('center') || el.classList.contains('align-center')) return 'center';
+            const inlineAlign = String(el.style?.textAlign || '').trim().toLowerCase();
+            if (inlineAlign === 'right' || inlineAlign === 'center') return inlineAlign;
+            let computedAlign = '';
+            try { computedAlign = String(window.getComputedStyle(el).textAlign || '').trim().toLowerCase(); } catch {}
+            return (computedAlign === 'right' || computedAlign === 'center') ? computedAlign : '';
+        };
+        const withAlignAttr = (markdown, el) => {
+            const align = alignClassFor(el);
+            return align ? `${markdown}\n{: class="${align}" }` : markdown;
+        };
         if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
             return `${'#'.repeat(level)} ${escapeMd(inlineMarkdown(node))}`;
         }
         if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
-            return escapeMd(inlineMarkdown(node));
+            return withAlignAttr(escapeMd(inlineMarkdown(node)), node);
         }
         if (tag === 'blockquote') {
             return Array.from(node.childNodes)
@@ -3815,7 +3829,7 @@
             const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
             if (!m) {
                 if (delta > 0) {
-                    const out = '# ' + line;
+                    const out = '## ' + line;
                     deltas.push({ absStart, delta: out.length - line.length });
                     return out;
                 }
@@ -3827,7 +3841,8 @@
             const hashes = m[2] || '';
             const rest = m[3] || '';
             const level = hashes.length;
-            const nextLevel = Math.max(0, Math.min(6, level + delta));
+            const rawNextLevel = level + delta;
+            const nextLevel = rawNextLevel <= 1 ? 0 : Math.max(2, Math.min(6, rawNextLevel));
 
             if (nextLevel <= 0) {
                 const out = indent + rest.replace(/^\s+/, '');
@@ -3855,7 +3870,7 @@
     };
 
     const setHeadingLevel = (targetLevel) => {
-        const level = Math.max(1, Math.min(6, Number(targetLevel) || 1));
+        const level = Math.max(2, Math.min(6, Number(targetLevel) || 2));
         const value = ta.value;
         const selStart = ta.selectionStart ?? 0;
         const selEnd = ta.selectionEnd ?? 0;
@@ -4609,6 +4624,84 @@
         document.getElementById('addImageBtn'),
     ].forEach(saveVisualSelectionBeforeToolbar);
 
+    const previewElForToolbar = document.getElementById('preview');
+    const closestEditableBlock = (node) => {
+        const el = node instanceof Element ? node : node?.parentElement;
+        if (!(el instanceof Element) || !(previewElForToolbar instanceof HTMLElement) || !previewElForToolbar.contains(el)) return null;
+        return el.closest('h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,div');
+    };
+    const readAlignFromElement = (el) => {
+        if (!(el instanceof HTMLElement)) return 'left';
+        if (el.classList.contains('right') || el.classList.contains('align-right')) return 'right';
+        if (el.classList.contains('center') || el.classList.contains('align-center')) return 'center';
+        const inlineAlign = String(el.style?.textAlign || '').trim().toLowerCase();
+        if (inlineAlign === 'right' || inlineAlign === 'center') return inlineAlign;
+        let computedAlign = '';
+        try { computedAlign = String(window.getComputedStyle(el).textAlign || '').trim().toLowerCase(); } catch {}
+        return (computedAlign === 'right' || computedAlign === 'center') ? computedAlign : 'left';
+    };
+    const currentMarkdownLineInfo = () => {
+        const value = ta.value;
+        const pos = ta.selectionStart ?? 0;
+        const lineStart = value.lastIndexOf('\n', Math.max(0, pos - 1)) + 1;
+        let lineEnd = value.indexOf('\n', pos);
+        if (lineEnd === -1) lineEnd = value.length;
+        const line = value.slice(lineStart, lineEnd);
+        const headingMatch = line.match(/^\s*(#{1,6})\s+/);
+        const readAttrLine = (raw) => {
+            const m = String(raw || '').match(/^\s*\{\s*:\s*([^}]*)\}\s*$/);
+            if (!m) return '';
+            const cls = String(m[1] || '').match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"']+))/i);
+            const classes = String(cls?.[1] || cls?.[2] || cls?.[3] || '').split(/\s+/);
+            if (classes.includes('right') || classes.includes('align-right')) return 'right';
+            if (classes.includes('center') || classes.includes('align-center')) return 'center';
+            return '';
+        };
+        let nextLineEnd = value.indexOf('\n', lineEnd + 1);
+        if (nextLineEnd === -1) nextLineEnd = value.length;
+        const nextLine = lineEnd < value.length ? value.slice(lineEnd + 1, nextLineEnd) : '';
+        const currentAttrAlign = readAttrLine(line);
+        return {
+            heading: headingMatch && headingMatch[1].length >= 2 ? String(headingMatch[1].length) : '',
+            align: currentAttrAlign || readAttrLine(nextLine) || 'left',
+        };
+    };
+    let toolbarSyncScheduled = false;
+    const syncToolbarFromSelection = () => {
+        toolbarSyncScheduled = false;
+        let heading = '';
+        let align = 'left';
+        const sel = window.getSelection?.();
+        if (isUsingVisualEditor() && sel && sel.rangeCount && previewElForToolbar instanceof HTMLElement && previewElForToolbar.contains(sel.anchorNode)) {
+            const block = closestEditableBlock(sel.anchorNode);
+            if (block instanceof HTMLElement) {
+                const tag = block.tagName.toLowerCase();
+                if (/^h[2-6]$/.test(tag)) heading = tag.slice(1);
+                align = readAlignFromElement(block);
+            }
+        } else if (document.activeElement === ta) {
+            const info = currentMarkdownLineInfo();
+            heading = info.heading;
+            align = info.align;
+        }
+        if (headingSelect instanceof HTMLSelectElement) headingSelect.value = heading;
+        if (alignSelect instanceof HTMLSelectElement) alignSelect.value = align;
+    };
+    const scheduleToolbarSync = () => {
+        if (toolbarSyncScheduled) return;
+        toolbarSyncScheduled = true;
+        requestAnimationFrame(syncToolbarFromSelection);
+    };
+    document.addEventListener('selectionchange', scheduleToolbarSync);
+    ta.addEventListener('keyup', scheduleToolbarSync);
+    ta.addEventListener('mouseup', scheduleToolbarSync);
+    ta.addEventListener('click', scheduleToolbarSync);
+    if (previewElForToolbar instanceof HTMLElement) {
+        previewElForToolbar.addEventListener('keyup', scheduleToolbarSync);
+        previewElForToolbar.addEventListener('mouseup', scheduleToolbarSync);
+        previewElForToolbar.addEventListener('click', scheduleToolbarSync);
+    }
+
     headingSelect?.addEventListener('change', () => {
         if (!(headingSelect instanceof HTMLSelectElement)) return;
         const value = String(headingSelect.value || '').trim();
@@ -4620,7 +4713,7 @@
             runFormatAction(() => setHeadingLevel(level));
             ta.focus();
         }
-        headingSelect.value = '';
+        setTimeout(scheduleToolbarSync, 0);
     });
 
     alignSelect?.addEventListener('change', () => {
@@ -4635,7 +4728,7 @@
             runFormatAction(() => applyAlignment(align));
             ta.focus();
         }
-        alignSelect.value = 'left';
+        setTimeout(scheduleToolbarSync, 0);
     });
 
     boldBtn?.addEventListener('click', () => {
@@ -4895,8 +4988,8 @@
             return;
         }
 
-        // Set heading level directly: Ctrl+Alt+1..6
-        if (!e.shiftKey && /^[1-6]$/.test(String(e.key || ''))) {
+        // Set heading level directly: Ctrl+Alt+2..6 (H1 is reserved for the page title).
+        if (!e.shiftKey && /^[2-6]$/.test(String(e.key || ''))) {
             e.preventDefault();
             const level = Number(e.key);
             runFormatAction(() => setHeadingLevel(level));

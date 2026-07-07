@@ -1438,8 +1438,7 @@ window.mermaid = mermaid;
                                     <option value="right">R</option>
                                 </select>
                                 <select id="headingSelect" class="input editor-toolbar-select editor-heading-select" aria-label="<?=h(mdw_t('edit.toolbar.heading','Heading'))?>">
-                                    <option value="" class="md-h1 heading-select-option" selected>H1</option>
-                                    <option value="1" class="md-h1 heading-select-option">H1</option>
+                                    <option value="" class="heading-select-option" selected>H</option>
                                     <option value="2" class="md-h2 heading-select-option">H2</option>
                                     <option value="3" class="md-h3 heading-select-option">H3</option>
                                     <option value="4" class="md-h4 heading-select-option">H4</option>
