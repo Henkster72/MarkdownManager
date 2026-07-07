@@ -1,4 +1,4 @@
-# MarkdownManager v0.81
+# MarkdownManager v0.9
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,12 +7,12 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.9: WPM hide-markdown/visual editing mode, source toggle, article metadata modal, optional TOC toolbar control, responsive toolbar fixes, WPM copy cleanup, localized EN/NL UI strings, and test-login/config updates.
 - v0.81: major Explorer/index overhaul with lazy-loaded + cached note trees, sticky and unified explorer controls, keyboard/focus and SPA navigation fixes, smarter focused-file rename behavior, split-view layout controls, and broader UI/settings polish.
 - v0.8: optional AW-SSG template export plugin (Jinja), smarter WPM metafield mapping/defaults, and cleaner class/footnote template output.
 - v0.7: toolbar sizing/icon polish, WPM publish badges/icons, list-item class attributes, preview/meta fixes (author defaults), and active note icon sync.
 - v0.6.3: editor bracket-pair highlight, HTML-only author metadata in WPM, and drag/drop internal link insertion.
 - v0.6: TOC sidebar option, wet export font links, safer auth hashes, and mobile pane focus fixes.
-- v0.5.1: richer static exports (foldered index, Mermaid support, repo footer) and a smoother Pages workflow.
 
 ## Why check this out
 
@@ -71,6 +71,10 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 - Link modal with internal/external/footnote helpers.
 - Multi-language UI (EN/NL/DE/FR/PT/ES/IT).
 - Works on desktop and mobile.
+
+## Languages
+
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.9 refreshes the English and Dutch labels for the new WPM visual-editor controls, article metadata editor, TOC toolbar option, and WPM settings text.
 
 ## Security warning (read this)
 
@@ -163,6 +167,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
+- 0.9: WPM visual editing mode with hide-markdown layout, source toggle, article metadata modal, optional TOC toolbar button, responsive toolbar cleanup, localized EN/NL labels, and safer WPM settings copy.
 - 0.81: Explorer/index got lazy-loading + caching, sticky and unified explorer controls, improved keyboard/focus flow and SPA loading, focused-file rename upgrades (including optional date-prefix keep in non-WPM), split-view layout controls, and broader settings/UI cleanup.
 - 0.6.2: JS refactor into `mdm.*` modules with shared helpers and core bootstrap.
 - 0.6: TOC sidebar option, wet export font links, safer auth hashes, and mobile pane focus fixes.

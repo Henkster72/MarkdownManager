@@ -1,34 +1,47 @@
 {
-  "_meta": {
-    "version": 1
-  },
-  "_auth": {
-    "user_hash": "",
-    "superuser_hash": ""
-  },
-  "_settings": {
-    "publisher_mode": false,
-    "publisher_default_author": "",
-    "publisher_require_h2": true,
-    "editor_wrap": false,
-    "copy_html_mode": "dry",
-    "toc_menu": "inline",
-    "ui_language": "",
-    "ui_theme": "",
-    "theme_preset": "default",
-    "theme_overrides": {
-      "preview": {},
-      "editor": {}
+    "_meta": {
+        "version": 1
     },
-    "custom_css": "",
-    "folder_icon_style": "folder",
-    "app_title": ""
-  },
-  "fields": {
-    "date": {
-      "label": "Date",
-      "markdown_visible": true,
-      "html_visible": false
+    "_auth": {
+        "user_hash": "$argon2id$v=19$m=65536,t=4,p=1$MU5QMlZLZmlEbEYwOWt4RA$uKnIEJlr4Lh7ZOAKg8K/5t2qbePJl2HbE7Cm0tQOrCo",
+        "superuser_hash": "$argon2id$v=19$m=65536,t=4,p=1$cFgub0htdVZGUWppbE9rdQ$4AKI5m3MjPh2Ar1o+E4znKJZU2voEjr2fEeYlgzwiQ4"
+    },
+    "_settings": {
+        "publisher_mode": false,
+        "publisher_default_author": "",
+        "publisher_require_h2": true,
+        "allow_user_publish": false,
+        "allow_user_delete": true,
+        "editor_wrap": false,
+        "copy_buttons_enabled": true,
+        "copy_include_meta": true,
+        "copy_html_mode": "dry",
+        "toc_menu": "inline",
+        "post_date_format": "mdy_short",
+        "post_date_align": "left",
+        "folder_icon_style": "folder",
+        "index_dual_pane_overview": true,
+        "hide_markdown_editor": true,
+        "ui_language": "nl",
+        "ui_theme": "",
+        "theme_preset": "default",
+        "theme_overrides": {
+            "preview": [],
+            "editor": []
+        },
+        "custom_css": "",
+        "app_title": "",
+        "internal_link_prefix": "",
+        "export_class_prefix": "",
+        "jinja_meta_prefix": "page_"
+    },
+    "fields": {
+        "date": {
+            "label": "Date",
+            "markdown_visible": true,
+            "html_visible": false,
+            "obligatory": false,
+            "default_value": ""
+        }
     }
-  }
 }

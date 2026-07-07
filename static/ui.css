@@ -818,6 +818,57 @@ a:hover {
 .edit-page #paneMarkdown { grid-column: 3; grid-row: 1; }
 .edit-page .col-resizer[data-resizer="right"] { grid-column: 4; grid-row: 1; }
 .edit-page #panePreview { grid-column: 5; grid-row: 1; }
+.edit-page.hide-markdown-editor .editor-grid {
+  grid-template-columns: minmax(0, calc(var(--col-left) - 2px)) 4px minmax(0, calc(100% - var(--col-left) - 2px));
+}
+.edit-page.hide-markdown-editor #paneMarkdown,
+.edit-page.hide-markdown-editor .col-resizer[data-resizer="right"],
+.edit-page.hide-markdown-editor #panePreview .pane-focus-toggle {
+  display: none;
+}
+.edit-page.hide-markdown-editor #panePreview {
+  grid-column: 3;
+}
+.edit-page.hide-markdown-editor.mdw-show-markdown-source .editor-grid {
+  grid-template-columns: minmax(0, calc(var(--col-left) - 2px)) 4px minmax(0, calc(var(--col-mid) - 4px)) 4px minmax(0, calc(var(--col-right) - 2px));
+}
+.edit-page.hide-markdown-editor.mdw-show-markdown-source #paneMarkdown {
+  display: flex;
+}
+.edit-page.hide-markdown-editor.mdw-show-markdown-source .col-resizer[data-resizer="right"] {
+  display: block;
+}
+.edit-page.hide-markdown-editor.mdw-show-markdown-source #panePreview {
+  grid-column: 5;
+}
+.edit-page.hide-markdown-editor #panePreview .pane-header-actions {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.edit-page.hide-markdown-editor #panePreview .editor-toolbar {
+  margin-bottom: 0;
+}
+.edit-page.hide-markdown-editor #preview[contenteditable="true"] {
+  min-height: 100%;
+  outline: none;
+}
+.edit-page.hide-markdown-editor #preview[contenteditable="true"]:focus {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.edit-page.hide-markdown-editor #preview img.is-selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.16);
+}
+.hide-markdown-editor .new-md-extension {
+  display: none;
+}
+.md-source-toggle {
+  display: none;
+}
+.hide-markdown-editor .md-source-toggle {
+  display: inline-flex;
+}
 .index-page.index-split-layout #links_md_overview { grid-column: 1; grid-row: 1; }
 .index-page.index-split-layout .col-resizer[data-resizer="right"] { grid-column: 2; grid-row: 1; }
 .index-page.index-split-layout #panePreview { grid-column: 3; grid-row: 1; }
@@ -825,6 +876,21 @@ a:hover {
 /* Edit: collapse/expand explorer (left pane) */
 .mdw-explorer-collapsed .editor-grid {
   grid-template-columns: 2.25rem 0px calc(100% - var(--col-right) - 4px - 2.25rem) 4px var(--col-right);
+}
+.mdw-explorer-collapsed .edit-page.hide-markdown-editor .editor-grid {
+  grid-template-columns: 2.25rem minmax(0, calc(100% - 2.25rem));
+}
+.mdw-explorer-collapsed .edit-page.hide-markdown-editor.mdw-show-markdown-source .editor-grid {
+  grid-template-columns: 2.25rem 0px calc(100% - var(--col-right) - 4px - 2.25rem) 4px var(--col-right);
+}
+.mdw-explorer-collapsed .edit-page.hide-markdown-editor .col-resizer[data-resizer="left"] {
+  display: none;
+}
+.mdw-explorer-collapsed .edit-page.hide-markdown-editor #panePreview {
+  grid-column: 2;
+}
+.mdw-explorer-collapsed .edit-page.hide-markdown-editor.mdw-show-markdown-source #panePreview {
+  grid-column: 5;
 }
 .mdw-explorer-collapsed #links_md_overview {
   padding: 0.35rem;
@@ -950,7 +1016,7 @@ a:hover {
 }
 
 @supports (container-type: inline-size) {
-  @container (max-width: 520px) {
+  @container (max-width: 1024px) {
     .pane-header-actions .btn-label {
       display: none;
     }
@@ -964,7 +1030,7 @@ a:hover {
     }
   }
 
-  @container (min-width: 521px) {
+  @container (min-width: 1025px) {
     .pane-header-actions .btn-label {
       display: inline-flex;
     }
@@ -976,7 +1042,7 @@ a:hover {
 }
 
 @supports not (container-type: inline-size) {
-  @media (max-width: 960px) {
+  @media (max-width: 1024px) {
     .edit-page .pane-header-actions .btn-label {
       display: none;
     }
@@ -1857,6 +1923,24 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   font-weight: 700;
 }
 
+.format-toc-btn .format-letter {
+  font-size: 0.62rem;
+}
+
+.article-meta-fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.article-meta-field .input {
+  width: 100%;
+}
+
+.article-meta-key {
+  margin-top: 0.18rem;
+  font-family: var(--font-mono);
+}
+
 .format-italic {
   font-style: italic;
   font-family: "Courier New", "Courier", "Nimbus Mono L", "Liberation Mono", monospace;
@@ -2163,6 +2247,62 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 
   .edit-page #paneMarkdown { grid-row: 1; }
   .edit-page #panePreview { grid-row: 3; }
+  .edit-page.hide-markdown-editor .editor-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(360px, 1fr);
+  }
+  .edit-page.hide-markdown-editor #panePreview {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+  }
+  .edit-page.hide-markdown-editor.mdw-show-markdown-source .editor-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(240px, var(--row-top, 50vh)) 12px minmax(240px, var(--row-bottom, 50vh));
+  }
+  .edit-page.hide-markdown-editor.mdw-show-markdown-source #paneMarkdown {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .edit-page.hide-markdown-editor.mdw-show-markdown-source .col-resizer[data-resizer="right"] {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .edit-page.hide-markdown-editor.mdw-show-markdown-source #panePreview {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .edit-page.hide-markdown-editor #panePreview .editor-pane-inner,
+  .edit-page.hide-markdown-editor #panePreview .pane-body,
+  .edit-page.hide-markdown-editor #panePreview .preview-container,
+  .edit-page.hide-markdown-editor #panePreview .preview-content {
+    width: 100%;
+    max-width: 100%;
+  }
+  .edit-page.hide-markdown-editor #panePreview .pane-title-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+  .edit-page.hide-markdown-editor #panePreview .pane-header-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(2.2rem, 1fr));
+    align-items: stretch;
+    width: 100%;
+    gap: 0.35rem;
+  }
+  .edit-page.hide-markdown-editor #panePreview .pane-header-actions .editor-toolbar {
+    display: contents;
+  }
+  .edit-page.hide-markdown-editor #panePreview .editor-toolbar-left {
+    display: contents;
+  }
+  .edit-page.hide-markdown-editor #panePreview .pane-header-actions > *,
+  .edit-page.hide-markdown-editor #panePreview .editor-toolbar-left > * {
+    min-width: 0;
+    width: 100%;
+  }
 
   .index-page.index-split-layout .editor-grid {
     grid-template-columns: 1fr;

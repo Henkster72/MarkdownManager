@@ -150,6 +150,10 @@
 	    window.__mdwCloseLinkModal = close;
 
 	    const getEditorSelectionText = () => {
+        if (typeof window.__mdwGetVisualSelectionText === 'function') {
+            const visualText = window.__mdwGetVisualSelectionText();
+            if (visualText) return visualText;
+        }
 	        const start = editor.selectionStart ?? 0;
 	        const end = editor.selectionEnd ?? 0;
 	        if (end > start) return editor.value.slice(start, end);
@@ -157,6 +161,9 @@
     };
 
     const insertAtSelection = (text) => {
+        if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(text)) {
+            return;
+        }
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
         const before = editor.value.slice(0, start);
@@ -169,6 +176,9 @@
     };
 
     const insertBlockAtSelection = (block) => {
+        if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(block)) {
+            return;
+        }
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
         const before = editor.value.slice(0, start);
@@ -685,10 +695,14 @@
 
     const insertLink = () => {
         if (mode === 'external') {
-            const url = String(externalUrl?.value || '').trim();
+            let url = String(externalUrl?.value || '').trim();
             if (!url) return;
+            if (!/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith('//')) {
+                url = 'https://' + url;
+            }
             const selection = getEditorSelectionText();
-            const text = selection || String(externalText?.value || '').trim() || url;
+            const modalText = String(externalText?.value || '').trim();
+            const text = modalText || selection || url;
             const cls = isPdfUrl(url) ? 'pdflink externlink' : 'externlink';
             insertAtSelection(`[${text}](${url}) {: class="${cls}"}`);
             close();
@@ -881,6 +895,9 @@
     };
 
     const insertAtSelection = (text) => {
+        if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(text)) {
+            return;
+        }
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
         editor.setRangeText(text, start, end, 'end');

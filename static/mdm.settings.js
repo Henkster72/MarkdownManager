@@ -868,6 +868,7 @@
     const exportClassPrefixStatus = document.getElementById('exportClassPrefixStatus');
     const copySettingsStatus = document.getElementById('copySettingsStatus');
     const tocMenuSelect = document.getElementById('tocMenuSelect');
+    const tocButtonToggle = document.getElementById('tocButtonToggle');
     const tocMenuStatus = document.getElementById('tocMenuStatus');
     const settingsExportBtn = document.getElementById('settingsExportBtn');
     const settingsImportBtn = document.getElementById('settingsImportBtn');
@@ -880,6 +881,7 @@
     const folderIconStyleSelect = document.getElementById('folderIconStyleSelect');
     const folderIconStyleStatus = document.getElementById('folderIconStyleStatus');
     const indexDualPaneToggle = document.getElementById('indexDualPaneToggle');
+    const hideMarkdownEditorToggle = document.getElementById('hideMarkdownEditorToggle');
     const indexLayoutStatus = document.getElementById('indexLayoutStatus');
 
     const inputs = {
@@ -1092,6 +1094,10 @@
         const v = s && typeof s.toc_menu === 'string' ? s.toc_menu.trim().toLowerCase() : '';
         return (v === 'left' || v === 'right' || v === 'inline') ? v : 'inline';
     };
+    const readTocButtonSetting = () => {
+        const s = getSettings();
+        return !!(s && s.toc_button_enabled);
+    };
     const readPostDateFormatSetting = () => {
         const s = getSettings();
         const v = s && typeof s.post_date_format === 'string' ? s.post_date_format.trim() : '';
@@ -1111,6 +1117,11 @@
         const s = getSettings();
         if (!s || typeof s !== 'object') return true;
         return !Object.prototype.hasOwnProperty.call(s, 'index_dual_pane_overview') ? true : !!s.index_dual_pane_overview;
+    };
+    const readHideMarkdownEditorSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return false;
+        return !Object.prototype.hasOwnProperty.call(s, 'hide_markdown_editor') ? false : !!s.hide_markdown_editor;
     };
     const readUiLanguageSetting = () => {
         const s = getSettings();
@@ -1348,6 +1359,9 @@
         if (tocMenuSelect instanceof HTMLSelectElement) {
             tocMenuSelect.value = readTocMenuSetting();
         }
+        if (tocButtonToggle instanceof HTMLInputElement) {
+            tocButtonToggle.checked = readTocButtonSetting();
+        }
         if (postDateFormatSelect instanceof HTMLSelectElement) {
             postDateFormatSelect.value = readPostDateFormatSetting();
         }
@@ -1359,6 +1373,9 @@
         }
         if (indexDualPaneToggle instanceof HTMLInputElement) {
             indexDualPaneToggle.checked = readIndexDualPaneSetting();
+        }
+        if (hideMarkdownEditorToggle instanceof HTMLInputElement) {
+            hideMarkdownEditorToggle.checked = readHideMarkdownEditorSetting();
         }
         if (langSelect instanceof HTMLSelectElement) {
             const uiLang = readUiLanguageSetting();
@@ -1731,6 +1748,35 @@
         }
     };
 
+    const saveTocButtonSetting = async (enabled) => {
+        setTocMenuStatus(t('theme.toc_menu.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setTocMenuStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (tocButtonToggle instanceof HTMLInputElement) tocButtonToggle.checked = readTocButtonSetting();
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = !!enabled;
+            const result = await saveSettingsToServer({ toc_button_enabled: value });
+            if (!result.ok) throw new Error(result.message || t('theme.toc_menu.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.toc_button_enabled = value;
+            }
+            setTocMenuStatus(t('theme.toc_menu.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('toc button save failed', e);
+            if (tocButtonToggle instanceof HTMLInputElement) tocButtonToggle.checked = readTocButtonSetting();
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.toc_menu.save_failed', 'Save failed');
+            setTocMenuStatus(msg, 'error');
+            return false;
+        }
+    };
+
     const refreshPreviewAfterSettings = () => {
         const ta = document.getElementById('editor');
         if (ta instanceof HTMLTextAreaElement) {
@@ -1840,6 +1886,33 @@
             return true;
         } catch (e) {
             console.error('index layout save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.index_layout.save_failed', 'Save failed');
+            setIndexLayoutStatus(msg, 'error');
+            return false;
+        }
+    };
+    const saveHideMarkdownEditorSetting = async (nextValue) => {
+        setIndexLayoutStatus(t('theme.index_layout.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setIndexLayoutStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = !!nextValue;
+            const result = await saveSettingsToServer({ hide_markdown_editor: value });
+            if (!result.ok) throw new Error(result.message || t('theme.index_layout.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.hide_markdown_editor = value;
+            }
+            document.body?.classList.toggle('hide-markdown-editor', value);
+            setIndexLayoutStatus(t('theme.index_layout.saved_reload', 'Saved. Reload to apply the layout.'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('hide markdown editor save failed', e);
             const msg = (e && typeof e.message === 'string' && e.message.trim())
                 ? e.message.trim()
                 : t('theme.index_layout.save_failed', 'Save failed');
@@ -2033,6 +2106,11 @@
             await saveTocMenuSetting(next);
         });
 
+        tocButtonToggle?.addEventListener('change', async () => {
+            if (!(tocButtonToggle instanceof HTMLInputElement)) return;
+            await saveTocButtonSetting(tocButtonToggle.checked);
+        });
+
         settingsExportBtn?.addEventListener('click', () => {
             if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
                 setSettingsIoStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
@@ -2147,6 +2225,16 @@
             if (document.body?.classList.contains('index-page')) {
                 window.location.reload();
             }
+        });
+        hideMarkdownEditorToggle?.addEventListener('change', async () => {
+            if (!(hideMarkdownEditorToggle instanceof HTMLInputElement)) return;
+            const next = !!hideMarkdownEditorToggle.checked;
+            const ok = await saveHideMarkdownEditorSetting(next);
+            if (!ok) {
+                hideMarkdownEditorToggle.checked = readHideMarkdownEditorSetting();
+                return;
+            }
+            window.location.reload();
         });
 
         const onKbdModChange = (e) => {
@@ -2590,6 +2678,13 @@
                 const next = !!indexDualPaneToggle.checked;
                 if (next !== readIndexDualPaneSetting()) {
                     const ok = await saveIndexDualPaneSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (hideMarkdownEditorToggle instanceof HTMLInputElement) {
+                const next = !!hideMarkdownEditorToggle.checked;
+                if (next !== readHideMarkdownEditorSetting()) {
+                    const ok = await saveHideMarkdownEditorSetting(next);
                     if (!ok) return false;
                 }
             }

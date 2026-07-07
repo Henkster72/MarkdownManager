@@ -349,6 +349,7 @@
         const publishBtn = document.getElementById('publishBtn');
         const publishStateSelect = document.getElementById('publishStateSelect');
         if (!(publishBtn instanceof HTMLElement) || !(publishStateSelect instanceof HTMLElement)) return;
+        if (document.body?.classList.contains('hide-markdown-editor')) return;
         const headerActions = document.querySelector('#paneMarkdown .pane-header-actions');
         const toolbarLeft = document.querySelector('#paneMarkdown .editor-toolbar-left');
         const revertBtn = document.getElementById('btnRevert');
@@ -383,6 +384,156 @@
         }
     };
 
+    const setupMarkdownSourceToggle = () => {
+        const btn = document.getElementById('markdownSourceToggle');
+        if (!(btn instanceof HTMLButtonElement)) return;
+        const icon = btn.querySelector('.pi');
+        const showTitle = t('edit.toolbar.show_markdown_title', 'Show markdown source');
+        const hideTitle = t('edit.toolbar.hide_markdown_title', 'Show visual editor');
+        const sync = () => {
+            const shown = !!document.body?.classList.contains('mdw-show-markdown-source');
+            const preview = document.getElementById('preview');
+            btn.setAttribute('aria-pressed', shown ? 'true' : 'false');
+            btn.setAttribute('title', shown ? hideTitle : showTitle);
+            btn.setAttribute('aria-label', shown ? hideTitle : showTitle);
+            if (icon instanceof HTMLElement) {
+                icon.classList.toggle('pi-code', !shown);
+                icon.classList.toggle('pi-eye', shown);
+            }
+            if (preview instanceof HTMLElement && document.body?.classList.contains('hide-markdown-editor')) {
+                if (shown) {
+                    preview.setAttribute('contenteditable', 'false');
+                } else {
+                    preview.setAttribute('contenteditable', 'true');
+                }
+            }
+        };
+        btn.addEventListener('click', () => {
+            if (!document.body?.classList.contains('hide-markdown-editor')) return;
+            document.body.classList.toggle('mdw-show-markdown-source');
+            sync();
+            if (document.body.classList.contains('mdw-show-markdown-source')) {
+                editor.focus();
+            }
+        });
+        sync();
+    };
+
+    const setupArticleMetaModal = () => {
+        const btn = document.getElementById('articleMetaBtn');
+        const modal = document.getElementById('articleMetaModal');
+        const overlay = document.getElementById('articleMetaModalOverlay');
+        const closeBtn = document.getElementById('articleMetaModalClose');
+        const cancelBtn = document.getElementById('articleMetaCancel');
+        const formEl = document.getElementById('articleMetaForm');
+        const fieldsEl = document.getElementById('articleMetaFields');
+        const emptyEl = document.getElementById('articleMetaEmpty');
+        if (!(btn instanceof HTMLButtonElement)
+            || !(modal instanceof HTMLElement)
+            || !(formEl instanceof HTMLFormElement)
+            || !(fieldsEl instanceof HTMLElement)) return;
+        if (!isPublisherMode()) return;
+
+        const modalBinding = (typeof window.__mdwBindModal === 'function')
+            ? window.__mdwBindModal({
+                modal,
+                overlay,
+                closeButtons: [closeBtn, cancelBtn],
+                closeOnOverlay: true,
+                closeOnEsc: true,
+            })
+            : null;
+
+        const getFieldConfig = (key) => {
+            const baseCfg = getBaseCfg();
+            const pubCfg = getPublisherCfg();
+            return pubCfg[key] || baseCfg[key] || {};
+        };
+        const fieldLabel = (key, cfg) => {
+            const raw = cfg && typeof cfg.label === 'string' ? cfg.label.trim() : '';
+            return raw || key.replace(/_/g, ' ');
+        };
+        const visibleFields = () => {
+            const { order } = getKnownKeysAndOrder();
+            return order.filter((key) => isMarkdownVisible(getFieldConfig(key)));
+        };
+        const openModal = () => {
+            const fields = visibleFields();
+            const { meta } = extractMetaAndBody(editor.value);
+            fieldsEl.textContent = '';
+            if (emptyEl instanceof HTMLElement) emptyEl.hidden = fields.length > 0;
+
+            fields.forEach((key) => {
+                const cfg = getFieldConfig(key);
+                const wrap = document.createElement('div');
+                wrap.className = 'modal-field article-meta-field';
+
+                const label = document.createElement('label');
+                label.className = 'modal-label';
+                label.setAttribute('for', `articleMeta_${key}`);
+                label.textContent = fieldLabel(key, cfg);
+
+                const input = document.createElement('input');
+                input.id = `articleMeta_${key}`;
+                input.className = 'input';
+                input.type = 'text';
+                input.name = key;
+                input.value = String(meta[key] ?? metaStore[key] ?? cfg.default_value ?? '');
+                input.dataset.metaKey = key;
+
+                const keyEl = document.createElement('div');
+                keyEl.className = 'status-text article-meta-key';
+                keyEl.textContent = key;
+
+                wrap.append(label, input, keyEl);
+                fieldsEl.appendChild(wrap);
+            });
+
+            if (modalBinding) modalBinding.open({ source: 'article-meta' });
+            else {
+                if (overlay instanceof HTMLElement) overlay.hidden = false;
+                modal.hidden = false;
+            }
+            const first = fieldsEl.querySelector('input');
+            if (first instanceof HTMLInputElement) first.focus();
+        };
+        const closeModal = () => {
+            if (modalBinding) modalBinding.close({ source: 'article-meta' });
+            else {
+                modal.hidden = true;
+                if (overlay instanceof HTMLElement) overlay.hidden = true;
+            }
+        };
+        const applyValues = () => {
+            const { meta, body } = extractMetaAndBody(editor.value);
+            const nextMeta = { ...metaStore, ...meta };
+            fieldsEl.querySelectorAll('input[data-meta-key]').forEach((input) => {
+                if (!(input instanceof HTMLInputElement)) return;
+                const key = String(input.dataset.metaKey || '').trim().toLowerCase();
+                if (!key) return;
+                const value = String(input.value || '').trim();
+                if (value === '') delete nextMeta[key];
+                else nextMeta[key] = value;
+            });
+            metaStore = nextMeta;
+            const includeKeys = visibleFields();
+            const block = buildMetaBlock(metaStore, includeKeys);
+            const cleanedBody = String(body).replace(/^\n+/, '');
+            const next = block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+            editor.value = next;
+            applyMetaVisibility();
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            updateAppTitleFromEditor();
+            closeModal();
+        };
+
+        btn.addEventListener('click', openModal);
+        formEl.addEventListener('submit', (event) => {
+            event.preventDefault();
+            applyValues();
+        });
+    };
+
     window.__mdwApplyMetaVisibility = applyMetaVisibility;
     window.__mdwStripHiddenMetaForDirty = stripHiddenMeta;
     window.__mdwBuildPreviewContent = () => {
@@ -415,6 +566,8 @@
     };
     applyMetaVisibility();
     setupPublishControlsPlacement();
+    setupMarkdownSourceToggle();
+    setupArticleMetaModal();
 
     const scheduleApply = () => {
         if (isApplying) return;
@@ -786,6 +939,9 @@
     };
 
     const insertAtSelection = (text) => {
+        if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(text)) {
+            return;
+        }
         const start = ta.selectionStart ?? 0;
         const end = ta.selectionEnd ?? 0;
         const before = ta.value.slice(0, start);
@@ -1800,6 +1956,7 @@
     }
 
     let previewTimer = null;
+    let visualPreviewInputActive = false;
     const cancelScheduledPreview = () => {
         if (!previewTimer) return;
         clearTimeout(previewTimer);
@@ -1833,7 +1990,7 @@
     const applyTocHotKeyword = (previewEl, rawText) => {
         if (!(previewEl instanceof HTMLElement)) return;
         const text = String(rawText || '');
-        if (!/(^|\\n)\\s*\\{TOC\\}\\s*(\\n|$)/i.test(text)) return;
+        if (!/(^|\\n)\\s*\\{\\s*TOC\\s*\\}\\s*(\\n|$)/i.test(text)) return;
         if (previewEl.querySelector('[data-mdw-toc="1"]')) return;
         const readTocMenuSetting = () => {
             const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
@@ -1848,7 +2005,7 @@
                     if (!(node instanceof HTMLElement)) return NodeFilter.FILTER_SKIP;
                     if (node.closest('pre, code')) return NodeFilter.FILTER_SKIP;
                     const txt = (node.textContent || '').trim();
-                    if (txt === '{TOC}') return NodeFilter.FILTER_ACCEPT;
+                    if (/^\{\s*TOC\s*\}$/i.test(txt)) return NodeFilter.FILTER_ACCEPT;
                     return NodeFilter.FILTER_SKIP;
                 }
             });
@@ -2039,6 +2196,9 @@
                 window.__mdwMarkOnline();
             }
             prev.innerHTML = html;
+            if (typeof markPreviewGeneratedContent === 'function' && isVisualEditorMode()) {
+                markPreviewGeneratedContent();
+            }
             if (typeof window.__mdwResetSelectionSync === 'function') {
                 window.__mdwResetSelectionSync(previewContent);
             }
@@ -2073,10 +2233,344 @@
         }
     }
 
+    const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
+        && !document.body.classList.contains('mdw-show-markdown-source');
+    const escapeMd = (value) => String(value || '').replace(/\u00a0/g, ' ').trim();
+    const inlineMarkdown = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
+        if (!(node instanceof Element)) return '';
+        const tag = node.tagName.toLowerCase();
+        const text = Array.from(node.childNodes).map(inlineMarkdown).join('');
+        if (tag === 'br') return '\n';
+        if (tag === 'strong' || tag === 'b') return text.trim() ? `**${text.trim()}**` : '';
+        if (tag === 'em' || tag === 'i') return text.trim() ? `*${text.trim()}*` : '';
+        if (tag === 'u') return text.trim() ? `<u>${text.trim()}</u>` : '';
+        if (tag === 'code') return text.trim() ? '`' + text.trim().replace(/`/g, '\\`') + '`' : '';
+        if (tag === 'a') {
+            const href = node.getAttribute('href') || '';
+            return href ? `[${text.trim() || href}](${href})` : text;
+        }
+        if (tag === 'img') {
+            const src = node.getAttribute('data-mdw-markdown-src') || node.getAttribute('src') || '';
+            const alt = node.getAttribute('alt') || '';
+            return src ? `![${alt}](${src})` : '';
+        }
+        return text;
+    };
+    const blockMarkdown = (node, depth = 0, orderedIndex = 1) => {
+        if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
+        if (!(node instanceof Element)) return '';
+        if (node.matches('.md-meta, [data-mdw-generated="metadata"]')) return '';
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
+            const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
+            return `${'#'.repeat(level)} ${escapeMd(inlineMarkdown(node))}`;
+        }
+        if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
+            return escapeMd(inlineMarkdown(node));
+        }
+        if (tag === 'blockquote') {
+            return Array.from(node.childNodes)
+                .map((child) => blockMarkdown(child, depth))
+                .join('\n')
+                .split('\n')
+                .map((line) => line.trim() ? `> ${line}` : '>')
+                .join('\n');
+        }
+        if (tag === 'pre') {
+            const code = node.textContent || '';
+            return '```\n' + code.replace(/\n+$/g, '') + '\n```';
+        }
+        if (tag === 'ul' || tag === 'ol') {
+            let index = 1;
+            return Array.from(node.children)
+                .filter((child) => child instanceof HTMLElement && child.tagName.toLowerCase() === 'li')
+                .map((child) => blockMarkdown(child, depth, index++))
+                .join('\n');
+        }
+        if (tag === 'table') {
+            const rows = Array.from(node.querySelectorAll('tr'))
+                .map((row) => Array.from(row.children)
+                    .filter((cell) => cell instanceof HTMLElement && ['td', 'th'].includes(cell.tagName.toLowerCase()))
+                    .map((cell) => escapeMd(inlineMarkdown(cell)).replace(/\|/g, '\\|')));
+            const usableRows = rows.filter((row) => row.length);
+            if (!usableRows.length) return '';
+            const colCount = Math.max(...usableRows.map((row) => row.length));
+            const normalizeRow = (row) => Array.from({ length: colCount }, (_, idx) => row[idx] || ' ');
+            const header = normalizeRow(usableRows[0]);
+            const body = usableRows.slice(1).map(normalizeRow);
+            const sep = Array.from({ length: colCount }, () => '---');
+            return [header, sep, ...body]
+                .map((row) => `| ${row.join(' | ')} |`)
+                .join('\n');
+        }
+        if (tag === 'li') {
+            const marker = node.parentElement?.tagName.toLowerCase() === 'ol' ? `${orderedIndex}.` : '-';
+            const prefix = '  '.repeat(depth) + marker + ' ';
+            const own = [];
+            const nested = [];
+            Array.from(node.childNodes).forEach((child) => {
+                if (child instanceof Element && ['ul', 'ol'].includes(child.tagName.toLowerCase())) nested.push(blockMarkdown(child, depth + 1));
+                else own.push(inlineMarkdown(child));
+            });
+            const head = prefix + escapeMd(own.join(''));
+            return [head, ...nested.filter(Boolean)].filter(Boolean).join('\n');
+        }
+        if (tag === 'hr') return '---';
+        return escapeMd(inlineMarkdown(node));
+    };
+    const previewHtmlToMarkdown = () => {
+        const blocks = Array.from(prev.childNodes)
+            .map((node) => blockMarkdown(node))
+            .map((s) => String(s || '').trim())
+            .filter(Boolean);
+        return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    };
+    const markPreviewGeneratedContent = () => {
+        prev.querySelectorAll('.md-meta, [data-mdw-generated="metadata"]').forEach((node) => {
+            if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
+        });
+    };
+    let visualSelectionRange = null;
+    const isRangeInPreview = (range) => {
+        if (!range) return false;
+        return prev.contains(range.startContainer) && prev.contains(range.endContainer);
+    };
+    const saveVisualSelection = () => {
+        if (!isVisualEditorMode()) return;
+        const sel = window.getSelection?.();
+        if (!sel || sel.rangeCount < 1) return;
+        const range = sel.getRangeAt(0);
+        if (!isRangeInPreview(range)) return;
+        visualSelectionRange = range.cloneRange();
+    };
+    const restoreVisualSelection = () => {
+        if (!isVisualEditorMode()) return false;
+        if (!visualSelectionRange || !isRangeInPreview(visualSelectionRange)) return false;
+        const sel = window.getSelection?.();
+        if (!sel) return false;
+        sel.removeAllRanges();
+        sel.addRange(visualSelectionRange);
+        return true;
+    };
+    const syncVisualPreviewToTextarea = () => {
+        const next = previewHtmlToMarkdown();
+        if (ta.value === next) return;
+        visualPreviewInputActive = true;
+        try {
+            ta.value = next;
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+        } finally {
+            visualPreviewInputActive = false;
+        }
+    };
+    const runVisualCommand = (command, value = null) => {
+        if (!isVisualEditorMode()) return false;
+        restoreVisualSelection();
+        prev.focus();
+        const ok = document.execCommand(command, false, value);
+        saveVisualSelection();
+        syncVisualPreviewToTextarea();
+        return ok;
+    };
+    const runVisualCommandWithSelection = (fn) => {
+        if (!isVisualEditorMode() || typeof fn !== 'function') return false;
+        restoreVisualSelection();
+        prev.focus();
+        const ok = fn();
+        saveVisualSelection();
+        syncVisualPreviewToTextarea();
+        return ok !== false;
+    };
+    const getVisualSelectedText = () => {
+        restoreVisualSelection();
+        const sel = window.getSelection?.();
+        if (!sel || sel.rangeCount < 1) return '';
+        const range = sel.getRangeAt(0);
+        if (!isRangeInPreview(range)) return '';
+        return String(sel.toString() || '');
+    };
+    const markdownImageSrc = (src) => {
+        const raw = String(src || '').trim();
+        const token = raw.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
+        if (token) return `images/${encodeURIComponent(token[1].trim())}`;
+        return raw;
+    };
+    let selectedVisualImage = null;
+    const clearSelectedVisualImage = () => {
+        if (selectedVisualImage instanceof HTMLElement) selectedVisualImage.classList.remove('is-selected');
+        selectedVisualImage = null;
+    };
+    const selectVisualImage = (img) => {
+        if (!(img instanceof HTMLImageElement) || !prev.contains(img)) return false;
+        clearSelectedVisualImage();
+        selectedVisualImage = img;
+        img.classList.add('is-selected');
+        const range = document.createRange();
+        range.selectNode(img);
+        visualSelectionRange = range.cloneRange();
+        const sel = window.getSelection?.();
+        if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        return true;
+    };
+    const deleteSelectedVisualImage = () => {
+        if (!(selectedVisualImage instanceof HTMLImageElement) || !prev.contains(selectedVisualImage)) return false;
+        const img = selectedVisualImage;
+        clearSelectedVisualImage();
+        img.remove();
+        visualSelectionRange = null;
+        syncVisualPreviewToTextarea();
+        return true;
+    };
+    const buildBasicTableHtml = (rows = 2, cols = 2) => {
+        const safeRows = Math.max(1, Math.min(12, Number(rows) || 2));
+        const safeCols = Math.max(1, Math.min(8, Number(cols) || 2));
+        const head = '<tr>' + Array.from({ length: safeCols }, (_, idx) => `<th>Kolom ${idx + 1}</th>`).join('') + '</tr>';
+        const body = Array.from({ length: safeRows }, (_, rowIdx) => (
+            '<tr>' + Array.from({ length: safeCols }, (_, colIdx) => `<td>Cel ${rowIdx + 1}.${colIdx + 1}</td>`).join('') + '</tr>'
+        )).join('');
+        return `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    };
+    const isMarkdownTable = (text) => {
+        const lines = String(text || '').trim().split('\n').map((line) => line.trim()).filter(Boolean);
+        return lines.length >= 2 && lines[0].startsWith('|') && /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(lines[1]);
+    };
+    const insertVisualTable = () => insertVisualHtml(buildBasicTableHtml(2, 2));
+    const toggleVisualBlockquote = () => runVisualCommandWithSelection(() => {
+        const sel = window.getSelection?.();
+        const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+        const node = range ? (range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement) : null;
+        const quote = node instanceof Element ? node.closest('blockquote') : null;
+        if (quote instanceof HTMLElement && prev.contains(quote)) {
+            const parent = quote.parentNode;
+            if (!parent) return false;
+            const frag = document.createDocumentFragment();
+            while (quote.firstChild) frag.appendChild(quote.firstChild);
+            parent.insertBefore(frag, quote);
+            quote.remove();
+            return true;
+        }
+        return document.execCommand('formatBlock', false, 'blockquote');
+    });
+    const insertVisualHtml = (html) => {
+        if (!isVisualEditorMode()) return false;
+        restoreVisualSelection();
+        prev.focus();
+        document.execCommand('insertHTML', false, html);
+        saveVisualSelection();
+        syncVisualPreviewToTextarea();
+        return true;
+    };
+    const insertVisualMarkdown = (markdown) => {
+        const text = String(markdown || '');
+        if (!isVisualEditorMode()) return false;
+        if (isMarkdownTable(text)) {
+            return insertVisualTable();
+        }
+        const imageMatch = text.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+        if (imageMatch) {
+            const alt = escapeHtml(imageMatch[1] || '');
+            const markdownSrc = imageMatch[2] || '';
+            const src = escapeHtml(markdownImageSrc(markdownSrc));
+            return insertVisualHtml(`<img src="${src}" alt="${alt}" data-mdw-markdown-src="${escapeHtml(markdownSrc)}">`);
+        }
+        const linkMatch = text.match(/^\[([^\]]*)\]\(([^)]+)\)/);
+        if (linkMatch) {
+            const label = linkMatch[1] || linkMatch[2] || '';
+            const href = linkMatch[2] || '';
+            restoreVisualSelection();
+            const selectedText = getVisualSelectedText();
+            if (selectedText && selectedText.trim() === String(label || '').trim()) {
+                const ok = runVisualCommand('createLink', href);
+                const sel = window.getSelection?.();
+                const node = sel && sel.anchorNode ? (sel.anchorNode.nodeType === Node.ELEMENT_NODE ? sel.anchorNode : sel.anchorNode.parentElement) : null;
+                const link = node instanceof Element ? node.closest('a') : null;
+                if (link instanceof HTMLAnchorElement) link.classList.add('link');
+                return ok;
+            }
+            return insertVisualHtml(`<a href="${escapeHtml(href)}" class="link">${escapeHtml(label)}</a>`);
+        }
+        restoreVisualSelection();
+        prev.focus();
+        document.execCommand('insertText', false, text);
+        saveVisualSelection();
+        syncVisualPreviewToTextarea();
+        return true;
+    };
+    window.__mdwVisualEditorMode = isVisualEditorMode;
+    window.__mdwSaveVisualSelection = saveVisualSelection;
+    window.__mdwGetVisualSelectionText = getVisualSelectedText;
+    window.__mdwInsertMarkdownAtSelection = insertVisualMarkdown;
+    window.__mdwInsertVisualTable = insertVisualTable;
+    window.__mdwToggleVisualBlockquote = toggleVisualBlockquote;
+    window.__mdwRunVisualCommand = runVisualCommand;
+    window.__mdwRunVisualCommandWithSelection = runVisualCommandWithSelection;
+    const enableVisualPreviewEditing = () => {
+        if (!isVisualEditorMode()) return;
+        prev.setAttribute('contenteditable', 'true');
+        prev.setAttribute('role', 'textbox');
+        prev.setAttribute('aria-multiline', 'true');
+        markPreviewGeneratedContent();
+        prev.addEventListener('keyup', saveVisualSelection);
+        prev.addEventListener('mouseup', saveVisualSelection);
+        prev.addEventListener('focus', saveVisualSelection);
+        prev.addEventListener('blur', saveVisualSelection);
+        prev.addEventListener('click', (e) => {
+            const target = e.target instanceof Element ? e.target.closest('img') : null;
+            if (target instanceof HTMLImageElement && prev.contains(target)) {
+                e.preventDefault();
+                selectVisualImage(target);
+            } else {
+                clearSelectedVisualImage();
+            }
+        });
+        document.addEventListener('selectionchange', saveVisualSelection);
+        prev.addEventListener('keydown', (e) => {
+            if ((e.key === 'Backspace' || e.key === 'Delete') && deleteSelectedVisualImage()) {
+                e.preventDefault();
+                return;
+            }
+            const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+            if (!mod) return;
+            if (e.key === 'z' || e.key === 'Z') {
+                e.preventDefault();
+                runVisualCommand(e.shiftKey ? 'redo' : 'undo');
+                return;
+            }
+            if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+                e.preventDefault();
+                runVisualCommand('redo');
+                return;
+            }
+            if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+                e.preventDefault();
+                runVisualCommand('bold');
+                return;
+            }
+            if (!e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+                e.preventDefault();
+                runVisualCommand('italic');
+                return;
+            }
+            if (!e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+                e.preventDefault();
+                runVisualCommand('underline');
+            }
+        });
+        prev.addEventListener('input', () => {
+            saveVisualSelection();
+            syncVisualPreviewToTextarea();
+        });
+    };
+    enableVisualPreviewEditing();
+
     ta.addEventListener('input', function(){
         updateLineNumbers();
         recomputeDirty();
-        schedulePreview();
+        if (!visualPreviewInputActive) schedulePreview();
         scheduleBracketOverlay();
         scheduleLinkSuggest();
     });
@@ -2842,6 +3336,9 @@
     // Revert naar initialContent
     if (btnRevert) {
         btnRevert.addEventListener('click', function(){
+            if (window.__mdDirty && !confirm(t('js.unsaved_confirm', 'You have unsaved changes. Discard them and continue?'))) {
+                return;
+            }
             ta.value = normalizeNewlines(window.initialContent || '');
             updateLineNumbers();
             recomputeDirty();
@@ -3596,6 +4093,46 @@
         setSelection(caret, caret);
     };
 
+    const toggleToc = () => {
+        const value = ta.value.replace(/\r\n?/g, '\n');
+        const tocLineRe = /(^|\n)\s*\{\s*TOC\s*\}\s*(\n|$)/i;
+        const match = value.match(tocLineRe);
+        if (match && typeof match.index === 'number') {
+            const next = value.replace(tocLineRe, (full, before, after) => (before && after ? '\n' : ''));
+            ta.value = next;
+            const pos = Math.min(match.index, next.length);
+            setSelection(pos, pos);
+            return;
+        }
+
+        const hasTocTarget = value.split('\n').some((line) => {
+            const raw = String(line || '').trim();
+            return /^#{3}\s+\S/.test(raw)
+                || /^<h3\b[^>]*>.*<\/h3>\s*$/i.test(raw);
+        });
+        if (!hasTocTarget) {
+            alert(t('edit.toolbar.toc_no_headings', 'No H3 headings yet.'));
+            return;
+        }
+
+        const lines = value.split('\n');
+        const { known } = getKnownKeysAndOrder();
+        let insertLine = 0;
+        while (insertLine < lines.length && String(lines[insertLine] || '').trim() === '') insertLine++;
+        while (insertLine < lines.length) {
+            const parsed = parseMetaEntries(lines[insertLine]);
+            if (!parsed || !parsed.length || parsed.some((entry) => !known.has(entry.key))) break;
+            insertLine++;
+        }
+
+        lines.splice(insertLine, 0, '{TOC}', '');
+        const next = lines.join('\n').replace(/\n{4,}/g, '\n\n\n');
+        ta.value = next;
+        const before = lines.slice(0, insertLine).join('\n');
+        const pos = (before ? before.length + 1 : 0);
+        setSelection(pos, pos + 5);
+    };
+
     const CUSTOM_CSS_CURSOR = '__MDW_CUSTOM_CSS_CURSOR__';
     let customCssSnippetMap = new Map();
     let lastCustomCssValue = null;
@@ -4026,16 +4563,43 @@
     const orderedListBtn = document.getElementById('formatOrderedListBtn');
     const unorderedListBtn = document.getElementById('formatUnorderedListBtn');
     const insertTableBtn = document.getElementById('insertTableBtn');
+    const tocBtn = document.getElementById('toggleTocBtn');
     const customCssSelect = document.getElementById('customCssSelect');
+    const isUsingVisualEditor = () => typeof window.__mdwVisualEditorMode === 'function' && window.__mdwVisualEditorMode();
+    const saveVisualSelectionBeforeToolbar = (el) => {
+        if (!(el instanceof HTMLElement)) return;
+        el.addEventListener('mousedown', () => {
+            if (typeof window.__mdwSaveVisualSelection === 'function') window.__mdwSaveVisualSelection();
+        });
+    };
+    [
+        headingSelect,
+        alignSelect,
+        boldBtn,
+        italicBtn,
+        underlineBtn,
+        blockquoteBtn,
+        orderedListBtn,
+        unorderedListBtn,
+        insertTableBtn,
+        tocBtn,
+        customCssSelect,
+        document.getElementById('addLinkBtn'),
+        document.getElementById('addImageBtn'),
+    ].forEach(saveVisualSelectionBeforeToolbar);
 
     headingSelect?.addEventListener('change', () => {
         if (!(headingSelect instanceof HTMLSelectElement)) return;
         const value = String(headingSelect.value || '').trim();
         if (!value) return;
         const level = value;
-        runFormatAction(() => setHeadingLevel(level));
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('formatBlock', `h${level}`);
+        } else {
+            runFormatAction(() => setHeadingLevel(level));
+            ta.focus();
+        }
         headingSelect.value = '';
-        ta.focus();
     });
 
     alignSelect?.addEventListener('change', () => {
@@ -4043,16 +4607,29 @@
         const value = String(alignSelect.value || '').trim();
         if (!value) return;
         const align = value;
-        runFormatAction(() => applyAlignment(align));
+        if (isUsingVisualEditor()) {
+            const command = align === 'center' ? 'justifyCenter' : (align === 'right' ? 'justifyRight' : 'justifyLeft');
+            window.__mdwRunVisualCommand?.(command);
+        } else {
+            runFormatAction(() => applyAlignment(align));
+            ta.focus();
+        }
         alignSelect.value = 'left';
-        ta.focus();
     });
 
     boldBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('bold');
+            return;
+        }
         runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
         ta.focus();
     });
     italicBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('italic');
+            return;
+        }
         runFormatAction(() => wrapOrUnwrap('*', '*', {
             lineWiseOnMultiline: true,
             singleCharSafe: ({ value, start, end }) => {
@@ -4064,23 +4641,47 @@
         ta.focus();
     });
     underlineBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('underline');
+            return;
+        }
         runFormatAction(() => wrapOrUnwrap('<u>', '</u>', { lineWiseOnMultiline: true }));
         ta.focus();
     });
     blockquoteBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwToggleVisualBlockquote?.();
+            return;
+        }
         runFormatAction(() => toggleLinePrefix('quote'));
         ta.focus();
     });
     orderedListBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('insertOrderedList');
+            return;
+        }
         runFormatAction(() => toggleOrderedList());
         ta.focus();
     });
     unorderedListBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwRunVisualCommand?.('insertUnorderedList');
+            return;
+        }
         runFormatAction(() => toggleLinePrefix('bullet'));
         ta.focus();
     });
     insertTableBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            window.__mdwInsertVisualTable?.();
+            return;
+        }
         runFormatAction(() => insertTable());
+        ta.focus();
+    });
+    tocBtn?.addEventListener('click', () => {
+        runFormatAction(() => toggleToc());
         ta.focus();
     });
 
@@ -4596,7 +5197,7 @@
 
     const normalizeTocLayoutForExport = (targetRoot, htmlMode) => {
         if (!(targetRoot instanceof Element)) return;
-        if (htmlMode === 'wet') return;
+        if (htmlMode !== 'dry') return;
         const layouts = Array.from(targetRoot.querySelectorAll('.md-toc-layout'));
         layouts.forEach((layout) => {
             const body = layout.querySelector('.md-toc-body');
@@ -4611,6 +5212,22 @@
         });
     };
 
+    const normalizeTocTemplateStructureForExport = (targetRoot, htmlMode) => {
+        if (!(targetRoot instanceof Element) || htmlMode !== 'medium') return;
+        const layouts = Array.from(targetRoot.querySelectorAll('.toc-layout'));
+        layouts.forEach((layout) => {
+            if (!(layout instanceof HTMLElement)) return;
+            layout.className = 'toc-layout';
+            layout.removeAttribute('data-mdw-toc-layout');
+            const nav = layout.querySelector('nav.toc-side');
+            const tocWrap = nav instanceof HTMLElement ? nav.querySelector('.toc-wrap[data-mdw-toc="1"]') : null;
+            if (nav instanceof HTMLElement && tocWrap instanceof HTMLElement) {
+                tocWrap.classList.add('toc-side', 'toc-wrap');
+                nav.replaceWith(tocWrap);
+            }
+        });
+    };
+
     const getPreviewSnapshot = (stripMeta, htmlMode, allowedClasses, exportClassPrefix) => {
         if (!(preview instanceof HTMLElement)) return null;
         const clone = preview.cloneNode(true);
@@ -4619,6 +5236,7 @@
         stripSourceMapAttrs(clone);
         normalizeTocLayoutForExport(clone, htmlMode);
         applyHtmlMode(clone, htmlMode, allowedClasses, exportClassPrefix);
+        normalizeTocTemplateStructureForExport(clone, htmlMode);
         return clone instanceof HTMLElement ? clone.outerHTML : null;
     };
 
@@ -4666,7 +5284,9 @@
         wrapper.innerHTML = html || '';
         if (stripMeta) stripMetaHtml(wrapper);
         stripSourceMapAttrs(wrapper);
+        normalizeTocLayoutForExport(wrapper, htmlMode);
         applyHtmlMode(wrapper, htmlMode, allowedClasses, exportClassPrefix);
+        normalizeTocTemplateStructureForExport(wrapper, htmlMode);
         return wrapper.outerHTML;
     };
  

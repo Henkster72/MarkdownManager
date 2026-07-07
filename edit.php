@@ -159,6 +159,14 @@ $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'st
 $IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
 $THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
 $TOOLS_DIR = 'tools';
+function mdw_static_asset($file) {
+    global $STATIC_DIR;
+    $file = ltrim((string)$file, "/\\");
+    $url = rtrim((string)$STATIC_DIR, "/\\") . '/' . $file;
+    $path = __DIR__ . '/' . $url;
+    $mtime = is_file($path) ? @filemtime($path) : false;
+    return $mtime ? ($url . '?v=' . rawurlencode((string)$mtime)) : $url;
+}
 $themesList = list_available_themes($THEMES_DIR);
 $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
@@ -174,6 +182,7 @@ if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) $exportCla
 $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($MDW_SETTINGS['jinja_meta_prefix'] ?? 'page_');
 $tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
 if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+$tocButtonEnabled = !empty($MDW_SETTINGS['toc_button_enabled']);
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
@@ -182,6 +191,7 @@ $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
 $indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
+$hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $internalLinkPrefix = isset($MDW_SETTINGS['internal_link_prefix']) ? trim((string)$MDW_SETTINGS['internal_link_prefix']) : '';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
@@ -252,11 +262,47 @@ function compare_entries_desc_date($a, $b) {
     return strcasecmp($a['basename'], $b['basename']);
 }
 
+function mdw_publisher_should_hide_md_entry($path) {
+    global $MDW_PUBLISHER_MODE;
+    if (empty($MDW_PUBLISHER_MODE)) return false;
+    if (!is_string($path) || $path === '') return false;
+    $full = mdw_safe_full_path($path, true);
+    if (!$full || !is_file($full) || !is_readable($full)) return false;
+
+    $h = @fopen($full, 'rb');
+    if (!$h) return false;
+    $state = '';
+    $maxLines = 120;
+    while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
+        $line = rtrim($line, "\r\n");
+        $k = null;
+        $v = null;
+        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+            if (strtolower(trim((string)$k)) === 'publishstate') {
+                $state = (string)$v;
+                break;
+            }
+            continue;
+        }
+        if (preg_match('/^\s*(?:_+publishstate\s*:\s*(.*?)\s*_*\s*|\{+\s*publishstate\s*:\s*(.*?)\s*\}+\s*)$/iu', $line, $m)) {
+            $state = (string)(($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? ''));
+            break;
+        }
+    }
+    fclose($h);
+    if ($state === '') return false;
+    $normalized = function_exists('mdw_publisher_normalize_publishstate')
+        ? mdw_publisher_normalize_publishstate($state)
+        : trim($state);
+    return $normalized === 'ToDelete';
+}
+
 /* ROOT FILES */
 function list_md_root_sorted(){
     $mds = glob("*.md");
     $out=[];
     foreach($mds as $path){
+        if (mdw_publisher_should_hide_md_entry($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -316,6 +362,7 @@ function list_md_by_subdir_sorted(){
             $tmp = [];
             if ($mds) {
                 foreach ($mds as $path) {
+                    if (mdw_publisher_should_hide_md_entry($path)) continue;
                     $base = basename($path);
                     [$yy,$mm,$dd] = parse_ymd_from_filename($base);
                     $tmp[] = [
@@ -1115,10 +1162,10 @@ $editSplitRowStorageLegacyKey = 'mdw_editor_row_heights';
 })();
 </script>
 
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/htmlpreview.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/popicon.css">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('ui.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('markdown.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('htmlpreview.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('popicon.css'))?>">
 
 <script>
 // theme bootstrap (zonder Tailwind)
@@ -1165,7 +1212,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body edit-page <?=h($folderIconClass)?>">
+<body class="app-body edit-page <?=h($folderIconClass)?> <?= $hideMarkdownEditor ? 'hide-markdown-editor' : '' ?>">
     <header class="app-header">
         <div class="app-header-inner">
 	            <div class="app-header-main">
@@ -1323,7 +1370,7 @@ window.mermaid = mermaid;
                                 <?php endif; ?>
                             </div>
 			                            <div class="pane-header-actions">
-			                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+			                                <?php if (!empty($MDW_PUBLISHER_MODE) && !$hideMarkdownEditor): ?>
                                     <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-publish="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
 			                                        <span class="pi pi-upload"></span>
 			                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
@@ -1353,11 +1400,20 @@ window.mermaid = mermaid;
                             <input type="hidden" name="publish_state_override" id="publishStateOverride" value="0">
                         <?php endif; ?>
 
+                        <?php $editorToolbar = function() use ($requested, $MDW_PUBLISHER_MODE, $tocButtonEnabled) { ?>
                         <div class="editor-toolbar">
                             <div class="editor-toolbar-left">
                                 <button type="submit" form="editor-form" class="btn btn-ghost" id="saveBtn">
                                     <span class="pi pi-floppydisk"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.save','Save'))?></span>
+                                </button>
+                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+                                <button type="button" id="articleMetaBtn" class="btn btn-ghost btn-small" title="<?=h(mdw_t('edit.toolbar.article_meta_title','Article metadata'))?>" aria-label="<?=h(mdw_t('edit.toolbar.article_meta_title','Article metadata'))?>" <?= $requested ? '' : 'disabled' ?>>
+                                    <span class="pi pi-gear"></span>
+                                </button>
+                                <?php endif; ?>
+                                <button type="button" id="markdownSourceToggle" class="btn btn-ghost btn-small md-source-toggle" title="<?=h(mdw_t('edit.toolbar.show_markdown_title','Show markdown source'))?>" aria-label="<?=h(mdw_t('edit.toolbar.show_markdown_title','Show markdown source'))?>" aria-pressed="false">
+                                    <span class="pi pi-code"></span>
                                 </button>
                                 <button type="button" id="formatBoldBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.bold','Bold'))?>">
                                     <span class="format-letter">B</span>
@@ -1408,12 +1464,21 @@ window.mermaid = mermaid;
                                 <button type="button" id="insertTableBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.table','Insert table'))?>">
                                     <span class="icon-table-grid" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
                                 </button>
+                                <?php if (!empty($MDW_PUBLISHER_MODE) && $tocButtonEnabled): ?>
+                                <button type="button" id="toggleTocBtn" class="btn btn-ghost btn-small format-btn format-toc-btn" aria-label="<?=h(mdw_t('edit.toolbar.toc','TOC'))?>">
+                                    <span class="format-letter">TOC</span>
+                                </button>
+                                <?php endif; ?>
                                 <button type="button" id="btnRevert" class="btn btn-ghost">
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
                                 </button>
                             </div>
                         </div>
+                        <?php }; ?>
+                        <?php if (!$hideMarkdownEditor): ?>
+                            <?php $editorToolbar(); ?>
+                        <?php endif; ?>
 
                         <div class="editor-body">
                             <div class="editor-lines" id="lineNumbers"></div>
@@ -1449,10 +1514,37 @@ window.mermaid = mermaid;
                     <header class="pane-header">
                         <div class="pane-title-row">
                             <div class="pane-title">
-                                <span class="pi pi-eye"></span>
-                                <span><?=h(mdw_t('edit.preview_title','HTML preview'))?></span>
+                                <?php if ($hideMarkdownEditor): ?>
+                                    <span class="pi pi-documentlabel"></span>
+                                    <span><?=h(mdw_t('edit.visual_editor_title','Visual editor'))?></span>
+                                <?php else: ?>
+                                    <span class="pi pi-eye"></span>
+                                    <span><?=h(mdw_t('edit.preview_title','HTML preview'))?></span>
+                                <?php endif; ?>
                             </div>
                             <div class="pane-header-actions">
+                                <?php if ($hideMarkdownEditor): ?>
+                                    <?php $editorToolbar(); ?>
+                                    <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+                                        <button type="submit" form="editor-form" class="btn btn-ghost" id="publishBtn" name="publish_action" value="publish" data-auth-publish="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
+                                            <span class="pi pi-upload"></span>
+                                            <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
+                                        </button>
+                                        <select id="publishStateSelect" name="publish_state" form="editor-form" class="input" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
+                                            <?php
+                                                $stateOptions = [
+                                                    'Concept' => mdw_t('edit.publish_state.concept', 'Concept'),
+                                                    'Processing' => mdw_t('edit.publish_state.processing', 'Processing'),
+                                                    'Published' => mdw_t('edit.publish_state.published', 'Published'),
+                                                ];
+                                                foreach ($stateOptions as $val => $label):
+                                                    $selected = ($current_publish_state_ui === $val) ? 'selected' : '';
+                                            ?>
+                                                <option value="<?=h($val)?>" <?= $selected ?>><?=h($label)?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                                 <button type="button" id="exportHtmlBtn" class="btn btn-ghost" title="<?=h(mdw_t('edit.preview.export_title','Download a plain HTML export'))?>" <?= $requested ? '' : 'disabled' ?> data-auth-superuser="1">
                                     <span class="pi pi-download"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.preview.export_btn','HTML download'))?></span>
@@ -1517,6 +1609,31 @@ window.mermaid = mermaid;
             ],
         ]);
         ?>
+
+        <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+        <div class="modal-overlay" id="articleMetaModalOverlay" hidden></div>
+        <div class="modal" id="articleMetaModal" role="dialog" aria-modal="true" aria-labelledby="articleMetaModalTitle" hidden>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="articleMetaModalTitle"><?=h(mdw_t('article_meta.title','Article metadata'))?></div>
+                    <div class="status-text" style="margin-top:0.25rem;"><?=h(mdw_t('article_meta.hint','Only metadata fields visible in Markdown are shown.'))?></div>
+                </div>
+                <button type="button" class="btn btn-ghost icon-button" id="articleMetaModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
+                    <span class="pi pi-cross"></span>
+                </button>
+            </div>
+            <form id="articleMetaForm">
+                <div class="modal-body">
+                    <div id="articleMetaFields" class="article-meta-fields"></div>
+                    <div id="articleMetaEmpty" class="status-text" hidden><?=h(mdw_t('article_meta.empty','No editable metadata fields are visible in Markdown.'))?></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" id="articleMetaCancel"><?=h(mdw_t('common.cancel','Cancel'))?></button>
+                    <button type="submit" class="btn btn-primary" id="articleMetaApply"><?=h(mdw_t('article_meta.apply','Apply'))?></button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
 
         <div class="modal-overlay" id="renameModalOverlay" hidden></div>
         <div class="modal" id="renameModal" role="dialog" aria-modal="true" aria-labelledby="renameModalTitle" hidden>
@@ -1985,6 +2102,10 @@ window.mermaid = mermaid;
 				                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
 				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
 				                </label>
+				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="hideMarkdownEditorToggle" type="checkbox" <?= $hideMarkdownEditor ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.hide_markdown','Hide markdown'))?></span>
+				                </label>
 				                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
 				                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
 				                </div>
@@ -2044,6 +2165,12 @@ window.mermaid = mermaid;
 					                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
 					                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
 					                </select>
+					                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+					                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+					                    <input id="tocButtonToggle" type="checkbox" <?= $tocButtonEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+					                    <span class="status-text"><?=h(mdw_t('theme.toc_menu.show_button','Show TOC toolbar button'))?></span>
+					                </label>
+					                <?php endif; ?>
 					                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
 					                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
 					                </div>
@@ -2165,7 +2292,7 @@ window.mermaid = mermaid;
 				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable WPM'))?></span>
 				                    </label>
 				                    <div class="status-text" style="margin-top: 0.35rem;">
-				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
+				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Requires an author name; subtitle requirement is optional.'))?>
 				                    </div>
 				                    <div style="display:grid; grid-template-columns: 1fr; gap: 0.35rem; margin-top: 0.6rem;">
 				                        <label class="status-text" for="publisherAuthorInput"><?=h(mdw_t('theme.publisher.author_label','Author name'))?></label>
@@ -2310,19 +2437,19 @@ window.mermaid = mermaid;
 	window.MDW_META_PUBLISHER_CONFIG = <?= json_encode($META_PUBLISHER_CFG, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 	</script>
 
-<script defer src="<?=h($STATIC_DIR)?>/mdm.dom.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.api.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.ui.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.auth.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.settings.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.splitter.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.editor.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.explorer.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.modals.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.layout.js"></script>
-<script defer src="<?=h($STATIC_DIR)?>/mdm.core.js"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.dom.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.api.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.ui.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.auth.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.settings.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.splitter.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.editor.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.explorer.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.modals.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.layout.js'))?>"></script>
+<script defer src="<?=h(mdw_static_asset('mdm.core.js'))?>"></script>
 <?php if ($github_pages_plugin_loaded): ?>
-<script defer src="<?=h($STATIC_DIR)?>/github_pages_export.js"></script>
+<script defer src="<?=h(mdw_static_asset('github_pages_export.js'))?>"></script>
 <?php endif; ?>
 
 </body>

@@ -86,7 +86,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
                     <label class="status-text" for="newMdFile"><?= $esc($tr('index.new_markdown.slug_label', 'Slug / filename')) ?></label>
                     <div style="display:flex; align-items:center; gap: 0.4rem;">
                         <input id="newMdFile" name="new_slug" class="input" style="width: 100%;" type="text" value="<?= $esc($slugValue) ?>" placeholder="<?= $esc($tr('index.new_markdown.filename_placeholder', 'my-title')) ?>" minlength="<?= MDW_NEW_MD_SLUG_MIN ?>" maxlength="<?= MDW_NEW_MD_SLUG_MAX ?>" data-slug-min="<?= MDW_NEW_MD_SLUG_MIN ?>" data-slug-max="<?= MDW_NEW_MD_SLUG_MAX ?>" required>
-                        <span class="status-text">.md</span>
+                        <span class="status-text new-md-extension">.md</span>
                     </div>
                     <div id="newMdFileHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
                     <div id="newMdFilePreview" class="status-text" data-label="<?= $esc($tr('index.new_markdown.filename_preview', 'Filename')) ?>" style="margin-top: 0.1rem; display: none;">

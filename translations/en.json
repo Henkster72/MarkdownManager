@@ -55,6 +55,11 @@
       "link": "Link",
       "image": "Image",
       "save": "Save",
+      "article_meta_title": "Article metadata",
+      "toc": "TOC",
+      "toc_no_headings": "No H3 headings yet.",
+      "show_markdown_title": "Show markdown source",
+      "hide_markdown_title": "Show visual editor",
       "publish": "Publish",
       "publish_title": "Send to processing",
       "rename": "Rename",
@@ -73,6 +78,7 @@
     },
     "new_md_hint": "Use +MD in the top bar to create a new markdown file.",
     "preview_title": "HTML preview",
+    "visual_editor_title": "Visual editor",
     "preview": {
       "export_title": "Download a plain HTML export",
       "export_btn": "HTML download",
@@ -85,6 +91,12 @@
       "collapse_overview": "Collapse overview",
       "expand_overview": "Expand overview"
     }
+  },
+  "article_meta": {
+    "title": "Article metadata",
+    "hint": "Only metadata fields visible in Markdown are shown.",
+    "empty": "No editable metadata fields are visible in Markdown.",
+    "apply": "Apply"
   },
   "theme": {
     "settings_title": "Settings",
@@ -105,6 +117,9 @@
     },
     "ui": {
       "title": "User interface"
+    },
+    "index_layout": {
+      "hide_markdown": "Hide markdown"
     },
     "kbd_modifier": {
       "label": "Keyboard shortcuts system",
@@ -182,6 +197,7 @@
       "option_inline": "Inline (default)",
       "option_left": "Left sidebar",
       "option_right": "Right sidebar",
+      "show_button": "Show TOC toolbar button",
       "hint": "Side menu appears in preview/view and only exports in wet HTML.",
       "saving": "Saving…",
       "saved": "Saved",
@@ -266,7 +282,7 @@
     "publisher": {
       "title": "WPM (Website publication mode)",
       "enable": "Enable WPM",
-      "hint": "WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.",
+      "hint": "WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Requires an author name; subtitle requirement is optional.",
       "author_label": "Author name",
       "author_placeholder": "Your name",
       "author_required": "Please enter an author name to enable WPM.",

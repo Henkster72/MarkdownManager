@@ -225,15 +225,22 @@
         });
     };
 
-    document.querySelectorAll('.nav-section[data-folder-section]').forEach((section) => {
-        const header = section.querySelector('.note-group-title');
-        if (!(header instanceof HTMLElement)) return;
-        const path = String(section.dataset.folderSection || '');
-        if (path && path !== 'root') {
-            header.setAttribute('draggable', 'true');
-        }
-        header.dataset.folderPath = path;
-    });
+    const syncFolderDragState = () => {
+        const allowDrag = canManageFolders();
+        document.querySelectorAll('.nav-section[data-folder-section]').forEach((section) => {
+            const header = section.querySelector('.note-group-title');
+            if (!(header instanceof HTMLElement)) return;
+            const path = String(section.dataset.folderSection || '');
+            if (path && path !== 'root' && allowDrag) {
+                header.setAttribute('draggable', 'true');
+            } else {
+                header.removeAttribute('draggable');
+            }
+            header.dataset.folderPath = path;
+        });
+    };
+    window.__mdwSyncFolderDragState = syncFolderDragState;
+    syncFolderDragState();
 
     let dragSrcPath = '';
     let dragSrcSection = null;
@@ -668,7 +675,8 @@
         const prefix = (newMdPrefixDate instanceof HTMLInputElement) ? String(newMdPrefixDate.dataset.datePrefix || '') : '';
         const usePrefix = !!(newMdPrefixDate instanceof HTMLInputElement && newMdPrefixDate.checked && prefix);
         const withPrefix = usePrefix && !slug.startsWith(prefix) ? `${prefix}${slug}` : slug;
-        newMdPreviewValue.textContent = `${withPrefix}.md`;
+        const suffix = document.body?.classList.contains('hide-markdown-editor') ? '' : '.md';
+        newMdPreviewValue.textContent = `${withPrefix}${suffix}`;
     };
 
     const validateTitle = ({ showHint } = { showHint: false }) => {

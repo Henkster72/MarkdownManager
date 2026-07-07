@@ -42,7 +42,7 @@
       "title_placeholder": "Je titel",
       "slug_label": "Slug / bestandsnaam",
       "filename_preview": "Bestandsnaam",
-      "slug_locked": "Alleen een superuser kan de slug aanpassen.",
+      "slug_locked": "Alleen een superuser kan de slug veranderen na initiele aanmaak.",
       "date_prefix_title": "Voegt een yy-mm-dd- prefix toe aan de bestandsnaam.",
       "filename_placeholder": "mijn-titel",
       "content_placeholder": "# Titel\n\nBegin met schrijven..."
@@ -55,6 +55,11 @@
       "link": "Link",
       "image": "Afbeelding",
       "save": "Opslaan",
+      "article_meta_title": "Artikelmetadata",
+      "toc": "TOC",
+      "toc_no_headings": "Nog geen H3-kopstukken gevonden.",
+      "show_markdown_title": "Markdownbron tonen",
+      "hide_markdown_title": "Visuele editor tonen",
       "publish": "Publiceren",
       "publish_title": "Naar verwerking",
       "rename": "Hernoem",
@@ -73,6 +78,7 @@
     },
     "new_md_hint": "Gebruik +MD in de bovenbalk om een nieuwe markdown te maken.",
     "preview_title": "HTML-voorbeeld",
+    "visual_editor_title": "Visuele editor",
     "preview": {
       "export_title": "Download een eenvoudige HTML-export",
       "export_btn": "HTML downloaden",
@@ -85,6 +91,12 @@
       "collapse_overview": "Overzicht inklappen",
       "expand_overview": "Overzicht uitklappen"
     }
+  },
+  "article_meta": {
+    "title": "Artikelmetadata",
+    "hint": "Alleen metadatavelden die zichtbaar zijn in Markdown worden getoond.",
+    "empty": "Er zijn geen bewerkbare metadatavelden zichtbaar in Markdown.",
+    "apply": "Toepassen"
   },
   "theme": {
     "settings_title": "Instellingen",
@@ -105,6 +117,9 @@
     },
     "ui": {
       "title": "Gebruikersinterface"
+    },
+    "index_layout": {
+      "hide_markdown": "Verberg markdown"
     },
     "kbd_modifier": {
       "label": "Sneltoets-systeem",
@@ -173,6 +188,7 @@
       "option_inline": "Inline (standaard)",
       "option_left": "Linker zijbalk",
       "option_right": "Rechter zijbalk",
+      "show_button": "Toon TOC-knop in toolbar",
       "hint": "Zijmenu verschijnt in preview/weergave en wordt alleen geëxporteerd in wet HTML.",
       "saving": "Opslaan…",
       "saved": "Opgeslagen",
@@ -257,7 +273,7 @@
     "publisher": {
       "title": "WPM (Website publicatiemodus)",
       "enable": "WPM inschakelen",
-      "hint": "WPM voegt publicatiestatussen toe (Concept / Verwerking / Gepubliceerd) en toont ze in het overzicht. Schakelt geheime notities uit. Vereist een auteurnaam; subtitel is optioneel.",
+      "hint": "WPM voegt publicatiestatussen toe (Concept / Verwerking / Gepubliceerd) en toont ze in het overzicht. Vereist een auteurnaam; subtitel is optioneel.",
       "author_label": "Auteurnaam",
       "author_placeholder": "Jouw naam",
       "author_required": "Vul een auteurnaam in om WPM in te schakelen.",

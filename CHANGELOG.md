@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9
+
+- WPM visual editing: added a hide-markdown editor mode that lets authors work in the preview surface while keeping the Markdown textarea available as an underwater/source mode.
+- Editor toolbar: added a source toggle (`pi-code` / `pi-eye`), a WPM article metadata button (`pi-gear`), and an optional TOC toolbar button controlled from superuser settings.
+- Article metadata: added a modal editor for Markdown-visible WPM/frontmatter fields so regular users can edit allowed key/value metadata without touching hidden fields.
+- TOC workflow: `{TOC}` is now toggled near the frontmatter/metafields instead of at the cursor, accepts spaced `{ TOC }`, and warns in EN/NL when no H3 (`###`) headings exist.
+- Hide-markdown responsive UX: fixed preview width on narrow viewports, balanced toolbar buttons across the available width, hides button text at tablet/mobile widths, and omits the `.md` extension in the new-article UI.
+- WPM/settings copy: removed the obsolete secret-notes wording from WPM hints, updated the slug lock text, and added settings persistence for hide-markdown and TOC toolbar options.
+- Visual editor commands: wired toolbar/link/image/format actions through the visual editor mode so they affect the active editing surface instead of only the hidden Markdown textarea.
+- Authentication/test config: updated local test hashes so the normal user password can differ from the superuser password.
+- Translations: refreshed English and Dutch labels for the new editor, metadata, TOC, hide-markdown, and WPM setting controls.
+
 ## 0.81
 
 - Explorer performance (large libraries): added lazy explorer tree loading with JSON note payloads, client-side cache/TTL reuse, and reduced initial index payload pressure for very large note sets.
@@ -214,7 +226,8 @@ When enabled, MarkdownManager expects a hidden metadata block at the top of each
 
 Example (hidden metadata block):
 
-```text
+```
+
 {page_title: Example page title}
 {page_subtitle: Optional subtitle}
 {post_date: 2025-11-23}
@@ -224,6 +237,7 @@ Example (hidden metadata block):
 ```
 
 Notes:
+
 - Each metadata line uses the format `{key: value}`. Legacy `_key: value_` is still accepted and will be normalized on save.
 - `published_date` overrides `post_date` when present.
 - If no date metadata exists, the explorer falls back to a date prefix in the filename (`yy-mm-dd-`).
@@ -294,7 +308,8 @@ The search and header link are only shown when `plugins/google_search_plugin.php
 
 From the project directory:
 
-```bash
+```
+
 php -S 127.0.0.1:8000
 ```
 
@@ -324,14 +339,13 @@ Everything you read and edit is stored as normal `*.md` files in this directory 
 When the Markdown textarea is focused:
 
 - Shortcut system: choose Windows/Linux (`Ctrl+Alt`) or Mac (`Ctrl+Command`) in the Settings modal.
-
 - `Ctrl+Z` -- undo (up to 25 steps)
 - `Ctrl+Shift+Z` -- redo
 - `Ctrl+Alt+S` -- save
 - `Ctrl+Alt+B` -- bold (`**...**`)
 - `Ctrl+Alt+I` -- italic (`*...*`)
 - `Ctrl+Alt+X` -- strikethrough (`~~...~~`)
-- `Ctrl+Alt+\`` -- inline code (`` `...` ``)
+- `Ctrl+Alt+\``-- inline code (`...`)
 - `Ctrl+Alt+H` -- replace (opens the replace modal)
 - `Ctrl+Alt+L` -- insert link (opens the link modal)
 - `Ctrl+Alt+K` -- insert link (opens the link modal)
@@ -339,7 +353,7 @@ When the Markdown textarea is focused:
 - `Ctrl+Alt+Q` -- toggle blockquote for line(s) (`> ...`)
 - `Ctrl+Alt+U` -- toggle bullet list for line(s) (`- ...`)
 - `Ctrl+Alt+O` -- fenced code block (wraps with ``` fences)
-- `Ctrl+Alt+/` -- comment selection (`<!-- ... -->`)
+- `Ctrl+Alt+/` -- comment selection ()
 - `Ctrl+Alt+PageUp` (or `Ctrl+Alt+Shift+PageUp`) -- uppercase selection (or current word)
 - `Ctrl+Alt+PageDown` (or `Ctrl+Alt+Shift+PageDown`) -- lowercase selection (or current word)
 - `Ctrl+Alt++` -- increase heading level (`#` -> `##` ...)
@@ -369,7 +383,8 @@ When the Markdown textarea is focused:
 
 ## Project layout
 
-```text
+```
+
 .
 |-- index.php           # viewer (overview + reader + create/delete)
 |-- edit.php            # editor (3-pane desktop, 2-row mobile)
@@ -431,13 +446,14 @@ Note: `example-notes/` is optional sample content and can be deleted after insta
 Rendering is implemented in PHP (a small custom parser) and is used by both `index.php` and `edit.php`.
 
 Hot keywords:
+
 - `{TOC}` inserts a table of contents for `###` headings and links them with numbered anchors (`#1`, `#2`, ...).
 
 It supports a practical subset:
 
 - Headings (`#` through `######`)
 - Paragraphs
-- Inline code (`` `code` ``)
+- Inline code (`code`)
 - Bold / italic (`**bold**`, `*italic*`)
 - Images (`![alt](url)`) including relative paths
 - Links (`[label](https://example.com)`)
@@ -457,6 +473,7 @@ It supports a practical subset:
 ## Configuration
 
 Configuration is read from a local `.env` file (or real environment variables).
+
 Copy `.env.example` to `.env` and edit as needed.
 
 - `LINKS_CSV` (default: `links.csv`)
@@ -500,7 +517,8 @@ You can provide only one of them; the other area simply keeps the defaults.
 
 `ThemeName_meta.json` lets the app show a nicer label and color swatches:
 
-```json
+```
+
 {
   "label": "Candy",
   "color": "#E5219D",
@@ -517,7 +535,8 @@ You can provide only one of them; the other area simply keeps the defaults.
 
 If your theme uses Google Fonts, add `ThemeName_fonts.json`:
 
-```json
+```
+
 {
   "preconnect": [
     "https://fonts.googleapis.com",
@@ -549,6 +568,7 @@ In `edit.php`, the HTML preview pane has two extra buttons:
 - **Copy HTML**: copies the same standalone HTML to your clipboard
 
 Notes:
+
 - The export uses the current server-rendered preview (same output as the live preview).
 - Internal `index.php?file=...` links are rewritten to relative `.md` links so exported HTML is more portable.
 - CSS classes are stripped to keep the export "plain".
@@ -562,6 +582,7 @@ In `edit.php`, click the **image** icon to open the image manager modal:
 - Insert Markdown at the cursor: `![alt](images/filename.ext)`
 
 Implementation notes:
+
 - Upload/list endpoint: `image_manager.php`
 - Uses a CSRF token stored in the session.
 - If the GD extension is available, uploads may be converted/resized to WebP for consistency; otherwise the original image is stored.
@@ -580,6 +601,7 @@ To disable a built-in plugin, remove (or rename) its `.php` file from `PLUGINS_D
 - `plugins/pdfs_plugin.php`: shows a `PDF/` folder section (lists `.pdf` files recursively) on the index/overview page, only if `PDF/` exists.
 
 Notes:
+
 - Plugins are only loaded in `index.php` (overview/explorer). The editor (`edit.php`) keeps the explorer focused on markdown files.
 - Plugin folders also support the same `?folder=...` filtering behavior as markdown folders.
 
@@ -587,12 +609,14 @@ Notes:
 
 `secret_mds.txt` is a newline-separated list of relative markdown paths to protect:
 
-```text
+```
+
 example-notes/finance/private.md
 research/25-01-01-secret-note.md
 ```
 
 Password:
+
 - Set `SECRET_MDS_PASSWORD` in `.env`.
 - If it's empty/missing, secret notes stay locked (no login possible).
 
@@ -604,7 +628,8 @@ If `links.csv` exists, it is shown as a "Shortcuts" section (via the links plugi
 
 The parser expects a header row and at least two columns:
 
-```csv
+```
+
 shortcut,url
 DuckDuckGo Search,https://duckduckgo.com/
 PHP Docs,https://www.php.net/

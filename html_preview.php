@@ -894,7 +894,7 @@ function mdw_toc_is_token_line($line) {
     $line = preg_replace('/[\x{200B}\x{FEFF}]/u', '', $line);
     $trim = trim($line);
     if ($trim === '') return false;
-    return strtoupper($trim) === '{TOC}';
+    return (bool)preg_match('/^\{\s*TOC\s*\}$/i', $trim);
 }
 
 function mdw_toc_normalize_id($id) {
@@ -947,7 +947,9 @@ function mdw_toc_collect_h3($text) {
             if (strlen($m[1]) === 3) {
                 $items[] = ['text' => trim((string)$m[2]), 'id' => ''];
             }
+            continue;
         }
+
     }
     return $items;
 }
@@ -1135,6 +1137,67 @@ function mdw_rewrite_md_class_prefix_in_html($html, $prefix, $dropMdClassesWhenP
     }, $html);
 }
 
+function mdw_export_normalize_toc_template_html($html) {
+    $html = (string)$html;
+    if ($html === '' || stripos($html, 'md-toc') === false) return $html;
+
+    $html = (string)preg_replace_callback('/\sclass\s*=\s*(["\'])(.*?)\1/si', function($m) {
+        $quote = (string)($m[1] ?? '"');
+        $raw = html_entity_decode((string)($m[2] ?? ''), ENT_QUOTES, 'UTF-8');
+        $tokens = preg_split('/\s+/', trim($raw));
+        if (!is_array($tokens) || !$tokens) return $m[0];
+
+        $mapped = [];
+        foreach ($tokens as $cls) {
+            $cls = trim((string)$cls);
+            if ($cls === '') continue;
+            if ($cls === 'md-toc-layout') {
+                $mapped[] = 'toc-layout';
+                continue;
+            }
+            if (in_array($cls, ['md-toc-inline', 'md-toc-left', 'md-toc-right'], true)) {
+                continue;
+            }
+            if ($cls === 'md-toc-side') {
+                $mapped[] = 'toc-side';
+                continue;
+            }
+            if ($cls === 'md-toc-body') {
+                $mapped[] = 'toc-body';
+                continue;
+            }
+            if ($cls === 'md-toc-wrap') {
+                $mapped[] = 'toc-wrap';
+                continue;
+            }
+            if ($cls === 'md-toc') {
+                $mapped[] = 'toc';
+                continue;
+            }
+            if ($cls === 'md-toc-item') {
+                $mapped[] = 'toc-item';
+                continue;
+            }
+            $mapped[] = $cls;
+        }
+
+        $mapped = array_values(array_unique($mapped));
+        if (!$mapped) return '';
+        return ' class=' . $quote . htmlspecialchars(implode(' ', $mapped), ENT_QUOTES, 'UTF-8') . $quote;
+    }, $html);
+
+    $html = (string)preg_replace(
+        '/<nav\b([^>]*)\bclass\s*=\s*(["\'])toc-side\2([^>]*)>\s*(<!--\s*Table of contents\s*-->\s*)?<div\b([^>]*)\bclass\s*=\s*(["\'])toc-wrap\6([^>]*)>/i',
+        '$4<div$5$7 class="toc-side toc-wrap">',
+        $html
+    );
+    $html = (string)preg_replace('/<div\s{2,}(?=[^>]*\bdata-mdw-toc\s*=)/i', '<div ', $html);
+    $html = (string)preg_replace('/\sdata-mdw-toc-layout\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+    $html = (string)preg_replace('/<\/div>\s*<\/nav>\s*(?=<div\b[^>]*\bclass\s*=\s*(["\'])toc-body\1)/i', "</div>\n", $html);
+
+    return $html;
+}
+
 function mdw_html_render_heading_line($line, $profile, $context, $mdPath, $tocRequested, $tocActive, $tocItems, &$tocIndex) {
     if (!preg_match('/^\\s*<h([1-6])\\b([^>]*)>(.*?)<\\/h\\1>\\s*$/i', (string)$line, $m)) return null;
     $level = (int)$m[1];
@@ -1207,10 +1270,12 @@ function mdw_metadata_default_config() {
             'copy_include_meta' => true,
             'copy_html_mode' => 'dry',
             'toc_menu' => 'inline',
+            'toc_button_enabled' => false,
             'post_date_format' => 'mdy_short',
             'post_date_align' => 'left',
             'folder_icon_style' => 'folder',
             'index_dual_pane_overview' => true,
+            'hide_markdown_editor' => false,
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
@@ -1286,6 +1351,7 @@ function mdw_metadata_normalize_config($cfg) {
     if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
     $tocMenu = isset($inSettings['toc_menu']) ? strtolower(trim((string)$inSettings['toc_menu'])) : 'inline';
     if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+    $tocButtonEnabled = !array_key_exists('toc_button_enabled', $inSettings) ? false : (bool)$inSettings['toc_button_enabled'];
     $postDateFormat = isset($inSettings['post_date_format']) ? trim((string)$inSettings['post_date_format']) : 'mdy_short';
     if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
     $postDateAlign = isset($inSettings['post_date_align']) ? trim((string)$inSettings['post_date_align']) : 'left';
@@ -1293,6 +1359,7 @@ function mdw_metadata_normalize_config($cfg) {
     $folderIconStyle = isset($inSettings['folder_icon_style']) ? strtolower(trim((string)$inSettings['folder_icon_style'])) : 'folder';
     if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
     $indexDualPaneOverview = !array_key_exists('index_dual_pane_overview', $inSettings) ? true : (bool)$inSettings['index_dual_pane_overview'];
+    $hideMarkdownEditor = !array_key_exists('hide_markdown_editor', $inSettings) ? false : (bool)$inSettings['hide_markdown_editor'];
     $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
     if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
@@ -1324,10 +1391,12 @@ function mdw_metadata_normalize_config($cfg) {
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
         'toc_menu' => $tocMenu,
+        'toc_button_enabled' => (bool)$tocButtonEnabled,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
+        'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
@@ -1582,10 +1651,12 @@ function mdw_metadata_settings() {
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
         'copy_html_mode' => isset($s['copy_html_mode']) ? trim((string)$s['copy_html_mode']) : 'dry',
         'toc_menu' => isset($s['toc_menu']) ? strtolower(trim((string)$s['toc_menu'])) : 'inline',
+        'toc_button_enabled' => !array_key_exists('toc_button_enabled', $s) ? false : (bool)$s['toc_button_enabled'],
         'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
         'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
         'folder_icon_style' => isset($s['folder_icon_style']) ? strtolower(trim((string)$s['folder_icon_style'])) : 'folder',
         'index_dual_pane_overview' => !array_key_exists('index_dual_pane_overview', $s) ? true : (bool)$s['index_dual_pane_overview'],
+        'hide_markdown_editor' => !array_key_exists('hide_markdown_editor', $s) ? false : (bool)$s['hide_markdown_editor'],
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
@@ -1999,6 +2070,7 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
         $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
     }
     $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
+    $bodyHtml = mdw_export_normalize_toc_template_html($bodyHtml);
     $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
 
     $lines = [];
@@ -2466,6 +2538,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
     $context = is_array($context) ? $context : [];
     $sourceMapEnabled = !array_key_exists('source_map', $context) || !empty($context['source_map']);
+    $renderMetadata = !array_key_exists('render_metadata', $context) || !empty($context['render_metadata']);
 
     $meta = [];
     $lineMap = null;
@@ -2551,123 +2624,125 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $htmlBlockTag = '';
     $htmlBlockDepth = 0;
 
-    // Render metadata block (optional, based on config).
-    $baseFields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
-    $pubFields = ($publisherMode && isset($pcfg['fields']) && is_array($pcfg['fields'])) ? $pcfg['fields'] : [];
-    $metaFields = array_merge($baseFields, $pubFields);
-    $metaShown = [];
-    $order = [];
-    foreach (array_keys($baseFields) as $k) $order[] = $k;
-    foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'] as $k) {
-        if (!isset($pubFields[$k])) continue;
-        $order[] = $k;
-    }
-    $order = array_values(array_unique(array_map(fn($x) => strtolower((string)$x), $order)));
+    if ($renderMetadata) {
+        // Render metadata block (optional, based on config).
+        $baseFields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
+        $pubFields = ($publisherMode && isset($pcfg['fields']) && is_array($pcfg['fields'])) ? $pcfg['fields'] : [];
+        $metaFields = array_merge($baseFields, $pubFields);
+        $metaShown = [];
+        $order = [];
+        foreach (array_keys($baseFields) as $k) $order[] = $k;
+        foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'] as $k) {
+            if (!isset($pubFields[$k])) continue;
+            $order[] = $k;
+        }
+        $order = array_values(array_unique(array_map(fn($x) => strtolower((string)$x), $order)));
 
-    $pagePictureHtml = '';
-    $pictureInserted = false;
-    if ($publisherMode) {
-        $pictureValue = isset($meta['page_picture']) ? trim((string)$meta['page_picture']) : '';
-        if ($pictureValue !== '') {
-            $f = isset($metaFields['page_picture']) && is_array($metaFields['page_picture']) ? $metaFields['page_picture'] : null;
+        $pagePictureHtml = '';
+        $pictureInserted = false;
+        if ($publisherMode) {
+            $pictureValue = isset($meta['page_picture']) ? trim((string)$meta['page_picture']) : '';
+            if ($pictureValue !== '') {
+                $f = isset($metaFields['page_picture']) && is_array($metaFields['page_picture']) ? $metaFields['page_picture'] : null;
+                $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
+                $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
+                if (!$mdVis) $htmlVis = false;
+                if ($htmlVis) {
+                    $titleText = isset($meta['page_title']) ? trim((string)$meta['page_title']) : '';
+                    $src = mdw_page_picture_src($pictureValue);
+                    if ($src !== '') {
+                        $pagePictureHtml = '<img class="md-img" src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($titleText, ENT_QUOTES, 'UTF-8') . '" loading="lazy" decoding="async">';
+                    }
+                }
+            }
+        }
+
+        $mappedMetaKeys = [];
+        if ($publisherMode) {
+            $htmlMap = (isset($pcfg['html_map']) && is_array($pcfg['html_map'])) ? $pcfg['html_map'] : [];
+            if (!empty($htmlMap)) {
+                foreach ($order as $k) {
+                    if (!isset($meta[$k])) continue;
+                    $spec = (isset($htmlMap[$k]) && is_array($htmlMap[$k])) ? $htmlMap[$k] : null;
+                    if (!$spec) continue;
+                    if (array_key_exists('enabled', $spec) && !$spec['enabled']) continue;
+                    $v = trim((string)$meta[$k]);
+                    if ($v === '') continue;
+                    if ($k === 'post_date') {
+                        $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
+                    }
+                    $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
+                    $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
+                    $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
+                    if (!$mdVis && $k !== 'author') $htmlVis = false;
+                    if (!$htmlVis) continue;
+                    $prefix = isset($spec['prefix']) ? (string)$spec['prefix'] : '';
+                    $postfix = isset($spec['postfix']) ? (string)$spec['postfix'] : '';
+                    $html[] = $prefix . htmlspecialchars($v, ENT_QUOTES, 'UTF-8') . $postfix;
+                    if (!empty($spec['omit_meta'])) {
+                        $mappedMetaKeys[$k] = true;
+                    }
+                    if ($k === 'page_title' && $pagePictureHtml !== '') {
+                        $html[] = $pagePictureHtml;
+                        $mappedMetaKeys['page_picture'] = true;
+                        $pictureInserted = true;
+                    }
+                }
+            }
+        }
+
+        if ($pagePictureHtml !== '' && !$pictureInserted) {
+            $html[] = $pagePictureHtml;
+            $mappedMetaKeys['page_picture'] = true;
+        }
+
+        foreach ($order as $k) {
+            if (!isset($meta[$k])) continue;
+            $v = trim((string)$meta[$k]);
+            if ($v === '') continue;
+            if (isset($mappedMetaKeys[$k])) continue;
+            if ($k === 'post_date') {
+                $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
+            }
+            $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
             $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
             $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
             if (!$mdVis && $k !== 'author') $htmlVis = false;
-            if ($htmlVis) {
-                $titleText = isset($meta['page_title']) ? trim((string)$meta['page_title']) : '';
-                $src = mdw_page_picture_src($pictureValue);
-                if ($src !== '') {
-                    $pagePictureHtml = '<img class="md-img" src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($titleText, ENT_QUOTES, 'UTF-8') . '" loading="lazy" decoding="async">';
+            if (!$htmlVis) continue;
+            if ($k === 'author' && !$mdVis && $publisherMode) {
+                $defaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
+                if ($v === '' && $defaultAuthor !== '' && $publishState === 'Concept') {
+                    $v = $defaultAuthor;
                 }
             }
-        }
-    }
-
-    $mappedMetaKeys = [];
-    if ($publisherMode) {
-        $htmlMap = (isset($pcfg['html_map']) && is_array($pcfg['html_map'])) ? $pcfg['html_map'] : [];
-        if (!empty($htmlMap)) {
-            foreach ($order as $k) {
-                if (!isset($meta[$k])) continue;
-                $spec = (isset($htmlMap[$k]) && is_array($htmlMap[$k])) ? $htmlMap[$k] : null;
-                if (!$spec) continue;
-                if (array_key_exists('enabled', $spec) && !$spec['enabled']) continue;
-                $v = trim((string)$meta[$k]);
-                if ($v === '') continue;
-                if ($k === 'post_date') {
-                    $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
-                }
-                $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
-                $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
-                $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
-                if (!$mdVis && $k !== 'author') $htmlVis = false;
-                if (!$htmlVis) continue;
-                $prefix = isset($spec['prefix']) ? (string)$spec['prefix'] : '';
-                $postfix = isset($spec['postfix']) ? (string)$spec['postfix'] : '';
-                $html[] = $prefix . htmlspecialchars($v, ENT_QUOTES, 'UTF-8') . $postfix;
-                if (!empty($spec['omit_meta'])) {
-                    $mappedMetaKeys[$k] = true;
-                }
-                if ($k === 'page_title' && $pagePictureHtml !== '') {
-                    $html[] = $pagePictureHtml;
-                    $mappedMetaKeys['page_picture'] = true;
-                    $pictureInserted = true;
-                }
+            $label = $f && isset($f['label']) ? (string)$f['label'] : $k;
+            if ($k === 'author' && function_exists('mdw_t')) {
+                $label = mdw_t('theme.metadata.author_label', $label);
             }
+            $isPostDate = ($k === 'post_date');
+            $metaShown[] = [
+                'k' => $k,
+                'label' => $label,
+                'value' => $v,
+                'no_label' => $isPostDate,
+                'align' => $isPostDate ? ($settings['post_date_align'] ?? 'left') : null,
+            ];
         }
-    }
 
-    if ($pagePictureHtml !== '' && !$pictureInserted) {
-        $html[] = $pagePictureHtml;
-        $mappedMetaKeys['page_picture'] = true;
-    }
-
-    foreach ($order as $k) {
-        if (!isset($meta[$k])) continue;
-        $v = trim((string)$meta[$k]);
-        if ($v === '') continue;
-        if (isset($mappedMetaKeys[$k])) continue;
-        if ($k === 'post_date') {
-            $v = mdw_format_post_date_value($v, $settings['post_date_format'] ?? 'mdy_short');
-        }
-        $f = isset($metaFields[$k]) && is_array($metaFields[$k]) ? $metaFields[$k] : null;
-        $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
-        $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
-        if (!$mdVis && $k !== 'author') $htmlVis = false;
-        if (!$htmlVis) continue;
-        if ($k === 'author' && !$mdVis && $publisherMode) {
-            $defaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
-            if ($v === '' && $defaultAuthor !== '' && $publishState === 'Concept') {
-                $v = $defaultAuthor;
+        if (!empty($metaShown)) {
+            $html[] = '<dl class="md-meta" data-mdw-generated="metadata">';
+            foreach ($metaShown as $it) {
+                $valEsc = htmlspecialchars((string)$it['value'], ENT_QUOTES, 'UTF-8');
+                if (!empty($it['no_label'])) {
+                    $align = in_array((string)$it['align'], ['left', 'center', 'right'], true) ? (string)$it['align'] : 'left';
+                    $html[] = '<div class="md-meta-row meta-post-date meta-align-' . $align . '"><dd>' . $valEsc . '</dd></div>';
+                    continue;
+                }
+                $labelEsc = htmlspecialchars((string)$it['label'], ENT_QUOTES, 'UTF-8');
+                $html[] = '<div class="md-meta-row"><dt>' . $labelEsc . '</dt><dd>' . $valEsc . '</dd></div>';
             }
+            $html[] = '</dl>';
         }
-        $label = $f && isset($f['label']) ? (string)$f['label'] : $k;
-        if ($k === 'author' && function_exists('mdw_t')) {
-            $label = mdw_t('theme.metadata.author_label', $label);
-        }
-        $isPostDate = ($k === 'post_date');
-        $metaShown[] = [
-            'k' => $k,
-            'label' => $label,
-            'value' => $v,
-            'no_label' => $isPostDate,
-            'align' => $isPostDate ? ($settings['post_date_align'] ?? 'left') : null,
-        ];
-    }
-
-    if (!empty($metaShown)) {
-        $html[] = '<dl class="md-meta">';
-        foreach ($metaShown as $it) {
-            $valEsc = htmlspecialchars((string)$it['value'], ENT_QUOTES, 'UTF-8');
-            if (!empty($it['no_label'])) {
-                $align = in_array((string)$it['align'], ['left', 'center', 'right'], true) ? (string)$it['align'] : 'left';
-                $html[] = '<div class="md-meta-row meta-post-date meta-align-' . $align . '"><dd>' . $valEsc . '</dd></div>';
-                continue;
-            }
-            $labelEsc = htmlspecialchars((string)$it['label'], ENT_QUOTES, 'UTF-8');
-            $html[] = '<div class="md-meta-row"><dt>' . $labelEsc . '</dt><dd>' . $valEsc . '</dd></div>';
-        }
-        $html[] = '</dl>';
     }
 
     $openList = function($tag, $indent) use (&$html, &$listStack, $p) {
@@ -2918,7 +2993,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $bqAttrs = mdw_merge_attr_list($bqAttrs, $parsed);
             }
             $inner = implode("\n", $bq);
-            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false])) . "\n" . '</blockquote>';
+            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false, 'render_metadata' => false])) . "\n" . '</blockquote>';
             $bqHtml = $applySrcAttrs($bqHtml, $bqStartLine, $bqEndLine);
             if ($bqAttrs) {
                 $bqHtml = mdw_apply_attr_list_to_html($bqHtml, $bqAttrs);

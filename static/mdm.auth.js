@@ -76,6 +76,9 @@
         if (typeof window.__mdwApplyPublishPermissions === 'function') {
             window.__mdwApplyPublishPermissions();
         }
+        if (typeof window.__mdwSyncFolderDragState === 'function') {
+            window.__mdwSyncFolderDragState();
+        }
     };
 
     window.__mdwShowAuthModal = () => {

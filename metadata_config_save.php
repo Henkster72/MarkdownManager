@@ -250,6 +250,9 @@ if (is_array($settingsIn)) {
         ? strtolower(trim((string)($settingsIn['toc_menu'] ?? '')))
         : strtolower(trim((string)($curSettings['toc_menu'] ?? 'inline')));
     if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+    $tocButtonEnabled = array_key_exists('toc_button_enabled', $settingsIn)
+        ? (bool)$settingsIn['toc_button_enabled']
+        : (!array_key_exists('toc_button_enabled', $curSettings) ? false : (bool)$curSettings['toc_button_enabled']);
     $postDateFormat = array_key_exists('post_date_format', $settingsIn)
         ? trim((string)($settingsIn['post_date_format'] ?? ''))
         : trim((string)($curSettings['post_date_format'] ?? 'mdy_short'));
@@ -265,6 +268,9 @@ if (is_array($settingsIn)) {
     $indexDualPaneOverview = array_key_exists('index_dual_pane_overview', $settingsIn)
         ? (bool)$settingsIn['index_dual_pane_overview']
         : (!array_key_exists('index_dual_pane_overview', $curSettings) ? true : (bool)$curSettings['index_dual_pane_overview']);
+    $hideMarkdownEditor = array_key_exists('hide_markdown_editor', $settingsIn)
+        ? (bool)$settingsIn['hide_markdown_editor']
+        : (!array_key_exists('hide_markdown_editor', $curSettings) ? false : (bool)$curSettings['hide_markdown_editor']);
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -332,10 +338,12 @@ if (is_array($settingsIn)) {
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
         'toc_menu' => $tocMenu,
+        'toc_button_enabled' => (bool)$tocButtonEnabled,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
+        'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,

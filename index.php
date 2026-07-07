@@ -138,6 +138,7 @@ if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) $exportCla
 $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($MDW_SETTINGS['jinja_meta_prefix'] ?? 'page_');
 $tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
 if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+$tocButtonEnabled = !empty($MDW_SETTINGS['toc_button_enabled']);
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
 $postDateAlign = isset($MDW_SETTINGS['post_date_align']) ? trim((string)$MDW_SETTINGS['post_date_align']) : 'left';
@@ -146,6 +147,7 @@ $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
 $indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
+$hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -257,6 +259,41 @@ function compare_entries_desc_date($a, $b) {
     return strcasecmp($a['basename'], $b['basename']);
 }
 
+function mdw_publisher_should_hide_md_entry($path) {
+    global $MDW_PUBLISHER_MODE;
+    if (empty($MDW_PUBLISHER_MODE)) return false;
+    if (!is_string($path) || $path === '') return false;
+    $full = mdw_safe_full_path($path, true);
+    if (!$full || !is_file($full) || !is_readable($full)) return false;
+
+    $h = @fopen($full, 'rb');
+    if (!$h) return false;
+    $state = '';
+    $maxLines = 120;
+    while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
+        $line = rtrim($line, "\r\n");
+        $k = null;
+        $v = null;
+        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
+            if (strtolower(trim((string)$k)) === 'publishstate') {
+                $state = (string)$v;
+                break;
+            }
+            continue;
+        }
+        if (preg_match('/^\s*(?:_+publishstate\s*:\s*(.*?)\s*_*\s*|\{+\s*publishstate\s*:\s*(.*?)\s*\}+\s*)$/iu', $line, $m)) {
+            $state = (string)(($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? ''));
+            break;
+        }
+    }
+    fclose($h);
+    if ($state === '') return false;
+    $normalized = function_exists('mdw_publisher_normalize_publishstate')
+        ? mdw_publisher_normalize_publishstate($state)
+        : trim($state);
+    return $normalized === 'ToDelete';
+}
+
 /* List md files in a specific dir (relative), sorted like root list */
 function list_md_in_dir_sorted($dirRel) {
     $dirRel = is_string($dirRel) ? $dirRel : '';
@@ -266,6 +303,7 @@ function list_md_in_dir_sorted($dirRel) {
     $mds = glob($pattern);
     $out = [];
     foreach ($mds as $path) {
+        if (mdw_publisher_should_hide_md_entry($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -285,6 +323,7 @@ function list_md_root_sorted(){
     $mds = glob("*.md");
     $out=[];
     foreach($mds as $path){
+        if (mdw_publisher_should_hide_md_entry($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -344,6 +383,7 @@ function list_md_by_subdir_sorted(){
             $tmp = [];
             if ($mds) {
                 foreach ($mds as $path) {
+                    if (mdw_publisher_should_hide_md_entry($path)) continue;
                     $base = basename($path);
                     [$yy,$mm,$dd] = parse_ymd_from_filename($base);
                     $tmp[] = [
@@ -433,6 +473,159 @@ function mdw_explorer_collect_notes_payload($rootList, $dirMap, $secretMap, $pub
         }
     }
     return $notes;
+}
+
+function mdw_search_request_base_url() {
+    $host = isset($_SERVER['HTTP_HOST']) ? trim((string)$_SERVER['HTTP_HOST']) : '';
+    $script = isset($_SERVER['SCRIPT_NAME']) ? (string)$_SERVER['SCRIPT_NAME'] : 'index.php';
+    if ($host === '') return '';
+    $forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? strtolower(trim((string)$_SERVER['HTTP_X_FORWARDED_PROTO'])) : '';
+    if ($forwardedProto === 'http' || $forwardedProto === 'https') {
+        $scheme = $forwardedProto;
+        return $scheme . '://' . $host . $script;
+    }
+    $https = isset($_SERVER['HTTPS']) ? strtolower((string)$_SERVER['HTTPS']) : '';
+    $port = isset($_SERVER['SERVER_PORT']) ? (string)$_SERVER['SERVER_PORT'] : '';
+    $scheme = (($https !== '' && $https !== 'off') || $port === '443') ? 'https' : 'http';
+    return $scheme . '://' . $host . $script;
+}
+
+function mdw_search_url_for_path($path) {
+    $base = mdw_search_request_base_url();
+    $q = http_build_query(['file' => (string)$path], '', '&', PHP_QUERY_RFC3986);
+    return ($base !== '' ? $base : 'index.php') . '?' . $q;
+}
+
+function mdw_search_terms($query) {
+    $query = trim(preg_replace('/\s+/u', ' ', (string)$query));
+    if ($query === '') return [];
+    $parts = preg_split('/\s+/u', $query, -1, PREG_SPLIT_NO_EMPTY);
+    $terms = [];
+    foreach ($parts as $part) {
+        $part = trim((string)$part);
+        if ($part !== '') $terms[] = $part;
+    }
+    return array_values(array_unique($terms));
+}
+
+function mdw_search_matches_all_terms($haystack, $terms) {
+    $haystack = (string)$haystack;
+    foreach ($terms as $term) {
+        if (@preg_match('/' . preg_quote((string)$term, '/') . '/iu', $haystack) !== 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function mdw_search_score($title, $path, $body, $terms) {
+    $score = 0;
+    foreach ($terms as $term) {
+        $pattern = '/' . preg_quote((string)$term, '/') . '/iu';
+        if (@preg_match($pattern, (string)$title)) $score += 30;
+        if (@preg_match($pattern, (string)$path)) $score += 20;
+        if (@preg_match($pattern, (string)$body)) $score += 10;
+    }
+    return $score;
+}
+
+function mdw_search_snippet($body, $terms, $limit = 240) {
+    $body = trim(preg_replace('/\s+/u', ' ', (string)$body));
+    if ($body === '') return '';
+    $limit = max(80, min(500, (int)$limit));
+    $offset = 0;
+    foreach ($terms as $term) {
+        $pattern = '/' . preg_quote((string)$term, '/') . '/iu';
+        if (@preg_match($pattern, $body, $m, PREG_OFFSET_CAPTURE)) {
+            $offset = max(0, (int)$m[0][1] - 80);
+            break;
+        }
+    }
+    $snippet = function_exists('mb_substr')
+        ? mb_substr($body, $offset, $limit)
+        : substr($body, $offset, $limit);
+    $prefix = $offset > 0 ? '...' : '';
+    $suffix = (function_exists('mb_strlen') ? mb_strlen($body) : strlen($body)) > ($offset + $limit) ? '...' : '';
+    return $prefix . trim((string)$snippet) . $suffix;
+}
+
+function mdw_search_collect_md_entries() {
+    $entries = [];
+    foreach (list_md_root_sorted() as $entry) {
+        if (is_array($entry)) $entries[] = $entry;
+    }
+    foreach (list_md_by_subdir_sorted() as $list) {
+        if (!is_array($list)) continue;
+        foreach ($list as $entry) {
+            if (is_array($entry)) $entries[] = $entry;
+        }
+    }
+    return $entries;
+}
+
+function mdw_search_markdown($query, $limit = 50) {
+    global $MDW_PUBLISHER_MODE;
+    $terms = mdw_search_terms($query);
+    if (empty($terms)) return [];
+    $limit = max(1, min(100, (int)$limit));
+    $secretAuthenticated = is_secret_authenticated();
+    $publisherMode = !empty($MDW_PUBLISHER_MODE);
+    $results = [];
+
+    foreach (mdw_search_collect_md_entries() as $entry) {
+        $path = isset($entry['path']) ? trim((string)$entry['path']) : '';
+        if ($path === '') continue;
+        if (is_secret_file($path) && !$secretAuthenticated) continue;
+        $full = mdw_safe_full_path($path, true);
+        if (!$full || !is_file($full) || !is_readable($full)) continue;
+
+        $basename = isset($entry['basename']) && (string)$entry['basename'] !== ''
+            ? (string)$entry['basename']
+            : basename($path);
+        $info = explorer_view_extract_md_title_and_meta_from_file(
+            $full,
+            $basename,
+            $publisherMode ? ['page_title'] : []
+        );
+        $metaTitle = $publisherMode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
+        $title = $metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $basename);
+        $raw = @file_get_contents($full);
+        if (!is_string($raw)) continue;
+        $body = function_exists('mdw_hidden_meta_extract_and_remove_all')
+            ? mdw_hidden_meta_extract_and_remove_all($raw)
+            : $raw;
+        $haystack = $title . "\n" . $path . "\n" . $body;
+        if (!mdw_search_matches_all_terms($haystack, $terms)) continue;
+
+        $results[] = [
+            'title' => $title,
+            'url' => mdw_search_url_for_path($path),
+            'path' => $path,
+            'folder' => folder_from_path($path),
+            'snippet' => mdw_search_snippet($body, $terms),
+            'score' => mdw_search_score($title, $path, $body, $terms),
+            'modified' => @filemtime($full) ?: null,
+        ] + [
+            'yy' => $entry['yy'] ?? null,
+            'mm' => $entry['mm'] ?? null,
+            'dd' => $entry['dd'] ?? null,
+            'basename' => $basename,
+        ];
+    }
+
+    usort($results, function($a, $b) {
+        if (($a['score'] ?? 0) !== ($b['score'] ?? 0)) {
+            return (int)($b['score'] ?? 0) <=> (int)($a['score'] ?? 0);
+        }
+        return compare_entries_desc_date($a, $b);
+    });
+
+    $results = array_slice($results, 0, $limit);
+    foreach ($results as &$row) {
+        unset($row['yy'], $row['mm'], $row['dd'], $row['basename']);
+    }
+    unset($row);
+    return $results;
 }
 
 function list_existing_folders_sorted($excludeNames = []) {
@@ -725,6 +918,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
         'publisher_mode' => $publisherModeForJson,
         'generated_at' => time(),
         'notes' => $notes,
+    ]);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
+    $query = trim((string)$_GET['search']);
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+    $results = mdw_search_markdown($query, $limit);
+    header('Cache-Control: private, max-age=60');
+    header('Vary: Accept-Encoding');
+    json([
+        'ok' => true,
+        'query' => $query,
+        'count' => count($results),
+        'results' => $results,
     ]);
 }
 
@@ -1625,7 +1832,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body index-page <?=h($folderIconClass)?> <?= $indexSplitLayout ? 'index-split-layout' : '' ?>">
+<body class="app-body index-page <?=h($folderIconClass)?> <?= $indexSplitLayout ? 'index-split-layout' : '' ?> <?= $hideMarkdownEditor ? 'hide-markdown-editor' : '' ?>">
 
 	<header class="app-header">
 	    <div class="app-header-inner">
@@ -2227,14 +2434,18 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 
 			            <div class="modal-field" data-auth-superuser="1">
 			                <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>
-			                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
-			                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
-			                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
-			                </label>
-			                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
-			                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
-			                </div>
-			            </div>
+				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
+				                </label>
+				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="hideMarkdownEditorToggle" type="checkbox" <?= $hideMarkdownEditor ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.hide_markdown','Hide markdown'))?></span>
+				                </label>
+				                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
+				                </div>
+				            </div>
 
 			            <div class="modal-field" data-auth-superuser="1">
 			                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
@@ -2285,12 +2496,18 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 			                    <?=h(mdw_t('theme.copy.class_prefix_hint','Applies to medium/wet HTML export; dry export removes all classes.'))?>
 			                </div>
 			                <label class="modal-label" for="tocMenuSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.label','TOC menu'))?></label>
-			                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
-			                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
-			                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
-			                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
-			                </select>
-			                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
+					                <select id="tocMenuSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
+					                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
+					                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
+					                </select>
+					                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+					                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+					                    <input id="tocButtonToggle" type="checkbox" <?= $tocButtonEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
+					                    <span class="status-text"><?=h(mdw_t('theme.toc_menu.show_button','Show TOC toolbar button'))?></span>
+					                </label>
+					                <?php endif; ?>
+					                <div id="copySettingsStatus" class="status-text" style="margin-top: 0.35rem;">
 			                    <?=h(mdw_t('theme.copy.hint','Saved for all users.'))?>
 			                </div>
 			                <div id="tocMenuStatus" class="status-text" style="margin-top: 0.35rem;">
@@ -2411,7 +2628,7 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 				                        <span class="status-text"><?=h(mdw_t('theme.publisher.enable','Enable WPM'))?></span>
 				                    </label>
 				                    <div class="status-text" style="margin-top: 0.35rem;">
-				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Disables Secret notes. Requires an author name; subtitle requirement is optional.'))?>
+				                        <?=h(mdw_t('theme.publisher.hint','WPM adds publish states (Concept / Processing / Published) and shows them in the overview. Requires an author name; subtitle requirement is optional.'))?>
 				                    </div>
 				                    <div style="display:grid; grid-template-columns: 1fr; gap: 0.35rem; margin-top: 0.6rem;">
 				                        <label class="status-text" for="publisherAuthorInput"><?=h(mdw_t('theme.publisher.author_label','Author name'))?></label>
