@@ -2235,6 +2235,7 @@
             showPreviewError(t('js.preview_failed', 'Preview failed.'), detail);
         }
     }
+    window.__mdwSendPreview = sendPreview;
 
     const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
         && !document.body.classList.contains('mdw-show-markdown-source');
@@ -4706,7 +4707,7 @@
             runFormatAction(() => { changed = toggleToc(); });
             if (!changed) return;
             if (typeof window.__mdwCancelScheduledPreview === 'function') window.__mdwCancelScheduledPreview();
-            sendPreview();
+            if (typeof window.__mdwSendPreview === 'function') window.__mdwSendPreview();
             prev.focus();
             return;
         }
