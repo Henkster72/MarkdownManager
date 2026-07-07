@@ -4138,14 +4138,10 @@
         }
 
         const lines = value.split('\n');
-        const { known } = getKnownKeysAndOrder();
+        const isFrontmatterLine = (line) => /^\s*(?:\{+\s*[A-Za-z][A-Za-z0-9_-]*\s*:\s*[^}]*\}+)+\s*$/.test(String(line || ''));
         let insertLine = 0;
         while (insertLine < lines.length && String(lines[insertLine] || '').trim() === '') insertLine++;
-        while (insertLine < lines.length) {
-            const parsed = parseMetaEntries(lines[insertLine]);
-            if (!parsed || !parsed.length || parsed.some((entry) => !known.has(entry.key))) break;
-            insertLine++;
-        }
+        while (insertLine < lines.length && isFrontmatterLine(lines[insertLine])) insertLine++;
 
         lines.splice(insertLine, 0, '{TOC}', '');
         const next = lines.join('\n').replace(/\n{4,}/g, '\n\n\n');
@@ -4709,7 +4705,7 @@
             let changed = false;
             runFormatAction(() => { changed = toggleToc(); });
             if (!changed) return;
-            cancelScheduledPreview();
+            if (typeof window.__mdwCancelScheduledPreview === 'function') window.__mdwCancelScheduledPreview();
             sendPreview();
             prev.focus();
             return;
