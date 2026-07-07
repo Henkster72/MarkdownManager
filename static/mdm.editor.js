@@ -4123,6 +4123,7 @@
             ta.value = next;
             const pos = Math.min(match.index, next.length);
             setSelection(pos, pos);
+            dispatchInput();
             return;
         }
 
@@ -4152,6 +4153,7 @@
         const before = lines.slice(0, insertLine).join('\n');
         const pos = (before ? before.length + 1 : 0);
         setSelection(pos, pos + 5);
+        dispatchInput();
     };
 
     const CUSTOM_CSS_CURSOR = '__MDW_CUSTOM_CSS_CURSOR__';
@@ -4702,6 +4704,14 @@
         ta.focus();
     });
     tocBtn?.addEventListener('click', () => {
+        if (isUsingVisualEditor()) {
+            if (typeof syncVisualPreviewToTextarea === 'function') syncVisualPreviewToTextarea();
+            runFormatAction(() => toggleToc());
+            cancelScheduledPreview();
+            sendPreview();
+            prev.focus();
+            return;
+        }
         runFormatAction(() => toggleToc());
         ta.focus();
     });
