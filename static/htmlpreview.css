@@ -174,8 +174,8 @@
 
 .edit-page #panePreview .preview-content .md-toc-side,
 .index-page.index-split-layout #panePreview .preview-content .md-toc-side {
-    position: relative;
-    top: auto;
+    position: sticky;
+    top: 0.75rem;
     max-height: none;
     overflow: visible;
 }
