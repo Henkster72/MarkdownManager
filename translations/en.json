@@ -448,6 +448,7 @@
     "folder_delete_failed": "Could not delete folder.",
     "folder_delete_non_md": "Folder contains non-markdown files. Delete manually.",
     "invalid_filename_hint": "Invalid filename. Adjust the title (spaces become hyphens) and try again.",
+    "title_required": "Title is required.",
     "title_too_short": "Title is too short (min {min}).",
     "title_too_long": "Title is too long (max {max}).",
     "slug_too_short": "Slug is too short (min {min}).",

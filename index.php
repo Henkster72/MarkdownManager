@@ -40,8 +40,6 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
-define('MDW_NEW_MD_TITLE_MIN', 3);
-define('MDW_NEW_MD_TITLE_MAX', 80);
 define('MDW_NEW_MD_SLUG_MIN', 3);
 define('MDW_NEW_MD_SLUG_MAX', 80);
 
@@ -1352,11 +1350,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
                 $draftContent = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
                 $titleInput = trim((string)($draftTitle ?? ''));
                 $titleInput = preg_replace('/\\s+/u', ' ', $titleInput);
-                $titleLen = mdw_strlen($titleInput);
-                $authToken = isset($_POST['auth_token']) ? (string)$_POST['auth_token'] : '';
-                $authIsSuperuser = function_exists('mdw_auth_verify_token')
-                    ? mdw_auth_verify_token('superuser', $authToken)
-                    : false;
             if (trim($postedPath) === '') {
                 $folder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : '';
             $folder = sanitize_folder_name($folder) ?? 'root';
@@ -1368,13 +1361,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
                     }
                 }
             $slugInput = trim((string)($draftSlug ?? ''));
-            if (!$authIsSuperuser || $slugInput === '') $slugInput = $titleInput;
+            if ($slugInput === '') $slugInput = $titleInput;
             $slug = sanitize_new_md_slug($slugInput);
-            $maxSlugLen = min(MDW_NEW_MD_SLUG_MAX, $titleLen);
-            if ($titleInput === '' || $titleLen < MDW_NEW_MD_TITLE_MIN) {
-                $_SESSION['flash_error'] = mdw_t('flash.title_too_short', 'Title is too short.', ['min' => MDW_NEW_MD_TITLE_MIN]);
-            } else if ($titleLen > MDW_NEW_MD_TITLE_MAX) {
-                $_SESSION['flash_error'] = mdw_t('flash.title_too_long', 'Title is too long.', ['max' => MDW_NEW_MD_TITLE_MAX]);
+            $maxSlugLen = MDW_NEW_MD_SLUG_MAX;
+            if ($titleInput === '') {
+                $_SESSION['flash_error'] = mdw_t('flash.title_required', 'Title is required.');
             } else if (!$slug) {
                 $_SESSION['flash_error'] = mdw_t('flash.invalid_filename_hint', 'Invalid filename. Adjust the title (spaces become hyphens) and try again.');
             } else {

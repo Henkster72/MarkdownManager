@@ -439,6 +439,7 @@
     "folder_delete_failed": "Kon map niet verwijderen.",
     "folder_delete_non_md": "Map bevat niet-Markdownbestanden. Verwijder handmatig.",
     "invalid_filename_hint": "Bestandsnaam bevat ongeldige tekens. Pas de titel aan (spaties worden koppeltekens) en probeer opnieuw.",
+    "title_required": "Titel is verplicht.",
     "title_too_short": "Titel is te kort (min {min}).",
     "title_too_long": "Titel is te lang (max {max}).",
     "slug_too_short": "Slug is te kort (min {min}).",

@@ -569,7 +569,6 @@
             if (newMdOverlay) newMdOverlay.hidden = false;
             newMdPanel.hidden = false;
         }
-        setSlugReadonly();
         const focusTarget = (newMdTitle instanceof HTMLInputElement) ? newMdTitle : newMdSlug;
         if (focusTarget instanceof HTMLInputElement) {
             focusTarget.focus();
@@ -610,12 +609,10 @@
         ? /[^\p{L}\p{N}._-]+/gu
         : /[^A-Za-z0-9._-]+/g;
     const whitespaceRe = /\s+/g;
-    const titleMin = Number(newMdTitle?.dataset?.titleMin || 3);
-    const titleMax = Number(newMdTitle?.dataset?.titleMax || 80);
     const slugMin = Number(newMdSlug?.dataset?.slugMin || 3);
     const slugMax = Number(newMdSlug?.dataset?.slugMax || 80);
+    let newMdSlugTouched = !!String(newMdSlug?.value || '').trim();
 
-    const isSuperuser = () => (typeof window.__mdwIsSuperuser === 'function') ? window.__mdwIsSuperuser() : false;
     const isPublisherMode = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
@@ -643,13 +640,6 @@
     };
 
     const getTitleValue = () => (newMdTitle?.value || '').toString().trim().replace(whitespaceRe, ' ');
-
-    const setSlugReadonly = () => {
-        if (!(newMdSlug instanceof HTMLInputElement)) return;
-        const hasTitle = !!getTitleValue();
-        const allowEdit = isSuperuser() && hasTitle;
-        newMdSlug.readOnly = !allowEdit;
-    };
 
     const slugify = (raw) => {
         let v = (raw || '').toString().trim();
@@ -682,21 +672,8 @@
     const validateTitle = ({ showHint } = { showHint: false }) => {
         if (!(newMdTitle instanceof HTMLInputElement)) return true;
         const title = getTitleValue();
-        const len = title.length;
         if (!title) {
             const msg = t('js.new_md.enter_title', 'Please enter a title for the filename.');
-            newMdTitle.setCustomValidity(msg);
-            if (showHint) setHint(newMdTitleHint, msg, 'danger');
-            return false;
-        }
-        if (len < titleMin) {
-            const msg = t('js.new_md.title_too_short', 'Title is too short (min {min}).', { min: titleMin });
-            newMdTitle.setCustomValidity(msg);
-            if (showHint) setHint(newMdTitleHint, msg, 'danger');
-            return false;
-        }
-        if (len > titleMax) {
-            const msg = t('js.new_md.title_too_long', 'Title is too long (max {max}).', { max: titleMax });
             newMdTitle.setCustomValidity(msg);
             if (showHint) setHint(newMdTitleHint, msg, 'danger');
             return false;
@@ -716,15 +693,10 @@
     const validateSlug = ({ showHint, allowAdjust } = { showHint: false, allowAdjust: true }) => {
         if (!(newMdSlug instanceof HTMLInputElement)) return true;
         const titleLen = getTitleValue().length;
-        const maxLen = Math.min(slugMax, titleLen || slugMax);
+        const maxLen = slugMax;
         const raw = newMdSlug.value || '';
         let slug = slugify(raw);
         let changed = slug !== raw;
-        if (titleLen > 0 && titleLen < titleMin) {
-            newMdSlug.setCustomValidity('');
-            if (showHint) setHint(newMdSlugHint, '', 'info');
-            return true;
-        }
         if (titleLen === 0 && slug === '') {
             newMdSlug.setCustomValidity('');
             if (showHint) setHint(newMdSlugHint, '', 'info');
@@ -772,7 +744,7 @@
             setHint(newMdSlugHint, '', 'info');
             return;
         }
-        const maxLen = Math.min(slugMax, title.length);
+        const maxLen = slugMax;
         let slug = slugify(title);
         if (slug.length > maxLen) {
             slug = slug.slice(0, Math.max(0, maxLen)).replace(/[-.]+$/g, '');
@@ -791,13 +763,13 @@
 
     newMdTitle?.addEventListener('input', () => {
         validateTitle({ showHint: true });
-        setSlugReadonly();
-        syncSlugFromTitle({ showHint: true });
+        if (!newMdSlugTouched) syncSlugFromTitle({ showHint: true });
         validateSlug({ showHint: true, allowAdjust: true });
         buildFilenamePreview();
     });
 
     newMdSlug?.addEventListener('input', () => {
+        newMdSlugTouched = true;
         validateSlug({ showHint: true, allowAdjust: true });
         buildFilenamePreview();
     });
@@ -838,9 +810,8 @@
     if (newMdPanel.dataset.initialOpen === '1') {
         open();
     }
-    setSlugReadonly();
     validateTitle({ showHint: false });
-    syncSlugFromTitle({ showHint: false });
+    if (!newMdSlugTouched) syncSlugFromTitle({ showHint: false });
     validateSlug({ showHint: false, allowAdjust: true });
     buildFilenamePreview();
     setHint(newMdSlugHint, '', 'info');

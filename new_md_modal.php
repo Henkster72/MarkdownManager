@@ -78,7 +78,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
 
                 <div style="display:flex; flex-direction: column; gap: 0.35rem;">
                     <label class="status-text" for="newMdTitle"><?= $esc($tr('index.new_markdown.title_label', 'Title')) ?></label>
-                    <input id="newMdTitle" name="new_title" class="input" style="width: 100%;" type="text" value="<?= $esc($titleValue) ?>" placeholder="<?= $esc($tr('index.new_markdown.title_placeholder', 'Your title')) ?>" minlength="<?= MDW_NEW_MD_TITLE_MIN ?>" maxlength="<?= MDW_NEW_MD_TITLE_MAX ?>" data-title-min="<?= MDW_NEW_MD_TITLE_MIN ?>" data-title-max="<?= MDW_NEW_MD_TITLE_MAX ?>" required>
+                    <input id="newMdTitle" name="new_title" class="input" style="width: 100%;" type="text" value="<?= $esc($titleValue) ?>" placeholder="<?= $esc($tr('index.new_markdown.title_placeholder', 'Your title')) ?>" required>
                     <div id="newMdTitleHint" class="status-text" style="display:none; margin-top: 0.1rem;"></div>
                 </div>
 
@@ -92,7 +92,6 @@ if (!function_exists('mdw_render_new_md_modal')) {
                     <div id="newMdFilePreview" class="status-text" data-label="<?= $esc($tr('index.new_markdown.filename_preview', 'Filename')) ?>" style="margin-top: 0.1rem; display: none;">
                         <?= $esc($tr('index.new_markdown.filename_preview', 'Filename')) ?>: <code id="newMdFilePreviewValue"></code>
                     </div>
-                    <div class="status-text" data-auth-regular="1" style="margin-top: 0.1rem;"><?= $esc($tr('index.new_markdown.slug_locked', 'Only a superuser can edit the slug.')) ?></div>
                 </div>
 
                 <textarea name="new_content" class="input" rows="6" style="height: auto; display: block;" placeholder="<?= $esc($tr('index.new_markdown.content_placeholder', "# Title\n\nStart writing...")) ?>"><?= $esc($contentValue) ?></textarea>
