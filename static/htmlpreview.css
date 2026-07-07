@@ -172,6 +172,14 @@
     background: color-mix(in srgb, currentColor 3%, transparent);
 }
 
+.edit-page #panePreview .preview-content .md-toc-side,
+.index-page.index-split-layout #panePreview .preview-content .md-toc-side {
+    position: relative;
+    top: auto;
+    max-height: none;
+    overflow: visible;
+}
+
 .preview-content .md-toc-layout.md-toc-inline .md-toc-side {
     position: relative;
     top: auto;
