@@ -2579,6 +2579,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $tocIndex = 0;
     $tocActive = false;
     $tocInlineLayout = false;
+    $tocSideLayoutStartIndex = null;
 
     $lines = explode("\n",$text);
     $rawLines = [];
@@ -2887,6 +2888,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                     $html[] = '<div class="md-toc-body">';
                     $tocInlineLayout = true;
                 }
+            } else if ($tocSideLayoutStartIndex === null) {
+                $tocSideLayoutStartIndex = count($html);
             }
             $tocActive = true;
             continue;
@@ -3212,20 +3215,23 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     }
 
     $output = implode("\n",$html);
-    if ($tocRequested && $tocLayout !== '' && !empty($tocItems)) {
+    if ($tocRequested && $tocLayout !== '' && !empty($tocItems) && $tocSideLayoutStartIndex !== null) {
         $layoutClass = 'md-toc-layout md-toc-' . $tocLayout;
         $layoutAttr = htmlspecialchars($tocLayout, ENT_QUOTES, 'UTF-8');
         $tocHtml = mdw_toc_render_html($tocItems, $profile, $context, $mdPath);
-        $output = implode("\n", [
+        $beforeToc = array_slice($html, 0, $tocSideLayoutStartIndex);
+        $afterToc = array_slice($html, $tocSideLayoutStartIndex);
+        $layoutHtml = [
             '<div class="'.$layoutClass.'" data-mdw-toc-layout="'.$layoutAttr.'">',
             '<nav class="md-toc-side" aria-label="Table of contents">',
             $tocHtml,
             '</nav>',
             '<div class="md-toc-body">',
-            $output,
+            implode("\n", $afterToc),
             '</div>',
             '</div>',
-        ]);
+        ];
+        $output = implode("\n", array_merge($beforeToc, $layoutHtml));
     }
     return mdw_restore_html_comments($output, $comments);
 }
