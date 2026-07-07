@@ -1015,6 +1015,19 @@ a:hover {
   margin: 0;
 }
 
+.pane-header-actions .publish-state-select.input,
+.editor-toolbar-left .publish-state-select.input {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 7.5rem;
+  max-width: 10rem;
+  height: var(--editor-toolbar-control-height);
+  min-height: var(--editor-toolbar-control-height);
+  padding-block: 0;
+  padding-inline: 0.45rem 1.8rem;
+  line-height: 1;
+}
+
 @supports (container-type: inline-size) {
   @container (max-width: 1024px) {
     .pane-header-actions .btn-label {
@@ -2302,6 +2315,13 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   .edit-page.hide-markdown-editor #panePreview .editor-toolbar-left > * {
     min-width: 0;
     width: 100%;
+  }
+
+  .edit-page.hide-markdown-editor #panePreview .pane-header-actions .publish-state-select.input {
+    justify-self: start;
+    width: auto;
+    min-width: 7.5rem;
+    max-width: 10rem;
   }
 
   .index-page.index-split-layout .editor-grid {

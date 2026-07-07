@@ -1375,7 +1375,7 @@ window.mermaid = mermaid;
 			                                        <span class="pi pi-upload"></span>
 			                                        <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
 			                                    </button>
-			                                    <select id="publishStateSelect" name="publish_state" form="editor-form" class="input" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
+			                                    <select id="publishStateSelect" name="publish_state" form="editor-form" class="input publish-state-select" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
 			                                        <?php
 			                                            $stateOptions = [
 			                                                'Concept' => mdw_t('edit.publish_state.concept', 'Concept'),
@@ -1530,7 +1530,7 @@ window.mermaid = mermaid;
                                             <span class="pi pi-upload"></span>
                                             <span class="btn-label"><?=h(mdw_t('edit.toolbar.publish','Publish'))?></span>
                                         </button>
-                                        <select id="publishStateSelect" name="publish_state" form="editor-form" class="input" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
+                                        <select id="publishStateSelect" name="publish_state" form="editor-form" class="input publish-state-select" data-auth-superuser="1" <?= $requested ? 'data-auth-superuser-enable="1" disabled' : 'disabled' ?> title="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>" aria-label="<?=h(mdw_t('edit.publish_state_label','Publish state'))?>">
                                             <?php
                                                 $stateOptions = [
                                                     'Concept' => mdw_t('edit.publish_state.concept', 'Concept'),
