@@ -1083,6 +1083,12 @@ a:hover {
   min-height: 0;
 }
 
+.edit-page #panePreview .preview-content .md-toc-side,
+.index-page.index-split-layout #panePreview .preview-content .md-toc-side {
+  top: 0.75rem;
+  max-height: calc(100% - 1.5rem);
+}
+
 /* Specifiek voor de editor header, zodat deze niet krimpt */
 .editor-pane-header.editor-header {
   flex-shrink: 0;

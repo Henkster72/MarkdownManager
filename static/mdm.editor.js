@@ -2240,6 +2240,27 @@
     const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
         && !document.body.classList.contains('mdw-show-markdown-source');
     const escapeMd = (value) => String(value || '').replace(/\u00a0/g, ' ').trim();
+    const cleanHeadingText = (value) => {
+        let text = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+        let prev = '';
+        while (text && text !== prev) {
+            prev = text;
+            text = text
+                .replace(/^\s*(?:\*\*|__)\s*(.*?)\s*(?:\*\*|__)\s*$/s, '$1')
+                .replace(/^\s*(?:\*|_)\s*(.*?)\s*(?:\*|_)\s*$/s, '$1')
+                .trim();
+        }
+        return text
+            .replace(/(\*\*|__)([^*_].*?)\1/g, '$2')
+            .replace(/(^|[\s([{])([*_])([^*_]+)\2(?=$|[\s)\]},.!?:;])/g, '$1$3')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+    const cleanMarkdownHeadingLine = (line) => {
+        const m = String(line || '').match(/^(\s*#{1,6})(\s+)(.*)$/);
+        if (!m) return String(line || '');
+        return `${m[1]}${m[2]}${cleanHeadingText(m[3])}`;
+    };
     const inlineMarkdown = (node) => {
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
@@ -2300,7 +2321,7 @@
         };
         if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
-            return `${'#'.repeat(level)} ${escapeMd(inlineMarkdown(node))}`;
+            return `${'#'.repeat(level)} ${cleanHeadingText(node.textContent || inlineMarkdown(node))}`;
         }
         if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
             return withAlignAttr(escapeMd(inlineMarkdown(node)), node);
@@ -2408,6 +2429,22 @@
         saveVisualSelection();
         syncVisualPreviewToTextarea();
         return ok;
+    };
+    const isVisualSelectionInHeading = () => {
+        if (!isVisualEditorMode()) return false;
+        restoreVisualSelection();
+        const sel = window.getSelection?.();
+        if (!sel || !sel.rangeCount) return false;
+        const range = sel.getRangeAt(0);
+        const node = range.commonAncestorContainer;
+        const el = node instanceof Element ? node : node?.parentElement;
+        if (el instanceof Element && el.closest('h1, h2, h3, h4, h5, h6')) return true;
+        const anchor = sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
+        const focus = sel.focusNode instanceof Element ? sel.focusNode : sel.focusNode?.parentElement;
+        return !!(
+            (anchor instanceof Element && anchor.closest('h1, h2, h3, h4, h5, h6')) ||
+            (focus instanceof Element && focus.closest('h1, h2, h3, h4, h5, h6'))
+        );
     };
     const runVisualCommandWithSelection = (fn) => {
         if (!isVisualEditorMode() || typeof fn !== 'function') return false;
@@ -2544,6 +2581,8 @@
     window.__mdwToggleVisualBlockquote = toggleVisualBlockquote;
     window.__mdwRunVisualCommand = runVisualCommand;
     window.__mdwRunVisualCommandWithSelection = runVisualCommandWithSelection;
+    window.__mdwIsVisualSelectionInHeading = isVisualSelectionInHeading;
+    window.__mdwSyncVisualPreviewToTextarea = syncVisualPreviewToTextarea;
     const enableVisualPreviewEditing = () => {
         if (!isVisualEditorMode()) return;
         prev.setAttribute('contenteditable', 'true');
@@ -2583,6 +2622,10 @@
             }
             if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
                 e.preventDefault();
+                if (isVisualSelectionInHeading()) {
+                    syncVisualPreviewToTextarea();
+                    return;
+                }
                 runVisualCommand('bold');
                 return;
             }
@@ -3591,12 +3634,61 @@
         dispatchInput();
     };
 
+    const selectionIntersectsMarkdownHeading = () => {
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? selStart;
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', selEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+        return value.slice(blockStart, blockEnd).split('\n').some((line) => /^\s*#{1,6}\s+\S/.test(line));
+    };
+
+    const normalizeMarkdownHeadingFormatting = () => {
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? selStart;
+        let offset = 0;
+        let startDelta = 0;
+        let endDelta = 0;
+        let changed = false;
+        const lines = value.split('\n').map((line) => {
+            const absStart = offset;
+            offset += line.length + 1;
+            const next = cleanMarkdownHeadingLine(line);
+            if (next === line) return line;
+            changed = true;
+            const delta = next.length - line.length;
+            const lineEnd = absStart + line.length;
+            if (selStart > lineEnd) {
+                startDelta += delta;
+            } else if (selStart > absStart) {
+                startDelta += Math.min(0, delta);
+            }
+            if (selEnd > lineEnd) {
+                endDelta += delta;
+            } else if (selEnd > absStart) {
+                endDelta += Math.min(0, delta);
+            }
+            return next;
+        });
+        if (!changed) return false;
+        ta.value = lines.join('\n');
+        setSelection(selStart + startDelta, selEnd + endDelta);
+        dispatchInput();
+        return true;
+    };
+
     let lastFormatAction = null;
     const runFormatAction = (fn) => {
         if (typeof fn !== 'function') return;
         lastFormatAction = fn;
         fn();
     };
+
+    ta.addEventListener('paste', () => {
+        setTimeout(normalizeMarkdownHeadingFormatting, 0);
+    });
 
     const parseHtmlTabToken = (token) => {
         const m = String(token || '').match(/^([A-Za-z][A-Za-z0-9_-]*)(.*)$/);
@@ -3829,7 +3921,7 @@
             const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
             if (!m) {
                 if (delta > 0) {
-                    const out = '## ' + line;
+                    const out = '## ' + cleanHeadingText(line);
                     deltas.push({ absStart, delta: out.length - line.length });
                     return out;
                 }
@@ -3839,7 +3931,7 @@
 
             const indent = m[1] || '';
             const hashes = m[2] || '';
-            const rest = m[3] || '';
+            const rest = cleanHeadingText(m[3] || '');
             const level = hashes.length;
             const rawNextLevel = level + delta;
             const nextLevel = rawNextLevel <= 1 ? 0 : Math.max(2, Math.min(6, rawNextLevel));
@@ -3891,7 +3983,7 @@
             const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
             const indent = m ? (m[1] || '') : (line.match(/^(\s*)/)?.[1] || '');
             const restRaw = m ? (m[3] || '') : line.slice(indent.length);
-            const rest = restRaw.replace(/^\s+/, '');
+            const rest = cleanHeadingText(restRaw.replace(/^\s+/, ''));
             const out = indent + '#'.repeat(level) + ' ' + rest;
             deltas.push({ absStart, delta: out.length - line.length });
             return out;
@@ -4733,7 +4825,17 @@
 
     boldBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
+            if (window.__mdwIsVisualSelectionInHeading?.()) {
+                window.__mdwSyncVisualPreviewToTextarea?.();
+                window.__mdwSendPreview?.();
+                return;
+            }
             window.__mdwRunVisualCommand?.('bold');
+            return;
+        }
+        if (selectionIntersectsMarkdownHeading()) {
+            runFormatAction(normalizeMarkdownHeadingFormatting);
+            ta.focus();
             return;
         }
         runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
@@ -4879,6 +4981,10 @@
         // Bold: Ctrl+Alt+B
         if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
             e.preventDefault();
+            if (selectionIntersectsMarkdownHeading()) {
+                runFormatAction(normalizeMarkdownHeadingFormatting);
+                return;
+            }
             runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
             return;
         }

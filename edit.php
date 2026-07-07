@@ -1364,7 +1364,7 @@ window.mermaid = mermaid;
                     <header class="pane-header editor-header">
 	                        <div class="pane-title-row">
                             <div class="pane-title">
-                                <span class="icon-text-logo"><span class="pi pi-documentlabel"></span></span>
+                                <span class="icon-text-logo"><span class="pi pi-code"></span></span>
                                 <?php if ($requested): ?>
                                     <span class="pane-subtitle small"><?=h($requested)?></span>
                                 <?php endif; ?>
@@ -1514,7 +1514,7 @@ window.mermaid = mermaid;
                         <div class="pane-title-row">
                             <div class="pane-title">
                                 <?php if ($hideMarkdownEditor): ?>
-                                    <span class="pi pi-documentlabel"></span>
+                                    <span class="pi pi-eye"></span>
                                     <span><?=h(mdw_t('edit.visual_editor_title','Visual editor'))?></span>
                                 <?php else: ?>
                                     <span class="pi pi-eye"></span>
