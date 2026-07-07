@@ -119,12 +119,28 @@
     text-underline-offset: 2px;
 }
 
+.preview-content img,
 .md-img {
     max-width: 100%;
+    max-inline-size: 100%;
     height: auto;
+    box-sizing: border-box;
+}
+
+.md-img {
     display: block;
     margin: 0.5rem 0;
     border-radius: 0.6rem;
+}
+
+.preview-content picture,
+.preview-content figure {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.preview-content figure img {
+    width: auto;
 }
 
 /* block elements, reused in preview as basis */
