@@ -2380,6 +2380,12 @@
         prev.querySelectorAll('.md-meta, [data-mdw-generated="metadata"]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
+        prev.querySelectorAll('.md-toc-layout').forEach((node) => {
+            if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
+        });
+        prev.querySelectorAll('.md-toc-body').forEach((node) => {
+            if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'true');
+        });
         prev.querySelectorAll('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
