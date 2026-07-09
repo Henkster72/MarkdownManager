@@ -81,6 +81,128 @@ function html_preview_expand_image_token($url) {
     return $imagesDir !== '' ? ($imagesDir . '/' . $safePath) : $safePath;
 }
 
+function mdw_preview_sections_dir() {
+    $dir = __DIR__ . '/sections';
+    return is_dir($dir) ? $dir : '';
+}
+
+function mdw_preview_safe_section_path($name) {
+    $name = str_replace("\\", "/", trim((string)$name));
+    $base = basename($name);
+    if ($base === '' || $base !== $name) return '';
+    if (!preg_match('/^section_[A-Za-z0-9_.-]+\\.html$/', $base)) return '';
+
+    $dir = mdw_preview_sections_dir();
+    if ($dir === '') return '';
+
+    $path = $dir . '/' . $base;
+    return is_file($path) ? $path : '';
+}
+
+function mdw_preview_collect_jinja_vars($text, $meta = []) {
+    $vars = [];
+    if (is_array($meta)) {
+        foreach ($meta as $key => $value) {
+            $key = trim((string)$key);
+            if ($key !== '' && preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+                $vars[$key] = (string)$value;
+            }
+        }
+    }
+
+    if (preg_match_all('/\{%\s*set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^%]+?))\s*%\}/', (string)$text, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $m) {
+            $key = (string)($m[1] ?? '');
+            $value = '';
+            if (isset($m[2]) && $m[2] !== '') $value = (string)$m[2];
+            else if (isset($m[3]) && $m[3] !== '') $value = (string)$m[3];
+            else $value = trim((string)($m[4] ?? ''));
+            if ($key !== '') $vars[$key] = $value;
+        }
+    }
+
+    return $vars;
+}
+
+function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
+    $expr = trim((string)$expr);
+    if ($expr === '') return '';
+    if (isset($vars[$expr])) return (string)$vars[$expr];
+    if (preg_match('/^(?:"([^"]*)"|\'([^\']*)\')$/', $expr, $m)) {
+        return isset($m[1]) && $m[1] !== '' ? (string)$m[1] : (string)($m[2] ?? '');
+    }
+    if (!preg_match('/^[A-Za-z0-9_.\/-]+$/', $expr)) return '';
+
+    $value = $expr;
+    if (strtolower((string)$forAttr) === 'src') {
+        $value = html_preview_expand_image_token('{{ ' . $value . ' }}');
+    }
+    return $value;
+}
+
+function mdw_preview_render_section_template($html, $vars) {
+    $html = str_replace(["\r\n", "\r"], "\n", (string)$html);
+    $html = (string)preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
+    $html = (string)preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+
+    $html = preg_replace_callback(
+        '/\{%\s*if\s+([A-Za-z_][A-Za-z0-9_]*)\s*==\s*(?:"([^"]*)"|\'([^\']*)\')\s*%\}(.*?)\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/s',
+        function($m) use ($vars) {
+            $key = (string)($m[1] ?? '');
+            $expected = isset($m[2]) && $m[2] !== '' ? (string)$m[2] : (string)($m[3] ?? '');
+            return ((string)($vars[$key] ?? '') === $expected) ? (string)($m[4] ?? '') : (string)($m[5] ?? '');
+        },
+        $html
+    );
+
+    $html = preg_replace_callback(
+        '/\b(src|href)\s*=\s*(["\'])\s*\{\{\s*([^{}]+?)\s*\}\}\s*\2/i',
+        function($m) use ($vars) {
+            $attr = strtolower((string)$m[1]);
+            $quote = (string)$m[2];
+            $value = mdw_preview_resolve_jinja_value((string)$m[3], $vars, $attr);
+            if ($value === '') $value = $attr === 'href' ? '#' : '';
+            return $attr . '=' . $quote . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . $quote;
+        },
+        $html
+    );
+
+    $html = preg_replace_callback(
+        '/\{\{\s*([^{}]+?)\s*\}\}/',
+        function($m) use ($vars) {
+            $value = mdw_preview_resolve_jinja_value((string)$m[1], $vars);
+            return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+        },
+        $html
+    );
+
+    return (string)preg_replace('/\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}/', '', $html);
+}
+
+function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], &$expanded = false) {
+    $expanded = false;
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $vars = mdw_preview_collect_jinja_vars($text, $meta);
+
+    $out = preg_replace_callback(
+        '/\{%\s*include\s+(?:"([^"]+)"|\'([^\']+)\')\s*%\}/',
+        function($m) use ($vars, &$expanded) {
+            $name = isset($m[1]) && $m[1] !== '' ? (string)$m[1] : (string)($m[2] ?? '');
+            $path = mdw_preview_safe_section_path($name);
+            if ($path === '') return '';
+
+            $html = @file_get_contents($path);
+            if (!is_string($html)) return '';
+
+            $expanded = true;
+            return "\n\n" . mdw_preview_render_section_template($html, $vars) . "\n\n";
+        },
+        $text
+    );
+
+    return is_string($out) ? $out : $text;
+}
+
 function resolve_rel_url_from_md($url, $mdPath) {
     $url = (string)$url;
     if ($url === '' || $mdPath === null || $mdPath === '') return $url;
@@ -1476,24 +1598,35 @@ function mdw_metadata_normalize_publisher_config($cfg) {
 
     if (!is_array($cfg)) return $out;
     $fields = isset($cfg['fields']) && is_array($cfg['fields']) ? $cfg['fields'] : [];
-    foreach ($out['fields'] as $k => $v) {
-        $in = isset($fields[$k]) && is_array($fields[$k]) ? $fields[$k] : [];
+    $normalizeField = function($key, $in, $fallback = []) {
+        $in = is_array($in) ? $in : [];
+        $fallback = is_array($fallback) ? $fallback : [];
         $label = isset($in['label']) && is_string($in['label']) && trim($in['label']) !== ''
             ? trim($in['label'])
-            : (string)($v['label'] ?? $k);
-        $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($v['markdown_visible'] ?? true);
-        $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($v['html_visible'] ?? false);
-        $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($v['obligatory'] ?? false);
-        $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($v['default_value'] ?? ''));
+            : (string)($fallback['label'] ?? $key);
+        $mdVis = isset($in['markdown_visible']) ? (bool)$in['markdown_visible'] : (bool)($fallback['markdown_visible'] ?? true);
+        $htmlVis = isset($in['html_visible']) ? (bool)$in['html_visible'] : (bool)($fallback['html_visible'] ?? false);
+        $obligatory = isset($in['obligatory']) ? (bool)$in['obligatory'] : (bool)($fallback['obligatory'] ?? false);
+        $defaultValue = isset($in['default_value']) ? trim((string)$in['default_value']) : trim((string)($fallback['default_value'] ?? ''));
         $defaultValue = preg_replace('/[\r\n]+/', ' ', $defaultValue);
-        if (!$mdVis && $k !== 'author') $htmlVis = false;
-        $out['fields'][$k] = [
+        if (!$mdVis && $key !== 'author') $htmlVis = false;
+        return [
             'label' => $label,
             'markdown_visible' => $mdVis,
             'html_visible' => $htmlVis,
             'obligatory' => $obligatory,
             'default_value' => $defaultValue,
         ];
+    };
+    foreach ($out['fields'] as $k => $v) {
+        $in = isset($fields[$k]) && is_array($fields[$k]) ? $fields[$k] : [];
+        $out['fields'][$k] = $normalizeField($k, $in, $v);
+    }
+    foreach ($fields as $k => $in) {
+        if (!is_string($k) || trim($k) === '') continue;
+        $kk = strtolower(trim($k));
+        if ($kk === '' || isset($out['fields'][$kk])) continue;
+        $out['fields'][$kk] = $normalizeField($kk, $in, []);
     }
 
     $defMap = (isset($def['html_map']) && is_array($def['html_map'])) ? $def['html_map'] : [];
@@ -2139,11 +2272,11 @@ function mdw_attr_list_parse_line($line) {
     if (!preg_match_all('/\\{:\\s*[^}]+\\}/', $line, $m)) return null;
     $stripped = trim(preg_replace('/\\{:\\s*[^}]+\\}/', '', $line));
     if ($stripped !== '') return null;
-    $attrs = ['class' => '', 'style' => ''];
+    $attrs = ['class' => '', 'style' => '', 'id' => ''];
     foreach ($m[0] as $chunk) {
         if (!preg_match('/\\{:\\s*([^}]+)\\}/', $chunk, $cm)) continue;
         $inner = (string)$cm[1];
-        if (!preg_match_all('/\\b(class|style)\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s]+))/i', $inner, $am, PREG_SET_ORDER)) {
+        if (!preg_match_all('/\\b(class|style|id)\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s]+))/i', $inner, $am, PREG_SET_ORDER)) {
             continue;
         }
         foreach ($am as $match) {
@@ -2162,10 +2295,18 @@ function mdw_attr_list_parse_line($line) {
                 if ($val !== '') {
                     $attrs['style'] = trim($attrs['style'] . '; ' . $val);
                 }
+            } else if ($key === 'id') {
+                $val = mdw_toc_normalize_id($val);
+                $val = preg_replace('/[^A-Za-z0-9_\\-:.]+/', '', (string)$val);
+                $val = trim((string)$val);
+                if ($val !== '') {
+                    $attrs['id'] = $val;
+                }
             }
         }
     }
     $out = [];
+    if (isset($attrs['id']) && $attrs['id'] !== '') $out['id'] = $attrs['id'];
     if (isset($attrs['class']) && $attrs['class'] !== '') $out['class'] = $attrs['class'];
     if (isset($attrs['style']) && $attrs['style'] !== '') $out['style'] = trim($attrs['style'], '; ');
     return $out ?: null;
@@ -2191,6 +2332,14 @@ function mdw_apply_attr_list_to_html($html, $attrs) {
     $tag = $m[1];
     $attrStr = (string)($m[2] ?? '');
 
+    if (isset($attrs['id']) && $attrs['id'] !== '') {
+        $id = htmlspecialchars((string)$attrs['id'], ENT_QUOTES, 'UTF-8');
+        if (preg_match('/\\bid\\s*=\\s*\"[^\"]*\"/i', $attrStr)) {
+            $attrStr = preg_replace('/\\bid\\s*=\\s*\"[^\"]*\"/i', ' id="'.$id.'"', $attrStr, 1);
+        } else {
+            $attrStr .= ' id="'.$id.'"';
+        }
+    }
     if (isset($attrs['class']) && $attrs['class'] !== '') {
         if (preg_match('/\\bclass\\s*=\\s*\"([^\"]*)\"/i', $attrStr, $cm)) {
             $merged = trim(preg_replace('/\\s+/', ' ', trim($cm[1]) . ' ' . $attrs['class']));
@@ -2229,6 +2378,9 @@ function mdw_merge_attr_list($base, $extra) {
         } else if ($extraStyle !== '') {
             $out['style'] = $extraStyle;
         }
+    }
+    if (isset($extra['id']) && $extra['id'] !== '') {
+        $out['id'] = $extra['id'];
     }
     return $out;
 }
@@ -2562,6 +2714,11 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $tocLayout = ($tocMenu === 'left' || $tocMenu === 'right') ? $tocMenu : '';
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
+    $sectionIncludesExpanded = false;
+    $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
+    if ($sectionIncludesExpanded) {
+        $lineMap = null;
+    }
     [$text, $comments] = mdw_extract_html_comments($text);
     if ($sourceMapEnabled && is_array($lineMap)) {
         [$text, $localFootnotes] = mdw_extract_footnotes($text, $lineMap, $lineMap);

@@ -59,7 +59,7 @@ function mdw_wpm_public_url($path, $siteBase) {
     $parts = explode('/', $path);
     $parts = array_map('rawurlencode', $parts);
     $safePath = implode('/', $parts);
-    return rtrim($siteBase, '/') . '/' . ltrim($safePath, '/');
+    return rtrim($siteBase, '/') . '/' . trim($safePath, '/') . '/';
 }
 
 [$WPM_BASE_DOMAIN, $WPM_SITE_BASE] = mdw_wpm_base_info();
@@ -97,6 +97,48 @@ if ($github_pages_plugin_loaded) {
 
 /* ESCAPE */
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
+
+function mdw_json_for_script($value) {
+    return json_encode(
+        $value,
+        JSON_UNESCAPED_SLASHES
+        | JSON_UNESCAPED_UNICODE
+        | JSON_HEX_TAG
+        | JSON_HEX_AMP
+        | JSON_HEX_APOS
+        | JSON_HEX_QUOT
+    );
+}
+
+function mdw_section_snippet_label($filename) {
+    $base = pathinfo((string)$filename, PATHINFO_FILENAME);
+    $base = preg_replace('/^section[_-]*/i', 'sectie_', $base);
+    $base = str_replace(['_', '-'], ' ', (string)$base);
+    $base = trim((string)preg_replace('/\s+/', ' ', $base));
+    return $base !== '' ? $base : (string)$filename;
+}
+
+function mdw_section_snippets($dir) {
+    if (!is_string($dir) || !is_dir($dir)) return [];
+    $items = @scandir($dir);
+    if (!is_array($items)) return [];
+    $snippets = [];
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..' || str_starts_with($item, '.')) continue;
+        $path = rtrim($dir, "/\\") . DIRECTORY_SEPARATOR . $item;
+        if (!is_file($path)) continue;
+        $ext = strtolower((string)pathinfo($item, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['html', 'md', 'txt'], true)) continue;
+        $content = @file_get_contents($path);
+        if (!is_string($content) || trim($content) === '') continue;
+        $snippets[] = [
+            'label' => mdw_section_snippet_label($item),
+            'snippet' => $content,
+        ];
+    }
+    usort($snippets, fn($a, $b) => strcasecmp((string)($a['label'] ?? ''), (string)($b['label'] ?? '')));
+    return $snippets;
+}
 
 function mdw_perm_user_name($uid) {
     if ($uid === false || $uid === null) return 'unknown';
@@ -1233,10 +1275,10 @@ window.mermaid = mermaid;
 	                <div class="app-header-text">
 	                    <div class="app-title-row">
 	                        <div class="app-title"><?=h($current_title)?></div>
-                            <?php if ($requested && !empty($MDW_PUBLISHER_MODE) && $current_publish_state_lower === 'published'): ?>
+                            <?php if ($requested && !empty($MDW_PUBLISHER_MODE) && $WPM_SITE_BASE): ?>
                                 <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
                                 <?php if ($wpm_public_url): ?>
-                                    <a class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">
+                                    <a id="wpmPublicPageLink" class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page" data-wpm-public-base="<?=h($WPM_SITE_BASE ?? '')?>" <?= $current_publish_state_lower === 'published' ? '' : 'hidden' ?>>
                                         <span class="pi pi-externallink"></span>
                                     </a>
                                 <?php endif; ?>
@@ -1262,7 +1304,7 @@ window.mermaid = mermaid;
                             </span>
 	                        <span class="breadcrumb-sep">/</span>
 	                        <a class="breadcrumb-link app-path-segment" data-crumb="file" href="<?=h($crumbFileHref)?>">
-                                <?=h(basename($requested))?>
+                                <?=h($hideMarkdownEditor ? preg_replace('/\.md$/i', '', basename($requested)) : basename($requested))?>
                             </a>
 	                        <span id="headerSecretBadge" class="badge-secret" style="<?= $is_secret_req ? '' : 'display:none;' ?>"><?=h(mdw_t('common.secret','secret'))?></span>
 	                    <?php endif; ?>
@@ -1615,7 +1657,7 @@ window.mermaid = mermaid;
             <div class="modal-header">
                 <div>
                     <div class="modal-title" id="articleMetaModalTitle"><?=h(mdw_t('article_meta.title','Article metadata'))?></div>
-                    <div class="status-text" style="margin-top:0.25rem;"><?=h(mdw_t('article_meta.hint','Only metadata fields visible in Markdown are shown.'))?></div>
+                    <div class="status-text" style="margin-top:0.25rem;"><?=h(mdw_t('article_meta.hint','Edit the main article details.'))?></div>
                 </div>
                 <button type="button" class="btn btn-ghost icon-button" id="articleMetaModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
                     <span class="pi pi-cross"></span>
@@ -2421,19 +2463,20 @@ window.mermaid = mermaid;
 				</div>
 
 	<script>
-	window.CURRENT_FILE = <?= json_encode($requested ?? '') ?>;
-	window.initialContent = <?= json_encode($current_content ?? '') ?>;
-	window.IS_SECRET_AUTHENTICATED = <?= json_encode(is_secret_authenticated()) ?>;
-	window.MDW_THEMES_DIR = <?= json_encode($THEMES_DIR) ?>;
-	window.MDW_THEMES = <?= json_encode($themesList) ?>;
-	window.MDW_TRANSLATIONS_DIR = <?= json_encode($TRANSLATIONS_DIR) ?>;
-	window.MDW_LANG = <?= json_encode($MDW_LANG) ?>;
-	window.MDW_LANGS = <?= json_encode($MDW_LANGS) ?>;
-	window.MDW_I18N = <?= json_encode($GLOBALS['MDW_I18N'] ?? new stdClass(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-	window.MDW_CSRF = <?= json_encode($CSRF_TOKEN) ?>;
-	window.MDW_AUTH_META = <?= json_encode($MDW_AUTH_META) ?>;
-	window.MDW_META_CONFIG = <?= json_encode($META_CFG_CLIENT, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-	window.MDW_META_PUBLISHER_CONFIG = <?= json_encode($META_PUBLISHER_CFG, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+	window.CURRENT_FILE = <?= mdw_json_for_script($requested ?? '') ?>;
+	window.initialContent = <?= mdw_json_for_script($current_content ?? '') ?>;
+	window.IS_SECRET_AUTHENTICATED = <?= mdw_json_for_script(is_secret_authenticated()) ?>;
+	window.MDW_THEMES_DIR = <?= mdw_json_for_script($THEMES_DIR) ?>;
+	window.MDW_THEMES = <?= mdw_json_for_script($themesList) ?>;
+	window.MDW_TRANSLATIONS_DIR = <?= mdw_json_for_script($TRANSLATIONS_DIR) ?>;
+	window.MDW_LANG = <?= mdw_json_for_script($MDW_LANG) ?>;
+	window.MDW_LANGS = <?= mdw_json_for_script($MDW_LANGS) ?>;
+	window.MDW_I18N = <?= mdw_json_for_script($GLOBALS['MDW_I18N'] ?? new stdClass()) ?>;
+	window.MDW_CSRF = <?= mdw_json_for_script($CSRF_TOKEN) ?>;
+	window.MDW_AUTH_META = <?= mdw_json_for_script($MDW_AUTH_META) ?>;
+	window.MDW_META_CONFIG = <?= mdw_json_for_script($META_CFG_CLIENT) ?>;
+	window.MDW_META_PUBLISHER_CONFIG = <?= mdw_json_for_script($META_PUBLISHER_CFG) ?>;
+	window.MDW_SECTION_SNIPPETS = <?= mdw_json_for_script(mdw_section_snippets(__DIR__ . '/sections')) ?>;
 	</script>
 
 <script defer src="<?=h(mdw_static_asset('mdm.dom.js'))?>"></script>

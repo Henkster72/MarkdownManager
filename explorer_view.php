@@ -71,7 +71,7 @@ function explorer_view_meta_cache_flush() {
     if (!$path) return;
 
     $payload = json_encode([
-        'v' => 1,
+        'v' => 2,
         'items' => $state['items'],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if (!is_string($payload) || $payload === '') return;
@@ -99,7 +99,7 @@ function explorer_view_meta_cache_boot() {
         $raw = @file_get_contents($path);
         if (is_string($raw) && $raw !== '') {
             $decoded = json_decode($raw, true);
-            if (is_array($decoded) && (int)($decoded['v'] ?? 0) === 1 && isset($decoded['items']) && is_array($decoded['items'])) {
+            if (is_array($decoded) && (int)($decoded['v'] ?? 0) === 2 && isset($decoded['items']) && is_array($decoded['items'])) {
                 $state['items'] = $decoded['items'];
             }
         }
@@ -221,14 +221,16 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
                 continue;
             }
             if (preg_match('/^\s*(?:_+([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*_*\s*|\{+\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*\}+\s*)$/u', $line, $m)) {
-                $key = strtolower(trim((string)($m[1] ?? $m[3] ?? '')));
-                $val = trim((string)($m[2] ?? $m[4] ?? ''));
+                $rawKey = ($m[1] ?? '') !== '' ? $m[1] : ($m[3] ?? '');
+                $rawVal = ($m[1] ?? '') !== '' ? ($m[2] ?? '') : ($m[4] ?? '');
+                $key = strtolower(trim((string)$rawKey));
+                $val = trim((string)$rawVal);
                 if ($key !== '') {
                     $metaAll[$key] = $val;
                     if (isset($want[$key])) $foundWant[$key] = true;
                     $seenMeta = true;
                     continue;
-                    }
+                }
             }
             if (!$seenMeta && trim((string)$line) === '') {
                 continue;

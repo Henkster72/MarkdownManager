@@ -2098,6 +2098,23 @@
         next.set('focus', file);
         return `index.php?${next.toString()}`;
     };
+    const buildWpmPublicUrl = (file, baseUrl) => {
+        const base = String(baseUrl || '').trim().replace(/\/+$/, '');
+        let path = String(file || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!base || !path) return '';
+        path = path.replace(/\.md$/i, '');
+        const encoded = path.split('/').filter(Boolean).map((part) => encodeURIComponent(part)).join('/');
+        return encoded ? `${base}/${encoded}/` : '';
+    };
+    const updateWpmPublicPageLink = (file, publishState) => {
+        const link = document.getElementById('wpmPublicPageLink');
+        if (!(link instanceof HTMLAnchorElement)) return;
+        const href = buildWpmPublicUrl(file, link.dataset.wpmPublicBase || '');
+        const isPublished = normalizeSort(publishState || '') === 'published';
+        if (href) link.href = href;
+        link.hidden = !(href && isPublished);
+    };
+    window.__mdwUpdateWpmPublicPageLink = updateWpmPublicPageLink;
     const lazyCreateRow = (note) => {
         const file = String(note?.path || '');
         const folder = lazyFolderFromNote(note);
@@ -2270,7 +2287,7 @@
             lazyNotesByFolder.set(folder, list);
         }
     };
-    const lazyCacheKey = 'mdw_explorer_dataset_v1';
+    const lazyCacheKey = 'mdw_explorer_dataset_v2';
     const lazyReadCache = () => {
         try {
             const raw = mdwStorageGet(lazyCacheKey);
@@ -2725,7 +2742,10 @@
                     const filePath = String(data.file || '');
                     if (!filePath) return '';
                     const idx = filePath.lastIndexOf('/');
-                    return idx === -1 ? filePath : filePath.slice(idx + 1);
+                    const base = idx === -1 ? filePath : filePath.slice(idx + 1);
+                    return document.body?.classList.contains('hide-markdown-editor')
+                        ? base.replace(/\.md$/i, '')
+                        : base;
                 })();
                 pathSegment.textContent = fileLabel;
                 if (pathSegment instanceof HTMLAnchorElement) {
@@ -2829,6 +2849,7 @@
             if (data && data.publish_state && typeof window.__mdwApplyPublishStateUi === 'function') {
                 window.__mdwApplyPublishStateUi(data.publish_state);
             }
+            updateWpmPublicPageLink(data.file, data.publish_state);
             const publishOverride = document.getElementById('publishStateOverride');
             if (publishOverride instanceof HTMLInputElement) {
                 publishOverride.value = '0';

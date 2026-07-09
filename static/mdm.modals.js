@@ -31,6 +31,7 @@
     const externalSection = document.getElementById('linkModalExternal');
     const footnoteSection = document.getElementById('linkModalFootnote');
     const youtubeSection = document.getElementById('linkModalYoutube');
+    const titleEl = document.getElementById('linkModalTitle');
     const picker = document.getElementById('linkPicker');
     const pickerFilter = document.getElementById('linkPickerFilter');
     const pickerFilterClear = document.getElementById('linkPickerFilterClear');
@@ -82,9 +83,116 @@
         return `${prefix}index.php?file=${encodeURIComponent(clean)}`;
     };
 
+    const publicSiteOrigin = () => {
+        const link = document.getElementById('wpmPublicPageLink');
+        const raw = link instanceof HTMLElement ? String(link.dataset.wpmPublicBase || '').trim() : '';
+        if (!raw) return '';
+        try {
+            return new URL(raw).origin;
+        } catch {
+            return '';
+        }
+    };
+
+    const markdownPathCandidatesFromHref = (href) => {
+        const raw = String(href || '').trim();
+        if (!raw || raw.startsWith('#')) return [];
+        if (/^(?:mailto|tel|javascript|data):/i.test(raw)) return [];
+        const candidates = [];
+        const add = (value) => {
+            let path = normalizePath(String(value || '').trim());
+            if (!path) return;
+            path = path.replace(/[?#].*$/, '');
+            path = path.replace(/\/(?:index)?$/i, '');
+            path = path.replace(/\/+$/g, '');
+            if (!path || /(?:^|\/)(?:index|edit)\.php$/i.test(path)) return;
+            const ext = (path.match(/\.([A-Za-z0-9]+)$/)?.[1] || '').toLowerCase();
+            if (ext === 'html' || ext === 'htm') path = path.replace(/\.(?:html|htm)$/i, '.md');
+            else if (ext === 'md' || ext === 'markdown') path = path.replace(/\.markdown$/i, '.md');
+            else if (ext === '') path += '.md';
+            if (path && !candidates.includes(path)) candidates.push(path);
+        };
+
+        try {
+            const url = new URL(raw, window.location.href);
+            const publicOrigin = publicSiteOrigin();
+            if (url.origin !== window.location.origin && (!publicOrigin || url.origin !== publicOrigin)) return [];
+            const file = url.searchParams.get('file');
+            if (file) add(decodeURIComponent(file));
+            const appDir = window.location.pathname.replace(/\/[^/]*$/, '/');
+            let path = url.pathname || '';
+            if (appDir && path.startsWith(appDir)) path = path.slice(appDir.length);
+            add(path);
+        } catch {
+            add(raw);
+        }
+
+        add(raw);
+        return candidates;
+    };
+
+    const findPickerItemByPath = (href) => {
+        if (!picker) return null;
+        const candidates = markdownPathCandidatesFromHref(href);
+        if (!candidates.length) return null;
+        const byBase = new Map();
+        const bySlug = new Map();
+        let baseMatch = null;
+        const items = Array.from(picker.querySelectorAll('.link-pick-item'))
+            .filter((item) => item instanceof HTMLElement);
+        const setUnique = (map, key, item) => {
+            if (!key) return;
+            if (map.has(key)) map.set(key, null);
+            else map.set(key, item);
+        };
+        for (const item of items) {
+            const path = normalizePath(item.getAttribute('data-path') || '');
+            if (!path) continue;
+            if (candidates.includes(path)) return item;
+            const base = path.split('/').pop() || '';
+            setUnique(byBase, base, item);
+            setUnique(bySlug, base.replace(/\.md$/i, ''), item);
+        }
+        for (const candidate of candidates) {
+            const base = candidate.split('/').pop() || '';
+            const slug = base.replace(/\.md$/i, '');
+            const item = base ? (byBase.get(base) || bySlug.get(slug)) : null;
+            if (item instanceof HTMLElement) {
+                if (baseMatch && baseMatch !== item) return null;
+                baseMatch = item;
+            }
+        }
+        return baseMatch;
+    };
+
+    const selectPickerItem = (item) => {
+        if (!(item instanceof HTMLElement)) return false;
+        picker?.querySelectorAll('.link-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        item.classList.add('is-selected');
+        selectedPath = item.getAttribute('data-path');
+        selectedTitle = item.getAttribute('data-title') || selectedPath || '';
+        try { item.scrollIntoView({ block: 'nearest' }); } catch {}
+        validate();
+        return !!selectedPath;
+    };
+
+    const setLinkModalLabels = (editing) => {
+        if (titleEl instanceof HTMLElement) {
+            titleEl.textContent = editing
+                ? t('link_modal.title_edit', 'Change link')
+                : t('link_modal.title', 'Add link');
+        }
+        if (insertBtn instanceof HTMLButtonElement) {
+            insertBtn.textContent = editing
+                ? t('link_modal.update', 'Change')
+                : t('link_modal.insert', 'Insert link');
+        }
+    };
+
     let mode = 'internal';
     let selectedPath = null;
     let selectedTitle = null;
+    let editContext = null;
     const FOOTNOTE_STYLE_VALUES = ['decimal', 'roman-upper', 'roman-lower', 'alpha-lower', 'alpha-upper'];
 
     const setMode = (next) => {
@@ -106,7 +214,17 @@
         }
     };
 
-	    const open = () => {
+    const linkTextFromElement = (link) => {
+        if (!(link instanceof HTMLAnchorElement)) return '';
+        return String(link.textContent || '').trim();
+    };
+
+    const selectModeRadio = (next) => {
+        const checked = modal.querySelector(`input[name="linkMode"][value="${next}"]`);
+        if (checked instanceof HTMLInputElement) checked.checked = true;
+    };
+
+    const open = (options = {}) => {
 	        if (typeof window.__mdwCloseImageModal === 'function') {
 	            window.__mdwCloseImageModal();
 	        }
@@ -117,11 +235,46 @@
 	        modal.hidden = false;
 	        mdmModalOpen(true);
 
+        editContext = null;
+        setLinkModalLabels(false);
         if (pickerFilter) pickerFilter.value = '';
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
+        if (typeof applyPickerFilter === 'function') applyPickerFilter();
+        if (externalText) externalText.value = '';
+        if (externalUrl) externalUrl.value = '';
+        if (footnoteText) footnoteText.value = '';
+        if (footnoteUrl) footnoteUrl.value = '';
+        if (footnoteTitle) footnoteTitle.value = '';
+        if (youtubeInput) youtubeInput.value = '';
 
-        const checked = modal.querySelector('input[name="linkMode"][value="internal"]');
-        if (checked instanceof HTMLInputElement) checked.checked = true;
+        const linkEl = options && options.linkEl instanceof HTMLAnchorElement ? options.linkEl : null;
+        if (linkEl) {
+            const href = String(linkEl.getAttribute('href') || '').trim();
+            const internalItem = findPickerItemByPath(href);
+            editContext = {
+                type: 'visual-link',
+                linkEl,
+                internal: internalItem instanceof HTMLElement,
+                className: String(linkEl.getAttribute('class') || '').trim(),
+                target: String(linkEl.getAttribute('target') || '').trim(),
+                rel: String(linkEl.getAttribute('rel') || '').trim(),
+            };
+            setLinkModalLabels(true);
+            if (internalItem instanceof HTMLElement) {
+                selectModeRadio('internal');
+                setMode('internal');
+                selectPickerItem(internalItem);
+                return;
+            }
+            if (externalText) externalText.value = linkTextFromElement(linkEl);
+            if (externalUrl) externalUrl.value = href;
+            selectModeRadio('external');
+            setMode('external');
+            validate();
+            return;
+        }
+
+        selectModeRadio('internal');
         setMode('internal');
     };
 
@@ -135,6 +288,7 @@
         picker?.querySelectorAll('.link-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
         if (pickerFilter) pickerFilter.value = '';
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
+        if (typeof applyPickerFilter === 'function') applyPickerFilter();
         if (externalText) externalText.value = '';
         if (externalUrl) externalUrl.value = '';
         if (footnoteText) footnoteText.value = '';
@@ -143,11 +297,14 @@
         if (footnoteNextLabel instanceof HTMLInputElement) footnoteNextLabel.value = '1';
         if (footnoteStyleHint instanceof HTMLElement) footnoteStyleHint.textContent = '';
         if (youtubeInput) youtubeInput.value = '';
+        setLinkModalLabels(false);
+        editContext = null;
         validate();
         btn.focus();
 	    };
 
 	    window.__mdwCloseLinkModal = close;
+    window.__mdwOpenLinkModal = open;
 
 	    const getEditorSelectionText = () => {
         if (typeof window.__mdwGetVisualSelectionText === 'function') {
@@ -240,15 +397,7 @@
     picker?.addEventListener('click', (e) => {
         const target = e.target instanceof Element ? e.target.closest('.link-pick-item') : null;
         if (!(target instanceof HTMLElement)) return;
-        const path = target.getAttribute('data-path');
-        const title = target.getAttribute('data-title') || '';
-        if (!path) return;
-
-        picker.querySelectorAll('.link-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
-        target.classList.add('is-selected');
-        selectedPath = path;
-        selectedTitle = title || path;
-        validate();
+        selectPickerItem(target);
     });
 
     const applyPickerFilter = () => {
@@ -703,6 +852,20 @@
             const selection = getEditorSelectionText();
             const modalText = String(externalText?.value || '').trim();
             const text = modalText || selection || url;
+            if (editContext?.type === 'visual-link' && editContext.linkEl instanceof HTMLAnchorElement) {
+                const link = editContext.linkEl;
+                link.setAttribute('href', url);
+                link.textContent = text;
+                if (editContext.className) link.setAttribute('class', editContext.className);
+                else link.removeAttribute('class');
+                if (editContext.target) link.setAttribute('target', editContext.target);
+                if (editContext.rel) link.setAttribute('rel', editContext.rel);
+                if (typeof window.__mdwSyncVisualPreviewToTextarea === 'function') {
+                    window.__mdwSyncVisualPreviewToTextarea();
+                }
+                close();
+                return;
+            }
             const cls = isPdfUrl(url) ? 'pdflink externlink' : 'externlink';
             insertAtSelection(`[${text}](${url}) {: class="${cls}"}`);
             close();
@@ -762,6 +925,21 @@
         const selection = getEditorSelectionText();
         const text = selection || selectedTitle || selectedPath;
         const href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
+        if (editContext?.type === 'visual-link' && editContext.linkEl instanceof HTMLAnchorElement) {
+            const link = editContext.linkEl;
+            link.setAttribute('href', href);
+            if (editContext.className) link.setAttribute('class', editContext.className);
+            else link.setAttribute('class', 'link');
+            if (editContext.target) link.setAttribute('target', editContext.target);
+            else link.removeAttribute('target');
+            if (editContext.rel) link.setAttribute('rel', editContext.rel);
+            else link.removeAttribute('rel');
+            if (typeof window.__mdwSyncVisualPreviewToTextarea === 'function') {
+                window.__mdwSyncVisualPreviewToTextarea();
+            }
+            close();
+            return;
+        }
         insertAtSelection(`[${text}](${href}) {: class="link"}`);
         close();
     };

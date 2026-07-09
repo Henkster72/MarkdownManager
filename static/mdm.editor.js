@@ -453,44 +453,120 @@
             return pubCfg[key] || baseCfg[key] || {};
         };
         const fieldLabel = (key, cfg) => {
+            const friendly = {
+                page_title: 'Pagina titel',
+                slug: 'Slug',
+                page_subtitle: 'Pagina ondertitel',
+                page_picture: 'Kop plaatje',
+                author: 'Auteur',
+                post_date: 'Datum',
+                published_date: 'Publicatiedatum',
+                creationdate: 'Aanmaakdatum',
+                changedate: 'Wijzigingsdatum',
+            };
+            if (friendly[key]) return friendly[key];
             const raw = cfg && typeof cfg.label === 'string' ? cfg.label.trim() : '';
             return raw || key.replace(/_/g, ' ');
         };
         const visibleFields = () => {
             const { order } = getKnownKeysAndOrder();
-            return order.filter((key) => isMarkdownVisible(getFieldConfig(key)));
+            const visible = order.filter((key) => isMarkdownVisible(getFieldConfig(key)));
+            const preferred = ['page_title', 'page_subtitle', 'page_picture', 'author', 'post_date'];
+            const out = [];
+            preferred.forEach((key) => {
+                if (visible.includes(key) && !out.includes(key)) out.push(key);
+            });
+            visible.forEach((key) => {
+                if (!out.includes(key)) out.push(key);
+            });
+            return out;
+        };
+        const currentSlug = () => {
+            const filePath = getCurrentFilePath();
+            let base = String(filePath || '').replace(/\\/g, '/').split('/').pop() || '';
+            base = base.replace(/\.md$/i, '').trim();
+            return base;
+        };
+        const publisherDefaultAuthor = () => {
+            const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+            const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+            return settings && typeof settings.publisher_default_author === 'string' ? settings.publisher_default_author.trim() : '';
+        };
+        const formatDateForArticleMeta = (date) => {
+            try {
+                return new Intl.DateTimeFormat('nl-NL', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                }).format(date);
+            } catch {
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                return `${dd}-${mm}-${yyyy}`;
+            }
+        };
+        const articleMetaValue = (key, meta, cfg) => {
+            const current = String(meta[key] ?? metaStore[key] ?? '').trim();
+            if (current) return current;
+            const fallback = String(cfg?.default_value ?? '').trim();
+            if (fallback) return fallback;
+            if (key === 'author') return publisherDefaultAuthor();
+            if (key === 'post_date') return formatDateForArticleMeta(new Date());
+            return '';
+        };
+        const appendArticleMetaField = ({ key, labelText, value, readonly = false, metaKey = '' }) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'modal-field article-meta-field';
+
+            const label = document.createElement('label');
+            label.className = 'modal-label';
+            label.setAttribute('for', `articleMeta_${key}`);
+            label.textContent = labelText;
+
+            const input = document.createElement('input');
+            input.id = `articleMeta_${key}`;
+            input.className = 'input';
+            input.type = 'text';
+            input.name = metaKey || key;
+            input.value = String(value ?? '');
+            if (metaKey) input.dataset.metaKey = metaKey;
+            if (readonly) {
+                input.readOnly = true;
+                input.setAttribute('aria-readonly', 'true');
+            }
+
+            wrap.append(label, input);
+            fieldsEl.appendChild(wrap);
         };
         const openModal = () => {
             const fields = visibleFields();
             const { meta } = extractMetaAndBody(editor.value);
             fieldsEl.textContent = '';
-            if (emptyEl instanceof HTMLElement) emptyEl.hidden = fields.length > 0;
+            if (emptyEl instanceof HTMLElement) emptyEl.hidden = true;
+            let slugAdded = false;
+            const appendSlug = () => {
+                if (slugAdded) return;
+                slugAdded = true;
+                appendArticleMetaField({
+                    key: 'slug',
+                    labelText: fieldLabel('slug', {}),
+                    value: currentSlug(),
+                    readonly: true,
+                });
+            };
 
             fields.forEach((key) => {
                 const cfg = getFieldConfig(key);
-                const wrap = document.createElement('div');
-                wrap.className = 'modal-field article-meta-field';
-
-                const label = document.createElement('label');
-                label.className = 'modal-label';
-                label.setAttribute('for', `articleMeta_${key}`);
-                label.textContent = fieldLabel(key, cfg);
-
-                const input = document.createElement('input');
-                input.id = `articleMeta_${key}`;
-                input.className = 'input';
-                input.type = 'text';
-                input.name = key;
-                input.value = String(meta[key] ?? metaStore[key] ?? cfg.default_value ?? '');
-                input.dataset.metaKey = key;
-
-                const keyEl = document.createElement('div');
-                keyEl.className = 'status-text article-meta-key';
-                keyEl.textContent = key;
-
-                wrap.append(label, input, keyEl);
-                fieldsEl.appendChild(wrap);
+                appendArticleMetaField({
+                    key,
+                    labelText: fieldLabel(key, cfg),
+                    value: articleMetaValue(key, meta, cfg),
+                    metaKey: key,
+                });
+                if (key === 'page_title') appendSlug();
             });
+            if (!slugAdded) appendSlug();
 
             if (modalBinding) modalBinding.open({ source: 'article-meta' });
             else {
@@ -1722,6 +1798,9 @@
             publishBtn.disabled = !hasFile || state.toLowerCase() !== 'concept';
         }
         updatePublishBadge(state);
+        if (typeof window.__mdwUpdateWpmPublicPageLink === 'function') {
+            window.__mdwUpdateWpmPublicPageLink(window.CURRENT_FILE || '', state);
+        }
     };
     window.__mdwApplyPublishStateUi = applyPublishStateUi;
 
@@ -2596,6 +2675,30 @@
         prev.addEventListener('focus', saveVisualSelection);
         prev.addEventListener('blur', saveVisualSelection);
         prev.addEventListener('click', (e) => {
+            const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+            if (link instanceof HTMLAnchorElement && prev.contains(link)) {
+                const href = String(link.getAttribute('href') || '').trim();
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (href) window.open(link.href, '_blank', 'noopener');
+                    return;
+                }
+                e.preventDefault();
+                clearSelectedVisualImage();
+                const range = document.createRange();
+                range.selectNodeContents(link);
+                visualSelectionRange = range.cloneRange();
+                const sel = window.getSelection?.();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+                if (typeof window.__mdwOpenLinkModal === 'function') {
+                    window.__mdwOpenLinkModal({ linkEl: link });
+                }
+                return;
+            }
+
             const target = e.target instanceof Element ? e.target.closest('img') : null;
             if (target instanceof HTMLImageElement && prev.contains(target)) {
                 e.preventDefault();
@@ -3386,10 +3489,11 @@
         prev.addEventListener('mouseup', schedule);
         prev.addEventListener('keyup', schedule);
 
-        return { reset };
+        return { reset, syncFromPreview };
     })();
 
     window.__mdwResetSelectionSync = selectionSync.reset;
+    window.__mdwSyncPreviewSelectionToTextarea = selectionSync.syncFromPreview;
 
     // Recompute wraps when panes are resized (affects visual line wrapping).
     let resizeTicking = false;
@@ -4627,9 +4731,85 @@
         return entries;
     };
 
+    const readSectionSnippetEntries = () => {
+        const raw = Array.isArray(window.MDW_SECTION_SNIPPETS) ? window.MDW_SECTION_SNIPPETS : [];
+        return raw.map((entry) => {
+            const label = String(entry?.label || '').trim();
+            const snippet = String(entry?.snippet || '').trim();
+            return label && snippet ? { label, snippet } : null;
+        }).filter(Boolean);
+    };
+
+    const classAttrSnippet = (snippet) => {
+        const cleaned = String(snippet || '').replace(CUSTOM_CSS_CURSOR, '').trim();
+        return /^\{:\s*class\s*=\s*(?:"[^"]+"|'[^']+')\s*\}$/i.test(cleaned) ? cleaned : '';
+    };
+
+    const markdownLinkRangeAtSelection = (value, start, end) => {
+        const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+        let lineEnd = value.indexOf('\n', Math.max(start, end));
+        if (lineEnd === -1) lineEnd = value.length;
+        const line = value.slice(lineStart, lineEnd);
+        const re = /!?\[[^\]\n]+\]\([^\n)]*(?:\([^\n)]*\)[^\n)]*)*\)/g;
+        let match;
+        while ((match = re.exec(line))) {
+            const linkStart = lineStart + match.index;
+            const linkEnd = linkStart + match[0].length;
+            if (start >= linkStart && end <= linkEnd) return { start: linkStart, end: linkEnd, lineEnd };
+        }
+        return null;
+    };
+
+    const insertClassAttrAfterSelection = (snippet) => {
+        const attr = classAttrSnippet(snippet);
+        if (!attr) return false;
+        const { start, end } = getSelection();
+        if (end <= start) return false;
+        const value = ta.value;
+        const linkRange = markdownLinkRangeAtSelection(value, start, end);
+        if (linkRange) {
+            const tail = value.slice(linkRange.end, linkRange.lineEnd);
+            const existing = tail.match(/^\s*\{:\s*[^}]*\}/);
+            if (existing) {
+                replaceRange(linkRange.end, linkRange.end + existing[0].length, ` ${attr}`);
+            } else {
+                replaceRange(linkRange.end, linkRange.end, ` ${attr}`);
+            }
+            setSelection(start, end);
+            return true;
+        }
+        let blockEnd = value.indexOf('\n', Math.max(start, end));
+        if (blockEnd === -1) blockEnd = value.length;
+        let nextLineEnd = value.indexOf('\n', blockEnd + 1);
+        if (nextLineEnd === -1) nextLineEnd = value.length;
+        const nextLine = blockEnd < value.length ? value.slice(blockEnd + 1, nextLineEnd) : '';
+        if (/^\s*\{:\s*[^}]*\}\s*$/.test(nextLine)) {
+            replaceRange(blockEnd + 1, nextLineEnd, attr);
+            setSelection(start, end);
+            return true;
+        }
+        const insert = `\n${attr}`;
+        replaceRange(blockEnd, blockEnd, insert);
+        setSelection(start, end);
+        return true;
+    };
+
     const insertCustomCssSnippet = (snippet) => {
         const raw = String(snippet || '');
         if (!raw) return;
+        if (typeof isUsingVisualEditor === 'function' && isUsingVisualEditor()) {
+            if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
+                window.__mdwSyncPreviewSelectionToTextarea();
+            }
+        }
+        if (insertClassAttrAfterSelection(raw)) {
+            try {
+                pushUndoSnapshot(snapshot(), { merge: false });
+                redoStack.length = 0;
+            } catch {}
+            ta.focus();
+            return;
+        }
         const cursorIndex = raw.indexOf(CUSTOM_CSS_CURSOR);
         const markerIndex = cursorIndex === -1 ? raw.length : cursorIndex;
         const block = raw.replace(CUSTOM_CSS_CURSOR, '');
@@ -4652,9 +4832,11 @@
     const refreshCustomCssSelect = (force = false) => {
         if (!(customCssSelect instanceof HTMLSelectElement)) return;
         const css = readCustomCssSetting();
-        if (!force && css === lastCustomCssValue) return;
-        lastCustomCssValue = css;
-        const entries = buildCustomCssEntries(css);
+        const sections = readSectionSnippetEntries();
+        const cacheValue = `${css}\n/* sections:${sections.map((entry) => `${entry.label}:${entry.snippet.length}`).join('|')} */`;
+        if (!force && cacheValue === lastCustomCssValue) return;
+        lastCustomCssValue = cacheValue;
+        const entries = [...sections, ...buildCustomCssEntries(css)];
         const hasCss = !!String(css || '').trim();
         customCssSnippetMap = new Map();
         customCssSelect.textContent = '';
@@ -4672,7 +4854,7 @@
             customCssSelect.appendChild(opt);
         });
         const hasEntries = entries.length > 0;
-        customCssSelect.hidden = !hasCss;
+        customCssSelect.hidden = !hasCss && sections.length === 0;
         customCssSelect.disabled = !hasEntries;
         if (!hasEntries) customCssSelect.value = '';
     };
@@ -4700,6 +4882,7 @@
         if (!(el instanceof HTMLElement)) return;
         el.addEventListener('mousedown', () => {
             if (typeof window.__mdwSaveVisualSelection === 'function') window.__mdwSaveVisualSelection();
+            if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') window.__mdwSyncPreviewSelectionToTextarea();
         });
     };
     [

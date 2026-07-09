@@ -74,7 +74,7 @@ function mdw_wpm_public_url($path, $siteBase) {
     $parts = explode('/', $path);
     $parts = array_map('rawurlencode', $parts);
     $safePath = implode('/', $parts);
-    return rtrim($siteBase, '/') . '/' . ltrim($safePath, '/');
+    return rtrim($siteBase, '/') . '/' . trim($safePath, '/') . '/';
 }
 
 [$WPM_BASE_DOMAIN, $WPM_SITE_BASE] = mdw_wpm_base_info();
@@ -121,6 +121,25 @@ $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'st
 $IMAGES_DIR = sanitize_folder_name(env_str('IMAGES_DIR', 'images') ?? '') ?? 'images';
 $THEMES_DIR = sanitize_folder_name(env_str('THEMES_DIR', 'themes') ?? '') ?? 'themes';
 $TOOLS_DIR = 'tools';
+function mdw_static_asset($file) {
+    global $STATIC_DIR;
+    $file = ltrim((string)$file, "/\\");
+    $url = rtrim((string)$STATIC_DIR, "/\\") . '/' . $file;
+    $path = __DIR__ . '/' . $url;
+    $mtime = is_file($path) ? @filemtime($path) : false;
+    return $mtime ? ($url . '?v=' . rawurlencode((string)$mtime)) : $url;
+}
+function mdw_json_for_script($value) {
+    return json_encode(
+        $value,
+        JSON_UNESCAPED_SLASHES
+        | JSON_UNESCAPED_UNICODE
+        | JSON_HEX_TAG
+        | JSON_HEX_AMP
+        | JSON_HEX_APOS
+        | JSON_HEX_QUOT
+    );
+}
 $themesList = list_available_themes($THEMES_DIR);
 $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
@@ -1728,8 +1747,8 @@ if ($requested) {
 // Bootstrap index split pane widths early (pre-CSS) to avoid layout shift.
 (function(){
     try {
-        const storageKey = <?= json_encode($indexSplitColStorageKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-        const legacyKey = <?= json_encode($indexSplitColStorageLegacyKey, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        const storageKey = <?= mdw_json_for_script($indexSplitColStorageKey) ?>;
+        const legacyKey = <?= mdw_json_for_script($indexSplitColStorageLegacyKey) ?>;
         const parseState = (raw) => {
             if (!raw) return null;
             const parsed = JSON.parse(raw);
@@ -1774,10 +1793,10 @@ if ($requested) {
 </script>
 <?php endif; ?>
 
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/ui.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/markdown.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/htmlpreview.css">
-<link rel="stylesheet" href="<?=h($STATIC_DIR)?>/popicon.css">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('ui.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('markdown.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('htmlpreview.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('popicon.css'))?>">
 
 <script>
 (function(){
@@ -1869,7 +1888,7 @@ window.mermaid = mermaid;
 	                <?php endif; ?>
 	                <?php if ($mode==='view' && $requested): ?>
 	                    <span class="breadcrumb-sep">/</span>
-	                    <span class="app-path-segment"><?=h(basename($requested))?></span>
+	                    <span class="app-path-segment"><?=h($hideMarkdownEditor ? preg_replace('/\.md$/i', '', basename($requested)) : basename($requested))?></span>
 	                <?php endif; ?>
 	                </div>
 	            </div>
@@ -1912,10 +1931,10 @@ window.mermaid = mermaid;
 <?php if ($indexSplitLayout): ?>
 <div class="index-split-root">
     <script>
-window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_next], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next]) ?>;
 <?php if ($indexSplitHasFile && isset($raw)): ?>
-window.CURRENT_FILE = <?= json_encode($requested, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
+window.CURRENT_FILE = <?= mdw_json_for_script($requested) ?>;
+window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 <?php endif; ?>
     </script>
 
@@ -2199,10 +2218,10 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 
 <!-- Article view -->
 <script>
-window.MDW_VIEW_NAV = <?= json_encode(['prev' => $view_prev, 'next' => $view_next], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next]) ?>;
 <?php if ($mode === 'view' && $requested && isset($raw)): ?>
-window.CURRENT_FILE = <?= json_encode($requested, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
+window.CURRENT_FILE = <?= mdw_json_for_script($requested) ?>;
+window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 <?php endif; ?>
 </script>
 <div class="preview-container">
@@ -2743,31 +2762,31 @@ window.MDW_CURRENT_MD = <?= json_encode($raw, JSON_UNESCAPED_UNICODE) ?>;
 		</div>
 
 		<script>
-		window.MDW_THEMES_DIR = <?= json_encode($THEMES_DIR) ?>;
-		window.MDW_THEMES = <?= json_encode($themesList) ?>;
-		window.MDW_TRANSLATIONS_DIR = <?= json_encode($TRANSLATIONS_DIR) ?>;
-		window.MDW_LANG = <?= json_encode($MDW_LANG) ?>;
-		window.MDW_LANGS = <?= json_encode($MDW_LANGS) ?>;
-		window.MDW_I18N = <?= json_encode($GLOBALS['MDW_I18N'] ?? new stdClass(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-		window.MDW_CSRF = <?= json_encode($CSRF_TOKEN) ?>;
-		window.MDW_AUTH_META = <?= json_encode($MDW_AUTH_META) ?>;
-		window.MDW_META_CONFIG = <?= json_encode($META_CFG_CLIENT, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
-		window.MDW_META_PUBLISHER_CONFIG = <?= json_encode($META_PUBLISHER_CFG, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+		window.MDW_THEMES_DIR = <?= mdw_json_for_script($THEMES_DIR) ?>;
+		window.MDW_THEMES = <?= mdw_json_for_script($themesList) ?>;
+		window.MDW_TRANSLATIONS_DIR = <?= mdw_json_for_script($TRANSLATIONS_DIR) ?>;
+		window.MDW_LANG = <?= mdw_json_for_script($MDW_LANG) ?>;
+		window.MDW_LANGS = <?= mdw_json_for_script($MDW_LANGS) ?>;
+		window.MDW_I18N = <?= mdw_json_for_script($GLOBALS['MDW_I18N'] ?? new stdClass()) ?>;
+		window.MDW_CSRF = <?= mdw_json_for_script($CSRF_TOKEN) ?>;
+		window.MDW_AUTH_META = <?= mdw_json_for_script($MDW_AUTH_META) ?>;
+		window.MDW_META_CONFIG = <?= mdw_json_for_script($META_CFG_CLIENT) ?>;
+		window.MDW_META_PUBLISHER_CONFIG = <?= mdw_json_for_script($META_PUBLISHER_CFG) ?>;
 		</script>
 
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.dom.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.api.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.ui.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.auth.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.settings.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.splitter.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.editor.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.explorer.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.modals.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.layout.js"></script>
-	<script defer src="<?=h($STATIC_DIR)?>/mdm.core.js"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.dom.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.api.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.ui.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.auth.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.settings.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.splitter.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.editor.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.explorer.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.modals.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.layout.js'))?>"></script>
+	<script defer src="<?=h(mdw_static_asset('mdm.core.js'))?>"></script>
 	<?php if ($github_pages_plugin_loaded): ?>
-	<script defer src="<?=h($STATIC_DIR)?>/github_pages_export.js"></script>
+	<script defer src="<?=h(mdw_static_asset('github_pages_export.js'))?>"></script>
 	<?php endif; ?>
 
 	</body>

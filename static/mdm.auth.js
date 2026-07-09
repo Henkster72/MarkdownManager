@@ -304,6 +304,21 @@
         updateAuthButton();
     };
 
+    const refreshAuthStatus = async () => {
+        try {
+            const data = await authRequest({ action: 'status' });
+            meta.has_user = !!data.has_user;
+            meta.has_superuser = !!data.has_superuser;
+            const needsSetup = !meta.has_user && !meta.has_superuser;
+            const { role, token } = getStoredAuth();
+            const loggedIn = !!(role && token);
+            setMode(needsSetup ? 'setup' : 'login');
+            setLocked(!loggedIn || needsSetup);
+            updateSuperuserUi();
+            updateAuthButton();
+        } catch {}
+    };
+
     const onSubmit = async () => {
         try {
             const needsSetup = !meta.has_user && !meta.has_superuser;
@@ -314,6 +329,14 @@
             }
         } catch (e) {
             const msg = (e && typeof e.message === 'string' && e.message.trim()) ? e.message.trim() : 'Auth failed';
+            if (msg === 'already_set') {
+                meta.has_user = true;
+                meta.has_superuser = true;
+                setMode('login');
+                setStatus(t('auth.login_title', 'Login'), 'info');
+                updateAuthButton();
+                return;
+            }
             const friendly = msg === 'invalid_password'
                 ? t('auth.wrong_password', 'Wrong password.')
                 : (msg === 'missing_password'
@@ -407,6 +430,7 @@
     updateSuperuserUi();
     updateAuthButton();
     updateLockUi();
+    refreshAuthStatus();
 
     // Attach auth fields to all form submissions.
     document.addEventListener('submit', (e) => {

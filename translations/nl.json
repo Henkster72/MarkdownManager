@@ -94,7 +94,7 @@
   },
   "article_meta": {
     "title": "Artikelmetadata",
-    "hint": "Alleen metadatavelden die zichtbaar zijn in Markdown worden getoond.",
+    "hint": "Bewerk de belangrijkste artikelgegevens.",
     "empty": "Er zijn geen bewerkbare metadatavelden zichtbaar in Markdown.",
     "apply": "Toepassen"
   },
@@ -302,6 +302,7 @@
   },
   "link_modal": {
     "title": "Link toevoegen",
+    "title_edit": "Link wijzigen",
     "mode_internal": "Intern",
     "mode_external": "Extern",
     "mode_footnote": "Voetnoot",
@@ -329,7 +330,8 @@
     "url_placeholder": "https://www.nu.nl/",
     "youtube_label": "YouTube-ID of URL",
     "youtube_placeholder": "yob8SkcOKaYv of https://youtu.be/",
-    "insert": "Link invoegen"
+    "insert": "Link invoegen",
+    "update": "Wijzigen"
   },
   "image_modal": {
     "title": "Afbeelding invoegen",

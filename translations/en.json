@@ -94,7 +94,7 @@
   },
   "article_meta": {
     "title": "Article metadata",
-    "hint": "Only metadata fields visible in Markdown are shown.",
+    "hint": "Edit the main article details.",
     "empty": "No editable metadata fields are visible in Markdown.",
     "apply": "Apply"
   },
@@ -311,6 +311,7 @@
   },
   "link_modal": {
     "title": "Add link",
+    "title_edit": "Change link",
     "mode_internal": "Internal",
     "mode_external": "External",
     "mode_footnote": "Footnote",
@@ -338,7 +339,8 @@
     "url_placeholder": "https://example.com/",
     "youtube_label": "YouTube ID or URL",
     "youtube_placeholder": "yob8SkcOKaYv or https://youtu.be/",
-    "insert": "Insert link"
+    "insert": "Insert link",
+    "update": "Change"
   },
   "image_modal": {
     "title": "Insert image",

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.92
+
+- WPM public links: public-page URLs now use clean trailing-slash paths, stay hidden until the note is Published, and update correctly during SPA note loads and publish-state changes.
+- Section snippets/includes: added optional `sections/section_*.html` snippets for the editor insert menu and expanded matching Jinja-style `{% include %}` templates in preview, with basic variable substitution from metadata and `{% set %}` values.
+- Visual link editing: clicking links in visual editor mode now opens the link modal for editing, preserving existing link attributes where possible and syncing the edited link back to Markdown.
+- Article metadata modal: refreshed the main article fields with friendlier labels, preferred field ordering, slug display, default author fallback, and default post-date filling.
+- Markdown attributes/export: attribute-list parsing now supports `id` alongside `class` and `style`, including merge behavior during preview rendering.
+- WPM metadata fields: publisher metadata config now preserves additional configured fields instead of dropping unknown keys.
+- Asset/script safety: JSON bootstrapping is escaped for inline scripts and static CSS/JS assets now receive file-mtime cache busters in the index view.
+- Explorer/cache polish: metadata and lazy explorer cache versions were bumped for the changed metadata parsing, and folder/header visual spacing was tightened.
+- Authentication setup: the auth modal now refreshes backend auth status on load and handles an already-configured setup response by returning to login.
+- Translations: English and Dutch labels were refreshed for article metadata and link editing.
+
 ## 0.91
 
 - TOC layout stability: fixed the right-side TOC preview layout so the TOC rail and article body stay in the same two-column grid row instead of slipping above or below the title/content block.
