@@ -140,11 +140,52 @@ function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     return $value;
 }
 
+function mdw_preview_social_share_links() {
+    return [
+        ['name' => 'facebook', 'url' => 'https://www.facebook.com/sharer/sharer.php?s=100&u=', 'icon' => 'pi-facebook', 'bgcolor' => '#3b5998', 'color' => ''],
+        ['name' => 'linkedin', 'url' => 'https://www.linkedin.com/shareArticle?url=', 'icon' => 'pi-linkedin', 'bgcolor' => '#0077b5', 'color' => ''],
+        ['name' => 'pinterest', 'url' => 'https://pinterest.com/pin/create/button/?url=', 'icon' => 'pi-pinterest', 'bgcolor' => '#E60023', 'color' => ''],
+        ['name' => 'whatsapp', 'url' => 'https://api.whatsapp.com/send?text=*Kijk eens wat ik gevonden heb* ', 'icon' => 'pi-whatsapp', 'bgcolor' => '#25d366', 'color' => ''],
+        ['name' => 'x', 'url' => 'https://twitter.com/intent/tweet?text=Hi%20misschien%20vind%20je%20dit%20interessant&hashtags=nederlandslank&url=', 'icon' => 'pi-x', 'bgcolor' => '#1DA1F2', 'color' => ''],
+    ];
+}
+
+function mdw_preview_render_social_share_loop($block) {
+    $out = '';
+    foreach (mdw_preview_social_share_links() as $sociallink) {
+        $chunk = (string)$block;
+        $chunk = preg_replace_callback(
+            '/\{%\s*if\s+sociallink\.([A-Za-z_][A-Za-z0-9_]*)\s*%\}(.*?)\{%\s*endif\s*%\}/s',
+            function($m) use ($sociallink) {
+                $key = (string)($m[1] ?? '');
+                return trim((string)($sociallink[$key] ?? '')) !== '' ? (string)($m[2] ?? '') : '';
+            },
+            $chunk
+        );
+        $chunk = preg_replace_callback(
+            '/\{\{\s*sociallink\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/',
+            function($m) use ($sociallink) {
+                $key = (string)($m[1] ?? '');
+                return htmlspecialchars((string)($sociallink[$key] ?? ''), ENT_QUOTES, 'UTF-8');
+            },
+            $chunk
+        );
+        $out .= $chunk;
+    }
+    return $out;
+}
+
 function mdw_preview_render_section_template($html, $vars) {
     $html = str_replace(["\r\n", "\r"], "\n", (string)$html);
     $html = (string)preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
     $html = (string)preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
-    $html = (string)preg_replace('/<[^>]+\bid=(["\'])shareall\1[^>]*>.*?<\/[^>]+>/is', '', $html);
+    $html = preg_replace_callback(
+        '/\{%\s*for\s+sociallink\s+in\s+social_share_links\s*%\}(.*?)\{%\s*endfor\s*%\}/s',
+        function($m) {
+            return mdw_preview_render_social_share_loop((string)($m[1] ?? ''));
+        },
+        $html
+    );
     $html = (string)preg_replace('/\{%\s*for\b.*?%\}.*?\{%\s*endfor\s*%\}/s', '', $html);
     $html = (string)preg_replace('/\{%\s*macro\b.*?%\}.*?\{%\s*endmacro\s*%\}/s', '', $html);
 
