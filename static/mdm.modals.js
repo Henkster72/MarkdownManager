@@ -94,9 +94,19 @@
         }
     };
 
+    const hrefFragment = (href) => {
+        const raw = String(href || '').trim();
+        const idx = raw.indexOf('#');
+        return idx >= 0 ? raw.slice(idx) : '';
+    };
+
     const markdownPathCandidatesFromHref = (href) => {
         const raw = String(href || '').trim();
-        if (!raw || raw.startsWith('#')) return [];
+        if (!raw) return [];
+        if (raw.startsWith('#')) {
+            const current = normalizePath(window.CURRENT_FILE || '');
+            return current ? [current] : [];
+        }
         if (/^(?:mailto|tel|javascript|data):/i.test(raw)) return [];
         const candidates = [];
         const add = (value) => {
@@ -258,12 +268,21 @@
                 className: String(linkEl.getAttribute('class') || '').trim(),
                 target: String(linkEl.getAttribute('target') || '').trim(),
                 rel: String(linkEl.getAttribute('rel') || '').trim(),
+                fragment: hrefFragment(href),
             };
             setLinkModalLabels(true);
             if (internalItem instanceof HTMLElement) {
                 selectModeRadio('internal');
                 setMode('internal');
                 selectPickerItem(internalItem);
+                return;
+            }
+            if (href.startsWith('#') && normalizePath(window.CURRENT_FILE || '')) {
+                selectedPath = normalizePath(window.CURRENT_FILE || '');
+                selectedTitle = selectedPath;
+                selectModeRadio('internal');
+                setMode('internal');
+                validate();
                 return;
             }
             if (externalText) externalText.value = linkTextFromElement(linkEl);
@@ -924,7 +943,10 @@
         if (!selectedPath) return;
         const selection = getEditorSelectionText();
         const text = selection || selectedTitle || selectedPath;
-        const href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
+        let href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
+        if (editContext?.type === 'visual-link' && editContext.fragment) {
+            href += editContext.fragment;
+        }
         if (editContext?.type === 'visual-link' && editContext.linkEl instanceof HTMLAnchorElement) {
             const link = editContext.linkEl;
             link.setAttribute('href', href);

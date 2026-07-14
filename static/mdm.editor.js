@@ -4877,6 +4877,12 @@
                 }
                 if (rule.type === CSSRule.MEDIA_RULE || rule.type === CSSRule.SUPPORTS_RULE) {
                     processRules(rule.cssRules);
+                    return;
+                }
+                if (rule.type === CSSRule.IMPORT_RULE) {
+                    try {
+                        processRules(rule.styleSheet?.cssRules || []);
+                    } catch {}
                 }
             });
         };
@@ -4998,7 +5004,7 @@
         customCssSelect.textContent = '';
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = t('edit.toolbar.custom_css', 'Custom CSS');
+        placeholder.textContent = t('edit.toolbar.custom_css', 'Custom sections');
         placeholder.selected = true;
         customCssSelect.appendChild(placeholder);
         entries.forEach((entry, index) => {

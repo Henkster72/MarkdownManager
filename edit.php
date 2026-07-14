@@ -1520,8 +1520,8 @@ window.mermaid = mermaid;
                                     <option value="5" class="md-h5 heading-select-option">H5</option>
                                     <option value="6" class="md-h6 heading-select-option">H6</option>
                                 </select>
-                                <select id="customCssSelect" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?>" hidden>
-                                    <option value="" selected><?=h(mdw_t('edit.toolbar.custom_css','Custom CSS'))?></option>
+                                <select id="customCssSelect" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_css','Custom sections'))?>" hidden>
+                                    <option value="" selected><?=h(mdw_t('edit.toolbar.custom_css','Custom sections'))?></option>
                                 </select>                                <button type="button" id="formatBlockquoteBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.blockquote','Blockquote'))?>">
                                     <span class="pi pi-quote"></span>
                                 </button>

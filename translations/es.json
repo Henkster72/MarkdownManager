@@ -62,6 +62,7 @@
       "delete": "Eliminar",
       "wrap": "Ajuste",
       "wrap_title": "Ajuste de línea",
+      "custom_css": "Secciones personalizadas",
       "lines": "Líneas",
       "lines_title": "Números de línea"
     },
@@ -458,6 +459,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Sistema de atajos: elige Windows/Linux (Ctrl+Alt) o Mac (Ctrl+Command) en el modal de Configuración.",
+    "release_094": "v0.94: los enlaces con fragmento siguen siendo internos, los snippets personalizados se llaman secciones personalizadas, el CSS importado se escanea para clases de sección y la vista visual oculta variables Jinja desconocidas.",
     "release_093": "v0.93: WPM ahora ordena los artículos más recientes primero por post_date, luego por fecha de creación/nombre de archivo, oculta la sugerencia de imagen en modo visual y añade un selector de imágenes a los metadatos del artículo."
   },
   "wpm": {

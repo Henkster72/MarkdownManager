@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.94
+
+- Visual link editing: fragment links such as `#section` are treated as internal links in the link modal and keep their fragment when updated.
+- Editor toolbar: the custom section/snippet dropdown is now labeled as custom sections instead of custom CSS, and imported CSS rules are scanned for section classes too.
+- WPM visual preview: Jinja-style preview variables are resolved from metadata/`set` values or hidden from the editor preview so authors in hide-Markdown mode do not see raw template syntax.
+- Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
+
 ## 0.93
 
 - WPM explorer sorting: default date sorting now uses `post_date`, then `creationdate`, then the filename date, with newest articles first in each folder across index, edit, lazy explorer payloads, and basic view.
@@ -293,7 +300,7 @@ In the overview/explorer, notes are labeled and color-coded by state so you can 
 
 ### WPM_BASE_URL (public site integration)
 
-Set `WPM_BASE_URL` to your public site domain (for example `ntg.nu` or `https://ntg.nu`). When this is set and the plugin file exists, two WPM extras are enabled:
+Set `WPM_BASE_URL` to your public site domain (for example `example.com` or `https://example.com`). When this is set and the plugin file exists, two WPM extras are enabled:
 
 - **Google site search**: a search input appears in the overview page. Queries are sent to Google with `site:your-domain` applied.
 - **Public link in the app header**: when a note is open, a pi-externallink button appears next to the app title. It opens the public URL derived from the current note path (URL-safe, `.md` stripped).

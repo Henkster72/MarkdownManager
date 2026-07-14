@@ -179,6 +179,24 @@ function mdw_preview_render_section_template($html, $vars) {
     return (string)preg_replace('/\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}/', '', $html);
 }
 
+function mdw_preview_render_inline_template_vars($text, $vars) {
+    $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $text = preg_replace_callback(
+        '/\{\{\s*([^{}]+?)\s*\}\}/',
+        function($m) use ($vars) {
+            $expr = trim((string)$m[1]);
+            if ($expr === '') return '';
+            if (isset($vars[$expr])) return (string)$vars[$expr];
+            if (preg_match('/^(?:"([^"]*)"|\'([^\']*)\')$/', $expr, $mm)) {
+                return isset($mm[1]) && $mm[1] !== '' ? (string)$mm[1] : (string)($mm[2] ?? '');
+            }
+            return '';
+        },
+        $text
+    );
+    return (string)preg_replace('/^\s*\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
+}
+
 function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], &$expanded = false) {
     $expanded = false;
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
@@ -2716,7 +2734,10 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $text = str_replace(["\r\n","\r"], "\n", $body);
     $sectionIncludesExpanded = false;
     $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
-    if ($sectionIncludesExpanded) {
+    $templateVars = mdw_preview_collect_jinja_vars($text, $meta);
+    $templateSource = $text;
+    $text = mdw_preview_render_inline_template_vars($text, $templateVars);
+    if ($sectionIncludesExpanded || $text !== $templateSource) {
         $lineMap = null;
     }
     [$text, $comments] = mdw_extract_html_comments($text);

@@ -67,6 +67,7 @@
       "delete": "Delete",
       "wrap": "Wrap",
       "wrap_title": "Word wrap",
+      "custom_css": "Custom sections",
       "lines": "Lines",
       "lines_title": "Line numbers"
     },
@@ -478,6 +479,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal.",
+    "release_094": "v0.94: fragment links stay internal, custom snippets are labeled as custom sections, imported CSS is scanned for section classes, and visual preview hides unresolved Jinja variables.",
     "release_093": "v0.93: WPM now sorts newest articles first by post_date, then creation date/filename, hides the image tip in visual mode, and adds an image picker to Article metadata."
   },
   "wpm": {
