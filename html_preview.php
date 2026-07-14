@@ -181,6 +181,17 @@ function mdw_preview_render_section_template($html, $vars) {
 
 function mdw_preview_render_inline_template_vars($text, $vars) {
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
+    $protected = [];
+    $text = preg_replace_callback(
+        '/(!\[[^\]\n]*\]\([^)\n]*?)\{\{\s*([^{}]+?)\s*\}\}([^)\n]*\))/',
+        function($m) use ($vars, &$protected) {
+            $value = mdw_preview_resolve_jinja_value((string)$m[2], $vars);
+            $token = '@@MDW_PREVIEW_IMAGE_TOKEN_' . count($protected) . '@@';
+            $protected[$token] = (string)$m[1] . '{{ ' . $value . ' }}' . (string)$m[3];
+            return $token;
+        },
+        $text
+    );
     $text = preg_replace_callback(
         '/\{\{\s*([^{}]+?)\s*\}\}/',
         function($m) use ($vars) {
@@ -194,7 +205,8 @@ function mdw_preview_render_inline_template_vars($text, $vars) {
         },
         $text
     );
-    return (string)preg_replace('/^\s*\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
+    $text = (string)preg_replace('/^\s*\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
+    return $protected ? strtr($text, $protected) : $text;
 }
 
 function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], &$expanded = false) {

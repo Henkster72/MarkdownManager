@@ -53,6 +53,9 @@
     const setLocked = (locked) => {
         document.documentElement.classList.toggle('auth-locked', !!locked);
         if (overlay) overlay.hidden = !locked;
+        if (typeof window.__mdwApplyTheme === 'function') {
+            window.__mdwApplyTheme();
+        }
     };
 
     const updateSuperuserUi = () => {

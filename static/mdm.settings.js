@@ -791,7 +791,8 @@
         }
 
         const css = overridesCss(overrides).trim();
-        const customCss = readCustomCssSetting();
+        const authLocked = document.documentElement.classList.contains('auth-locked');
+        const customCss = authLocked ? '' : readCustomCssSetting();
         const styleEl = ensureStyleEl();
         const combined = [css, customCss].filter((chunk) => String(chunk || '').trim() !== '').join('\n\n');
         styleEl.textContent = combined ? (combined + '\n') : '';
