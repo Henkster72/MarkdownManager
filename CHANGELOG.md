@@ -5,6 +5,7 @@
 - Visual link editing: fragment links such as `#section` are treated as internal links in the link modal and keep their fragment when updated.
 - Editor toolbar: the custom section/snippet dropdown is now labeled as custom sections instead of custom CSS, and imported CSS rules are scanned for section classes too.
 - WPM visual preview: Jinja-style preview variables are resolved from metadata/`set` values or hidden from the editor preview so authors in hide-Markdown mode do not see raw template syntax.
+- WPM legacy templates: Pandoc-style `:::` div blocks render as preview wrappers, Jinja imports/macros/loops are suppressed in the visual preview, and included sharing snippets no longer show empty social buttons.
 - Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
 
 ## 0.93

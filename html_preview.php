@@ -144,6 +144,8 @@ function mdw_preview_render_section_template($html, $vars) {
     $html = str_replace(["\r\n", "\r"], "\n", (string)$html);
     $html = (string)preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
     $html = (string)preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+    $html = (string)preg_replace('/\{%\s*for\b.*?%\}.*?\{%\s*endfor\s*%\}/s', '', $html);
+    $html = (string)preg_replace('/\{%\s*macro\b.*?%\}.*?\{%\s*endmacro\s*%\}/s', '', $html);
 
     $html = preg_replace_callback(
         '/\{%\s*if\s+([A-Za-z_][A-Za-z0-9_]*)\s*==\s*(?:"([^"]*)"|\'([^\']*)\')\s*%\}(.*?)\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/s',
@@ -176,7 +178,7 @@ function mdw_preview_render_section_template($html, $vars) {
         $html
     );
 
-    return (string)preg_replace('/\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}/', '', $html);
+    return (string)preg_replace('/\{%\s*(?:set|include|import|from|macro|endmacro|endif|else|if|for|endfor)\b[^%]*%\}/', '', $html);
 }
 
 function mdw_preview_render_inline_template_vars($text, $vars) {
@@ -205,8 +207,51 @@ function mdw_preview_render_inline_template_vars($text, $vars) {
         },
         $text
     );
-    $text = (string)preg_replace('/^\s*\{%\s*(?:set|include|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
+    $text = (string)preg_replace('/^\s*\{%\s*(?:set|include|import|from|macro|endmacro|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
     return $protected ? strtr($text, $protected) : $text;
+}
+
+function mdw_pandoc_div_attrs_from_spec($spec) {
+    $spec = trim((string)$spec);
+    if ($spec === '') return '';
+    if (preg_match('/^\{(.*)\}$/s', $spec, $m)) {
+        $spec = trim((string)$m[1]);
+    }
+    $attrs = ['id' => '', 'class' => '', 'style' => ''];
+
+    if (preg_match_all('/\b(class|style|id)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s]+)/i', $spec, $matches, PREG_SET_ORDER)) {
+        foreach ($matches as $match) {
+            $key = strtolower((string)($match[1] ?? ''));
+            $value = trim((string)($match[2] ?? ''), "\"'");
+            $value = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
+            if ($key === 'id') {
+                $value = mdw_toc_normalize_id($value);
+                $value = preg_replace('/[^A-Za-z0-9_\-:.]+/', '', (string)$value);
+            } else if ($key === 'class') {
+                $value = preg_replace('/[^A-Za-z0-9_\-\s]+/', '', (string)$value);
+                $value = trim(preg_replace('/\s+/', ' ', $value));
+            } else if ($key === 'style') {
+                $value = preg_replace('/[^A-Za-z0-9_\-\s:;,#.%()]/', '', (string)$value);
+                $value = trim($value);
+            }
+            if ($value !== '') $attrs[$key] = trim((string)$attrs[$key] . ' ' . $value);
+        }
+    }
+
+    if (preg_match_all('/(?:^|\s)\.([A-Za-z0-9_-]+)/', $spec, $classMatches)) {
+        $attrs['class'] = trim((string)$attrs['class'] . ' ' . implode(' ', $classMatches[1]));
+    }
+    if ($attrs['id'] === '' && preg_match('/(?:^|\s)#([A-Za-z0-9_\-:.]+)/', $spec, $idMatch)) {
+        $attrs['id'] = mdw_toc_normalize_id((string)$idMatch[1]);
+    }
+
+    $out = '';
+    foreach (['id', 'class', 'style'] as $name) {
+        $value = trim((string)($attrs[$name] ?? ''));
+        if ($value === '') continue;
+        $out .= ' ' . $name . '="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"';
+    }
+    return $out;
 }
 
 function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], &$expanded = false) {
@@ -790,10 +835,13 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
 
             $classAttr = md_join_classes($linkClass, $rawClass);
             $classAttr = $classAttr !== '' ? ' class="'.$classAttr.'"' : '';
+            $externalAttr = preg_match('~^https?://~i', $urlRaw)
+                ? ' target="_blank" rel="noopener noreferrer"'
+                : '';
 
             return '<a'.$classAttr.' href="'.
                    $urlEsc.
-                   '" target="_blank" rel="noopener noreferrer">'.$label.'</a>';
+                   '"'.$externalAttr.'>'.$label.'</a>';
         },
         $text
     );
@@ -966,10 +1014,6 @@ function mdw_hidden_meta_match($line, &$keyOut = null, &$valueOut = null) {
 
     $key = strtolower(trim((string)($m[1] ?? '')));
     if ($key === '') return false;
-
-    $allowed = function_exists('mdw_metadata_allowed_keys') ? mdw_metadata_allowed_keys() : [];
-    if (empty($allowed)) $allowed = ['date' => true];
-    if (!isset($allowed[$key])) return false;
 
     $keyOut = $key;
     $valueOut = trim((string)($m[2] ?? ''));
@@ -2690,11 +2734,10 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         if (!$publisherMode && !array_key_exists($k, $meta)) continue;
         if (!in_array($k, $order, true)) $order[] = $k;
     }
-    // Preserve any extra known keys present in file.
+    // Preserve any extra top-of-file keys present in instance markdown.
     foreach (array_keys($meta) as $k) {
         $k = strtolower((string)$k);
         if ($k === '') continue;
-        if (!isset($baseFields[$k]) && !isset($pubFields[$k])) continue;
         if (!in_array($k, $order, true)) $order[] = $k;
     }
 
@@ -2964,6 +3007,33 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $count = count($lines);
     for ($i = 0; $i < $count; $i++) {
         $line = $lines[$i];
+
+        if (preg_match('/^\s*:::\s*(\{[^}]*\})?\s*$/', $line, $m)) {
+            $closeAllLists();
+            $depth = 1;
+            $closeIndex = null;
+            for ($j = $i + 1; $j < $count; $j++) {
+                if (!preg_match('/^\s*:::\s*(\{[^}]*\})?\s*$/', $lines[$j], $dm)) continue;
+                if (trim((string)($dm[1] ?? '')) !== '') {
+                    $depth++;
+                } else {
+                    $depth--;
+                    if ($depth <= 0) {
+                        $closeIndex = $j;
+                        break;
+                    }
+                }
+            }
+            if ($closeIndex !== null) {
+                $inner = implode("\n", array_slice($lines, $i + 1, $closeIndex - $i - 1));
+                $innerHtml = md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false, 'render_metadata' => false]));
+                $attrs = mdw_pandoc_div_attrs_from_spec((string)($m[1] ?? ''));
+                $html[] = $applySrcAttrs('<div' . $attrs . '>' . "\n" . $innerHtml . "\n" . '</div>', $i, $closeIndex);
+                $i = $closeIndex;
+                continue;
+            }
+            continue;
+        }
 
         // ``` fenced code blocks (allow indentation, e.g. inside lists)
         if (preg_match('/^\s*```(.*)$/', $line, $m)) {

@@ -470,7 +470,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Sneltoets-systeem: kies Windows/Linux (Ctrl+Alt) of Mac (Ctrl+Command) in Instellingen.",
-    "release_094": "v0.94: fragmentlinks blijven intern, custom snippets heten nu custom secties, geïmporteerde CSS wordt gescand op sectieclasses en de visuele preview verbergt onbekende Jinja-variabelen.",
+    "release_094": "v0.94: fragmentlinks blijven intern, custom snippets heten nu custom secties, geïmporteerde CSS wordt gescand op sectieclasses en de visuele preview verbergt onbekende Jinja-/legacy-template syntax.",
     "release_093": "v0.93: WPM sorteert nieuwe artikelen nu bovenaan op post_date, daarna aanmaakdatum/bestandsnaam, verbergt de afbeeldingstip in visuele modus en voegt een plaatjeskiezer toe aan Artikelmetadata."
   },
   "wpm": {

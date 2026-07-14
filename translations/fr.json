@@ -451,7 +451,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres.",
-    "release_094": "v0.94 : les liens avec fragment restent internes, les snippets personnalisés sont nommés sections personnalisées, le CSS importé est analysé pour les classes de section et l'aperçu visuel masque les variables Jinja inconnues.",
+    "release_094": "v0.94 : les liens avec fragment restent internes, les snippets personnalisés sont nommés sections personnalisées, le CSS importé est analysé pour les classes de section et l'aperçu visuel masque la syntaxe Jinja/legacy inconnue.",
     "release_093": "v0.93 : WPM trie désormais les articles les plus récents d'abord par post_date, puis par date de création/nom de fichier, masque l'astuce image en mode visuel et ajoute un sélecteur d'image aux métadonnées d'article."
   },
   "wpm": {
