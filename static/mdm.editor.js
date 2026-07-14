@@ -431,11 +431,13 @@
         const formEl = document.getElementById('articleMetaForm');
         const fieldsEl = document.getElementById('articleMetaFields');
         const emptyEl = document.getElementById('articleMetaEmpty');
+        const titleEl = document.getElementById('articleMetaModalTitle');
         if (!(btn instanceof HTMLButtonElement)
             || !(modal instanceof HTMLElement)
             || !(formEl instanceof HTMLFormElement)
             || !(fieldsEl instanceof HTMLElement)) return;
         if (!isPublisherMode()) return;
+        const baseTitle = titleEl instanceof HTMLElement ? String(titleEl.textContent || '').trim() : '';
 
         const modalBinding = (typeof window.__mdwBindModal === 'function')
             ? window.__mdwBindModal({
@@ -487,6 +489,19 @@
             base = base.replace(/\.md$/i, '').trim();
             return base;
         };
+        const updateArticleMetaTitle = () => {
+            if (!(titleEl instanceof HTMLElement)) return;
+            titleEl.textContent = baseTitle || 'Article metadata';
+            const slug = currentSlug().toLowerCase();
+            if (!slug) return;
+            const span = document.createElement('span');
+            span.className = 'status-text article-meta-title-slug';
+            span.style.marginLeft = '0.45rem';
+            span.style.fontSize = '0.78rem';
+            span.style.fontWeight = '500';
+            span.textContent = slug;
+            titleEl.appendChild(span);
+        };
         const publisherDefaultAuthor = () => {
             const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
             const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
@@ -515,6 +530,156 @@
             if (key === 'post_date') return formatDateForArticleMeta(new Date());
             return '';
         };
+        let articleMetaImages = null;
+        let articleMetaImagesPromise = null;
+        const imageTokenForFile = (file, path) => {
+            let name = String(file || '').trim();
+            if (!name) {
+                const parts = String(path || '').replace(/\\/g, '/').split('/');
+                name = parts[parts.length - 1] || '';
+            }
+            return name ? `{{ ${name} }}` : '';
+        };
+        const renderArticleMetaImages = (listEl, filterEl, input) => {
+            if (!(listEl instanceof HTMLElement) || !(input instanceof HTMLInputElement)) return;
+            const q = String(filterEl?.value || '').trim().toLowerCase();
+            const images = Array.isArray(articleMetaImages) ? articleMetaImages : [];
+            const filtered = q
+                ? images.filter((it) => `${it.file || ''} ${it.alt || ''} ${it.path || ''}`.toLowerCase().includes(q))
+                : images;
+            listEl.textContent = '';
+            if (!filtered.length) {
+                const empty = document.createElement('div');
+                empty.className = 'status-text';
+                empty.style.padding = '0.45rem';
+                empty.textContent = t('image_modal.no_images', 'No images found.');
+                listEl.appendChild(empty);
+                return;
+            }
+            filtered.forEach((it) => {
+                const path = String(it.path || '');
+                const file = String(it.file || '');
+                const token = imageTokenForFile(file, path);
+                if (!token) return;
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.className = 'btn btn-ghost';
+                row.style.width = '100%';
+                row.style.justifyContent = 'flex-start';
+                row.style.gap = '0.55rem';
+                row.style.marginTop = '0.35rem';
+
+                const img = document.createElement('img');
+                img.src = path;
+                img.alt = '';
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                img.style.width = '42px';
+                img.style.height = '42px';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '0.5rem';
+                img.style.border = '1px solid var(--border-soft)';
+
+                const text = document.createElement('span');
+                text.style.display = 'flex';
+                text.style.flexDirection = 'column';
+                text.style.alignItems = 'flex-start';
+                text.style.minWidth = '0';
+                const name = document.createElement('span');
+                name.style.fontSize = '0.8rem';
+                name.style.fontWeight = '600';
+                name.style.maxWidth = '32ch';
+                name.style.overflow = 'hidden';
+                name.style.textOverflow = 'ellipsis';
+                name.style.whiteSpace = 'nowrap';
+                name.textContent = String(it.alt || file || path);
+                const meta = document.createElement('span');
+                meta.className = 'status-text';
+                meta.style.maxWidth = '38ch';
+                meta.style.overflow = 'hidden';
+                meta.style.textOverflow = 'ellipsis';
+                meta.style.whiteSpace = 'nowrap';
+                meta.textContent = path;
+                text.append(name, meta);
+
+                row.append(img, text);
+                row.addEventListener('click', () => {
+                    input.value = token;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.focus();
+                });
+                listEl.appendChild(row);
+            });
+        };
+        const loadArticleMetaImages = async (statusEl) => {
+            if (Array.isArray(articleMetaImages)) return articleMetaImages;
+            if (articleMetaImagesPromise) return articleMetaImagesPromise;
+            if (statusEl instanceof HTMLElement) statusEl.textContent = t('image_modal.loading', 'Loading…');
+            articleMetaImagesPromise = (async () => {
+                if (!mdmApi || typeof mdmApi.get !== 'function') throw new Error('network');
+                const data = await mdmApi.get('image_manager.php?action=list');
+                if (!data || data.ok !== true) throw new Error(t('image_modal.load_failed', 'Failed to load images.'));
+                articleMetaImages = Array.isArray(data.images) ? data.images : [];
+                return articleMetaImages;
+            })();
+            try {
+                return await articleMetaImagesPromise;
+            } catch (e) {
+                articleMetaImagesPromise = null;
+                throw e;
+            }
+        };
+        const attachPagePicturePicker = (wrap, input) => {
+            const tools = document.createElement('div');
+            tools.style.display = 'flex';
+            tools.style.gap = '0.5rem';
+            tools.style.marginTop = '0.45rem';
+            tools.style.alignItems = 'center';
+
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'btn btn-ghost btn-small';
+            toggle.textContent = t('image_modal.title', 'Insert image');
+
+            const status = document.createElement('span');
+            status.className = 'status-text';
+            tools.append(toggle, status);
+
+            const panel = document.createElement('div');
+            panel.hidden = true;
+            panel.style.marginTop = '0.55rem';
+            panel.style.border = '1px solid var(--border-soft)';
+            panel.style.borderRadius = '0.75rem';
+            panel.style.padding = '0.55rem';
+
+            const filter = document.createElement('input');
+            filter.type = 'text';
+            filter.className = 'input';
+            filter.placeholder = t('image_modal.search_images', 'Search images...');
+
+            const list = document.createElement('div');
+            list.style.maxHeight = '28vh';
+            list.style.overflow = 'auto';
+            list.style.marginTop = '0.3rem';
+
+            panel.append(filter, list);
+            wrap.append(tools, panel);
+
+            filter.addEventListener('input', () => renderArticleMetaImages(list, filter, input));
+            toggle.addEventListener('click', async () => {
+                panel.hidden = !panel.hidden;
+                if (panel.hidden) return;
+                status.textContent = '';
+                try {
+                    await loadArticleMetaImages(status);
+                    status.textContent = '';
+                    renderArticleMetaImages(list, filter, input);
+                    filter.focus();
+                } catch (e) {
+                    status.textContent = e?.message || t('image_modal.load_failed', 'Failed to load images.');
+                }
+            });
+        };
         const appendArticleMetaField = ({ key, labelText, value, readonly = false, metaKey = '' }) => {
             const wrap = document.createElement('div');
             wrap.className = 'modal-field article-meta-field';
@@ -537,6 +702,9 @@
             }
 
             wrap.append(label, input);
+            if (key === 'page_picture') {
+                attachPagePicturePicker(wrap, input);
+            }
             fieldsEl.appendChild(wrap);
         };
         const openModal = () => {
@@ -544,17 +712,7 @@
             const { meta } = extractMetaAndBody(editor.value);
             fieldsEl.textContent = '';
             if (emptyEl instanceof HTMLElement) emptyEl.hidden = true;
-            let slugAdded = false;
-            const appendSlug = () => {
-                if (slugAdded) return;
-                slugAdded = true;
-                appendArticleMetaField({
-                    key: 'slug',
-                    labelText: fieldLabel('slug', {}),
-                    value: currentSlug(),
-                    readonly: true,
-                });
-            };
+            updateArticleMetaTitle();
 
             fields.forEach((key) => {
                 const cfg = getFieldConfig(key);
@@ -564,9 +722,7 @@
                     value: articleMetaValue(key, meta, cfg),
                     metaKey: key,
                 });
-                if (key === 'page_title') appendSlug();
             });
-            if (!slugAdded) appendSlug();
 
             if (modalBinding) modalBinding.open({ source: 'article-meta' });
             else {

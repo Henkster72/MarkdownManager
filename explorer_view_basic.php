@@ -178,7 +178,7 @@ function explorer_view_basic_render_tree($opts) {
                 ? $entry['basename']
                 : basename($p);
             $wantMeta = $publisher_mode
-                ? ['publishstate', 'page_title', 'post_date', 'published_date']
+                ? ['publishstate', 'page_title', 'post_date', 'creationdate']
                 : ['post_date', 'published_date'];
             $info = function_exists('explorer_view_extract_md_title_and_meta_from_file')
                 ? explorer_view_extract_md_title_and_meta_from_file(__DIR__ . '/' . $p, $basename, $wantMeta)
@@ -189,8 +189,13 @@ function explorer_view_basic_render_tree($opts) {
                 ? ($metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $basename))
                 : (string)($info['title'] ?? $basename);
 
-            $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
-            if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+            $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+            if ($publisher_mode) {
+                if ($rawDate === '') $rawDate = trim((string)($info['meta']['creationdate'] ?? ''));
+            } else {
+                $publishedDate = trim((string)($info['meta']['published_date'] ?? ''));
+                if ($publishedDate !== '') $rawDate = $publishedDate;
+            }
             if (function_exists('explorer_view_entry_date_key_label')) {
                 [, $dateLabel] = explorer_view_entry_date_key_label(
                     $rawDate,

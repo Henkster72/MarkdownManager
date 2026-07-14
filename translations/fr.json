@@ -449,7 +449,8 @@
     "back_to_index": "Retour à l'index"
   },
   "readme": {
-    "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres."
+    "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres.",
+    "release_093": "v0.93 : WPM trie désormais les articles les plus récents d'abord par post_date, puis par date de création/nom de fichier, masque l'astuce image en mode visuel et ajoute un sélecteur d'image aux métadonnées d'article."
   },
   "wpm": {
     "setup_title": "configuration",

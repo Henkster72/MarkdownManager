@@ -255,6 +255,15 @@ If both have no date, fallback alphabetically on basename ASC.
 function compare_entries_desc_date($a, $b) {
     // a['basename'], a['yy'], a['mm'], a['dd']
     // b['basename'], b['yy'], b['mm'], b['dd']
+    global $MDW_PUBLISHER_MODE;
+
+    if (!empty($MDW_PUBLISHER_MODE)) {
+        $dateA = mdw_entry_publisher_sort_date_key($a);
+        $dateB = mdw_entry_publisher_sort_date_key($b);
+        if ($dateA !== '' && $dateB !== '' && $dateA !== $dateB) return strcmp($dateB, $dateA);
+        if ($dateA !== '' && $dateB === '') return -1;
+        if ($dateA === '' && $dateB !== '') return 1;
+    }
 
     // both have valid yy?
     $aHas = $a['yy'] !== null;
@@ -274,6 +283,29 @@ function compare_entries_desc_date($a, $b) {
 
     // neither has date -> ASC by filename
     return strcasecmp($a['basename'], $b['basename']);
+}
+
+function mdw_entry_publisher_sort_date_key($entry) {
+    if (!is_array($entry)) return '';
+    $path = isset($entry['path']) ? trim((string)$entry['path']) : '';
+    if ($path === '') return '';
+    $basename = isset($entry['basename']) && is_string($entry['basename']) && $entry['basename'] !== ''
+        ? $entry['basename']
+        : basename($path);
+    $info = explorer_view_extract_md_title_and_meta_from_file(
+        __DIR__ . '/' . $path,
+        $basename,
+        ['post_date', 'creationdate']
+    );
+    $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+    if ($rawDate === '') $rawDate = trim((string)($info['meta']['creationdate'] ?? ''));
+    [$dateKey] = explorer_view_entry_date_key_label(
+        $rawDate,
+        $entry['yy'] ?? null,
+        $entry['mm'] ?? null,
+        $entry['dd'] ?? null
+    );
+    return (string)$dateKey;
 }
 
 function mdw_publisher_should_hide_md_entry($path) {
@@ -427,7 +459,7 @@ function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode
         ? $entry['basename']
         : basename($p);
     $wantMeta = $publisherMode
-        ? ['publishstate', 'page_title', 'post_date', 'published_date']
+        ? ['publishstate', 'page_title', 'post_date', 'creationdate']
         : ['post_date', 'published_date'];
     $info = explorer_view_extract_md_title_and_meta_from_file(
         __DIR__ . '/' . $p,
@@ -448,8 +480,13 @@ function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode
         if ($publishState === '') $publishState = 'Concept';
     }
 
-    $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
-    if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+    $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+    if ($publisherMode) {
+        if ($rawDate === '') $rawDate = trim((string)($info['meta']['creationdate'] ?? ''));
+    } else {
+        $publishedDate = trim((string)($info['meta']['published_date'] ?? ''));
+        if ($publishedDate !== '') $rawDate = $publishedDate;
+    }
     [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
         $rawDate,
         $entry['yy'] ?? null,

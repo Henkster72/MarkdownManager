@@ -289,12 +289,36 @@ function explorer_view_extract_md_title_and_meta_from_file($fullPath, $fallbackB
 function explorer_view_parse_date_value($value) {
     $value = trim((string)$value);
     if ($value === '') return [null, null, null];
-    if (preg_match('/(\d{4})[\\-\\/_\\.](\d{2})[\\-\\/_\\.](\d{2})/', $value, $m)) {
-        return [$m[1], $m[2], $m[3]];
+    if (preg_match('/(\d{4})[\\-\\/_\\.](\d{1,2})[\\-\\/_\\.](\d{1,2})/', $value, $m)) {
+        return [$m[1], str_pad($m[2], 2, '0', STR_PAD_LEFT), str_pad($m[3], 2, '0', STR_PAD_LEFT)];
     }
-    if (preg_match('/(\d{2})[\\-\\/_\\.](\d{2})[\\-\\/_\\.](\d{2})/', $value, $m)) {
+    if (preg_match('/(\d{2})[\\-\\/_\\.](\d{1,2})[\\-\\/_\\.](\d{1,2})/', $value, $m)) {
         $year = 2000 + (int)$m[1];
-        return [$year, $m[2], $m[3]];
+        return [$year, str_pad($m[2], 2, '0', STR_PAD_LEFT), str_pad($m[3], 2, '0', STR_PAD_LEFT)];
+    }
+    $lower = function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+    $lower = trim(str_replace('.', '', $lower));
+    $months = [
+        'januari' => '01', 'jan' => '01', 'january' => '01',
+        'februari' => '02', 'feb' => '02', 'february' => '02',
+        'maart' => '03', 'mar' => '03', 'march' => '03',
+        'april' => '04', 'apr' => '04',
+        'mei' => '05', 'may' => '05',
+        'juni' => '06', 'jun' => '06', 'june' => '06',
+        'juli' => '07', 'jul' => '07', 'july' => '07',
+        'augustus' => '08', 'aug' => '08', 'august' => '08',
+        'september' => '09', 'sep' => '09', 'sept' => '09',
+        'oktober' => '10', 'okt' => '10', 'oct' => '10', 'october' => '10',
+        'november' => '11', 'nov' => '11',
+        'december' => '12', 'dec' => '12',
+    ];
+    if (preg_match('/\b(\d{1,2})\s+([[:alpha:]]+)\s+(\d{4})\b/u', $lower, $m)) {
+        $month = $months[$m[2]] ?? null;
+        if ($month !== null) return [$m[3], $month, str_pad($m[1], 2, '0', STR_PAD_LEFT)];
+    }
+    if (preg_match('/\b([[:alpha:]]+)\s+(\d{1,2}),?\s+(\d{4})\b/u', $lower, $m)) {
+        $month = $months[$m[1]] ?? null;
+        if ($month !== null) return [$m[3], $month, str_pad($m[2], 2, '0', STR_PAD_LEFT)];
     }
     return [null, null, null];
 }
@@ -566,7 +590,7 @@ function explorer_view_render_tree($opts) {
         <?php foreach($list as $entry):
             $p   = $entry['path'];
             $wantMeta = $publisher_mode
-                ? ['publishstate', 'page_title', 'post_date', 'published_date']
+                ? ['publishstate', 'page_title', 'post_date', 'creationdate']
                 : ['post_date', 'published_date'];
             $info = explorer_view_extract_md_title_and_meta_from_file(
                 __DIR__ . '/' . $p,
@@ -588,8 +612,13 @@ function explorer_view_render_tree($opts) {
                 if ($publishState === '') $publishState = 'Concept';
                 $publishStateLabel = $publishState;
             }
-            $rawDate = trim((string)($info['meta']['published_date'] ?? ''));
-            if ($rawDate === '') $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+            $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+            if ($publisher_mode) {
+                if ($rawDate === '') $rawDate = trim((string)($info['meta']['creationdate'] ?? ''));
+            } else {
+                $publishedDate = trim((string)($info['meta']['published_date'] ?? ''));
+                if ($publishedDate !== '') $rawDate = $publishedDate;
+            }
             [$dateKey, $dateLabel] = explorer_view_entry_date_key_label(
                 $rawDate,
                 $entry['yy'] ?? null,

@@ -1996,7 +1996,7 @@
         const slugA = normalizeSort(a?.basename || '');
         const slugB = normalizeSort(b?.basename || '');
 
-        if (isPublisherMode()) {
+        if (mode !== 'date' && isPublisherMode()) {
             const rankA = stateRank(a?.publish_state || '');
             const rankB = stateRank(b?.publish_state || '');
             if (rankA !== rankB) return rankA - rankB;
@@ -2028,7 +2028,7 @@
             const titleB = normalizeSort(b.dataset.title || '');
             const slugA = normalizeSort(a.dataset.slug || '');
             const slugB = normalizeSort(b.dataset.slug || '');
-            if (isPublisherMode()) {
+            if (mode !== 'date' && isPublisherMode()) {
                 const rankA = stateRank(a.dataset.publishState || '');
                 const rankB = stateRank(b.dataset.publishState || '');
                 if (rankA !== rankB) return rankA - rankB;

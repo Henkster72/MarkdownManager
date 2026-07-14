@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.93
+
+- WPM explorer sorting: default date sorting now uses `post_date`, then `creationdate`, then the filename date, with newest articles first in each folder across index, edit, lazy explorer payloads, and basic view.
+- WPM date parsing: explorer dates now handle numeric dates plus common Dutch/English display formats such as `14 juli 2026`, `16 December 2025`, and `Nov 20, 2025`.
+- WPM publish-state ordering: default date sort no longer lets publish-state grouping push older Concept/Processing items above newer articles.
+- Image modal: the Markdown insertion tip is hidden when the hide-Markdown visual editor option is enabled.
+- Article metadata modal: the slug is no longer shown as an editable field; it appears in small text next to the modal title.
+- Article metadata images: `page_picture` now has an inline image picker fed by the existing image manager, making cover image selection easier.
+- Documentation/translations: README, short changelog copy, and README translation notes were refreshed for version 0.93.
+
 ## 0.92
 
 - WPM public links: public-page URLs now use clean trailing-slash paths, stay hidden until the note is Published, and update correctly during SPA note loads and publish-state changes.

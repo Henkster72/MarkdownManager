@@ -457,7 +457,8 @@
     "back_to_index": "Torna all'indice"
   },
   "readme": {
-    "shortcut_modifier_note": "Sistema di scorciatoie: scegli Windows/Linux (Ctrl+Alt) o Mac (Ctrl+Command) nel modale Impostazioni."
+    "shortcut_modifier_note": "Sistema di scorciatoie: scegli Windows/Linux (Ctrl+Alt) o Mac (Ctrl+Command) nel modale Impostazioni.",
+    "release_093": "v0.93: WPM ora ordina prima gli articoli più recenti per post_date, poi per data di creazione/nome file, nasconde il suggerimento immagine in modalità visuale e aggiunge un selettore immagini ai metadati articolo."
   },
   "wpm": {
     "setup_title": "configurazione",

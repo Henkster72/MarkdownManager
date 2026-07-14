@@ -477,7 +477,8 @@
     "back_to_index": "Back to index"
   },
   "readme": {
-    "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal."
+    "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal.",
+    "release_093": "v0.93: WPM now sorts newest articles first by post_date, then creation date/filename, hides the image tip in visual mode, and adds an image picker to Article metadata."
   },
   "wpm": {
     "setup_title": "setup",

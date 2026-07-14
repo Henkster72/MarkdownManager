@@ -289,6 +289,16 @@ function parse_ymd_from_filename($basename) {
 }
 
 function compare_entries_desc_date($a, $b) {
+    global $MDW_PUBLISHER_MODE;
+
+    if (!empty($MDW_PUBLISHER_MODE)) {
+        $dateA = mdw_entry_publisher_sort_date_key($a);
+        $dateB = mdw_entry_publisher_sort_date_key($b);
+        if ($dateA !== '' && $dateB !== '' && $dateA !== $dateB) return strcmp($dateB, $dateA);
+        if ($dateA !== '' && $dateB === '') return -1;
+        if ($dateA === '' && $dateB !== '') return 1;
+    }
+
     $aHas = $a['yy'] !== null;
     $bHas = $b['yy'] !== null;
 
@@ -302,6 +312,29 @@ function compare_entries_desc_date($a, $b) {
     if ($aHas && !$bHas) return -1;
     if ($bHas && !$aHas) return  1;
     return strcasecmp($a['basename'], $b['basename']);
+}
+
+function mdw_entry_publisher_sort_date_key($entry) {
+    if (!is_array($entry)) return '';
+    $path = isset($entry['path']) ? trim((string)$entry['path']) : '';
+    if ($path === '') return '';
+    $basename = isset($entry['basename']) && is_string($entry['basename']) && $entry['basename'] !== ''
+        ? $entry['basename']
+        : basename($path);
+    $info = explorer_view_extract_md_title_and_meta_from_file(
+        __DIR__ . '/' . $path,
+        $basename,
+        ['post_date', 'creationdate']
+    );
+    $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
+    if ($rawDate === '') $rawDate = trim((string)($info['meta']['creationdate'] ?? ''));
+    [$dateKey] = explorer_view_entry_date_key_label(
+        $rawDate,
+        $entry['yy'] ?? null,
+        $entry['mm'] ?? null,
+        $entry['dd'] ?? null
+    );
+    return (string)$dateKey;
 }
 
 function mdw_publisher_should_hide_md_entry($path) {
@@ -1903,9 +1936,11 @@ window.mermaid = mermaid;
 
 		        <div class="modal-row" style="gap: 0.6rem;">
 		            <div id="imageList" style="max-height: 38vh; overflow:auto; border: 1px solid var(--border-soft); border-radius: 0.75rem; padding: 0.5rem;"></div>
+                    <?php if (!$hideMarkdownEditor): ?>
 		            <div class="status-text" style="margin-top: 0.25rem;">
 		                <?=h(mdw_t('image_modal.tip_insert','Tip: click an image to insert'))?> <code>![]({{ }})</code> <?=h(mdw_t('image_modal.tip_at_cursor','at the cursor.'))?>
 		            </div>
+                    <?php endif; ?>
 		        </div>
 			    </div>
 			<div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">

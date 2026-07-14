@@ -449,7 +449,8 @@
     "back_to_index": "Voltar ao índice"
   },
   "readme": {
-    "shortcut_modifier_note": "Sistema de atalhos: escolha Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) nas definições."
+    "shortcut_modifier_note": "Sistema de atalhos: escolha Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) nas definições.",
+    "release_093": "v0.93: o WPM agora ordena os artigos mais recentes primeiro por post_date, depois por data de criação/nome do ficheiro, oculta a dica de imagem no modo visual e adiciona um seletor de imagens aos metadados do artigo."
   },
   "wpm": {
     "setup_title": "configuração",
