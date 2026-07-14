@@ -335,7 +335,7 @@
     margin: 0.9rem 0;
 }
 
-.preview-content a {
+:where(.preview-content) a {
     color: inherit;
     text-decoration: underline;
     text-decoration-color: rgba(148, 163, 184, 0.55);
@@ -344,14 +344,14 @@
     word-break: break-word;
 }
 
-.preview-content .externlink,
-.preview-content .pdflink,
-.preview-content .link {
+:where(.preview-content) .externlink,
+:where(.preview-content) .pdflink,
+:where(.preview-content) .link {
     color: var(--accent);
     text-decoration: underline;
 }
 
-.preview-content .externlink:after {
+:where(.preview-content) .externlink:after {
     font-family: "Pop Icon";
     content: "\e949";
     margin-left: 0.2rem;

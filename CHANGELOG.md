@@ -9,6 +9,7 @@
 - WPM instance snippets: reserved snippet folders such as `sections` are hidden from article folder browsers, and the preview has fallback styling for common legacy classes such as `nlbullet`, `checkmarked`, and social copy buttons.
 - WPM sharing snippets: visual preview now expands `social_share_links` loops into the same social buttons as the rendered site output.
 - WPM macro preview: supported `overview.add_header` calls render as a styled header, while `form.contact_form` calls render as a clearly marked non-functional form template preview.
+- Preview custom CSS: scoped base link rules now use low-specificity selectors so instance rules such as `.externlink`, `.link`, and `a` can override them after reload without `!important`.
 - Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
 
 ## 0.93
