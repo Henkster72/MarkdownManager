@@ -184,6 +184,7 @@ function mdw_reserved_folder_names() {
         'root' => true,
         'HTML' => true,
         'PDF' => true,
+        'sections' => true,
         basename($pluginsDir) => true,
         $TOOLS_DIR => true,
         $STATIC_DIR => true,
@@ -399,6 +400,7 @@ function list_md_by_subdir_sorted(){
         'root' => true,
         'HTML' => true,
         'PDF' => true,
+        'sections' => true,
         basename($pluginsDir) => true,
         $toolsDir => true,
         $staticDir => true,
@@ -1346,6 +1348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		            'root' => true,
 		            'HTML' => true,
 		            'PDF' => true,
+		            'sections' => true,
 		            basename($pluginsDir) => true,
 		            $TOOLS_DIR => true,
 		            $STATIC_DIR => true,
@@ -1714,7 +1717,7 @@ if ($requested) {
 		$today_prefix = date('y-m-d-');
 			if ($mode === 'index') {
 			    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-			    $exclude = [basename($pluginsDir), 'HTML', 'PDF', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+			    $exclude = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
 				    $existingFolders = list_existing_folders_sorted($exclude);
 			    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
 			        $default_new_folder = $folder_filter;

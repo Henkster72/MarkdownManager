@@ -404,6 +404,7 @@ function list_md_by_subdir_sorted(){
         'root' => true,
         'HTML' => true,
         'PDF' => true,
+        'sections' => true,
         basename($pluginsDir) => true,
         $toolsDir => true,
         $staticDir => true,
@@ -646,7 +647,7 @@ if (isset($_SESSION['new_md_draft']) && is_array($_SESSION['new_md_draft'])) {
 }
 
 $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-$excludeFolders = [basename($pluginsDir), 'HTML', 'PDF', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+$excludeFolders = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
 $existingFolders = list_existing_folders_sorted($excludeFolders);
 $default_new_folder = 'root';
 if ($requested) {

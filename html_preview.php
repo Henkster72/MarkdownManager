@@ -144,6 +144,7 @@ function mdw_preview_render_section_template($html, $vars) {
     $html = str_replace(["\r\n", "\r"], "\n", (string)$html);
     $html = (string)preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
     $html = (string)preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+    $html = (string)preg_replace('/<[^>]+\bid=(["\'])shareall\1[^>]*>.*?<\/[^>]+>/is', '', $html);
     $html = (string)preg_replace('/\{%\s*for\b.*?%\}.*?\{%\s*endfor\s*%\}/s', '', $html);
     $html = (string)preg_replace('/\{%\s*macro\b.*?%\}.*?\{%\s*endmacro\s*%\}/s', '', $html);
 

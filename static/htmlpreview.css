@@ -240,6 +240,80 @@
     text-decoration: none !important;
 }
 
+.preview-content .nlbullet,
+.preview-content .nlbullet_white,
+.preview-content .nlbulletlink,
+.preview-content .nlbulletlink_white {
+    list-style: none;
+    font-weight: 600;
+}
+
+.preview-content .nlbullet,
+.preview-content .nlbullet_white {
+    display: inline-flex;
+    align-items: center;
+}
+
+.preview-content .nlbulletlink,
+.preview-content .nlbulletlink_white {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.preview-content .nlbullet::before,
+.preview-content .nlbullet_white::before,
+.preview-content .nlbulletlink::before,
+.preview-content .nlbulletlink_white::before {
+    content: "NL";
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    margin-right: 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 72%, #111827);
+    color: #fff;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.preview-content .checkmarked {
+    list-style: none;
+}
+
+.preview-content .checkmarked::before {
+    content: "\2713";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-right: 0.45rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.preview-content .blog-social-button,
+.preview-content .social-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.25rem;
+    color: #fff;
+    background: #4a5568;
+    text-decoration: none;
+}
+
 .preview-content .md-del {
     text-decoration: line-through;
     text-decoration-thickness: 2px;

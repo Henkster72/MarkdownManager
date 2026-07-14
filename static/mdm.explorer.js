@@ -2287,7 +2287,7 @@
             lazyNotesByFolder.set(folder, list);
         }
     };
-    const lazyCacheKey = 'mdw_explorer_dataset_v2';
+    const lazyCacheKey = 'mdw_explorer_dataset_v3';
     const lazyReadCache = () => {
         try {
             const raw = mdwStorageGet(lazyCacheKey);
