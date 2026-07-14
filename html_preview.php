@@ -140,6 +140,117 @@ function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     return $value;
 }
 
+function mdw_preview_parse_macro_args($raw) {
+    $parts = [];
+    $start = 0;
+    $quote = '';
+    $depth = 0;
+    $length = strlen((string)$raw);
+    for ($i = 0; $i < $length; $i++) {
+        $char = $raw[$i];
+        if ($quote !== '') {
+            if ($char === '\\') $i++;
+            else if ($char === $quote) $quote = '';
+            continue;
+        }
+        if ($char === '"' || $char === "'") $quote = $char;
+        else if ($char === '(' || $char === '[' || $char === '{') $depth++;
+        else if ($char === ')' || $char === ']' || $char === '}') $depth = max(0, $depth - 1);
+        else if ($char === ',' && $depth === 0) {
+            $parts[] = substr((string)$raw, $start, $i - $start);
+            $start = $i + 1;
+        }
+    }
+    $parts[] = substr((string)$raw, $start);
+
+    $args = [];
+    foreach ($parts as $part) {
+        if (!preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/s', (string)$part, $match)) continue;
+        $args[(string)$match[1]] = (string)$match[2];
+    }
+    return $args;
+}
+
+function mdw_preview_macro_arg($args, $name, $vars, $default = '') {
+    if (!is_array($args) || !array_key_exists($name, $args)) return $default;
+    $raw = trim((string)$args[$name]);
+    if (preg_match('/^(?:true|false)$/i', $raw)) return strtolower($raw) === 'true';
+    return mdw_preview_resolve_jinja_value($raw, $vars);
+}
+
+function mdw_preview_macro_image_src($value) {
+    $value = trim((string)$value);
+    if ($value === '') $value = 'banner.jpg';
+    if (preg_match('/^\{\{.*\}\}$/', $value)) $value = html_preview_expand_image_token($value);
+    if (is_external_url($value) || str_starts_with($value, '/')) return '';
+    $value = str_replace('\\', '/', $value);
+    if (!str_starts_with($value, html_preview_images_dir() . '/')) {
+        $value = html_preview_images_dir() . '/' . ltrim($value, '/');
+    }
+    $parts = [];
+    foreach (explode('/', $value) as $part) {
+        if ($part === '' || $part === '.') continue;
+        if ($part === '..' || !preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $part)) return '';
+        $parts[] = $part;
+    }
+    return implode('/', $parts);
+}
+
+function mdw_preview_render_overview_macro($args, $vars) {
+    $title = (string)mdw_preview_macro_arg($args, 'header_title', $vars, (string)($vars['page_title'] ?? 'Overzicht'));
+    $subtitle = (string)mdw_preview_macro_arg($args, 'header_subtitle', $vars, (string)($vars['page_subtitle'] ?? ''));
+    $banner = mdw_preview_macro_arg($args, 'header_banner', $vars, (string)($vars['page_picture'] ?? 'banner.jpg'));
+    $buttonLink = (string)mdw_preview_macro_arg($args, 'button_link', $vars, '');
+    $buttonText = (string)mdw_preview_macro_arg($args, 'button_text', $vars, '');
+    $image = mdw_preview_macro_image_src($banner);
+    $imageStyle = $image !== '' ? ' style="--mdw-preview-header-image: url(\'' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '\');"' : '';
+    $out = '<section class="mdw-preview-overview-header" data-mdw-macro="overview.add_header"' . $imageStyle . '>';
+    $out .= '<div class="mdw-preview-overview-header-inner"><div class="mdw-preview-overview-header-text">';
+    $out .= '<h1>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>';
+    if ($subtitle !== '') $out .= '<h3>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h3>';
+    $out .= '</div>';
+    if ($buttonLink !== '' && $buttonText !== '') {
+        $out .= '<div class="mdw-preview-overview-header-actions"><a class="mdw-preview-overview-button" href="' . htmlspecialchars(normalize_md_link_url($buttonLink), ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . htmlspecialchars($buttonText, ENT_QUOTES, 'UTF-8') . '<span aria-hidden="true">&rarr;</span></a></div>';
+    }
+    $out .= '</div></section>';
+    return $out;
+}
+
+function mdw_preview_render_form_macro($args, $vars) {
+    $title = (string)mdw_preview_macro_arg($args, 'form_title', $vars, 'Formulier');
+    $subtitle = (string)mdw_preview_macro_arg($args, 'form_subtitle', $vars, '');
+    $messageField = (bool)mdw_preview_macro_arg($args, 'messagefield', $vars, false);
+    $submitText = (string)mdw_preview_macro_arg($args, 'submittext', $vars, 'VERSTUUR');
+    $listId = (string)mdw_preview_macro_arg($args, 'ac_list_id', $vars, '');
+    $integration = $listId !== '' ? ' · ActiveCampaign' : '';
+    $out = '<section class="mdw-preview-form-macro" data-mdw-macro="form.contact_form" aria-label="Template formulier">';
+    $out .= '<div class="mdw-preview-macro-label">Template form' . htmlspecialchars($integration, ENT_QUOTES, 'UTF-8') . '</div>';
+    $out .= '<h3>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h3>';
+    if ($subtitle !== '') $out .= '<p class="mdw-preview-form-subtitle">' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</p>';
+    $out .= '<div class="mdw-preview-form-fields" aria-hidden="true">';
+    $out .= '<label>Voornaam*<input type="text" disabled></label>';
+    $out .= '<label>Email*<input type="email" disabled></label>';
+    if ($messageField) $out .= '<label>Bericht*<textarea rows="3" disabled></textarea></label>';
+    $out .= '<button type="button" disabled>' . htmlspecialchars($submitText, ENT_QUOTES, 'UTF-8') . '</button>';
+    $out .= '</div><p class="mdw-preview-macro-note">Deze formulierkoppeling wordt door de site-template beheerd.</p></section>';
+    return $out;
+}
+
+function mdw_preview_render_macro_calls($text, $vars) {
+    $rendered = (string)preg_replace_callback(
+        '/\{\{\s*(overview\.add_header|form\.contact_form)\s*\((.*?)\)\s*\}\}/s',
+        function($m) use ($vars) {
+            $args = mdw_preview_parse_macro_args((string)($m[2] ?? ''));
+            $rendered = (string)($m[1] ?? '') === 'overview.add_header'
+                ? mdw_preview_render_overview_macro($args, $vars)
+                : mdw_preview_render_form_macro($args, $vars);
+            return "\n\n" . $rendered . "\n\n";
+        },
+        (string)$text
+    );
+    return (string)preg_replace('/\{%\s*(?:import|from)\b[^%]*%\}/', '', $rendered);
+}
+
 function mdw_preview_social_share_links() {
     return [
         ['name' => 'facebook', 'url' => 'https://www.facebook.com/sharer/sharer.php?s=100&u=', 'icon' => 'pi-facebook', 'bgcolor' => '#3b5998', 'color' => ''],
@@ -2833,6 +2944,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
     $templateVars = mdw_preview_collect_jinja_vars($text, $meta);
     $templateSource = $text;
+    $text = mdw_preview_render_macro_calls($text, $templateVars);
     $text = mdw_preview_render_inline_template_vars($text, $templateVars);
     if ($sectionIncludesExpanded || $text !== $templateSource) {
         $lineMap = null;

@@ -47,6 +47,124 @@
   overflow-wrap: anywhere;
 }
 
+/* Safe visual stand-ins for Jinja macros rendered by the target site. */
+.preview-content .mdw-preview-overview-header {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    margin: 0.75rem 0 1.25rem;
+    min-height: 12rem;
+    padding: 2.5rem 2rem;
+    color: #1f2937;
+    background-color: #f3f4f6;
+}
+
+.preview-content .mdw-preview-overview-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: var(--mdw-preview-header-image);
+    background-position: center;
+    background-size: cover;
+    opacity: 0.34;
+}
+
+.preview-content .mdw-preview-overview-header-inner {
+    max-width: 44rem;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.preview-content .mdw-preview-overview-header h1 {
+    margin: 0;
+    text-align: left;
+    font-size: 1.65rem;
+}
+
+.preview-content .mdw-preview-overview-header h3 {
+    margin: 0.35rem 0 0;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.preview-content .mdw-preview-overview-header-actions {
+    margin-top: 1.15rem;
+}
+
+.preview-content .mdw-preview-overview-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.85rem;
+    color: #fff;
+    background: var(--accent, #2563eb);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.preview-content .mdw-preview-form-macro {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border-soft);
+    background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+.preview-content .mdw-preview-macro-label {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    padding: 0.2rem 0.45rem;
+    color: var(--text-muted, #64748b);
+    border: 1px solid var(--border-soft);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+}
+
+.preview-content .mdw-preview-form-macro h3 {
+    margin: 0.2rem 0;
+}
+
+.preview-content .mdw-preview-form-subtitle,
+.preview-content .mdw-preview-macro-note {
+    color: var(--text-muted, #64748b);
+    font-size: 0.85rem;
+}
+
+.preview-content .mdw-preview-form-fields {
+    display: grid;
+    gap: 0.7rem;
+    max-width: 34rem;
+    margin-top: 0.9rem;
+}
+
+.preview-content .mdw-preview-form-fields label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--text-muted, #64748b);
+    font-size: 0.82rem;
+}
+
+.preview-content .mdw-preview-form-fields input,
+.preview-content .mdw-preview-form-fields textarea {
+    width: 100%;
+    padding: 0.45rem;
+    border: 1px solid var(--border-soft);
+    background: var(--theme-bg, #fff);
+    opacity: 0.72;
+}
+
+.preview-content .mdw-preview-form-fields button {
+    width: fit-content;
+    padding: 0.45rem 0.8rem;
+    color: #fff;
+    background: var(--accent, #2563eb);
+    opacity: 0.72;
+}
+
+.preview-content .mdw-preview-macro-note {
+    margin: 0.8rem 0 0;
+}
+
 .preview-content h1,
 .preview-content h2,
 .preview-content h3,
