@@ -7,7 +7,7 @@
 - WPM publish-state ordering: default date sort no longer lets publish-state grouping push older Concept/Processing items above newer articles.
 - Image modal: the Markdown insertion tip is hidden when the hide-Markdown visual editor option is enabled.
 - Article metadata modal: the slug is no longer shown as an editable field; it appears in small text next to the modal title.
-- Article metadata images: `page_picture` now has an inline image picker fed by the existing image manager, making cover image selection easier.
+- Article metadata images: `page_picture` now has an inline image picker fed by the existing image manager, inserting plain image filenames such as `cover.webp`.
 - Documentation/translations: README, short changelog copy, and README translation notes were refreshed for version 0.93.
 
 ## 0.92

@@ -1092,8 +1092,7 @@
                 name = parts[parts.length - 1] || '';
             }
         }
-        if (!name) return '';
-        return `{{ ${name} }}`;
+        return name;
     };
 
     const guessAlt = (file) => {

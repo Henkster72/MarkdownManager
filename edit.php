@@ -1938,7 +1938,7 @@ window.mermaid = mermaid;
 		            <div id="imageList" style="max-height: 38vh; overflow:auto; border: 1px solid var(--border-soft); border-radius: 0.75rem; padding: 0.5rem;"></div>
                     <?php if (!$hideMarkdownEditor): ?>
 		            <div class="status-text" style="margin-top: 0.25rem;">
-		                <?=h(mdw_t('image_modal.tip_insert','Tip: click an image to insert'))?> <code>![]({{ }})</code> <?=h(mdw_t('image_modal.tip_at_cursor','at the cursor.'))?>
+		                <?=h(mdw_t('image_modal.tip_insert','Tip: click an image to insert'))?> <code>![](image.webp)</code> <?=h(mdw_t('image_modal.tip_at_cursor','at the cursor.'))?>
 		            </div>
                     <?php endif; ?>
 		        </div>

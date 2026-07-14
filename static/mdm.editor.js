@@ -538,7 +538,7 @@
                 const parts = String(path || '').replace(/\\/g, '/').split('/');
                 name = parts[parts.length - 1] || '';
             }
-            return name ? `{{ ${name} }}` : '';
+            return name;
         };
         const renderArticleMetaImages = (listEl, filterEl, input) => {
             if (!(listEl instanceof HTMLElement) || !(input instanceof HTMLInputElement)) return;
