@@ -271,6 +271,9 @@ if (is_array($settingsIn)) {
     $hideMarkdownEditor = array_key_exists('hide_markdown_editor', $settingsIn)
         ? (bool)$settingsIn['hide_markdown_editor']
         : (!array_key_exists('hide_markdown_editor', $curSettings) ? false : (bool)$curSettings['hide_markdown_editor']);
+    $customFormat = array_key_exists('custom_format', $settingsIn)
+        ? mdw_custom_format_normalize($settingsIn['custom_format'])
+        : mdw_custom_format_normalize($curSettings['custom_format'] ?? null);
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -344,6 +347,7 @@ if (is_array($settingsIn)) {
         'folder_icon_style' => $folderIconStyle,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
+        'custom_format' => $customFormat,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,

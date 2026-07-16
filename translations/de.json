@@ -63,6 +63,7 @@
       "wrap": "Umbruch",
       "wrap_title": "Zeilenumbruch",
       "custom_css": "Eigene Abschnitte",
+      "custom_format": "Benutzerdefiniertes Format",
       "lines": "Zeilen",
       "lines_title": "Zeilennummern"
     },
@@ -106,6 +107,15 @@
     },
     "ui": {
       "title": "Benutzeroberfläche"
+    },
+    "custom_format": {
+      "label": "Quellen für benutzerdefiniertes Format",
+      "custom_css": "custom.css anzeigen",
+      "sections": "Abschnitte anzeigen",
+      "hint": "Wählen Sie, welche Quellen in der Format-Symbolleiste erscheinen.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
     },
     "kbd_modifier": {
       "label": "Tastenkürzel-System",

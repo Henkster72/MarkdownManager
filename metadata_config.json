@@ -22,6 +22,10 @@
         "folder_icon_style": "folder",
         "index_dual_pane_overview": true,
         "hide_markdown_editor": true,
+        "custom_format": {
+            "custom_css": true,
+            "sections": false
+        },
         "ui_language": "nl",
         "ui_theme": "",
         "theme_preset": "default",

@@ -628,11 +628,39 @@
     };
     window.__mdwReadCustomCssSetting = readCustomCssSetting;
 
+    const normalizeCustomFormat = (raw) => {
+        const out = { custom_css: true, sections: false };
+        if (typeof raw === 'string') {
+            const value = raw.trim().toLowerCase();
+            if (value === 'sections') return { custom_css: false, sections: true };
+            return out;
+        }
+        if (!raw || typeof raw !== 'object') return out;
+        if (Object.prototype.hasOwnProperty.call(raw, 'custom_css')) out.custom_css = !!raw.custom_css;
+        if (Object.prototype.hasOwnProperty.call(raw, 'sections')) out.sections = !!raw.sections;
+        return out;
+    };
+
+    const readCustomFormatSetting = () => {
+        const s = getSettings();
+        return normalizeCustomFormat(s && s.custom_format);
+    };
+    window.__mdwReadCustomFormatSetting = readCustomFormatSetting;
+
     const writeCustomCssSetting = (value) => {
         const next = normalizeCustomCss(value);
         if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
             window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
             window.MDW_META_CONFIG._settings.custom_css = next;
+        }
+        return next;
+    };
+
+    const writeCustomFormatSetting = (value) => {
+        const next = normalizeCustomFormat(value);
+        if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+            window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+            window.MDW_META_CONFIG._settings.custom_format = next;
         }
         return next;
     };
@@ -861,6 +889,9 @@
     const allowUserPublishToggle = document.getElementById('allowUserPublishToggle');
     const allowUserDeleteToggle = document.getElementById('allowUserDeleteToggle');
     const allowUserDeleteStatus = document.getElementById('allowUserDeleteStatus');
+    const customFormatCustomCssToggle = document.getElementById('customFormatCustomCssToggle');
+    const customFormatSectionsToggle = document.getElementById('customFormatSectionsToggle');
+    const customFormatStatus = document.getElementById('customFormatStatus');
     const copyButtonsToggle = document.getElementById('copyButtonsToggle');
     const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
     const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
@@ -950,6 +981,14 @@
         if (!(allowUserDeleteStatus instanceof HTMLElement)) return;
         allowUserDeleteStatus.textContent = String(msg || '');
         allowUserDeleteStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const setCustomFormatStatus = (msg, kind = 'info') => {
+        if (!(customFormatStatus instanceof HTMLElement)) return;
+        customFormatStatus.textContent = String(msg || '');
+        customFormatStatus.style.color = kind === 'error'
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
@@ -1330,6 +1369,13 @@
         if (inputs.editorFontSize instanceof HTMLInputElement) inputs.editorFontSize.value = String(ov.editor?.fontSize || '');
         if (inputs.editorAccent instanceof HTMLInputElement) inputs.editorAccent.value = String(ov.editor?.accent || '');
         if (inputs.customCss instanceof HTMLTextAreaElement) inputs.customCss.value = readCustomCssSetting();
+        const customFormat = readCustomFormatSetting();
+        if (customFormatCustomCssToggle instanceof HTMLInputElement) {
+            customFormatCustomCssToggle.checked = customFormat.custom_css;
+        }
+        if (customFormatSectionsToggle instanceof HTMLInputElement) {
+            customFormatSectionsToggle.checked = customFormat.sections;
+        }
         if (appTitleInput instanceof HTMLInputElement) {
             appTitleInput.value = readAppTitleSetting();
         }
@@ -1391,6 +1437,7 @@
         setInternalLinkPrefixStatus(t('theme.internal_links.prefix_hint', 'Prefix is added before index.php?file= (leave empty for relative links).'), 'info');
         syncDeleteAfterUi();
         setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
+        setCustomFormatStatus(t('theme.custom_format.hint', 'Choose which sources appear in the custom format toolbar.'), 'info');
         setCopySettingsStatus(t('theme.copy.hint', 'Saved for all users.'), 'info');
         setExportClassPrefixStatus(t('theme.copy.class_prefix_hint', 'Applies to medium/wet HTML export; dry export removes all classes.'), 'info');
         setJinjaMetaPrefixStatus(t('theme.metadata.jinja_prefix_hint', 'Maps metadata keys like page_picture -> blog_picture in Template download (default: page_).'), 'info');
@@ -1579,6 +1626,36 @@
                 ? e.message.trim()
                 : t('theme.permissions.save_failed', 'Save failed');
             setAllowUserDeleteStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveCustomFormatSetting = async (nextValue) => {
+        setCustomFormatStatus(t('theme.custom_format.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setCustomFormatStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = normalizeCustomFormat(nextValue);
+            const result = await saveSettingsToServer({ custom_format: value });
+            if (!result.ok) throw new Error(result.message || t('theme.custom_format.save_failed', 'Save failed'));
+            writeCustomFormatSetting(value);
+            if (typeof window.__mdwRefreshCustomCssSelect === 'function') {
+                window.__mdwRefreshCustomCssSelect(true);
+            }
+            setCustomFormatStatus(t('theme.custom_format.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('custom format save failed', e);
+            const current = readCustomFormatSetting();
+            if (customFormatCustomCssToggle instanceof HTMLInputElement) customFormatCustomCssToggle.checked = current.custom_css;
+            if (customFormatSectionsToggle instanceof HTMLInputElement) customFormatSectionsToggle.checked = current.sections;
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.custom_format.save_failed', 'Save failed');
+            setCustomFormatStatus(msg, 'error');
             return false;
         }
     };
@@ -2058,6 +2135,16 @@
             const next = !!allowUserDeleteToggle.checked;
             await saveAllowUserDeleteSetting(next);
         });
+
+        const onCustomFormatChange = async () => {
+            if (!(customFormatCustomCssToggle instanceof HTMLInputElement) || !(customFormatSectionsToggle instanceof HTMLInputElement)) return;
+            await saveCustomFormatSetting({
+                custom_css: customFormatCustomCssToggle.checked,
+                sections: customFormatSectionsToggle.checked,
+            });
+        };
+        customFormatCustomCssToggle?.addEventListener('change', onCustomFormatChange);
+        customFormatSectionsToggle?.addEventListener('change', onCustomFormatChange);
 
         copyButtonsToggle?.addEventListener('change', async () => {
             if (!(copyButtonsToggle instanceof HTMLInputElement)) return;
@@ -2637,6 +2724,17 @@
                 const next = !!allowUserDeleteToggle.checked;
                 if (next !== readAllowUserDeleteSetting()) {
                     const ok = await saveAllowUserDeleteSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (customFormatCustomCssToggle instanceof HTMLInputElement && customFormatSectionsToggle instanceof HTMLInputElement) {
+                const next = {
+                    custom_css: customFormatCustomCssToggle.checked,
+                    sections: customFormatSectionsToggle.checked,
+                };
+                const current = readCustomFormatSetting();
+                if (next.custom_css !== current.custom_css || next.sections !== current.sections) {
+                    const ok = await saveCustomFormatSetting(next);
                     if (!ok) return false;
                 }
             }

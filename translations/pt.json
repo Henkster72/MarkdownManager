@@ -63,6 +63,7 @@
       "wrap": "Quebra",
       "wrap_title": "Quebra de linha",
       "custom_css": "Secções personalizadas",
+      "custom_format": "Formato personalizado",
       "lines": "Linhas",
       "lines_title": "Números de linha"
     },
@@ -106,6 +107,15 @@
     },
     "ui": {
       "title": "Interface do utilizador"
+    },
+    "custom_format": {
+      "label": "Fontes do formato personalizado",
+      "custom_css": "Mostrar custom.css",
+      "sections": "Mostrar secções",
+      "hint": "Escolha as fontes apresentadas na barra do formato personalizado.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
     },
     "kbd_modifier": {
       "label": "Sistema de atalhos",

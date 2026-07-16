@@ -68,6 +68,7 @@
       "wrap": "Wrap",
       "wrap_title": "Regelafbreking",
       "custom_css": "Custom secties",
+      "custom_format": "Custom format",
       "lines": "Regels",
       "lines_title": "Regelnummers"
     },
@@ -118,6 +119,15 @@
     },
     "ui": {
       "title": "Gebruikersinterface"
+    },
+    "custom_format": {
+      "label": "Bronnen voor custom format",
+      "custom_css": "Toon custom.css",
+      "sections": "Toon sections",
+      "hint": "Kies welke bronnen in de custom-formatwerkbalk verschijnen.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
     },
     "index_layout": {
       "hide_markdown": "Verberg markdown"

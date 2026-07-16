@@ -63,6 +63,7 @@
       "wrap": "Renvoi",
       "wrap_title": "Retour à la ligne",
       "custom_css": "Sections personnalisées",
+      "custom_format": "Format personnalisé",
       "lines": "Lignes",
       "lines_title": "Numéros de ligne"
     },
@@ -106,6 +107,15 @@
     },
     "ui": {
       "title": "Interface utilisateur"
+    },
+    "custom_format": {
+      "label": "Sources du format personnalisé",
+      "custom_css": "Afficher custom.css",
+      "sections": "Afficher les sections",
+      "hint": "Choisissez les sources affichées dans la barre du format personnalisé.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
     },
     "kbd_modifier": {
       "label": "Système de raccourcis",

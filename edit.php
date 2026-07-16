@@ -234,6 +234,9 @@ if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
 $indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
 $hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
+$customFormat = mdw_custom_format_normalize($MDW_SETTINGS['custom_format'] ?? null);
+$customFormatCss = !empty($customFormat['custom_css']);
+$customFormatSections = !empty($customFormat['sections']);
 $internalLinkPrefix = isset($MDW_SETTINGS['internal_link_prefix']) ? trim((string)$MDW_SETTINGS['internal_link_prefix']) : '';
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
@@ -1521,8 +1524,8 @@ window.mermaid = mermaid;
                                     <option value="5" class="md-h5 heading-select-option">H5</option>
                                     <option value="6" class="md-h6 heading-select-option">H6</option>
                                 </select>
-                                <select id="customCssSelect" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_css','Custom sections'))?>" hidden>
-                                    <option value="" selected><?=h(mdw_t('edit.toolbar.custom_css','Custom sections'))?></option>
+                                <select id="customFormat" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_format','Custom format'))?>" hidden>
+                                    <option value="" selected><?=h(mdw_t('edit.toolbar.custom_format','Custom format'))?></option>
                                 </select>                                <button type="button" id="formatBlockquoteBtn" class="btn btn-ghost btn-small format-btn" aria-label="<?=h(mdw_t('edit.toolbar.blockquote','Blockquote'))?>">
                                     <span class="pi pi-quote"></span>
                                 </button>
@@ -2174,8 +2177,8 @@ window.mermaid = mermaid;
 				                </div>
 				            </div>
 
-				            <div class="modal-field" data-auth-superuser="1">
-				                <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>
+	            <div class="modal-field" data-auth-superuser="1">
+	                <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>
 				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                    <input id="indexDualPaneToggle" type="checkbox" <?= $indexDualPaneEnabled ? 'checked' : '' ?> data-auth-superuser-enable="1">
 				                    <span class="status-text"><?=h(mdw_t('theme.index_layout.dual','Show overview + preview split view'))?></span>
@@ -2186,10 +2189,27 @@ window.mermaid = mermaid;
 				                </label>
 				                <div id="indexLayoutStatus" class="status-text" style="margin-top: 0.35rem;">
 				                    <?=h(mdw_t('theme.index_layout.hint','Turn off to use the classic overview-only index page.'))?>
-				                </div>
-				            </div>
+	                </div>
+	            </div>
 
-				            <div class="modal-field" data-auth-superuser="1">
+            <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+            <div class="modal-field" data-auth-superuser="1">
+                <div class="modal-label"><?=h(mdw_t('theme.custom_format.label','Custom format sources'))?></div>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+                    <input id="customFormatCustomCssToggle" type="checkbox" <?= $customFormatCss ? 'checked' : '' ?> data-auth-superuser-enable="1">
+                    <span class="status-text"><?=h(mdw_t('theme.custom_format.custom_css','Show custom.css'))?></span>
+                </label>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+                    <input id="customFormatSectionsToggle" type="checkbox" <?= $customFormatSections ? 'checked' : '' ?> data-auth-superuser-enable="1">
+                    <span class="status-text"><?=h(mdw_t('theme.custom_format.sections','Show sections'))?></span>
+                </label>
+                <div id="customFormatStatus" class="status-text" style="margin-top: 0.35rem;">
+                    <?=h(mdw_t('theme.custom_format.hint','Choose which sources appear in the custom format toolbar.'))?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+	            <div class="modal-field" data-auth-superuser="1">
 				                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>
 				                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
 				                    <input id="allowUserPublishToggle" type="checkbox" <?= !empty($MDW_SETTINGS['allow_user_publish']) ? 'checked' : '' ?> data-auth-superuser-enable="1">

@@ -63,6 +63,7 @@
       "wrap": "Ajuste",
       "wrap_title": "Ajuste de línea",
       "custom_css": "Secciones personalizadas",
+      "custom_format": "Formato personalizado",
       "lines": "Líneas",
       "lines_title": "Números de línea"
     },
@@ -106,6 +107,15 @@
     },
     "ui": {
       "title": "Interfaz de usuario"
+    },
+    "custom_format": {
+      "label": "Fuentes del formato personalizado",
+      "custom_css": "Mostrar custom.css",
+      "sections": "Mostrar secciones",
+      "hint": "Elige qué fuentes aparecen en la barra del formato personalizado.",
+      "saving": "Guardando…",
+      "saved": "Guardado",
+      "save_failed": "Error al guardar"
     },
     "kbd_modifier": {
       "label": "Sistema de atajos de teclado",

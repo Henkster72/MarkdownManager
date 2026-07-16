@@ -63,6 +63,7 @@
       "wrap": "A capo",
       "wrap_title": "A capo automatico",
       "custom_css": "Sezioni personalizzate",
+      "custom_format": "Formato personalizzato",
       "lines": "Righe",
       "lines_title": "Numeri di riga"
     },
@@ -106,6 +107,15 @@
     },
     "ui": {
       "title": "Interfaccia utente"
+    },
+    "custom_format": {
+      "label": "Fonti del formato personalizzato",
+      "custom_css": "Mostra custom.css",
+      "sections": "Mostra sezioni",
+      "hint": "Scegli quali fonti mostrare nella barra del formato personalizzato.",
+      "saving": "Salvataggio…",
+      "saved": "Salvato",
+      "save_failed": "Errore di salvataggio"
     },
     "kbd_modifier": {
       "label": "Sistema di scorciatoie da tastiera",

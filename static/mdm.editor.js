@@ -4525,7 +4525,7 @@
 
     const CUSTOM_CSS_CURSOR = '__MDW_CUSTOM_CSS_CURSOR__';
     let customCssSnippetMap = new Map();
-    let lastCustomCssValue = null;
+    let lastCustomFormatValue = null;
 
     const readCustomCssSetting = () => {
         const fn = window.__mdwReadCustomCssSetting;
@@ -4533,6 +4533,12 @@
             return String(fn() || '').trim();
         }
         return '';
+    };
+
+    const readCustomFormatSetting = () => {
+        const fn = window.__mdwReadCustomFormatSetting;
+        if (typeof fn === 'function') return fn();
+        return { custom_css: true, sections: false };
     };
 
     const splitSelectorList = (value) => {
@@ -4991,37 +4997,40 @@
         ta.focus();
     };
 
-    const refreshCustomCssSelect = (force = false) => {
-        if (!(customCssSelect instanceof HTMLSelectElement)) return;
-        const css = readCustomCssSetting();
-        const sections = readSectionSnippetEntries();
-        const cacheValue = `${css}\n/* sections:${sections.map((entry) => `${entry.label}:${entry.snippet.length}`).join('|')} */`;
-        if (!force && cacheValue === lastCustomCssValue) return;
-        lastCustomCssValue = cacheValue;
+    const refreshCustomFormat = (force = false) => {
+        if (!(customFormat instanceof HTMLSelectElement)) return;
+        const format = readCustomFormatSetting();
+        const showCss = format.custom_css !== false;
+        const showSections = format.sections === true;
+        const css = showCss ? readCustomCssSetting() : '';
+        const sections = showSections ? readSectionSnippetEntries() : [];
+        const cacheValue = `${showCss ? 'css' : 'no-css'}:${showSections ? 'sections' : 'no-sections'}\n${css}\n/* sections:${sections.map((entry) => `${entry.label}:${entry.snippet.length}`).join('|')} */`;
+        if (!force && cacheValue === lastCustomFormatValue) return;
+        lastCustomFormatValue = cacheValue;
         const entries = [...sections, ...buildCustomCssEntries(css)];
         const hasCss = !!String(css || '').trim();
         customCssSnippetMap = new Map();
-        customCssSelect.textContent = '';
+        customFormat.textContent = '';
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = t('edit.toolbar.custom_css', 'Custom sections');
+        placeholder.textContent = t('edit.toolbar.custom_format', 'Custom format');
         placeholder.selected = true;
-        customCssSelect.appendChild(placeholder);
+        customFormat.appendChild(placeholder);
         entries.forEach((entry, index) => {
             const key = `custom-css-${index}`;
             customCssSnippetMap.set(key, entry.snippet);
             const opt = document.createElement('option');
             opt.value = key;
             opt.textContent = entry.label;
-            customCssSelect.appendChild(opt);
+            customFormat.appendChild(opt);
         });
         const hasEntries = entries.length > 0;
-        customCssSelect.hidden = !hasCss && sections.length === 0;
-        customCssSelect.disabled = !hasEntries;
-        if (!hasEntries) customCssSelect.value = '';
+        customFormat.hidden = !hasCss && sections.length === 0;
+        customFormat.disabled = !hasEntries;
+        if (!hasEntries) customFormat.value = '';
     };
 
-    window.__mdwRefreshCustomCssSelect = refreshCustomCssSelect;
+    window.__mdwRefreshCustomCssSelect = refreshCustomFormat;
 
     const clickById = (id) => {
         const el = document.getElementById(id);
@@ -5038,7 +5047,7 @@
     const unorderedListBtn = document.getElementById('formatUnorderedListBtn');
     const insertTableBtn = document.getElementById('insertTableBtn');
     const tocBtn = document.getElementById('toggleTocBtn');
-    const customCssSelect = document.getElementById('customCssSelect');
+    const customFormat = document.getElementById('customFormat');
     const isUsingVisualEditor = () => typeof window.__mdwVisualEditorMode === 'function' && window.__mdwVisualEditorMode();
     const saveVisualSelectionBeforeToolbar = (el) => {
         if (!(el instanceof HTMLElement)) return;
@@ -5058,7 +5067,7 @@
         unorderedListBtn,
         insertTableBtn,
         tocBtn,
-        customCssSelect,
+        customFormat,
         document.getElementById('addLinkBtn'),
         document.getElementById('addImageBtn'),
     ].forEach(saveVisualSelectionBeforeToolbar);
@@ -5257,16 +5266,16 @@
         ta.focus();
     });
 
-    customCssSelect?.addEventListener('change', () => {
-        if (!(customCssSelect instanceof HTMLSelectElement)) return;
-        const key = String(customCssSelect.value || '').trim();
+    customFormat?.addEventListener('change', () => {
+        if (!(customFormat instanceof HTMLSelectElement)) return;
+        const key = String(customFormat.value || '').trim();
         if (!key) return;
         const snippet = customCssSnippetMap.get(key);
         if (snippet) insertCustomCssSnippet(snippet);
-        customCssSelect.value = '';
+        customFormat.value = '';
     });
 
-    refreshCustomCssSelect(true);
+    refreshCustomFormat(true);
 
     ta.addEventListener('keydown', (e) => {
         if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;

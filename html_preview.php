@@ -1625,6 +1625,7 @@ function mdw_metadata_default_config() {
             'folder_icon_style' => 'folder',
             'index_dual_pane_overview' => true,
             'hide_markdown_editor' => false,
+            'custom_format' => ['custom_css' => true, 'sections' => false],
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
@@ -1661,6 +1662,19 @@ function mdw_theme_overrides_normalize($raw) {
         if ($val !== '') $out['editor'][$k] = $val;
     }
 
+    return $out;
+}
+
+function mdw_custom_format_normalize($raw) {
+    $out = ['custom_css' => true, 'sections' => false];
+    if (is_string($raw)) {
+        $value = strtolower(trim($raw));
+        if ($value === 'sections') return ['custom_css' => false, 'sections' => true];
+        if ($value === 'custom_css') return $out;
+    }
+    if (!is_array($raw)) return $out;
+    if (array_key_exists('custom_css', $raw)) $out['custom_css'] = (bool)$raw['custom_css'];
+    if (array_key_exists('sections', $raw)) $out['sections'] = (bool)$raw['sections'];
     return $out;
 }
 
@@ -1709,6 +1723,7 @@ function mdw_metadata_normalize_config($cfg) {
     if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
     $indexDualPaneOverview = !array_key_exists('index_dual_pane_overview', $inSettings) ? true : (bool)$inSettings['index_dual_pane_overview'];
     $hideMarkdownEditor = !array_key_exists('hide_markdown_editor', $inSettings) ? false : (bool)$inSettings['hide_markdown_editor'];
+    $customFormat = mdw_custom_format_normalize($inSettings['custom_format'] ?? null);
     $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
     if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
@@ -1746,6 +1761,7 @@ function mdw_metadata_normalize_config($cfg) {
         'folder_icon_style' => $folderIconStyle,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
+        'custom_format' => $customFormat,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,
@@ -2017,6 +2033,7 @@ function mdw_metadata_settings() {
         'folder_icon_style' => isset($s['folder_icon_style']) ? strtolower(trim((string)$s['folder_icon_style'])) : 'folder',
         'index_dual_pane_overview' => !array_key_exists('index_dual_pane_overview', $s) ? true : (bool)$s['index_dual_pane_overview'],
         'hide_markdown_editor' => !array_key_exists('hide_markdown_editor', $s) ? false : (bool)$s['hide_markdown_editor'],
+        'custom_format' => mdw_custom_format_normalize($s['custom_format'] ?? null),
         'ui_language' => isset($s['ui_language']) ? trim((string)$s['ui_language']) : '',
         'ui_theme' => isset($s['ui_theme']) ? strtolower(trim((string)$s['ui_theme'])) : '',
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',

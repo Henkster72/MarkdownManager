@@ -68,6 +68,7 @@
       "wrap": "Wrap",
       "wrap_title": "Word wrap",
       "custom_css": "Custom sections",
+      "custom_format": "Custom format",
       "lines": "Lines",
       "lines_title": "Line numbers"
     },
@@ -118,6 +119,15 @@
     },
     "ui": {
       "title": "User interface"
+    },
+    "custom_format": {
+      "label": "Custom format sources",
+      "custom_css": "Show custom.css",
+      "sections": "Show sections",
+      "hint": "Choose which sources appear in the custom format toolbar.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
     },
     "index_layout": {
       "hide_markdown": "Hide markdown"
