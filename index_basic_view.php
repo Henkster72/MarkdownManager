@@ -173,10 +173,12 @@ $publisherDefaultAuthor = trim((string)($MDW_SETTINGS['publisher_default_author'
                                 <?php endforeach; ?>
                             </select>
 
-                            <label class="checkbox basic-checkbox">
-                                <input type="checkbox" name="prefix_date" value="1" <?= $newPrefixSafe ? 'checked' : '' ?>>
-                                <span><?= h(mdw_t('index.new_markdown.prefix_date', 'Prefix filename with today (yy-mm-dd-)')) ?></span>
-                            </label>
+                            <?php if (empty($hideMarkdownEditor)): ?>
+                                <label class="checkbox basic-checkbox">
+                                    <input type="checkbox" name="prefix_date" value="1" <?= $newPrefixSafe ? 'checked' : '' ?>>
+                                    <span><?= h(mdw_t('index.new_markdown.prefix_date', 'Prefix filename with today (yy-mm-dd-)')) ?></span>
+                                </label>
+                            <?php endif; ?>
 
                             <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
                                 <label class="modal-label" for="basicPublisherAuthor"><?= h(mdw_t('theme.publisher.author_label', 'Author name')) ?></label>

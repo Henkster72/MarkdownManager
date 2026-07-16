@@ -663,7 +663,7 @@ $today_prefix = date('y-m-d-');
 $new_md_title_value = '';
 $new_md_slug_value = '';
 $new_md_content_value = '';
-$new_md_prefix_checked = empty($MDW_PUBLISHER_MODE);
+$new_md_prefix_checked = empty($MDW_PUBLISHER_MODE) && empty($hideMarkdownEditor);
 if (is_array($new_md_draft)) {
     $draftFolder = sanitize_folder_name((string)($new_md_draft['folder'] ?? '')) ?? 'root';
     if ($draftFolder === 'root' || in_array($draftFolder, $existingFolders, true)) {
@@ -672,7 +672,7 @@ if (is_array($new_md_draft)) {
     $new_md_title_value = (string)($new_md_draft['title'] ?? '');
     $new_md_slug_value = (string)($new_md_draft['slug'] ?? (string)($new_md_draft['file'] ?? ''));
     $new_md_content_value = (string)($new_md_draft['content'] ?? '');
-    $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
+    $new_md_prefix_checked = !empty($new_md_draft['prefix_date']) && empty($hideMarkdownEditor);
 }
 
 /* HANDLE PREVIEW ENDPOINT (AJAX) */
@@ -1677,6 +1677,7 @@ window.mermaid = mermaid;
             'slug' => $new_md_slug_value,
             'content' => $new_md_content_value,
             'prefix_checked' => $new_md_prefix_checked,
+            'hide_markdown_editor' => $hideMarkdownEditor,
             'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
             'hidden_fields' => [
                 'return_page' => 'edit',

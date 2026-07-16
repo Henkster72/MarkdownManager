@@ -25,6 +25,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
         $slugValue = (string)($opts['slug'] ?? '');
         $contentValue = (string)($opts['content'] ?? '');
         $prefixChecked = !empty($opts['prefix_checked']);
+        $hideMarkdownEditor = !empty($opts['hide_markdown_editor']);
         $open = !empty($opts['open']);
         $errorMessage = trim((string)($opts['error_message'] ?? ''));
         $hiddenFields = is_array($opts['hidden_fields'] ?? null) ? $opts['hidden_fields'] : [];
@@ -70,10 +71,12 @@ if (!function_exists('mdw_render_new_md_modal')) {
                             <option value="<?= $esc($folder) ?>" <?= $defaultFolder === $folder ? 'selected' : '' ?>><?= $esc($folder) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <label class="status-text" style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;" title="<?= $esc($tr('index.new_markdown.date_prefix_title', 'Adds a yy-mm-dd- prefix so notes sort nicely by date.')) ?>">
-                        <input id="newMdPrefixDate" type="checkbox" name="prefix_date" value="1" <?= $prefixChecked ? 'checked' : '' ?> data-date-prefix="<?= $esc($todayPrefix) ?>">
-                        <span>yy-mm-dd-</span>
-                    </label>
+                    <?php if (!$hideMarkdownEditor): ?>
+                        <label class="status-text" style="display:flex; align-items:center; gap:0.35rem; white-space:nowrap;" title="<?= $esc($tr('index.new_markdown.date_prefix_title', 'Adds a yy-mm-dd- prefix so notes sort nicely by date.')) ?>">
+                            <input id="newMdPrefixDate" type="checkbox" name="prefix_date" value="1" <?= $prefixChecked ? 'checked' : '' ?> data-date-prefix="<?= $esc($todayPrefix) ?>">
+                            <span>yy-mm-dd-</span>
+                        </label>
+                    <?php endif; ?>
                 </div>
 
                 <div style="display:flex; flex-direction: column; gap: 0.35rem;">

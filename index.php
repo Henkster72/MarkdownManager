@@ -1402,7 +1402,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
             } else if ($_POST['action'] === 'create') {
             $returnAfterCreateError = mdw_new_md_return_url_from_post();
             $postedPath = isset($_POST['new_path']) ? (string)$_POST['new_path'] : '';
-            $prefixDate = isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
+            $prefixDate = empty($MDW_SETTINGS['hide_markdown_editor'])
+                && isset($_POST['prefix_date']) && (string)$_POST['prefix_date'] === '1';
                 $draftFolder = isset($_POST['new_folder']) ? (string)$_POST['new_folder'] : 'root';
                 $draftTitle = isset($_POST['new_title']) ? (string)$_POST['new_title'] : '';
                 $draftSlug = isset($_POST['new_slug']) ? (string)$_POST['new_slug'] : (isset($_POST['new_file']) ? (string)$_POST['new_file'] : '');
@@ -1727,7 +1728,7 @@ if ($requested) {
         $new_md_title_value = '';
         $new_md_slug_value = '';
         $new_md_content_value = '';
-        $new_md_prefix_checked = empty($MDW_PUBLISHER_MODE);
+        $new_md_prefix_checked = empty($MDW_PUBLISHER_MODE) && empty($hideMarkdownEditor);
         if (is_array($new_md_draft)) {
             $draftFolder = sanitize_folder_name((string)($new_md_draft['folder'] ?? '')) ?? 'root';
             if ($draftFolder === 'root' || in_array($draftFolder, $existingFolders, true)) {
@@ -1736,7 +1737,7 @@ if ($requested) {
             $new_md_title_value = (string)($new_md_draft['title'] ?? $new_md_title_value);
             $new_md_slug_value = (string)($new_md_draft['slug'] ?? (string)($new_md_draft['file'] ?? $new_md_slug_value));
             $new_md_content_value = (string)($new_md_draft['content'] ?? '');
-            $new_md_prefix_checked = !empty($new_md_draft['prefix_date']);
+            $new_md_prefix_checked = !empty($new_md_draft['prefix_date']) && empty($hideMarkdownEditor);
         }
 
         $indexSplitLayout = !$MDW_BASIC_MODE && $indexDualPaneEnabled && $mode !== 'secret_prompt';
@@ -2153,6 +2154,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
         'slug' => $new_md_slug_value,
         'content' => $new_md_content_value,
         'prefix_checked' => $new_md_prefix_checked,
+        'hide_markdown_editor' => $hideMarkdownEditor,
         'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
     ]);
     ?>
@@ -2225,6 +2227,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
         'slug' => $new_md_slug_value,
         'content' => $new_md_content_value,
         'prefix_checked' => $new_md_prefix_checked,
+        'hide_markdown_editor' => $hideMarkdownEditor,
         'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
     ]);
     ?>
