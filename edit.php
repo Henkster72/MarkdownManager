@@ -377,7 +377,7 @@ function list_md_root_sorted(){
     $mds = glob("*.md");
     $out=[];
     foreach($mds as $path){
-        if (mdw_publisher_should_hide_md_entry($path)) continue;
+        if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -438,7 +438,7 @@ function list_md_by_subdir_sorted(){
             $tmp = [];
             if ($mds) {
                 foreach ($mds as $path) {
-                    if (mdw_publisher_should_hide_md_entry($path)) continue;
+                    if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
                     $base = basename($path);
                     [$yy,$mm,$dd] = parse_ymd_from_filename($base);
                     $tmp[] = [

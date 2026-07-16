@@ -10,6 +10,7 @@
 - WPM sharing snippets: visual preview now expands `social_share_links` loops into the same social buttons as the rendered site output.
 - WPM macro preview: supported `overview.add_header` calls render as a styled header, while `form.contact_form` calls render as a clearly marked non-functional form template preview.
 - Preview custom CSS: scoped base link rules now use low-specificity selectors so instance rules such as `.externlink`, `.link`, and `a` can override them after reload without `!important`.
+- WPM hide-Markdown navigation: `README.md` and `CHANGELOG.md` are omitted from the index/edit explorers when the hide-Markdown setting is enabled.
 - Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
 
 ## 0.93

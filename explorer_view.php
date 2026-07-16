@@ -38,6 +38,13 @@ function explorer_view_folder_anchor_id($folder) {
     return 'folder-anchor-' . substr(sha1('folder:' . $folder), 0, 10);
 }
 
+function explorer_view_should_hide_editor_document($path) {
+    global $MDW_SETTINGS;
+    if (empty($MDW_SETTINGS['hide_markdown_editor'])) return false;
+    $basename = strtolower(basename(str_replace('\\', '/', (string)$path)));
+    return in_array($basename, ['readme.md', 'changelog.md'], true);
+}
+
 function &explorer_view_meta_cache_state() {
     static $state = null;
     if ($state === null) {
