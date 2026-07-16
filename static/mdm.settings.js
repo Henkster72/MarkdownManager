@@ -426,6 +426,7 @@
     const STORAGE_PRESET = 'mdw-theme-preset';
     const STORAGE_OVERRIDES = 'mdw-theme-overrides';
     const STYLE_ID = 'mdwThemeStyle';
+    const CUSTOM_CSS_STYLE_ID = 'mdwCustomCssStyle';
     const SHORTCUT_MOD_KEY = 'mdw_shortcut_mod';
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
@@ -674,6 +675,31 @@
         return el;
     };
 
+    const ensureCustomCssStyleEl = () => {
+        let el = document.getElementById(CUSTOM_CSS_STYLE_ID);
+        if (el && el.tagName === 'STYLE') return el;
+        el = document.createElement('style');
+        el.id = CUSTOM_CSS_STYLE_ID;
+        document.head.appendChild(el);
+        return el;
+    };
+
+    const promoteCustomCssRules = (rules) => {
+        if (!rules) return;
+        Array.from(rules).forEach((rule) => {
+            if (rule?.type === CSSRule.STYLE_RULE) {
+                const style = rule.style;
+                for (let i = 0; style && i < style.length; i++) {
+                    const property = style.item(i);
+                    const value = rule.style.getPropertyValue(property);
+                    if (value) rule.style.setProperty(property, value, 'important');
+                }
+                return;
+            }
+            if (rule?.cssRules) promoteCustomCssRules(rule.cssRules);
+        });
+    };
+
     const ensureThemeLink = (id) => {
         let el = document.getElementById(id);
         if (el && el.tagName === 'LINK') return el;
@@ -819,11 +845,12 @@
         }
 
         const css = overridesCss(overrides).trim();
-        const authLocked = document.documentElement.classList.contains('auth-locked');
-        const customCss = authLocked ? '' : readCustomCssSetting();
+        const customCss = readCustomCssSetting();
         const styleEl = ensureStyleEl();
-        const combined = [css, customCss].filter((chunk) => String(chunk || '').trim() !== '').join('\n\n');
-        styleEl.textContent = combined ? (combined + '\n') : '';
+        styleEl.textContent = css ? (css + '\n') : '';
+        const customCssStyleEl = ensureCustomCssStyleEl();
+        customCssStyleEl.textContent = customCss ? (customCss + '\n') : '';
+        try { promoteCustomCssRules(customCssStyleEl.sheet?.cssRules); } catch {}
         const themeLink = document.getElementById('mdwThemeHtmlpreviewCss');
         if (themeLink && themeLink.tagName === 'LINK' && !themeLink.disabled) {
             themeLink.addEventListener('load', () => {

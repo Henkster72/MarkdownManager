@@ -3610,7 +3610,11 @@
                 return;
             }
             if (srcStart === srcEnd) {
-                debug('skip preview sync: empty source range', { srcStart, srcEnd });
+                syncing = true;
+                ta.setSelectionRange(editorStart, editorStart);
+                syncing = false;
+                renderSelectionOverlay(ta.value || '', editorStart, editorStart);
+                debug('preview caret -> editor', { srcStart, editorStart });
                 return;
             }
             syncing = true;
@@ -6037,6 +6041,9 @@
             const overridesStyle = document.getElementById('mdwThemeStyle');
             const overridesCss = overridesStyle instanceof HTMLStyleElement ? String(overridesStyle.textContent || '') : '';
             if (overridesCss.trim()) chunks.push(overridesCss);
+            const customCssStyle = document.getElementById('mdwCustomCssStyle');
+            const customCss = customCssStyle instanceof HTMLStyleElement ? String(customCssStyle.textContent || '') : '';
+            if (customCss.trim()) chunks.push(customCss);
         } else if (htmlMode === 'medium') {
             const customCss = readCustomCssSetting();
             if (customCss) chunks.push(customCss);

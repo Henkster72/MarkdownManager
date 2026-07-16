@@ -10,6 +10,8 @@
 - WPM sharing snippets: visual preview now expands `social_share_links` loops into the same social buttons as the rendered site output.
 - WPM macro preview: supported `overview.add_header` calls render as a styled header, while `form.contact_form` calls render as a clearly marked non-functional form template preview.
 - Preview custom CSS: scoped base link rules now use low-specificity selectors so instance rules such as `.externlink`, `.link`, and `a` can override them after reload without `!important`.
+- Preview custom CSS: custom declarations now load after the selected theme, are kept available after auth initialization, and take precedence over more-specific non-important theme declarations.
+- Custom format insertion: section snippets use the active visual or Markdown caret instead of falling back to the end of the document.
 - WPM hide-Markdown navigation: `README.md` and `CHANGELOG.md` are omitted from the index/edit explorers when the hide-Markdown setting is enabled.
 - WPM hide-Markdown creation: the date-prefix checkbox is hidden and date-prefix input is ignored when creating a new page.
 - WPM custom format toolbar: the control is now named `customFormat`, and superusers can choose whether `custom.css` and/or `sections` snippets appear; the choice is stored per instance.
