@@ -290,9 +290,9 @@ $exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_p
 $appTitle = trim((string)($settings['app_title'] ?? ''));
 $siteTitle = $appTitle !== '' ? $appTitle : 'Markdown Manager';
 
-$staticDir = env_str('STATIC_DIR', 'static') ?? 'static';
+$staticDir = mdw_asset_relative_path('static_path', 'STATIC_PATH', env_str('STATIC_DIR', 'static') ?? 'static');
 $themesDir = env_str('THEMES_DIR', 'themes') ?? 'themes';
-$imagesDir = env_str('IMAGES_DIR', 'images') ?? 'images';
+$imagesDir = mdw_asset_relative_path('images_path', 'IMAGES_PATH', env_str('IMAGES_DIR', 'images') ?? 'images');
 $pluginsDir = env_str('PLUGINS_DIR', 'plugins') ?? 'plugins';
 $translationsDir = env_str('TRANSLATIONS_DIR', 'translations') ?? 'translations';
 
@@ -370,8 +370,8 @@ foreach ($it as $fi) {
 
 sort($mdFiles, SORT_NATURAL | SORT_FLAG_CASE);
 
-$baseCss = read_file($root . '/' . trim($staticDir, '/\\') . '/htmlpreview.css');
-$popiconCss = read_file($root . '/' . trim($staticDir, '/\\') . '/popicon.css');
+$baseCss = read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/htmlpreview.css');
+$popiconCss = read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.css');
 $baseHref = trim($baseHref);
 $fontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popicon.woff2' : '/popicon.woff2';
 if ($popiconCss !== '') {
@@ -544,12 +544,12 @@ $indexHtml = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf
 @file_put_contents($outDir . '/index.html', $indexHtml);
 
 // Copy images folder if present
-$imagesSrc = $root . '/' . trim($imagesDir, '/\\');
+$imagesSrc = mdw_asset_filesystem_path('images_path', 'IMAGES_PATH', $imagesDir);
 $imagesDst = $outDir . '/' . trim($imagesDir, '/\\');
 copy_dir($imagesSrc, $imagesDst);
 
 // Copy icon font for pi-* classes.
-$popiconFont = $root . '/' . trim($staticDir, '/\\') . '/popicon.woff2';
+$popiconFont = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.woff2';
 if (is_file($popiconFont)) {
     @copy($popiconFont, $outDir . '/popicon.woff2');
 }

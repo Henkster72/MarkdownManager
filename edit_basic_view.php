@@ -47,9 +47,9 @@ if ($requestedSafe !== '') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title><?= h($current_title) ?> • <?= h($APP_NAME) ?></title>
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/ui.css">
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/markdown.css">
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/htmlpreview.css">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('ui.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('markdown.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('htmlpreview.css')) ?>">
 </head>
 <body class="app-body edit-page basic-mode <?= h($folderIconClass) ?>">
     <header class="app-header">
@@ -161,4 +161,3 @@ if ($requestedSafe !== '') {
     </footer>
 </body>
 </html>
-

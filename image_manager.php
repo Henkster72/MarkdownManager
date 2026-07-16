@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/html_preview.php';
 
 function image_manager_sanitize_dir_name($name, $fallback) {
     $name = is_string($name) ? trim($name) : '';
@@ -72,11 +73,8 @@ function image_manager_unique_name($dir, $base, $ext) {
     return $candidate;
 }
 
-$IMAGES_DIR = image_manager_sanitize_dir_name(env_str('IMAGES_DIR', 'images'), 'images');
-$imagesFsDir = $IMAGES_DIR;
-if (!str_starts_with($imagesFsDir, '/')) {
-    $imagesFsDir = __DIR__ . '/' . $imagesFsDir;
-}
+$IMAGES_DIR = mdw_asset_relative_path('images_path', 'IMAGES_PATH', 'images');
+$imagesFsDir = mdw_asset_filesystem_path('images_path', 'IMAGES_PATH', 'images');
 if (!is_dir($imagesFsDir)) {
     @mkdir($imagesFsDir, 0755, true);
 }

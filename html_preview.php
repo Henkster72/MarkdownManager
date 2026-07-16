@@ -51,11 +51,46 @@ function html_preview_sanitize_dir_name($name, $fallback) {
     return $isAbs ? '/' . $clean : $clean;
 }
 
+function mdw_asset_sanitize_path($raw, $fallback) {
+    $raw = str_replace('\\', '/', trim((string)$raw));
+    if ($raw === '' || preg_match('~^[a-z][a-z0-9+.-]*:~i', $raw) || str_starts_with($raw, '//')) {
+        return (string)$fallback;
+    }
+    $leadingSlash = str_starts_with($raw, '/');
+    $parts = array_values(array_filter(explode('/', trim($raw, '/')), fn($part) => $part !== '' && $part !== '.'));
+    foreach ($parts as $part) {
+        if ($part === '..') continue;
+        if (!preg_match('/^[A-Za-z0-9._\\-\\p{L}\\p{N}]+$/u', $part)) return (string)$fallback;
+    }
+    if (!$parts) return (string)$fallback;
+    return ($leadingSlash ? '/' : '') . implode('/', $parts);
+}
+
+function mdw_asset_relative_path($settingKey, $envKey, $fallback) {
+    $raw = '';
+    if (function_exists('mdw_metadata_settings')) {
+        $settings = mdw_metadata_settings();
+        if (is_array($settings) && isset($settings[$settingKey])) {
+            $raw = trim((string)$settings[$settingKey]);
+        }
+    }
+    if ($raw === '' && function_exists('env_str')) {
+        $raw = trim((string)env_str($envKey, ''));
+    }
+    if ($raw === '') $raw = (string)$fallback;
+    return mdw_asset_sanitize_path($raw, $fallback);
+}
+
+function mdw_asset_filesystem_path($settingKey, $envKey, $fallback) {
+    $relative = mdw_asset_relative_path($settingKey, $envKey, $fallback);
+    if (str_starts_with($relative, '/')) return $relative;
+    return __DIR__ . '/' . $relative;
+}
+
 function html_preview_images_dir() {
     static $cache = null;
     if ($cache !== null) return $cache;
-    $raw = function_exists('env_str') ? env_str('IMAGES_DIR', 'images') : 'images';
-    $cache = html_preview_sanitize_dir_name($raw, 'images');
+    $cache = mdw_asset_relative_path('images_path', 'IMAGES_PATH', 'images');
     return $cache;
 }
 
@@ -190,7 +225,7 @@ function mdw_preview_macro_image_src($value) {
     $parts = [];
     foreach (explode('/', $value) as $part) {
         if ($part === '' || $part === '.') continue;
-        if ($part === '..' || !preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $part)) return '';
+        if ($part !== '..' && !preg_match('/^[A-Za-z0-9._\-\p{L}\p{N}]+$/u', $part)) return '';
         $parts[] = $part;
     }
     return implode('/', $parts);
@@ -1635,6 +1670,8 @@ function mdw_metadata_default_config() {
             'theme_preset' => 'default',
             'theme_overrides' => ['preview' => [], 'editor' => []],
             'custom_css' => '',
+            'static_path' => 'static',
+            'images_path' => 'images',
             'app_title' => '',
             'internal_link_prefix' => '',
             'export_class_prefix' => '',
@@ -1747,6 +1784,8 @@ function mdw_metadata_normalize_config($cfg) {
         $exportClassPrefix = substr($exportClassPrefix, 0, 24);
     }
     $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($inSettings['jinja_meta_prefix'] ?? 'page_');
+    $staticPath = mdw_asset_sanitize_path($inSettings['static_path'] ?? 'static', 'static');
+    $imagesPath = mdw_asset_sanitize_path($inSettings['images_path'] ?? 'images', 'images');
     $out['_settings'] = [
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $publisherDefaultAuthor,
@@ -1770,6 +1809,8 @@ function mdw_metadata_normalize_config($cfg) {
         'theme_preset' => $themePreset,
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
+        'static_path' => $staticPath,
+        'images_path' => $imagesPath,
         'app_title' => $appTitle,
         'internal_link_prefix' => $internalLinkPrefix,
         'export_class_prefix' => $exportClassPrefix,
@@ -2042,6 +2083,8 @@ function mdw_metadata_settings() {
         'theme_preset' => isset($s['theme_preset']) ? trim((string)$s['theme_preset']) : 'default',
         'theme_overrides' => mdw_theme_overrides_normalize($s['theme_overrides'] ?? []),
         'custom_css' => mdw_sanitize_custom_css($s['custom_css'] ?? ''),
+        'static_path' => mdw_asset_sanitize_path($s['static_path'] ?? 'static', 'static'),
+        'images_path' => mdw_asset_sanitize_path($s['images_path'] ?? 'images', 'images'),
         'app_title' => isset($s['app_title']) ? trim((string)$s['app_title']) : '',
         'internal_link_prefix' => isset($s['internal_link_prefix']) ? trim((string)$s['internal_link_prefix']) : '',
         'export_class_prefix' => isset($s['export_class_prefix']) ? trim((string)$s['export_class_prefix']) : '',

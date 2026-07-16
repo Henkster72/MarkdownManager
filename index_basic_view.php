@@ -56,9 +56,9 @@ $publisherDefaultAuthor = trim((string)($MDW_SETTINGS['publisher_default_author'
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title><?= h($APP_NAME) ?> • <?= h($article_title) ?></title>
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/ui.css">
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/markdown.css">
-    <link rel="stylesheet" href="<?= h($STATIC_DIR) ?>/htmlpreview.css">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('ui.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('markdown.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('htmlpreview.css')) ?>">
 </head>
 <body class="app-body index-page basic-mode">
     <header class="app-header">

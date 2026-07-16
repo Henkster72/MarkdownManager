@@ -320,6 +320,8 @@ if (is_array($settingsIn)) {
         ? trim((string)($settingsIn['jinja_meta_prefix'] ?? ''))
         : trim((string)($curSettings['jinja_meta_prefix'] ?? 'page_'));
     $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($jinjaMetaPrefix);
+    $staticPath = mdw_asset_sanitize_path($settingsIn['static_path'] ?? ($curSettings['static_path'] ?? 'static'), 'static');
+    $imagesPath = mdw_asset_sanitize_path($settingsIn['images_path'] ?? ($curSettings['images_path'] ?? 'images'), 'images');
 
     if ($publisherMode && $defaultAuthor === '') {
         json(['ok' => false, 'error' => 'publisher_author_required'], 400);
@@ -353,6 +355,8 @@ if (is_array($settingsIn)) {
         'theme_preset' => $themePreset,
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
+        'static_path' => $staticPath,
+        'images_path' => $imagesPath,
         'app_title' => $appTitle,
         'internal_link_prefix' => $internalLinkPrefix,
         'export_class_prefix' => $exportClassPrefix,

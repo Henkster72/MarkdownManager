@@ -2707,8 +2707,9 @@
     };
     const markdownImageSrc = (src) => {
         const raw = String(src || '').trim();
+        const imageBase = String(window.MDW_IMAGES_URL || 'images').replace(/\\/g, '/').replace(/\/$/, '');
         const token = raw.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
-        if (token) return `images/${encodeURIComponent(token[1].trim())}`;
+        if (token) return `${imageBase}/${encodeURIComponent(token[1].trim())}`;
         return raw;
     };
     let selectedVisualImage = null;

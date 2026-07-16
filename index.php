@@ -124,8 +124,9 @@ $TOOLS_DIR = 'tools';
 function mdw_static_asset($file) {
     global $STATIC_DIR;
     $file = ltrim((string)$file, "/\\");
-    $url = rtrim((string)$STATIC_DIR, "/\\") . '/' . $file;
-    $path = __DIR__ . '/' . $url;
+    $base = mdw_asset_relative_path('static_path', 'STATIC_PATH', $STATIC_DIR);
+    $url = rtrim($base, "/\\") . '/' . $file;
+    $path = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $STATIC_DIR) . '/' . $file;
     $mtime = is_file($path) ? @filemtime($path) : false;
     return $mtime ? ($url . '?v=' . rawurlencode((string)$mtime)) : $url;
 }
@@ -168,6 +169,8 @@ $hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $customFormat = mdw_custom_format_normalize($MDW_SETTINGS['custom_format'] ?? null);
 $customFormatCss = !empty($customFormat['custom_css']);
 $customFormatSections = !empty($customFormat['sections']);
+$assetStaticPath = mdw_asset_relative_path('static_path', 'STATIC_PATH', $STATIC_DIR);
+$assetImagesPath = mdw_asset_relative_path('images_path', 'IMAGES_PATH', $IMAGES_DIR);
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -2515,6 +2518,15 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                 </div>
             </div>
             <?php endif; ?>
+
+            <div class="modal-field" data-auth-superuser="1">
+                <div class="modal-label">Asset paths</div>
+                <label class="modal-label" for="staticPathInput">Static folder path</label>
+                <input id="staticPathInput" type="text" class="input" value="<?=h($assetStaticPath)?>" data-auth-superuser-enable="1">
+                <label class="modal-label" for="imagesPathInput" style="margin-top: 0.5rem;">Images folder path</label>
+                <input id="imagesPathInput" type="text" class="input" value="<?=h($assetImagesPath)?>" data-auth-superuser-enable="1">
+                <div class="status-text" style="margin-top: 0.35rem;">Relative to the editor folder, for example ../static and ../static/images.</div>
+            </div>
 
 	            <div class="modal-field" data-auth-superuser="1">
 			                <div class="modal-label"><?=h(mdw_t('theme.permissions.title','Permissions'))?></div>

@@ -353,17 +353,17 @@ try {
         }
     }
 
-    $staticDir = (string)env_str('STATIC_DIR', 'static');
+    $staticDir = mdw_asset_relative_path('static_path', 'STATIC_PATH', (string)env_str('STATIC_DIR', 'static'));
     $themesDir = (string)env_str('THEMES_DIR', 'themes');
-    $imagesDir = (string)env_str('IMAGES_DIR', 'images');
+    $imagesDir = mdw_asset_relative_path('images_path', 'IMAGES_PATH', (string)env_str('IMAGES_DIR', 'images'));
 
     $themePreset = isset($settings['theme_preset']) ? trim((string)$settings['theme_preset']) : 'default';
     $overrides = isset($settings['theme_overrides']) && is_array($settings['theme_overrides']) ? $settings['theme_overrides'] : [];
     $customCss = isset($settings['custom_css']) ? (string)$settings['custom_css'] : '';
     $exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_prefix'] ?? '');
 
-    $baseCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/htmlpreview.css');
-    $popiconCss = ghpx_read_file($root . '/' . trim($staticDir, '/\\') . '/popicon.css');
+    $baseCss = ghpx_read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/htmlpreview.css');
+    $popiconCss = ghpx_read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.css');
     $baseHref = trim($baseHref);
     $fontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popicon.woff2' : '/popicon.woff2';
     if ($popiconCss !== '') {
@@ -407,10 +407,10 @@ try {
         throw new RuntimeException('Failed to write export file.');
     }
 
-    $imagesSrc = $root . '/' . trim($imagesDir, '/\\');
-    $imagesDst = ghpx_normalize_path($outDir) . '/' . trim($imagesDir, '/\\');
+    $imagesSrc = mdw_asset_filesystem_path('images_path', 'IMAGES_PATH', $imagesDir);
+    $imagesDst = ghpx_normalize_path($outDir) . '/' . basename($imagesDir);
     ghpx_copy_dir($imagesSrc, $imagesDst);
-    $popiconFont = $root . '/' . trim($staticDir, '/\\') . '/popicon.woff2';
+    $popiconFont = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.woff2';
     if (is_file($popiconFont)) {
         @copy($popiconFont, ghpx_normalize_path($outDir) . '/popicon.woff2');
     }

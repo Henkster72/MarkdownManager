@@ -942,6 +942,8 @@
     const indexDualPaneToggle = document.getElementById('indexDualPaneToggle');
     const hideMarkdownEditorToggle = document.getElementById('hideMarkdownEditorToggle');
     const indexLayoutStatus = document.getElementById('indexLayoutStatus');
+    const staticPathInput = document.getElementById('staticPathInput');
+    const imagesPathInput = document.getElementById('imagesPathInput');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -1403,6 +1405,9 @@
         if (customFormatSectionsToggle instanceof HTMLInputElement) {
             customFormatSectionsToggle.checked = customFormat.sections;
         }
+        const assetSettings = getSettings() || {};
+        if (staticPathInput instanceof HTMLInputElement) staticPathInput.value = String(assetSettings.static_path || 'static');
+        if (imagesPathInput instanceof HTMLInputElement) imagesPathInput.value = String(assetSettings.images_path || 'images');
         if (appTitleInput instanceof HTMLInputElement) {
             appTitleInput.value = readAppTitleSetting();
         }
@@ -2812,6 +2817,15 @@
                 if (next !== readHideMarkdownEditorSetting()) {
                     const ok = await saveHideMarkdownEditorSetting(next);
                     if (!ok) return false;
+                }
+            }
+            if (staticPathInput instanceof HTMLInputElement && imagesPathInput instanceof HTMLInputElement) {
+                const nextStatic = String(staticPathInput.value || '').trim() || 'static';
+                const nextImages = String(imagesPathInput.value || '').trim() || 'images';
+                const current = getSettings() || {};
+                if (nextStatic !== String(current.static_path || 'static') || nextImages !== String(current.images_path || 'images')) {
+                    const result = await saveSettingsToServer({ static_path: nextStatic, images_path: nextImages });
+                    if (!result.ok) return false;
                 }
             }
             if (hasMetaChanges()) {
