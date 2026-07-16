@@ -2513,6 +2513,8 @@
     const blockMarkdown = (node, depth = 0, orderedIndex = 1) => {
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
         if (!(node instanceof Element)) return '';
+        const sectionInclude = node.getAttribute('data-mdw-section-include');
+        if (sectionInclude) return `{% include "${sectionInclude}" %}`;
         if (node.matches('.md-meta, [data-mdw-generated="metadata"]')) return '';
         if (node.matches('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]')) return '';
         if (node.matches('.md-toc-layout')) {
@@ -2622,6 +2624,9 @@
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'true');
         });
         prev.querySelectorAll('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]').forEach((node) => {
+            if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
+        });
+        prev.querySelectorAll('[data-mdw-section-include]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
     };
@@ -5631,6 +5636,16 @@
         rootEl.querySelectorAll('[data-mdw-src-start], [data-mdw-src-end]').forEach((el) => strip(el));
     };
 
+    const unwrapSectionIncludeMarkers = (rootEl) => {
+        if (!(rootEl instanceof Element)) return;
+        rootEl.querySelectorAll('[data-mdw-section-include]').forEach((el) => {
+            const parent = el.parentNode;
+            if (!parent) return;
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            el.remove();
+        });
+    };
+
     const stripCssAttributes = (rootEl, preserveClasses) => {
         if (!(rootEl instanceof Element)) return;
         const keepSet = preserveClasses instanceof Set ? preserveClasses : null;
@@ -5819,6 +5834,7 @@
         if (clone instanceof HTMLElement) clone.removeAttribute('id');
         if (stripMeta) stripMetaHtml(clone);
         stripSourceMapAttrs(clone);
+        unwrapSectionIncludeMarkers(clone);
         normalizeTocLayoutForExport(clone, htmlMode);
         applyHtmlMode(clone, htmlMode, allowedClasses, exportClassPrefix);
         normalizeTocTemplateStructureForExport(clone, htmlMode);
@@ -5869,6 +5885,7 @@
         wrapper.innerHTML = html || '';
         if (stripMeta) stripMetaHtml(wrapper);
         stripSourceMapAttrs(wrapper);
+        unwrapSectionIncludeMarkers(wrapper);
         normalizeTocLayoutForExport(wrapper, htmlMode);
         applyHtmlMode(wrapper, htmlMode, allowedClasses, exportClassPrefix);
         normalizeTocTemplateStructureForExport(wrapper, htmlMode);

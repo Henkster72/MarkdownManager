@@ -423,7 +423,10 @@ function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], 
             if (!is_string($html)) return '';
 
             $expanded = true;
-            return "\n\n" . mdw_preview_render_section_template($html, $vars) . "\n\n";
+            $includeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+            return "\n\n<div data-mdw-section-include=\"{$includeName}\">"
+                . mdw_preview_render_section_template($html, $vars)
+                . "</div>\n\n";
         },
         $text
     );

@@ -13,6 +13,11 @@
     word-break: break-word;
 }
 
+/* Keep expanded section includes visually transparent in the editor. */
+.preview-content [data-mdw-section-include] {
+    display: contents;
+}
+
 /* Metadata block rendered from hidden _key: value_ lines */
 .md-meta {
   margin: 0 0 0.85rem;

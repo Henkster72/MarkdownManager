@@ -13,6 +13,7 @@
 - WPM hide-Markdown navigation: `README.md` and `CHANGELOG.md` are omitted from the index/edit explorers when the hide-Markdown setting is enabled.
 - WPM hide-Markdown creation: the date-prefix checkbox is hidden and date-prefix input is ignored when creating a new page.
 - WPM custom format toolbar: the control is now named `customFormat`, and superusers can choose whether `custom.css` and/or `sections` snippets appear; the choice is stored per instance.
+- WPM section includes: visual previews keep rendered section includes linked to their original `{% include "section_*.html" %}` directive when syncing back to Markdown, while exported HTML remains free of editor markers.
 - Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
 
 ## 0.93
