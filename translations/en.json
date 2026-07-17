@@ -328,6 +328,7 @@
     "mode_footnote": "Footnote",
     "mode_youtube": "YouTube",
     "search_notes": "Search notes...",
+    "search_internal_links_or_new": "Search internal links or add a new internal link",
     "clear_search_aria": "Clear search",
     "link_text_label": "Link text",
     "link_text_placeholder": "e.g. Gold spot price",

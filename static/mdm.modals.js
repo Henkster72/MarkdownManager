@@ -275,6 +275,8 @@
                 selectModeRadio('internal');
                 setMode('internal');
                 selectPickerItem(internalItem);
+                if (pickerFilter) pickerFilter.value = href;
+                if (pickerFilterClear) pickerFilterClear.style.display = href ? '' : 'none';
                 return;
             }
             if (href.startsWith('#') && normalizePath(window.CURRENT_FILE || '')) {
@@ -282,6 +284,8 @@
                 selectedTitle = selectedPath;
                 selectModeRadio('internal');
                 setMode('internal');
+                if (pickerFilter) pickerFilter.value = href;
+                if (pickerFilterClear) pickerFilterClear.style.display = href ? '' : 'none';
                 validate();
                 return;
             }

@@ -1814,7 +1814,7 @@ window.mermaid = mermaid;
 
 	        <div id="linkModalInternal" class="link-modal-section">
 	            <div class="link-picker-filter-row">
-	                <input id="linkPickerFilter" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.search_notes','Search notes...'))?>">
+	                <input id="linkPickerFilter" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.search_internal_links_or_new','Search internal links or add a new internal link'))?>">
 	                <button type="button" class="btn btn-ghost icon-button" id="linkPickerFilterClear" aria-label="<?=h(mdw_t('link_modal.clear_search_aria','Clear search'))?>" style="display:none;">
 	                    <span class="pi pi-cross"></span>
 	                </button>

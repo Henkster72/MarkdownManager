@@ -310,6 +310,7 @@
     "mode_footnote": "Nota al pie",
     "mode_youtube": "YouTube",
     "search_notes": "Buscar notas...",
+    "search_internal_links_or_new": "Busca enlaces internos o añade un nuevo enlace interno",
     "clear_search_aria": "Limpiar búsqueda",
     "link_text_label": "Texto del enlace",
     "link_text_placeholder": "p. ej. Precio spot del oro",

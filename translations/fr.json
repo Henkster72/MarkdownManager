@@ -302,6 +302,7 @@
     "mode_footnote": "Note de bas de page",
     "mode_youtube": "YouTube",
     "search_notes": "Rechercher des notes...",
+    "search_internal_links_or_new": "Recherchez des liens internes ou ajoutez un nouveau lien interne",
     "clear_search_aria": "Effacer la recherche",
     "link_text_label": "Texte du lien",
     "link_text_placeholder": "ex. prix spot de l'or",
