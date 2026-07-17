@@ -480,6 +480,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Sneltoets-systeem: kies Windows/Linux (Ctrl+Alt) of Mac (Ctrl+Command) in Instellingen.",
+    "release_0951": "v0.951: afbeeldingsclass-directives worden nu op afbeeldingen toegepast, responsieve Tailwind-classsyntax blijft intact en herhaalde quote-attributen maken geen dubbele legacy-bullets meer.",
     "release_095": "v0.95: de visuele WPM-preview verwerkt ondersteunde Jinja-macro's en herbruikbare secties en verbergt onbekende legacy-syntax; custom formats, relatieve instance-assets, lokale lettertypen, gedeelde login, afbeeldingslijsten en CSS-isolatie zijn betrouwbaarder.",
     "release_093": "v0.93: WPM sorteert nieuwe artikelen nu bovenaan op post_date, daarna aanmaakdatum/bestandsnaam, verbergt de afbeeldingstip in visuele modus en voegt een plaatjeskiezer toe aan Artikelmetadata."
   },

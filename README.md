@@ -1,4 +1,4 @@
-# MarkdownManager v0.95
+# MarkdownManager v0.951
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.951: WPM now applies trailing image classes directly to images, preserves responsive Tailwind class syntax in fenced divs and attribute lists, and prevents duplicate legacy bullet rendering in blockquotes.
 - v0.95: WPM visual preview and reusable sections/macros are more reliable, custom format sources are configurable, legacy Jinja syntax stays out of visual editing, and nested instances can use relative assets, local fonts, shared authentication, resilient image lists, and isolated preview CSS without affecting the editor UI.
 - v0.93: WPM folder sorting now keeps newest articles first by `post_date`, then `creationdate`, then filename date; date parsing handles Dutch/English display dates; hide-Markdown image tips are suppressed; article metadata now shows the slug in the title and includes an inline `page_picture` image picker.
 - v0.92: WPM public-link cleanup, visual link editing, section snippet/include support, friendlier article metadata editing, `id` attribute-list support, safer inline JSON bootstrapping, cache-busted static assets, auth setup refresh, and EN/NL translation updates.
@@ -78,7 +79,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Versions 0.9 through 0.95 refreshed labels for WPM visual-editor controls, article metadata editing, TOC toolbar options, WPM settings text, link editing, custom sections, TOC/public-link/editor stability fixes, and the latest article metadata/image-picker notes.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Versions 0.9 through 0.951 refreshed labels for WPM visual-editor controls, article metadata editing, TOC toolbar options, WPM settings text, link editing, custom sections, TOC/public-link/editor stability fixes, and the latest article metadata/image-picker notes.
 
 ## Security warning (read this)
 
@@ -171,6 +172,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
+- 0.951: WPM image classes now apply directly to images, responsive Tailwind class syntax is preserved in fenced divs and attribute lists, and repeated quote attributes no longer create duplicate legacy bullets.
 - 0.95: WPM visual preview resolves supported Jinja macros and reusable sections while hiding unresolved legacy syntax; custom format sources are configurable; nested instances support relative asset paths, local fonts, optional shared authentication, reliable image JSON, preserved inline style URLs, and preview CSS that cannot reposition editor dialogs.
 - 0.93: WPM explorer date sorting now uses `post_date` before `creationdate`/filename fallback and keeps newest articles first, publish-state grouping no longer overrides default date sort, Dutch/English display dates parse correctly, the image insertion tip is hidden in hide-Markdown mode, and Article metadata now shows slug in the title with an inline `page_picture` image picker.
 - 0.92: WPM public links now generate clean trailing-slash URLs and update with publish state, visual links can be edited through the link modal, section snippets/includes are available for reusable content, article metadata editing is friendlier, attribute lists support `id`, script JSON/static assets are safer to load, explorer caches were bumped, auth setup refreshes status, and EN/NL labels were updated.

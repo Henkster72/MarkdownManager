@@ -461,6 +461,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Système de raccourcis : choisissez Windows/Linux (Ctrl+Alt) ou Mac (Ctrl+Command) dans les paramètres.",
+    "release_0951": "v0.951 : les directives de classe d’image s’appliquent désormais aux images, la syntaxe de classes Tailwind responsive est préservée et les attributs de citation répétés ne créent plus de puces legacy en double.",
     "release_095": "v0.95 : l’aperçu visuel WPM traite les macros Jinja prises en charge et les sections réutilisables tout en masquant la syntaxe legacy inconnue ; formats personnalisés, ressources relatives d’instance, polices locales, connexion partagée, listes d’images et isolation CSS sont plus fiables.",
     "release_093": "v0.93 : WPM trie désormais les articles les plus récents d'abord par post_date, puis par date de création/nom de fichier, masque l'astuce image en mode visuel et ajoute un sélecteur d'image aux métadonnées d'article."
   },

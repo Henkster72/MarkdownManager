@@ -463,7 +463,7 @@ function mdw_pandoc_div_attrs_from_spec($spec) {
                 $value = mdw_toc_normalize_id($value);
                 $value = preg_replace('/[^A-Za-z0-9_\-:.]+/', '', (string)$value);
             } else if ($key === 'class') {
-                $value = preg_replace('/[^A-Za-z0-9_\-\s]+/', '', (string)$value);
+                $value = preg_replace('/[^A-Za-z0-9_:\-\/\[\].%\s]+/', '', (string)$value);
                 $value = trim(preg_replace('/\s+/', ' ', $value));
             } else if ($key === 'style') {
                 $value = preg_replace('/[^A-Za-z0-9_\-\s:;,#.%()\/\'"?=&]/', '', (string)$value);
@@ -1024,9 +1024,9 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
 
     $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
-    // ![alt](url "title")
+    // ![alt](url "title") {: class="foo bar"}
     $text = preg_replace_callback(
-        '/!\[([^\]]*)\]\((?<img>(?:[^()]+|\((?&img)\))*)\)/',
+        '/!\[([^\]]*)\]\((?<img>(?:[^()]+|\((?&img)\))*)\)(?:\s*\{:\s*class\s*=\s*(?:"([^"]+)"|&quot;([^&]+)&quot;|&#039;([^\']+)&#039;)\s*\})?/i',
         function($m) use ($mdPath){
             $alt = $m[1];
             $innerRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
@@ -1041,7 +1041,15 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
             $urlEsc = htmlspecialchars($urlResolved, ENT_QUOTES, 'UTF-8');
             $titleRaw = trim((string)$titleRaw);
             $titleAttr = $titleRaw !== '' ? ' title="'.htmlspecialchars($titleRaw, ENT_QUOTES, 'UTF-8').'"' : '';
-            return '<img class="md-img" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
+            $rawClass = '';
+            if (isset($m[3]) && $m[3] !== '') $rawClass = (string)$m[3];
+            else if (isset($m[4]) && $m[4] !== '') $rawClass = (string)$m[4];
+            else if (isset($m[5]) && $m[5] !== '') $rawClass = (string)$m[5];
+            $rawClass = html_entity_decode($rawClass, ENT_QUOTES, 'UTF-8');
+            $rawClass = preg_replace('/[^A-Za-z0-9_:\-\/\[\].%\s]+/', '', $rawClass);
+            $rawClass = trim(preg_replace('/\s+/', ' ', $rawClass));
+            $classAttr = md_join_classes('md-img', $rawClass);
+            return '<img class="'.$classAttr.'" src="'.$urlEsc.'" alt="'.$alt.'" loading="lazy" decoding="async"'.$titleAttr.'>';
         },
         $text
     );
@@ -1068,7 +1076,7 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
             else if (isset($m[4]) && $m[4] !== '') $rawClass = $m[4];
             else if (isset($m[5]) && $m[5] !== '') $rawClass = $m[5];
             $rawClass = html_entity_decode($rawClass, ENT_QUOTES, 'UTF-8');
-            $rawClass = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', (string)$rawClass);
+            $rawClass = preg_replace('/[^A-Za-z0-9_:\\-\\/\\[\\].%\\s]+/', '', (string)$rawClass);
             $rawClass = trim(preg_replace('/\\s+/', ' ', $rawClass));
 
             $classAttr = md_join_classes($linkClass, $rawClass);
@@ -2645,13 +2653,13 @@ function mdw_attr_list_parse_line($line) {
             $val = $match[3] ?? ($match[4] ?? ($match[5] ?? ''));
             $val = html_entity_decode((string)$val, ENT_QUOTES, 'UTF-8');
             if ($key === 'class') {
-                $val = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', $val);
+                $val = preg_replace('/[^A-Za-z0-9_:\\-\\/\\[\\].%\\s]+/', '', $val);
                 $val = trim(preg_replace('/\\s+/', ' ', $val));
                 if ($val !== '') {
                     $attrs['class'] = trim($attrs['class'] . ' ' . $val);
                 }
             } else if ($key === 'style') {
-                $val = preg_replace('/[^A-Za-z0-9_\\-\\s:;,#.%()]/', '', $val);
+                $val = preg_replace('/[^A-Za-z0-9_\-\s:;,#.%()\/\'"?=&]/', '', $val);
                 $val = trim($val);
                 if ($val !== '') {
                     $attrs['style'] = trim($attrs['style'] . '; ' . $val);
@@ -2772,7 +2780,7 @@ function mdw_attr_list_extract_classes($line) {
         if (!preg_match('/\\bclass\\s*=\\s*(\"([^\"]*)\"|\\\'([^\\\']*)\\\'|([^\\s]+))/i', $chunk, $cm)) continue;
         $val = $cm[2] ?? ($cm[3] ?? ($cm[4] ?? ''));
         $val = html_entity_decode((string)$val, ENT_QUOTES, 'UTF-8');
-        $val = preg_replace('/[^A-Za-z0-9_\\-\\s]+/', '', $val);
+        $val = preg_replace('/[^A-Za-z0-9_:\\-\\/\\[\\].%\\s]+/', '', $val);
         $val = trim(preg_replace('/\\s+/', ' ', $val));
         if ($val !== '') $classes[] = $val;
     }
@@ -3534,11 +3542,20 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $bqEndLine = $i - 1;
             $i--;
             $bqAttrs = null;
-            while (!empty($bq)) {
-                $parsed = mdw_attr_list_parse_line($bq[count($bq) - 1]);
-                if (!$parsed) break;
-                array_pop($bq);
-                $bqAttrs = mdw_merge_attr_list($bqAttrs, $parsed);
+            $inlineAttrCount = 0;
+            foreach ($bq as $bqLine) {
+                if (mdw_attr_list_parse_line($bqLine)) $inlineAttrCount++;
+            }
+            if ($inlineAttrCount < 2) {
+                while (!empty($bq) && trim((string)$bq[count($bq) - 1]) === '') {
+                    array_pop($bq);
+                }
+                while (!empty($bq)) {
+                    $parsed = mdw_attr_list_parse_line($bq[count($bq) - 1]);
+                    if (!$parsed) break;
+                    array_pop($bq);
+                    $bqAttrs = mdw_merge_attr_list($bqAttrs, $parsed);
+                }
             }
             $inner = implode("\n", $bq);
             $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false, 'render_metadata' => false])) . "\n" . '</blockquote>';

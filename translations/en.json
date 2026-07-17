@@ -489,6 +489,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal.",
+    "release_0951": "v0.951: image class directives now apply to images, responsive Tailwind class syntax is preserved, and repeated quote attributes no longer create duplicate legacy bullets.",
     "release_095": "v0.95: WPM visual preview resolves supported Jinja macros and reusable sections while hiding unresolved legacy syntax; custom formats, relative instance assets, local fonts, shared login, image lists, and preview CSS isolation are more reliable.",
     "release_093": "v0.93: WPM now sorts newest articles first by post_date, then creation date/filename, hides the image tip in visual mode, and adds an image picker to Article metadata."
   },

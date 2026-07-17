@@ -469,6 +469,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Sistema di scorciatoie: scegli Windows/Linux (Ctrl+Alt) o Mac (Ctrl+Command) nel modale Impostazioni.",
+    "release_0951": "v0.951: le direttive di classe delle immagini vengono ora applicate alle immagini, la sintassi delle classi Tailwind responsive viene preservata e gli attributi di citazione ripetuti non creano più elenchi legacy duplicati.",
     "release_095": "v0.95: l'anteprima visuale WPM gestisce macro Jinja supportate e sezioni riutilizzabili nascondendo la sintassi legacy sconosciuta; formati personalizzati, risorse relative dell'istanza, font locali, accesso condiviso, elenchi immagini e isolamento CSS sono più affidabili.",
     "release_093": "v0.93: WPM ora ordina prima gli articoli più recenti per post_date, poi per data di creazione/nome file, nasconde il suggerimento immagine in modalità visuale e aggiunge un selettore immagini ai metadati articolo."
   },

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.951
+
+- WPM image attributes: trailing `{: class="..."}` directives now apply directly to Markdown images, so image classes such as `rounded`, `biground`, and responsive utility classes render instead of appearing as visual-editor text.
+- WPM legacy layout: safe Tailwind class characters such as `:` and `/` are preserved for both fenced-div and trailing attribute syntax, restoring responsive grids, sizing, and alignment.
+- WPM blockquotes: repeated attribute directives inside one blockquote apply to their matching paragraphs without creating a duplicate outer bullet class.
+
 ## 0.95
 
 - Visual link editing: fragment links such as `#section` are treated as internal links in the link modal and keep their fragment when updated.

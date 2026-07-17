@@ -461,6 +461,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Tastenkürzel-System: Wählen Sie Windows/Linux (Strg+Alt) oder Mac (Strg+Command) in den Einstellungen.",
+    "release_0951": "v0.951: Bildklassendirektiven werden direkt auf Bilder angewendet, responsive Tailwind-Klassensyntax bleibt erhalten und wiederholte Zitatattribute erzeugen keine doppelten Legacy-Aufzählungen mehr.",
     "release_095": "v0.95: Die visuelle WPM-Vorschau verarbeitet unterstützte Jinja-Makros und wiederverwendbare Abschnitte und blendet unbekannte Legacy-Syntax aus; benutzerdefinierte Formate, relative Instanz-Assets, lokale Schriften, geteilte Anmeldung, Bildlisten und CSS-Isolierung sind zuverlässiger.",
     "release_093": "v0.93: WPM sortiert neue Artikel jetzt zuerst nach post_date, dann nach Erstellungsdatum/Dateiname, blendet den Bildhinweis im visuellen Modus aus und ergänzt eine Bildauswahl in den Artikelmetadaten."
   },
