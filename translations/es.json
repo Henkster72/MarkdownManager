@@ -150,6 +150,21 @@
       "save_failed": "Error al guardar",
       "hint": "Deja en blanco para usar el predeterminado."
     },
+    "internal_links": {
+      "prefix_label": "Prefijo URL de enlaces internos",
+      "prefix_placeholder": "https://ejemplo.com/markdownmanager/",
+      "prefix_save": "Guardar prefijo",
+      "prefix_hint": "Se añade antes de index.php?file= (déjalo vacío para enlaces relativos).",
+      "prefix_saving": "Guardando…",
+      "prefix_saved": "Guardado",
+      "prefix_save_failed": "Error al guardar"
+    },
+    "asset_paths": {
+      "title": "Rutas de recursos",
+      "static_label": "Ruta de la carpeta static",
+      "images_label": "Ruta de la carpeta de imágenes",
+      "hint": "Relativa a la carpeta del editor, por ejemplo ../static y ../static/images."
+    },
     "editor_view": {
       "title": "Vista del editor"
     },

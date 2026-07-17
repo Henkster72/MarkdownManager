@@ -150,6 +150,21 @@
       "save_failed": "Errore di salvataggio",
       "hint": "Lascia vuoto per usare il predefinito."
     },
+    "internal_links": {
+      "prefix_label": "Prefisso URL dei link interni",
+      "prefix_placeholder": "https://esempio.it/markdownmanager/",
+      "prefix_save": "Salva prefisso",
+      "prefix_hint": "Aggiunto prima di index.php?file= (lascia vuoto per i link relativi).",
+      "prefix_saving": "Salvando…",
+      "prefix_saved": "Salvato",
+      "prefix_save_failed": "Errore di salvataggio"
+    },
+    "asset_paths": {
+      "title": "Percorsi delle risorse",
+      "static_label": "Percorso della cartella static",
+      "images_label": "Percorso della cartella immagini",
+      "hint": "Relativo alla cartella dell'editor, ad esempio ../static e ../static/images."
+    },
     "editor_view": {
       "title": "Vista editor"
     },

@@ -141,6 +141,21 @@
       "save_failed": "Échec de l'enregistrement",
       "hint": "Laissez vide pour utiliser la valeur par défaut."
     },
+    "internal_links": {
+      "prefix_label": "Préfixe URL des liens internes",
+      "prefix_placeholder": "https://exemple.fr/markdownmanager/",
+      "prefix_save": "Enregistrer le préfixe",
+      "prefix_hint": "Ajouté avant index.php?file= (laissez vide pour les liens relatifs).",
+      "prefix_saving": "Enregistrement…",
+      "prefix_saved": "Enregistré",
+      "prefix_save_failed": "Échec de l'enregistrement"
+    },
+    "asset_paths": {
+      "title": "Chemins des ressources",
+      "static_label": "Chemin du dossier static",
+      "images_label": "Chemin du dossier d'images",
+      "hint": "Relatif au dossier de l'éditeur, par exemple ../static et ../static/images."
+    },
     "editor_view": {
       "title": "Vue de l'éditeur"
     },

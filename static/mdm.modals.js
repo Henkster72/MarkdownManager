@@ -224,6 +224,9 @@
         item.classList.add('is-selected');
         selectedPath = item.getAttribute('data-path');
         selectedTitle = item.getAttribute('data-title') || selectedPath || '';
+        const displayHref = internalLinkDisplayValue(selectedPath);
+        if (pickerFilter) pickerFilter.value = displayHref;
+        if (pickerFilterClear) pickerFilterClear.style.display = displayHref ? '' : 'none';
         try { item.scrollIntoView({ block: 'nearest' }); } catch {}
         validate();
         return !!selectedPath;
@@ -480,7 +483,7 @@
                 .filter(el => el instanceof HTMLElement);
             let any = false;
             items.forEach(el => {
-                const text = (el.textContent || '').toLowerCase();
+                const text = `${el.getAttribute('data-search') || ''} ${el.textContent || ''}`.toLowerCase();
                 const match = !q || text.includes(q);
                 el.closest('li')?.toggleAttribute('hidden', !match);
                 if (match) any = true;

@@ -141,6 +141,21 @@
       "save_failed": "Falha ao guardar",
       "hint": "Deixe em branco para usar o predefinido."
     },
+    "internal_links": {
+      "prefix_label": "Prefixo de URL de links internos",
+      "prefix_placeholder": "https://exemplo.pt/markdownmanager/",
+      "prefix_save": "Guardar prefixo",
+      "prefix_hint": "Adicionado antes de index.php?file= (deixe vazio para links relativos).",
+      "prefix_saving": "A guardar…",
+      "prefix_saved": "Guardado",
+      "prefix_save_failed": "Falha ao guardar"
+    },
+    "asset_paths": {
+      "title": "Caminhos dos recursos",
+      "static_label": "Caminho da pasta static",
+      "images_label": "Caminho da pasta de imagens",
+      "hint": "Relativo à pasta do editor, por exemplo ../static e ../static/images."
+    },
     "editor_view": {
       "title": "Vista do editor"
     },

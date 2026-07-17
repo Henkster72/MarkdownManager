@@ -165,6 +165,21 @@
       "save_failed": "Save failed",
       "hint": "Leave blank to use the default."
     },
+    "internal_links": {
+      "prefix_label": "Internal link URL prefix",
+      "prefix_placeholder": "https://example.com/markdownmanager/",
+      "prefix_save": "Save prefix",
+      "prefix_hint": "Added before index.php?file= (leave empty for relative links).",
+      "prefix_saving": "Saving…",
+      "prefix_saved": "Saved",
+      "prefix_save_failed": "Save failed"
+    },
+    "asset_paths": {
+      "title": "Asset paths",
+      "static_label": "Static folder path",
+      "images_label": "Images folder path",
+      "hint": "Relative to the editor folder, for example ../static and ../static/images."
+    },
     "editor_view": {
       "title": "Editor view"
     },

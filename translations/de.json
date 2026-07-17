@@ -141,6 +141,21 @@
       "save_failed": "Speichern fehlgeschlagen",
       "hint": "Leer lassen, um den Standard zu verwenden."
     },
+    "internal_links": {
+      "prefix_label": "URL-Präfix für interne Links",
+      "prefix_placeholder": "https://beispiel.de/markdownmanager/",
+      "prefix_save": "Präfix speichern",
+      "prefix_hint": "Wird vor index.php?file= gesetzt (für relative Links leer lassen).",
+      "prefix_saving": "Speichern…",
+      "prefix_saved": "Gespeichert",
+      "prefix_save_failed": "Speichern fehlgeschlagen"
+    },
+    "asset_paths": {
+      "title": "Asset-Pfade",
+      "static_label": "Pfad zum Static-Ordner",
+      "images_label": "Pfad zum Bilderordner",
+      "hint": "Relativ zum Editorordner, zum Beispiel ../static und ../static/images."
+    },
     "editor_view": {
       "title": "Editor-Ansicht"
     },

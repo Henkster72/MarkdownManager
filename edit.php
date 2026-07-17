@@ -215,6 +215,12 @@ $META_CFG = mdw_metadata_load_config();
 $META_PUBLISHER_CFG = mdw_metadata_load_publisher_config();
 $MDW_SETTINGS = (isset($META_CFG['_settings']) && is_array($META_CFG['_settings'])) ? $META_CFG['_settings'] : [];
 $MDW_PUBLISHER_MODE = !empty($MDW_SETTINGS['publisher_mode']);
+if ($WPM_SITE_BASE === null && $MDW_PUBLISHER_MODE) {
+    $requestHost = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    if (preg_match('/^[A-Za-z0-9.-]+(?::\d+)?$/', $requestHost)) {
+        $WPM_SITE_BASE = 'https://' . $requestHost;
+    }
+}
 $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_buttons_enabled']);
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
@@ -1821,7 +1827,7 @@ window.mermaid = mermaid;
 	            </div>
 	            <div class="link-picker" id="linkPicker">
 	                <?php
-	                    $renderPickerGroup = function($groupTitle, $entries) use ($secretMap) {
+	                    $renderPickerGroup = function($groupTitle, $entries) use ($secretMap, $hideMarkdownEditor) {
 	                        if (empty($entries)) return;
 	                        $groupId = 'linkpicker-' . substr(sha1('picker:' . $groupTitle), 0, 10);
 	                        ?>
@@ -1836,12 +1842,16 @@ window.mermaid = mermaid;
 	                                $t = function_exists('explorer_view_extract_md_title_from_file')
 	                                    ? explorer_view_extract_md_title_from_file(__DIR__ . '/' . $p, $entry['basename'])
 	                                    : $entry['basename'];
+	                                $pickerTitle = $hideMarkdownEditor
+	                                    ? preg_replace('/\.md$/i', '', (string)$t)
+	                                    : (string)$t;
+	                                $pickerSearch = trim($pickerTitle . ' ' . preg_replace('/\.md$/i', '', (string)$p));
 	                                $isSecret = isset($secretMap[$p]);
 	                            ?>
 	                                <li class="note-item">
-	                                    <button type="button" class="note-link kbd-item link-pick-item" data-path="<?=h($p)?>" data-title="<?=h($t)?>">
+	                                    <button type="button" class="note-link kbd-item link-pick-item" data-path="<?=h($p)?>" data-title="<?=h($pickerTitle)?>" data-search="<?=h($pickerSearch)?>">
 	                                        <div class="note-title" style="justify-content: space-between;">
-	                                            <span><?=h($t)?></span>
+	                                            <span><?=h($pickerTitle)?></span>
 	                                            <?php if ($isSecret): ?>
 	                                                <span class="badge-secret"><?=h(mdw_t('common.secret','secret'))?></span>
 	                                            <?php endif; ?>
@@ -2165,8 +2175,8 @@ window.mermaid = mermaid;
 				                </div>
 				            </div>
 
-				            <div class="modal-field" data-auth-superuser="1">
-				                <label class="modal-label" for="internalLinkPrefixInput"><?=h(mdw_t('theme.internal_links.prefix_label','Internal link prefix'))?></label>
+			            <div class="modal-field" data-auth-superuser="1">
+			                <label class="modal-label" for="internalLinkPrefixInput"><?=h(mdw_t('theme.internal_links.prefix_label','Internal link URL prefix'))?></label>
 				                <div class="modal-row" style="gap: 0.6rem; margin: 0;">
 				                    <input id="internalLinkPrefixInput" type="text" class="input" style="flex: 1 1 auto;" placeholder="<?=h(mdw_t('theme.internal_links.prefix_placeholder','https://example.com/markdownmanager/'))?>" value="<?=h($internalLinkPrefix)?>" data-auth-superuser-enable="1">
 				                    <button type="button" class="btn btn-ghost btn-small" id="internalLinkPrefixSaveBtn" data-auth-superuser-enable="1"><?=h(mdw_t('theme.internal_links.prefix_save','Save prefix'))?></button>
@@ -2220,12 +2230,12 @@ window.mermaid = mermaid;
             <?php endif; ?>
 
             <div class="modal-field" data-auth-superuser="1">
-                <div class="modal-label">Asset paths</div>
-                <label class="modal-label" for="staticPathInput">Static folder path</label>
+                <div class="modal-label"><?=h(mdw_t('theme.asset_paths.title','Asset paths'))?></div>
+                <label class="modal-label" for="staticPathInput"><?=h(mdw_t('theme.asset_paths.static_label','Static folder path'))?></label>
                 <input id="staticPathInput" type="text" class="input" value="<?=h($assetStaticPath)?>" data-auth-superuser-enable="1">
-                <label class="modal-label" for="imagesPathInput" style="margin-top: 0.5rem;">Images folder path</label>
+                <label class="modal-label" for="imagesPathInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.asset_paths.images_label','Images folder path'))?></label>
                 <input id="imagesPathInput" type="text" class="input" value="<?=h($assetImagesPath)?>" data-auth-superuser-enable="1">
-                <div class="status-text" style="margin-top: 0.35rem;">Relative to the editor folder, for example ../static and ../static/images.</div>
+                <div class="status-text" style="margin-top: 0.35rem;"><?=h(mdw_t('theme.asset_paths.hint','Relative to the editor folder, for example ../static and ../static/images.'))?></div>
             </div>
 
 	            <div class="modal-field" data-auth-superuser="1">

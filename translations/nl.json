@@ -156,6 +156,21 @@
       "save_failed": "Opslaan mislukt",
       "hint": "Laat leeg om de standaard te gebruiken."
     },
+    "internal_links": {
+      "prefix_label": "Interne-link-URL-prefix",
+      "prefix_placeholder": "https://voorbeeld.nl/markdownmanager/",
+      "prefix_save": "Prefix opslaan",
+      "prefix_hint": "Wordt voor index.php?file= geplaatst (laat leeg voor relatieve links).",
+      "prefix_saving": "Opslaan…",
+      "prefix_saved": "Opgeslagen",
+      "prefix_save_failed": "Opslaan mislukt"
+    },
+    "asset_paths": {
+      "title": "Assetpaden",
+      "static_label": "Pad naar static-map",
+      "images_label": "Pad naar afbeeldingenmap",
+      "hint": "Relatief aan de editormap, bijvoorbeeld ../static en ../static/images."
+    },
     "editor_view": {
       "title": "Editorweergave"
     },
