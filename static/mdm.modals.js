@@ -100,8 +100,51 @@
         return idx >= 0 ? raw.slice(idx) : '';
     };
 
-    const markdownPathCandidatesFromHref = (href) => {
+    const unwrapTemplateHref = (href) => {
         const raw = String(href || '').trim();
+        const match = raw.match(/^\{\{\s*([^{}]+?)\s*\}\}((?:[?#].*)?)$/);
+        return match ? `${match[1].trim()}${match[2] || ''}` : raw;
+    };
+
+    const isInternalDocumentHref = (href) => {
+        const raw = unwrapTemplateHref(href);
+        if (!raw || raw.startsWith('#') || /^(?:mailto|tel|javascript|data):/i.test(raw) || raw.startsWith('//')) {
+            return raw.startsWith('#');
+        }
+        try {
+            const url = new URL(raw, window.location.href);
+            const publicOrigin = publicSiteOrigin();
+            if (url.origin !== window.location.origin && (!publicOrigin || url.origin !== publicOrigin)) return false;
+            if (url.searchParams.has('file')) return true;
+            const extension = (url.pathname.match(/\.([A-Za-z0-9]+)$/)?.[1] || '').toLowerCase();
+            return !extension || ['html', 'htm', 'md', 'markdown'].includes(extension);
+        } catch {
+            return false;
+        }
+    };
+
+    const internalLinkDisplayValue = (href) => {
+        const raw = String(href || '').trim();
+        if (!document.body?.classList.contains('hide-markdown-editor')) return raw;
+
+        const unwrapped = unwrapTemplateHref(raw);
+        if (unwrapped.startsWith('#')) return unwrapped;
+        if (!/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(unwrapped)) {
+            return unwrapped.replace(/\.(?:html?|md|markdown)(?=([?#]|$))/i, '');
+        }
+        try {
+            const url = new URL(unwrapped, window.location.href);
+            const file = url.searchParams.get('file');
+            const path = file ? decodeURIComponent(file) : url.pathname.replace(/^\/+/, '');
+            const suffix = url.hash || '';
+            return `${path.replace(/\.(?:html?|md|markdown)$/i, '')}${suffix}`;
+        } catch {
+            return unwrapped.replace(/\.(?:html?|md|markdown)(?=([?#]|$))/i, '');
+        }
+    };
+
+    const markdownPathCandidatesFromHref = (href) => {
+        const raw = unwrapTemplateHref(href);
         if (!raw) return [];
         if (raw.startsWith('#')) {
             const current = normalizePath(window.CURRENT_FILE || '');
@@ -261,32 +304,35 @@
         if (linkEl) {
             const href = String(linkEl.getAttribute('href') || '').trim();
             const internalItem = findPickerItemByPath(href);
+            const isInternal = internalItem instanceof HTMLElement || isInternalDocumentHref(href);
             editContext = {
                 type: 'visual-link',
                 linkEl,
-                internal: internalItem instanceof HTMLElement,
+                internal: isInternal,
+                href,
+                internalPath: internalItem instanceof HTMLElement
+                    ? normalizePath(internalItem.getAttribute('data-path') || '')
+                    : null,
                 className: String(linkEl.getAttribute('class') || '').trim(),
                 target: String(linkEl.getAttribute('target') || '').trim(),
                 rel: String(linkEl.getAttribute('rel') || '').trim(),
                 fragment: hrefFragment(href),
             };
             setLinkModalLabels(true);
-            if (internalItem instanceof HTMLElement) {
+            if (isInternal) {
                 selectModeRadio('internal');
                 setMode('internal');
-                selectPickerItem(internalItem);
-                if (pickerFilter) pickerFilter.value = href;
-                if (pickerFilterClear) pickerFilterClear.style.display = href ? '' : 'none';
-                return;
-            }
-            if (href.startsWith('#') && normalizePath(window.CURRENT_FILE || '')) {
-                selectedPath = normalizePath(window.CURRENT_FILE || '');
-                selectedTitle = selectedPath;
-                selectModeRadio('internal');
-                setMode('internal');
-                if (pickerFilter) pickerFilter.value = href;
-                if (pickerFilterClear) pickerFilterClear.style.display = href ? '' : 'none';
-                validate();
+                if (internalItem instanceof HTMLElement) {
+                    selectPickerItem(internalItem);
+                } else if (href.startsWith('#') && normalizePath(window.CURRENT_FILE || '')) {
+                    selectedPath = normalizePath(window.CURRENT_FILE || '');
+                    selectedTitle = selectedPath;
+                    editContext.internalPath = selectedPath;
+                    validate();
+                }
+                const displayHref = internalLinkDisplayValue(href);
+                if (pickerFilter) pickerFilter.value = displayHref;
+                if (pickerFilterClear) pickerFilterClear.style.display = displayHref ? '' : 'none';
                 return;
             }
             if (externalText) externalText.value = linkTextFromElement(linkEl);
@@ -385,7 +431,7 @@
             insertBtn.disabled = !id;
             return;
         }
-        insertBtn.disabled = !selectedPath;
+        insertBtn.disabled = !selectedPath && !(editContext?.type === 'visual-link' && editContext.internal);
     };
 
     btn.addEventListener('click', open);
@@ -944,11 +990,21 @@
             return;
         }
 
-        if (!selectedPath) return;
+        if (!selectedPath) {
+            if (editContext?.type === 'visual-link' && editContext.internal && editContext.linkEl instanceof HTMLAnchorElement) {
+                if (typeof window.__mdwSyncVisualPreviewToTextarea === 'function') {
+                    window.__mdwSyncVisualPreviewToTextarea();
+                }
+                close();
+            }
+            return;
+        }
         const selection = getEditorSelectionText();
         const text = selection || selectedTitle || selectedPath;
         let href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
-        if (editContext?.type === 'visual-link' && editContext.fragment) {
+        if (editContext?.type === 'visual-link' && editContext.internalPath === selectedPath) {
+            href = editContext.href;
+        } else if (editContext?.type === 'visual-link' && editContext.fragment) {
             href += editContext.fragment;
         }
         if (editContext?.type === 'visual-link' && editContext.linkEl instanceof HTMLAnchorElement) {
