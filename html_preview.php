@@ -162,11 +162,27 @@ function mdw_preview_collect_jinja_vars($text, $meta = []) {
 function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     $expr = trim((string)$expr);
     if ($expr === '') return '';
-    if (isset($vars[$expr])) return (string)$vars[$expr];
+    if (preg_match('/^(.*?)\|\s*static\s*\([^)]*\)\s*$/i', $expr, $filterMatch)) {
+        $value = mdw_preview_resolve_jinja_value((string)$filterMatch[1], $vars, $forAttr);
+        if ($value === '') return '';
+        $isMediaFile = preg_match('/\.(?:avif|gif|jpe?g|mp3|mp4|png|svg|wav|webm|webp)$/i', (string)$value) === 1;
+        $base = $isMediaFile && !str_contains((string)$value, '/')
+            ? mdw_asset_relative_path('images_path', 'IMAGES_PATH', 'images')
+            : mdw_asset_relative_path('static_path', 'STATIC_PATH', 'static');
+        return rtrim($base, '/') . '/' . ltrim($value, '/');
+    }
+    if (isset($vars[$expr])) {
+        $value = (string)$vars[$expr];
+        if (preg_match('/^\s*(?:"[^"]*"|\'[^\']*\'|[^|]+\|\s*[A-Za-z_][A-Za-z0-9_]*\s*\()/s', $value)) {
+            return mdw_preview_resolve_jinja_value($value, $vars, $forAttr);
+        }
+        return $value;
+    }
     if (preg_match('/^(?:"([^"]*)"|\'([^\']*)\')$/', $expr, $m)) {
         return isset($m[1]) && $m[1] !== '' ? (string)$m[1] : (string)($m[2] ?? '');
     }
     if (!preg_match('/^[A-Za-z0-9_.\/-]+$/', $expr)) return '';
+    if (preg_match('/\.html(?:[#?].*)?$/i', $expr)) return './' . ltrim($expr, './');
 
     $value = $expr;
     if (strtolower((string)$forAttr) === 'src') {
@@ -199,10 +215,15 @@ function mdw_preview_parse_macro_args($raw) {
     $parts[] = substr((string)$raw, $start);
 
     $args = [];
+    $positional = [];
     foreach ($parts as $part) {
-        if (!preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/s', (string)$part, $match)) continue;
+        if (!preg_match('/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/s', (string)$part, $match)) {
+            $positional[] = trim((string)$part);
+            continue;
+        }
         $args[(string)$match[1]] = (string)$match[2];
     }
+    if ($positional) $args['_positional'] = $positional;
     return $args;
 }
 
@@ -271,17 +292,47 @@ function mdw_preview_render_form_macro($args, $vars) {
     return $out;
 }
 
+function mdw_preview_render_audio_macro($args, $vars) {
+    $positional = isset($args['_positional']) && is_array($args['_positional']) ? $args['_positional'] : [];
+    if (!array_key_exists('src', $args) && isset($positional[0])) $args['src'] = $positional[0];
+    if (!array_key_exists('title', $args) && isset($positional[1])) $args['title'] = $positional[1];
+    $src = mdw_preview_macro_arg($args, 'src', $vars, '');
+    $title = (string)mdw_preview_macro_arg($args, 'title', $vars, 'Audio');
+    $srcEsc = htmlspecialchars((string)$src, ENT_QUOTES, 'UTF-8');
+    $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    return '<div class="mdw-preview-audio"><audio class="w-full my-4" controls preload="none"><source src="' . $srcEsc . '" type="audio/mpeg">' .
+        'Je browser ondersteunt het audio-element niet. <a class="externlink" href="' . $srcEsc . '">Download ' . $titleEsc . '</a>.</audio></div>';
+}
+
+function mdw_preview_render_course_image_macro($args, $vars) {
+    $positional = isset($args['_positional']) && is_array($args['_positional']) ? $args['_positional'] : [];
+    if (!array_key_exists('src', $args) && isset($positional[0])) $args['src'] = $positional[0];
+    if (!array_key_exists('alt', $args) && isset($positional[1])) $args['alt'] = $positional[1];
+    $src = mdw_preview_macro_arg($args, 'src', $vars, '');
+    $alt = (string)mdw_preview_macro_arg($args, 'alt', $vars, 'Image');
+    if (!is_external_url($src) && !str_starts_with((string)$src, '/') && !str_starts_with((string)$src, '../')) {
+        $src = html_preview_expand_image_token('{{ ' . ltrim((string)$src, '/') . ' }}');
+    }
+    $srcEsc = htmlspecialchars((string)$src, ENT_QUOTES, 'UTF-8');
+    $altEsc = htmlspecialchars($alt, ENT_QUOTES, 'UTF-8');
+    return '<figure class="my-8"><img class="w-full max-w-2xl mx-auto h-auto rounded shadow" src="' . $srcEsc .
+        '" alt="' . $altEsc . '" loading="lazy"></figure>';
+}
+
 function mdw_preview_render_macro_calls($text, $vars) {
+    $rendered = (string)preg_replace('/\{%\s*macro\b.*?%\}.*?\{%\s*endmacro\s*%\}/s', '', (string)$text);
     $rendered = (string)preg_replace_callback(
-        '/\{\{\s*(overview\.add_header|form\.contact_form)\s*\((.*?)\)\s*\}\}/s',
+        '/\{\{\s*(overview\.add_header|form\.contact_form|audio_player|course_image)\s*\(((?:[^()]|\([^()]*\))*)\)\s*\}\}/s',
         function($m) use ($vars) {
             $args = mdw_preview_parse_macro_args((string)($m[2] ?? ''));
-            $rendered = (string)($m[1] ?? '') === 'overview.add_header'
-                ? mdw_preview_render_overview_macro($args, $vars)
-                : mdw_preview_render_form_macro($args, $vars);
+            $name = (string)($m[1] ?? '');
+            if ($name === 'overview.add_header') $rendered = mdw_preview_render_overview_macro($args, $vars);
+            else if ($name === 'form.contact_form') $rendered = mdw_preview_render_form_macro($args, $vars);
+            else if ($name === 'audio_player') $rendered = mdw_preview_render_audio_macro($args, $vars);
+            else $rendered = mdw_preview_render_course_image_macro($args, $vars);
             return "\n\n" . $rendered . "\n\n";
         },
-        (string)$text
+        $rendered
     );
     return (string)preg_replace('/\{%\s*(?:import|from)\b[^%]*%\}/', '', $rendered);
 }
@@ -387,15 +438,11 @@ function mdw_preview_render_inline_template_vars($text, $vars) {
         function($m) use ($vars) {
             $expr = trim((string)$m[1]);
             if ($expr === '') return '';
-            if (isset($vars[$expr])) return (string)$vars[$expr];
-            if (preg_match('/^(?:"([^"]*)"|\'([^\']*)\')$/', $expr, $mm)) {
-                return isset($mm[1]) && $mm[1] !== '' ? (string)$mm[1] : (string)($mm[2] ?? '');
-            }
-            return '';
+            return mdw_preview_resolve_jinja_value($expr, $vars);
         },
         $text
     );
-    $text = (string)preg_replace('/^\s*\{%\s*(?:set|include|import|from|macro|endmacro|endif|else|if|for|endfor)\b[^%]*%\}\s*$/m', '', $text);
+    $text = (string)preg_replace('/\{%\s*(?:set|include|import|from|macro|endmacro|endif|else|if|for|endfor)\b[^%]*%\}/', '', $text);
     return $protected ? strtr($text, $protected) : $text;
 }
 
