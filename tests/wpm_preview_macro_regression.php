@@ -25,5 +25,9 @@ if (!preg_match('/data-mdw-macro-source="[A-Za-z0-9+\/=]+"/', $html)) {
     fwrite(STDERR, "Preview macro source marker is missing\n");
     exit(1);
 }
+if (substr_count($html, 'images/banner.jpg') !== 1) {
+    fwrite(STDERR, "Overview macro must be the only preview renderer for page_picture\n");
+    exit(1);
+}
 
 echo "WPM preview macro regression checks passed\n";

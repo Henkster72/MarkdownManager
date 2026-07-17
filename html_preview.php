@@ -3088,6 +3088,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
     $templateVars = mdw_preview_collect_jinja_vars($text, $meta);
     $templateSource = $text;
+    // The overview macro renders page_picture as its header background. Do not also
+    // inject the metadata image as a standalone preview image.
+    $hasOverviewHeaderMacro = preg_match('/\{\{\s*overview\.add_header\s*\(/', $templateSource) === 1;
     $text = mdw_preview_render_macro_calls($text, $templateVars);
     $text = mdw_preview_render_inline_template_vars($text, $templateVars);
     if ($sectionIncludesExpanded || $text !== $templateSource) {
@@ -3178,7 +3181,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 $mdVis = $f ? (bool)($f['markdown_visible'] ?? true) : true;
                 $htmlVis = $f ? (bool)($f['html_visible'] ?? false) : false;
                 if (!$mdVis) $htmlVis = false;
-                if ($htmlVis) {
+                if ($htmlVis && !$hasOverviewHeaderMacro) {
                     $titleText = isset($meta['page_title']) ? trim((string)$meta['page_title']) : '';
                     $src = mdw_page_picture_src($pictureValue);
                     if ($src !== '') {
