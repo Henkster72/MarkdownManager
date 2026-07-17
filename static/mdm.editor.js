@@ -2522,6 +2522,10 @@
         if (!(node instanceof Element)) return '';
         const sectionInclude = node.getAttribute('data-mdw-section-include');
         if (sectionInclude) return `{% include "${sectionInclude}" %}`;
+        const macroSource = node.getAttribute('data-mdw-macro-source');
+        if (macroSource) {
+            try { return atob(macroSource); } catch { return ''; }
+        }
         if (node.matches('.md-meta, [data-mdw-generated="metadata"]')) return '';
         if (node.matches('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]')) return '';
         if (node.matches('.md-toc-layout')) {
@@ -2559,6 +2563,23 @@
         if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
             return `${'#'.repeat(level)} ${cleanHeadingText(node.textContent || inlineMarkdown(node))}`;
+        }
+        if (tag === 'div' || tag === 'section' || tag === 'article') {
+            const containsGeneratedTemplate = !!node.querySelector('[data-mdw-section-include], [data-mdw-macro-source]');
+            if (containsGeneratedTemplate) {
+                const blocks = Array.from(node.childNodes)
+                    .map((child) => blockMarkdown(child, depth))
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean);
+                const content = blocks.join('\n\n');
+                const className = String(node.getAttribute('class') || '')
+                    .replace(/[^A-Za-z0-9_:\-\/\[\].%\s]+/g, '')
+                    .trim()
+                    .replace(/\s+/g, ' ');
+                return className && content
+                    ? `::: {class="${className}"}\n${content}\n:::`
+                    : content;
+            }
         }
         if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
             return withAlignAttr(escapeMd(inlineMarkdown(node)), node);
@@ -2634,6 +2655,9 @@
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
         prev.querySelectorAll('[data-mdw-section-include]').forEach((node) => {
+            if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
+        });
+        prev.querySelectorAll('[data-mdw-macro-source]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
     };

@@ -162,6 +162,7 @@ function mdw_preview_collect_jinja_vars($text, $meta = []) {
 function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     $expr = trim((string)$expr);
     if ($expr === '') return '';
+    if (preg_match('/^(?:none|null)$/i', $expr)) return '';
     if (preg_match('/^(.*?)\|\s*static\s*\([^)]*\)\s*$/i', $expr, $filterMatch)) {
         $value = mdw_preview_resolve_jinja_value((string)$filterMatch[1], $vars, $forAttr);
         if ($value === '') return '';
@@ -330,7 +331,8 @@ function mdw_preview_render_macro_calls($text, $vars) {
             else if ($name === 'form.contact_form') $rendered = mdw_preview_render_form_macro($args, $vars);
             else if ($name === 'audio_player') $rendered = mdw_preview_render_audio_macro($args, $vars);
             else $rendered = mdw_preview_render_course_image_macro($args, $vars);
-            return "\n\n" . $rendered . "\n\n";
+            $source = base64_encode(trim((string)($m[0] ?? '')));
+            return "\n\n<div data-mdw-macro-source=\"{$source}\">" . $rendered . "</div>\n\n";
         },
         $rendered
     );
