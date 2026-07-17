@@ -169,6 +169,7 @@ $hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $customFormat = mdw_custom_format_normalize($MDW_SETTINGS['custom_format'] ?? null);
 $customFormatCss = !empty($customFormat['custom_css']);
 $customFormatSections = !empty($customFormat['sections']);
+$instanceFontAssets = mdw_font_assets_normalize($MDW_SETTINGS['font_assets'] ?? []);
 $assetStaticPath = mdw_asset_relative_path('static_path', 'STATIC_PATH', $STATIC_DIR);
 $assetImagesPath = mdw_asset_relative_path('images_path', 'IMAGES_PATH', $IMAGES_DIR);
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
@@ -1844,6 +1845,12 @@ if ($requested) {
 <link rel="stylesheet" href="<?=h(mdw_static_asset('markdown.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('htmlpreview.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('popicon.css'))?>">
+<?php if ($instanceFontAssets['stylesheet'] !== ''): ?>
+<link rel="stylesheet" href="<?=h(mdw_static_asset($instanceFontAssets['stylesheet']))?>">
+<?php endif; ?>
+<?php if ($instanceFontAssets['family'] !== ''): ?>
+<style>body.app-body { --font-sans: <?=$instanceFontAssets['family']?>; }</style>
+<?php endif; ?>
 
 <script>
 (function(){
@@ -1916,7 +1923,7 @@ window.mermaid = mermaid;
 	                            <span style="font-weight: 500; opacity: 0.75;"> • overview</span>
 	                        <?php endif; ?>
 	                    </div>
-                        <?php if ($mode === 'view' && $requested && !empty($MDW_PUBLISHER_MODE) && $current_publish_state_lower === 'published'): ?>
+                        <?php if ($mode === 'view' && $requested && !empty($MDW_PUBLISHER_MODE)): ?>
                             <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
                             <?php if ($wpm_public_url): ?>
                                 <a class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page">

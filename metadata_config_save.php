@@ -293,6 +293,9 @@ if (is_array($settingsIn)) {
     $customCss = array_key_exists('custom_css', $settingsIn)
         ? mdw_sanitize_custom_css($settingsIn['custom_css'] ?? '')
         : mdw_sanitize_custom_css($curSettings['custom_css'] ?? '');
+    $fontAssets = array_key_exists('font_assets', $settingsIn)
+        ? mdw_font_assets_normalize($settingsIn['font_assets'])
+        : mdw_font_assets_normalize($curSettings['font_assets'] ?? []);
 
     $appTitle = array_key_exists('app_title', $settingsIn)
         ? trim((string)($settingsIn['app_title'] ?? ''))
@@ -355,6 +358,7 @@ if (is_array($settingsIn)) {
         'theme_preset' => $themePreset,
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
+        'font_assets' => $fontAssets,
         'static_path' => $staticPath,
         'images_path' => $imagesPath,
         'app_title' => $appTitle,

@@ -238,6 +238,7 @@ $hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $customFormat = mdw_custom_format_normalize($MDW_SETTINGS['custom_format'] ?? null);
 $customFormatCss = !empty($customFormat['custom_css']);
 $customFormatSections = !empty($customFormat['sections']);
+$instanceFontAssets = mdw_font_assets_normalize($MDW_SETTINGS['font_assets'] ?? []);
 $assetStaticPath = mdw_asset_relative_path('static_path', 'STATIC_PATH', $STATIC_DIR);
 $assetImagesPath = mdw_asset_relative_path('images_path', 'IMAGES_PATH', $IMAGES_DIR);
 $internalLinkPrefix = isset($MDW_SETTINGS['internal_link_prefix']) ? trim((string)$MDW_SETTINGS['internal_link_prefix']) : '';
@@ -1248,6 +1249,12 @@ $editSplitRowStorageLegacyKey = 'mdw_editor_row_heights';
 <link rel="stylesheet" href="<?=h(mdw_static_asset('markdown.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('htmlpreview.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('popicon.css'))?>">
+<?php if ($instanceFontAssets['stylesheet'] !== ''): ?>
+<link rel="stylesheet" href="<?=h(mdw_static_asset($instanceFontAssets['stylesheet']))?>">
+<?php endif; ?>
+<?php if ($instanceFontAssets['family'] !== ''): ?>
+<style>body.app-body { --font-sans: <?=$instanceFontAssets['family']?>; }</style>
+<?php endif; ?>
 
 <script>
 // theme bootstrap (zonder Tailwind)
@@ -1318,7 +1325,7 @@ window.mermaid = mermaid;
                             <?php if ($requested && !empty($MDW_PUBLISHER_MODE) && $WPM_SITE_BASE): ?>
                                 <?php $wpm_public_url = mdw_wpm_public_url($requested, $WPM_SITE_BASE); ?>
                                 <?php if ($wpm_public_url): ?>
-                                    <a id="wpmPublicPageLink" class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page" data-wpm-public-base="<?=h($WPM_SITE_BASE ?? '')?>" <?= $current_publish_state_lower === 'published' ? '' : 'hidden' ?>>
+                                    <a id="wpmPublicPageLink" class="icon-button" href="<?=h($wpm_public_url)?>" target="_blank" rel="noopener noreferrer" aria-label="Open public page" title="Open public page" data-wpm-public-base="<?=h($WPM_SITE_BASE ?? '')?>">
                                         <span class="pi pi-externallink"></span>
                                     </a>
                                 <?php endif; ?>

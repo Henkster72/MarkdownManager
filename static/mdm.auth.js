@@ -312,6 +312,16 @@
             const data = await authRequest({ action: 'status' });
             meta.has_user = !!data.has_user;
             meta.has_superuser = !!data.has_superuser;
+            if (data.shared_enabled === true) {
+                if (data.shared_role && data.shared_token) {
+                    storeAuth(data.shared_role, data.shared_token);
+                } else {
+                    try {
+                        mdwStorageRemove('mdw_auth_role');
+                        mdwStorageRemove('mdw_auth_token');
+                    } catch {}
+                }
+            }
             const needsSetup = !meta.has_user && !meta.has_superuser;
             const { role, token } = getStoredAuth();
             const loggedIn = !!(role && token);
@@ -407,9 +417,10 @@
         });
     }
 
-    authBtn?.addEventListener('click', () => {
+    authBtn?.addEventListener('click', async () => {
         const { role, token } = getStoredAuth();
         if (role && token) {
+            await authRequest({ action: 'logout' }).catch(() => {});
             try {
                 mdwStorageRemove('mdw_auth_role');
                 mdwStorageRemove('mdw_auth_token');

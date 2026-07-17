@@ -2110,9 +2110,8 @@
         const link = document.getElementById('wpmPublicPageLink');
         if (!(link instanceof HTMLAnchorElement)) return;
         const href = buildWpmPublicUrl(file, link.dataset.wpmPublicBase || '');
-        const isPublished = normalizeSort(publishState || '') === 'published';
         if (href) link.href = href;
-        link.hidden = !(href && isPublished);
+        link.hidden = !href;
     };
     window.__mdwUpdateWpmPublicPageLink = updateWpmPublicPageLink;
     const lazyCreateRow = (note) => {

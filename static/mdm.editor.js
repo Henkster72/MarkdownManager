@@ -439,6 +439,12 @@
         if (!isPublisherMode()) return;
         const baseTitle = titleEl instanceof HTMLElement ? String(titleEl.textContent || '').trim() : '';
 
+        const syncButtonState = () => {
+            const fileInput = document.querySelector('#editor-form input[name="file"]');
+            const file = fileInput instanceof HTMLInputElement ? fileInput.value : getCurrentFilePath();
+            btn.disabled = !String(file || '').trim();
+        };
+
         const modalBinding = (typeof window.__mdwBindModal === 'function')
             ? window.__mdwBindModal({
                 modal,
@@ -763,6 +769,7 @@
         };
 
         btn.addEventListener('click', openModal);
+        syncButtonState();
         formEl.addEventListener('submit', (event) => {
             event.preventDefault();
             applyValues();

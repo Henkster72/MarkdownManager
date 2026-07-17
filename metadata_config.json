@@ -34,6 +34,10 @@
             "editor": []
         },
         "custom_css": "",
+        "font_assets": {
+            "stylesheet": "",
+            "family": ""
+        },
         "app_title": "",
         "internal_link_prefix": "",
         "export_class_prefix": "",

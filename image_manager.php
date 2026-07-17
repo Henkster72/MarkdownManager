@@ -48,7 +48,8 @@ function image_manager_error($code, $status = 400, $extra = []) {
 function image_manager_guess_alt($filename) {
     $name = preg_replace('/\\.[a-z0-9]+$/i', '', (string)$filename);
     $name = str_replace(['_', '-'], ' ', $name);
-    $name = trim(preg_replace('/\\s+/u', ' ', $name));
+    $normalized = preg_replace('/\\s+/u', ' ', $name);
+    $name = trim(is_string($normalized) ? $normalized : $name);
     if ($name === '') return 'Image';
     if (function_exists('mb_convert_case')) {
         return mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');

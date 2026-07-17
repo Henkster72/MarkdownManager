@@ -292,6 +292,17 @@ a:hover {
   overflow: hidden;
 }
 
+/* Preview custom CSS must not reposition MarkdownManager's own dialogs. */
+body.app-body .modal {
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  max-height: calc(100dvh - 2rem) !important;
+}
+
 .modal.modal-small {
   width: min(420px, calc(100vw - 2rem));
 }
@@ -1481,6 +1492,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  margin: 0.3rem 0.7rem;
 }
 
 .index-page .note-link-main {

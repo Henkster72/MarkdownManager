@@ -489,7 +489,7 @@
   },
   "readme": {
     "shortcut_modifier_note": "Shortcut system: choose Windows/Linux (Ctrl+Alt) or Mac (Ctrl+Command) in the Settings modal.",
-    "release_094": "v0.94: fragment links stay internal, custom snippets are labeled as custom sections, imported CSS is scanned for section classes, and visual preview hides unresolved Jinja/legacy template syntax.",
+    "release_095": "v0.95: WPM visual preview resolves supported Jinja macros and reusable sections while hiding unresolved legacy syntax; custom formats, relative instance assets, local fonts, shared login, image lists, and preview CSS isolation are more reliable.",
     "release_093": "v0.93: WPM now sorts newest articles first by post_date, then creation date/filename, hides the image tip in visual mode, and adds an image picker to Article metadata."
   },
   "wpm": {

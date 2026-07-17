@@ -466,7 +466,7 @@ function mdw_pandoc_div_attrs_from_spec($spec) {
                 $value = preg_replace('/[^A-Za-z0-9_\-\s]+/', '', (string)$value);
                 $value = trim(preg_replace('/\s+/', ' ', $value));
             } else if ($key === 'style') {
-                $value = preg_replace('/[^A-Za-z0-9_\-\s:;,#.%()]/', '', (string)$value);
+                $value = preg_replace('/[^A-Za-z0-9_\-\s:;,#.%()\/\'"?=&]/', '', (string)$value);
                 $value = trim($value);
             }
             if ($value !== '') $attrs[$key] = trim((string)$attrs[$key] . ' ' . $value);
@@ -1717,6 +1717,7 @@ function mdw_metadata_default_config() {
             'theme_preset' => 'default',
             'theme_overrides' => ['preview' => [], 'editor' => []],
             'custom_css' => '',
+            'font_assets' => ['stylesheet' => '', 'family' => ''],
             'static_path' => 'static',
             'images_path' => 'images',
             'app_title' => '',
@@ -1776,6 +1777,27 @@ function mdw_sanitize_custom_css($css) {
     return $css;
 }
 
+function mdw_font_assets_normalize($raw) {
+    $out = ['stylesheet' => '', 'family' => ''];
+    if (!is_array($raw)) return $out;
+
+    $stylesheet = trim((string)($raw['stylesheet'] ?? ''));
+    $stylesheet = str_replace('\\', '/', $stylesheet);
+    if (
+        $stylesheet !== ''
+        && !str_contains($stylesheet, '..')
+        && preg_match('/^[A-Za-z0-9][A-Za-z0-9._\/-]*\.css$/', $stylesheet)
+    ) {
+        $out['stylesheet'] = ltrim($stylesheet, '/');
+    }
+
+    $family = trim((string)($raw['family'] ?? ''));
+    if ($family !== '' && strlen($family) <= 320 && preg_match('/^[A-Za-z0-9\s,\'"._-]+$/', $family)) {
+        $out['family'] = $family;
+    }
+    return $out;
+}
+
 function mdw_metadata_normalize_config($cfg) {
     $def = mdw_metadata_default_config();
     $out = $def;
@@ -1819,6 +1841,7 @@ function mdw_metadata_normalize_config($cfg) {
     if ($themePreset === '') $themePreset = 'default';
     $themeOverrides = mdw_theme_overrides_normalize($inSettings['theme_overrides'] ?? []);
     $customCss = mdw_sanitize_custom_css($inSettings['custom_css'] ?? '');
+    $fontAssets = mdw_font_assets_normalize($inSettings['font_assets'] ?? []);
     $appTitle = isset($inSettings['app_title']) ? trim((string)$inSettings['app_title']) : '';
     $internalLinkPrefix = isset($inSettings['internal_link_prefix']) ? trim((string)$inSettings['internal_link_prefix']) : '';
     $internalLinkPrefix = preg_replace('/[\r\n]+/', '', $internalLinkPrefix);
@@ -1856,6 +1879,7 @@ function mdw_metadata_normalize_config($cfg) {
         'theme_preset' => $themePreset,
         'theme_overrides' => $themeOverrides,
         'custom_css' => $customCss,
+        'font_assets' => $fontAssets,
         'static_path' => $staticPath,
         'images_path' => $imagesPath,
         'app_title' => $appTitle,

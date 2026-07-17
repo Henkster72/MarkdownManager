@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.94
+## 0.95
 
 - Visual link editing: fragment links such as `#section` are treated as internal links in the link modal and keep their fragment when updated.
 - Editor toolbar: the custom section/snippet dropdown is now labeled as custom sections instead of custom CSS, and imported CSS rules are scanned for section classes too.
@@ -17,6 +17,12 @@
 - WPM custom format toolbar: the control is now named `customFormat`, and superusers can choose whether `custom.css` and/or `sections` snippets appear; the choice is stored per instance.
 - WPM section includes: visual previews keep rendered section includes linked to their original `{% include "section_*.html" %}` directive when syncing back to Markdown, while exported HTML remains free of editor markers.
 - Instance styling: target instances can load generated or purged site CSS through the existing custom section CSS import path; instance settings remain the source of truth.
+- Optional shared authentication: instances can opt into a hardened, root-path session cookie so companion PHP tools share the same user login without changing the default per-instance login flow.
+- Instance fonts: `font_assets` lets an instance select a local stylesheet and font family for both editor surfaces while validating the configured asset path.
+- WPM public links and metadata: the public-page link remains available for the selected article, and Article metadata is enabled whenever an article is open.
+- Preview dialog isolation: MarkdownManager dialogs remain centered even when an instance preview stylesheet defines site-level `.modal` rules.
+- Image manager resilience: image lists remain valid JSON when filenames contain invalid UTF-8, and generated alt text handles those filenames without PHP deprecations.
+- Preview style URLs: legacy Pandoc-style inline style attributes preserve safe URL characters, so instance image backgrounds resolve instead of losing path separators.
 
 ## 0.93
 

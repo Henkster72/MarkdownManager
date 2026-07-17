@@ -2,6 +2,7 @@
 
 require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/shared_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json(['ok' => false, 'error' => 'method_not_allowed'], 405);
@@ -17,11 +18,23 @@ $action = isset($data['action']) ? (string)$data['action'] : '';
 $auth = mdw_auth_config();
 
 if ($action === 'status') {
+    $sharedRole = mdw_shared_auth_current_role();
+    $sharedToken = $sharedRole === 'superuser'
+        ? $auth['superuser_hash']
+        : ($sharedRole === 'user' ? $auth['user_hash'] : '');
     json([
         'ok' => true,
         'has_user' => $auth['user_hash'] !== '',
         'has_superuser' => $auth['superuser_hash'] !== '',
+        'shared_enabled' => mdw_shared_auth_enabled(),
+        'shared_role' => $sharedRole,
+        'shared_token' => $sharedToken,
     ]);
+}
+
+if ($action === 'logout') {
+    mdw_shared_auth_logout();
+    json(['ok' => true]);
 }
 
 if ($action === 'setup') {
@@ -49,6 +62,8 @@ if ($action === 'setup') {
     if (!$ok) {
         json(['ok' => false, 'error' => 'write_failed', 'message' => $msg], 500);
     }
+
+    mdw_shared_auth_login('superuser');
 
     json([
         'ok' => true,
@@ -121,6 +136,7 @@ if ($action === 'login') {
     }
 
     $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
+    mdw_shared_auth_login($role);
 
     json([
         'ok' => true,

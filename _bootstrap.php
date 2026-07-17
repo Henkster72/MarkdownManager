@@ -1,7 +1,25 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/env_loader.php';
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    $sharedAuthEnabled = in_array(strtolower(trim((string)env_str('MDW_SHARED_AUTH', ''))), ['1', 'true', 'yes', 'on'], true);
+    if ($sharedAuthEnabled) {
+        $secureCookie = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+        $sessionName = trim((string)env_str('MDW_SHARED_SESSION_NAME', 'MDW_SHARED_AUTH'));
+        $sessionPath = trim((string)env_str('MDW_SHARED_SESSION_PATH', '/'));
+        if ($sessionName !== '') {
+            session_name($sessionName);
+        }
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => $sessionPath !== '' ? $sessionPath : '/',
+            'secure' => $secureCookie,
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+    }
     session_start();
 }
 
@@ -20,7 +38,6 @@ if (
     }
 }
 
-require_once __DIR__ . '/env_loader.php';
 require_once __DIR__ . '/_resp.php';
 require_once __DIR__ . '/_path.php';
 
