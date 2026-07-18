@@ -1644,6 +1644,7 @@ if (isset($_GET['file'])) {
     if ($active_folder_for_breadcrumb === 'root') $active_folder_for_breadcrumb = null;
     $view_prev = null;
     $view_next = null;
+    $view_nav_items = [];
 
 if ($requested) {
     $full = mdw_safe_full_path($requested, true);
@@ -1702,6 +1703,16 @@ if ($requested) {
             if (!is_string($p) || $p === '') continue;
             if (is_secret_file($p) && !is_secret_authenticated()) continue;
             $paths[] = $p;
+            $userHidden = false;
+            if ($MDW_PUBLISHER_MODE) {
+                $info = explorer_view_extract_md_title_and_meta_from_file(
+                    __DIR__ . '/' . $p,
+                    (string)($e['basename'] ?? basename($p)),
+                    ['user_hidden']
+                );
+                $userHidden = mdw_hidden_meta_is_truthy($info['meta']['user_hidden'] ?? '');
+            }
+            $view_nav_items[] = ['path' => $p, 'user_hidden' => $userHidden];
         }
 
         $idx = array_search($requested, $paths, true);
@@ -2005,7 +2016,7 @@ window.mermaid = mermaid;
 <?php if ($indexSplitLayout): ?>
 <div class="index-split-root">
     <script>
-window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next]) ?>;
+window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next, 'items' => $view_nav_items]) ?>;
 <?php if ($indexSplitHasFile && isset($raw)): ?>
 window.CURRENT_FILE = <?= mdw_json_for_script($requested) ?>;
 window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
@@ -2298,7 +2309,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 
 <!-- Article view -->
 <script>
-window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next]) ?>;
+window.MDW_VIEW_NAV = <?= mdw_json_for_script(['prev' => $view_prev, 'next' => $view_next, 'items' => $view_nav_items]) ?>;
 <?php if ($mode === 'view' && $requested && isset($raw)): ?>
 window.CURRENT_FILE = <?= mdw_json_for_script($requested) ?>;
 window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;

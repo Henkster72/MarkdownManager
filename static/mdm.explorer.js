@@ -1586,6 +1586,21 @@
         return query ? `edit.php?${query}` : 'edit.php';
     };
     const nav = (window.MDW_VIEW_NAV && typeof window.MDW_VIEW_NAV === 'object') ? window.MDW_VIEW_NAV : null;
+    const viewNavTarget = (direction) => {
+        if (!Array.isArray(nav?.items)) {
+            return direction === 'previous' ? (nav?.prev || null) : (nav?.next || null);
+        }
+        const isSuperuser = typeof window.__mdwIsSuperuser === 'function' && window.__mdwIsSuperuser();
+        const accessible = nav.items.filter((item) => item
+            && typeof item.path === 'string'
+            && (isSuperuser || !item.user_hidden));
+        const currentIndex = accessible.findIndex((item) => item.path === file);
+        if (currentIndex < 0) return null;
+        const target = direction === 'previous'
+            ? accessible[currentIndex - 1]
+            : accessible[currentIndex + 1];
+        return target?.path || null;
+    };
 
     document.addEventListener('keydown', (e) => {
         const t = e.target;
@@ -1629,7 +1644,7 @@
 	        }
 
         if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-            const targetFile = (e.key === 'ArrowLeft') ? (nav?.prev || null) : (nav?.next || null);
+            const targetFile = viewNavTarget(e.key === 'ArrowLeft' ? 'previous' : 'next');
             if (!targetFile) return;
             e.preventDefault();
             const url = buildIndexUrl(targetFile, targetFile);

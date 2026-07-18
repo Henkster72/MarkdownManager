@@ -14,6 +14,7 @@
 - Explorer note actions: superuser visibility controls now share the edit/delete action group and its spacing.
 - Explorer note rows: publication and secret badges are centered with their adjacent action controls.
 - Action dividers: compact pane, header, navigation, and explorer action controls use a dedicated subtle divider without weakening general borders.
+- WPM keyboard navigation: normal users skip `user_hidden` Markdown files when moving through index previews with the arrow keys; superusers retain access to all notes.
 
 ## 0.952
 
