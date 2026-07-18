@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.952
+
+- WPM visual preview: rendered Jinja macro cards now preserve their original source when visual content is written back to Markdown, including macros nested inside `:::` containers.
+- WPM macro handling: `None`/`null` macro arguments no longer render as visible links or button labels, and `special.bigheader(...)` now has a matching non-editable visual preview component.
+- WPM page pictures: an `overview.add_header` macro is now the sole preview owner of its `page_picture`, preventing a duplicate standalone metadata image.
+- WPM blog previews: blog metadata now follows the template header order of image, title, subtitle, and date instead of the generic metadata order; instance preview CSS can retain its own site typography over the selected editor skin.
+- Markdown editor search: added `Ctrl+Shift+F` for find and `Ctrl+Shift+H` for find and replace. Both modes use one toggleable modal, and replacing one or all matches requires confirmation.
+- Translations: find, replace, match-status, and replacement-warning text is available in English, Dutch, German, French, Spanish, Italian, and Portuguese.
+
 ## 0.951
 
 - WPM image attributes: trailing `{: class="..."}` directives now apply directly to Markdown images, so image classes such as `rounded`, `biground`, and responsive utility classes render instead of appearing as visual-editor text.

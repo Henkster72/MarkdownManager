@@ -350,6 +350,12 @@
     "youtube_placeholder": "yob8SkcOKaYv o https://youtu.be/",
     "insert": "Inserisci link"
   },
+  "replace_modal": {
+    "title": "Cerca e sostituisci", "find_title": "Cerca", "find_label": "Cerca", "replace_label": "Sostituisci con",
+    "find_next": "Trova successivo", "replace_next": "Sostituisci successivo", "replace_all": "Sostituisci tutto",
+    "match_found": "Corrispondenza trovata.", "no_matches": "Nessuna corrispondenza trovata.", "replaced": "Sostituito.", "replaced_count": "{count} sostituiti.",
+    "confirm_next": "Sostituire la prossima occorrenza di \"{find}\" con \"{replace}\"?", "confirm_all": "Sostituire tutte le {count} occorrenze di \"{find}\" con \"{replace}\"?"
+  },
   "image_modal": {
     "title": "Inserisci immagine",
     "choose_file": "Scegli file",

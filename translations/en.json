@@ -369,6 +369,12 @@
     "insert": "Insert link",
     "update": "Change"
   },
+  "replace_modal": {
+    "title": "Find and replace", "find_title": "Find", "find_label": "Find", "replace_label": "Replace with",
+    "find_next": "Find next", "replace_next": "Replace next", "replace_all": "Replace all",
+    "match_found": "Match found.", "no_matches": "No matches found.", "replaced": "Replaced.", "replaced_count": "{count} replaced.",
+    "confirm_next": "Replace the next occurrence of \"{find}\" with \"{replace}\"?", "confirm_all": "Replace all {count} occurrences of \"{find}\" with \"{replace}\"?"
+  },
   "image_modal": {
     "title": "Insert image",
     "choose_file": "Choose file",

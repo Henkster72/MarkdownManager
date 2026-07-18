@@ -1,4 +1,4 @@
-# MarkdownManager v0.951
+# MarkdownManager v0.952
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.952: WPM preview now preserves supported Jinja macro source during visual editing, renders common site macros such as `special.bigheader`, prevents duplicate page pictures, and aligns blog metadata headers with the source template order. The Markdown pane now supports localized find (`Ctrl+Shift+F`) and confirmed find/replace (`Ctrl+Shift+H`).
 - v0.951: WPM now applies trailing image classes directly to images, preserves responsive Tailwind class syntax in fenced divs and attribute lists, and prevents duplicate legacy bullet rendering in blockquotes.
 - v0.95: WPM visual preview and reusable sections/macros are more reliable, custom format sources are configurable, legacy Jinja syntax stays out of visual editing, and nested instances can use relative assets, local fonts, shared authentication, resilient image lists, and isolated preview CSS without affecting the editor UI.
 - v0.93: WPM folder sorting now keeps newest articles first by `post_date`, then `creationdate`, then filename date; date parsing handles Dutch/English display dates; hide-Markdown image tips are suppressed; article metadata now shows the slug in the title and includes an inline `page_picture` image picker.
@@ -79,7 +80,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Versions 0.9 through 0.951 refreshed labels for WPM visual-editor controls, article metadata editing, TOC toolbar options, WPM settings text, link editing, custom sections, TOC/public-link/editor stability fixes, and the latest article metadata/image-picker notes.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.952 adds localized find/replace actions, match feedback, and replacement confirmations; earlier releases refreshed labels for WPM visual-editor controls, article metadata editing, TOC toolbar options, WPM settings text, link editing, custom sections, and editor stability fixes.
 
 ## Security warning (read this)
 

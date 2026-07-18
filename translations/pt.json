@@ -342,6 +342,12 @@
     "youtube_placeholder": "yob8SkcOKaYv ou https://youtu.be/",
     "insert": "Inserir ligação"
   },
+  "replace_modal": {
+    "title": "Pesquisar e substituir", "find_title": "Pesquisar", "find_label": "Pesquisar", "replace_label": "Substituir por",
+    "find_next": "Localizar seguinte", "replace_next": "Substituir seguinte", "replace_all": "Substituir tudo",
+    "match_found": "Ocorrência encontrada.", "no_matches": "Nenhuma ocorrência encontrada.", "replaced": "Substituído.", "replaced_count": "{count} substituídos.",
+    "confirm_next": "Substituir a próxima ocorrência de \"{find}\" por \"{replace}\"?", "confirm_all": "Substituir todas as {count} ocorrências de \"{find}\" por \"{replace}\"?"
+  },
   "image_modal": {
     "title": "Inserir imagem",
     "choose_file": "Escolher ficheiro",

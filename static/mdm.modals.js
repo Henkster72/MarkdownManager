@@ -1412,13 +1412,18 @@
     const modal = document.getElementById('replaceModal');
     const overlay = document.getElementById('replaceModalOverlay');
     const closeBtn = document.getElementById('replaceModalClose');
+    const titleEl = document.getElementById('replaceModalTitle');
+    const findNextBtn = document.getElementById('findNextBtn');
     const replaceNextBtn = document.getElementById('replaceNextBtn');
     const replaceAllBtn = document.getElementById('replaceAllBtn');
     const findInput = document.getElementById('replaceFindInput');
     const replaceInput = document.getElementById('replaceWithInput');
+    const replaceWithField = document.getElementById('replaceWithField');
     const statusEl = document.getElementById('replaceModalStatus');
     const editor = document.getElementById('editor');
-    if (!modal || !overlay || !replaceNextBtn || !replaceAllBtn || !findInput || !replaceInput || !editor) return;
+    if (!modal || !overlay || !findNextBtn || !replaceNextBtn || !replaceAllBtn || !findInput || !replaceInput || !replaceWithField || !editor) return;
+    const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
+    let replaceMode = false;
 
     const setStatus = (msg, kind = 'info') => {
         if (!statusEl) return;
@@ -1431,11 +1436,24 @@
     const updateButtons = () => {
         const needle = String(findInput.value || '');
         const hasNeedle = needle.trim() !== '';
-        replaceNextBtn.disabled = !hasNeedle;
-        replaceAllBtn.disabled = !hasNeedle;
+        findNextBtn.disabled = !hasNeedle;
+        replaceNextBtn.disabled = !replaceMode || !hasNeedle;
+        replaceAllBtn.disabled = !replaceMode || !hasNeedle;
     };
 
-    const open = () => {
+    const setMode = (nextReplaceMode) => {
+        replaceMode = !!nextReplaceMode;
+        replaceWithField.hidden = !replaceMode;
+        findNextBtn.hidden = replaceMode;
+        replaceNextBtn.hidden = !replaceMode;
+        replaceAllBtn.hidden = !replaceMode;
+        if (titleEl) titleEl.textContent = replaceMode
+            ? t('replace_modal.title', 'Find and replace')
+            : t('replace_modal.find_title', 'Find');
+        updateButtons();
+    };
+
+    const open = (nextReplaceMode = false) => {
         if (typeof window.__mdwCloseLinkModal === 'function') {
             window.__mdwCloseLinkModal();
         }
@@ -1449,6 +1467,7 @@
         modal.hidden = false;
         mdmModalOpen(true);
         setStatus('');
+        setMode(nextReplaceMode);
 
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
@@ -1471,7 +1490,8 @@
         editor.focus();
     };
 
-    window.__mdwOpenReplaceModal = open;
+    window.__mdwOpenFindModal = () => open(false);
+    window.__mdwOpenReplaceModal = () => open(true);
     window.__mdwCloseReplaceModal = close;
 
     const replaceRange = (start, end, replacement) => {
@@ -1489,25 +1509,39 @@
         return idx;
     };
 
+    const findNext = () => {
+        const needle = String(findInput.value || '');
+        if (!needle) return;
+        const idx = findNextIndex(needle);
+        if (idx === -1) {
+            setStatus(t('replace_modal.no_matches', 'No matches found.'), 'error');
+            return;
+        }
+        editor.setSelectionRange(idx, idx + needle.length);
+        editor.focus();
+        setStatus(t('replace_modal.match_found', 'Match found.'), 'ok');
+    };
+
     const replaceNext = () => {
         const needle = String(findInput.value || '');
         if (!needle) return;
         const replacement = String(replaceInput.value || '');
+        if (!window.confirm(t('replace_modal.confirm_next', 'Replace the next occurrence of "{find}" with "{replace}"?', { find: needle, replace: replacement }))) return;
         const selStart = editor.selectionStart ?? 0;
         const selEnd = editor.selectionEnd ?? 0;
         if (selEnd > selStart && editor.value.slice(selStart, selEnd) === needle) {
             replaceRange(selStart, selEnd, replacement);
-            setStatus('Replaced.', 'ok');
+            setStatus(t('replace_modal.replaced', 'Replaced.'), 'ok');
             return;
         }
 
         const idx = findNextIndex(needle);
         if (idx === -1) {
-            setStatus('No matches found.', 'error');
+            setStatus(t('replace_modal.no_matches', 'No matches found.'), 'error');
             return;
         }
         replaceRange(idx, idx + needle.length, replacement);
-        setStatus('Replaced.', 'ok');
+        setStatus(t('replace_modal.replaced', 'Replaced.'), 'ok');
     };
 
     const replaceAll = () => {
@@ -1517,9 +1551,17 @@
         const hay = editor.value;
         let idx = hay.indexOf(needle);
         if (idx === -1) {
-            setStatus('No matches found.', 'error');
+            setStatus(t('replace_modal.no_matches', 'No matches found.'), 'error');
             return;
         }
+
+        let matchCount = 0;
+        let countCursor = idx;
+        while (countCursor !== -1) {
+            matchCount++;
+            countCursor = hay.indexOf(needle, countCursor + needle.length);
+        }
+        if (!window.confirm(t('replace_modal.confirm_all', 'Replace all {count} occurrences of "{find}" with "{replace}"?', { count: matchCount, find: needle, replace: replacement }))) return;
 
         let out = '';
         let start = 0;
@@ -1539,11 +1581,12 @@
 
         const lastIdx = out.lastIndexOf(replacement);
         if (lastIdx >= 0) editor.setSelectionRange(lastIdx, lastIdx + replacement.length);
-        setStatus(`${count} replaced.`, 'ok');
+        setStatus(t('replace_modal.replaced_count', '{count} replaced.', { count }), 'ok');
     };
 
     overlay.addEventListener('click', close);
     closeBtn?.addEventListener('click', close);
+    findNextBtn.addEventListener('click', findNext);
     replaceNextBtn.addEventListener('click', replaceNext);
     replaceAllBtn.addEventListener('click', replaceAll);
     findInput.addEventListener('input', updateButtons);
@@ -1551,6 +1594,20 @@
 
     document.addEventListener('keydown', (e) => {
         if (modal.hidden) return;
+        if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+            if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                setMode(false);
+                findInput.focus();
+                return;
+            }
+            if (e.key === 'h' || e.key === 'H') {
+                e.preventDefault();
+                setMode(true);
+                replaceInput.focus();
+                return;
+            }
+        }
         if (e.key !== 'Escape' && e.key !== 'Esc') return;
         e.preventDefault();
         close();
@@ -1559,9 +1616,10 @@
     modal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (!replaceNextBtn.disabled) replaceNext();
+            if (replaceMode && !replaceNextBtn.disabled) replaceNext();
+            else if (!replaceMode && !findNextBtn.disabled) findNext();
         }
-        if (e.key === 'Enter' && e.shiftKey) {
+        if (replaceMode && e.key === 'Enter' && e.shiftKey) {
             e.preventDefault();
             if (!replaceAllBtn.disabled) replaceAll();
         }

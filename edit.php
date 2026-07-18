@@ -1976,7 +1976,7 @@ window.mermaid = mermaid;
 			<div class="modal-overlay no-blur" id="replaceModalOverlay" hidden></div>
 			<div class="modal modal-small" id="replaceModal" role="dialog" aria-modal="true" aria-labelledby="replaceModalTitle" hidden>
 			    <div class="modal-header">
-			        <div class="modal-title" id="replaceModalTitle"><?=h(mdw_t('replace_modal.title','Replace'))?></div>
+			        <div class="modal-title" id="replaceModalTitle"><?=h(mdw_t('replace_modal.find_title','Find'))?></div>
 			        <button type="button" class="btn btn-ghost icon-button" id="replaceModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
 			            <span class="pi pi-cross"></span>
 			        </button>
@@ -1986,14 +1986,15 @@ window.mermaid = mermaid;
 			            <label class="modal-label" for="replaceFindInput"><?=h(mdw_t('replace_modal.find_label','Find'))?></label>
 			            <input id="replaceFindInput" type="text" class="input" autocomplete="off">
 			        </div>
-			        <div class="modal-field">
+			        <div class="modal-field" id="replaceWithField" hidden>
 			            <label class="modal-label" for="replaceWithInput"><?=h(mdw_t('replace_modal.replace_label','Replace with'))?></label>
 			            <input id="replaceWithInput" type="text" class="input" autocomplete="off">
 			        </div>
-			        <div class="status-text" id="replaceModalStatus" style="min-height: 1.1em;"></div>
+			        <div class="status-text" id="replaceModalStatus" style="min-height: 1.1em;" role="status" aria-live="polite"></div>
 			    </div>
 			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
-			        <button type="button" class="btn btn-ghost btn-small" id="replaceAllBtn" disabled><?=h(mdw_t('replace_modal.replace_all','Replace all'))?></button>
+			        <button type="button" class="btn btn-ghost btn-small" id="findNextBtn" disabled><?=h(mdw_t('replace_modal.find_next','Find next'))?></button>
+			        <button type="button" class="btn btn-ghost btn-small" id="replaceAllBtn" disabled hidden><?=h(mdw_t('replace_modal.replace_all','Replace all'))?></button>
 			        <button type="button" class="btn btn-primary btn-small" id="replaceNextBtn" disabled><?=h(mdw_t('replace_modal.replace_next','Replace next'))?></button>
 			    </div>
 			</div>

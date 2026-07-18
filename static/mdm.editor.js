@@ -5342,6 +5342,20 @@
     });
 
     ta.addEventListener('keydown', (e) => {
+        // Find and replace use the standard Ctrl+Shift shortcuts, independent of
+        // the configurable Ctrl+Alt formatting modifier.
+        if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
+            if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                if (typeof window.__mdwOpenFindModal === 'function') window.__mdwOpenFindModal();
+                return;
+            }
+            if (e.key === 'h' || e.key === 'H') {
+                e.preventDefault();
+                if (typeof window.__mdwOpenReplaceModal === 'function') window.__mdwOpenReplaceModal();
+                return;
+            }
+        }
         if (!isModKey(e)) return;
 
         // Save: Ctrl+Alt+S
