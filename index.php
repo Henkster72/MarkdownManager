@@ -1766,6 +1766,7 @@ if ($requested) {
 
         $indexSplitLayout = !$MDW_BASIC_MODE && $indexDualPaneEnabled && $mode !== 'secret_prompt';
         $indexSplitHasFile = $mode === 'view' && is_string($requested) && $requested !== '';
+        $indexSplitCanCreateFromPreview = $indexSplitLayout && !$indexSplitHasFile && !empty($MDW_PUBLISHER_MODE) && !empty($hideMarkdownEditor);
         $indexSplitColStorageKey = 'mdw_index_split_col_widths';
         $indexSplitColStorageLegacyKey = 'mdw_index_col_widths';
         $indexSplitRowStorageKey = 'mdw_index_split_row_heights';
@@ -2153,7 +2154,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                         </div>
                     </header>
                     <div class="pane-body preview-body">
-                        <article id="preview" class="preview-content">
+                        <article id="preview" class="preview-content<?= $indexSplitCanCreateFromPreview ? ' preview-create-target' : '' ?>"<?= $indexSplitCanCreateFromPreview ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('index.new_markdown.title', 'New markdown')) . '"' : '' ?>>
                         <?php if ($indexSplitHasFile): ?>
                             <?=$article_html?>
                         <?php else: ?>

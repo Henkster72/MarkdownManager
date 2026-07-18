@@ -542,10 +542,10 @@
     const newFolderForm = document.getElementById('newFolderForm');
     const newFolderName = document.getElementById('newFolderName');
 
-    if (!newMdToggle) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     if (!newMdPanel) {
+        if (!newMdToggle) return;
         newMdToggle.addEventListener('click', () => {
             window.location.href = 'index.php?new=1';
         });
@@ -589,7 +589,20 @@
     window.__mdwOpenNewMdModal = open;
     window.__mdwCloseNewMdModal = close;
 
-    newMdToggle.addEventListener('click', toggle);
+    newMdToggle?.addEventListener('click', toggle);
+    const emptyPreview = document.querySelector('[data-new-md-empty-preview="1"]');
+    if (emptyPreview instanceof HTMLElement) {
+        const openFromPreview = (event) => {
+            if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea, label')) return;
+            open();
+        };
+        emptyPreview.addEventListener('click', openFromPreview);
+        emptyPreview.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            open();
+        });
+    }
     if (!newMdModalBinding) {
         newMdClose?.addEventListener('click', close);
         newMdOverlay?.addEventListener('click', close);
@@ -618,6 +631,120 @@
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
     };
+    const newMdPicture = newMdForm?.querySelector?.('input[data-new-md-meta-key="page_picture"]') || null;
+    const newMdPictureWrap = newMdPicture?.closest?.('.modal-field') || null;
+    let newMdImages = null;
+    let newMdImagesPromise = null;
+    const newMdImageToken = (image) => {
+        const file = String(image?.file || '').trim();
+        if (file) return file;
+        const path = String(image?.path || '').replace(/\\/g, '/');
+        return path.split('/').pop() || '';
+    };
+    const renderNewMdImages = (list, filter) => {
+        if (!(list instanceof HTMLElement) || !(newMdPicture instanceof HTMLInputElement)) return;
+        const query = String(filter?.value || '').trim().toLowerCase();
+        const images = Array.isArray(newMdImages) ? newMdImages : [];
+        const filtered = query
+            ? images.filter((image) => `${image.file || ''} ${image.alt || ''} ${image.path || ''}`.toLowerCase().includes(query))
+            : images;
+        list.textContent = '';
+        if (!filtered.length) {
+            const empty = document.createElement('div');
+            empty.className = 'status-text';
+            empty.style.padding = '0.45rem';
+            empty.textContent = t('image_modal.no_images', 'No images found.');
+            list.appendChild(empty);
+            return;
+        }
+        filtered.forEach((image) => {
+            const token = newMdImageToken(image);
+            if (!token) return;
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'btn btn-ghost';
+            row.style.width = '100%';
+            row.style.justifyContent = 'flex-start';
+            row.style.gap = '0.55rem';
+            row.style.marginTop = '0.35rem';
+            const thumbnail = document.createElement('img');
+            thumbnail.src = String(image.path || '');
+            thumbnail.alt = '';
+            thumbnail.loading = 'lazy';
+            thumbnail.style.width = '42px';
+            thumbnail.style.height = '42px';
+            thumbnail.style.objectFit = 'cover';
+            thumbnail.style.borderRadius = '0.5rem';
+            const label = document.createElement('span');
+            label.style.overflow = 'hidden';
+            label.style.textOverflow = 'ellipsis';
+            label.style.whiteSpace = 'nowrap';
+            label.textContent = String(image.alt || token);
+            row.append(thumbnail, label);
+            row.addEventListener('click', () => {
+                newMdPicture.value = token;
+                newMdPicture.dispatchEvent(new Event('input', { bubbles: true }));
+                newMdPicture.focus();
+            });
+            list.appendChild(row);
+        });
+    };
+    const attachNewMdPicturePicker = () => {
+        if (!(newMdPictureWrap instanceof HTMLElement) || !(newMdPicture instanceof HTMLInputElement)) return;
+        const tools = document.createElement('div');
+        tools.style.display = 'flex';
+        tools.style.gap = '0.5rem';
+        tools.style.marginTop = '0.45rem';
+        tools.style.alignItems = 'center';
+        const togglePicker = document.createElement('button');
+        togglePicker.type = 'button';
+        togglePicker.className = 'btn btn-ghost btn-small';
+        togglePicker.textContent = t('image_modal.title', 'Insert image');
+        const status = document.createElement('span');
+        status.className = 'status-text';
+        tools.append(togglePicker, status);
+        const picker = document.createElement('div');
+        picker.hidden = true;
+        picker.style.marginTop = '0.55rem';
+        picker.style.border = '1px solid var(--border-soft)';
+        picker.style.borderRadius = '0.75rem';
+        picker.style.padding = '0.55rem';
+        const filter = document.createElement('input');
+        filter.type = 'search';
+        filter.className = 'input';
+        filter.placeholder = t('image_modal.search_images', 'Search images...');
+        const list = document.createElement('div');
+        list.style.maxHeight = '28vh';
+        list.style.overflow = 'auto';
+        list.style.marginTop = '0.3rem';
+        picker.append(filter, list);
+        newMdPictureWrap.append(tools, picker);
+        filter.addEventListener('input', () => renderNewMdImages(list, filter));
+        togglePicker.addEventListener('click', async () => {
+            picker.hidden = !picker.hidden;
+            if (picker.hidden) return;
+            status.textContent = t('image_modal.loading', 'Loading…');
+            try {
+                if (!Array.isArray(newMdImages)) {
+                    if (!newMdImagesPromise) {
+                        const api = window.MDM?.api;
+                        if (!api || typeof api.get !== 'function') throw new Error('network');
+                        newMdImagesPromise = api.get('image_manager.php?action=list');
+                    }
+                    const data = await newMdImagesPromise;
+                    if (!data || data.ok !== true) throw new Error('network');
+                    newMdImages = Array.isArray(data.images) ? data.images : [];
+                }
+                status.textContent = '';
+                renderNewMdImages(list, filter);
+                filter.focus();
+            } catch (error) {
+                newMdImagesPromise = null;
+                status.textContent = t('image_modal.load_failed', 'Failed to load images.');
+            }
+        });
+    };
+    attachNewMdPicturePicker();
     const emojiRe = (() => {
         try {
             return /\p{Extended_Pictographic}/u;

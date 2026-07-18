@@ -160,7 +160,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
                 <?php foreach ($publisherFields as $field): ?>
                     <div class="modal-field article-meta-field">
                         <label class="modal-label" for="newMdMeta_<?= $esc($field['key']) ?>"><?= $esc($field['label']) ?></label>
-                        <input id="newMdMeta_<?= $esc($field['key']) ?>" class="input" type="text" name="new_meta[<?= $esc($field['key']) ?>]" value="<?= $esc($field['value']) ?>">
+                        <input id="newMdMeta_<?= $esc($field['key']) ?>" class="input" type="text" name="new_meta[<?= $esc($field['key']) ?>]" value="<?= $esc($field['value']) ?>" data-new-md-meta-key="<?= $esc($field['key']) ?>">
                     </div>
                 <?php endforeach; ?>
 
