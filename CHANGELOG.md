@@ -13,6 +13,7 @@
 - Action groups: app-header and explorer controls now share the compact, divider-only toolbar treatment.
 - Explorer note actions: superuser visibility controls now share the edit/delete action group and its spacing.
 - Explorer note rows: publication and secret badges are centered with their adjacent action controls.
+- Action dividers: compact pane, header, navigation, and explorer action controls use a dedicated subtle divider without weakening general borders.
 
 ## 0.952
 
