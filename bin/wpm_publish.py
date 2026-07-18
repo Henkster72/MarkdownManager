@@ -258,6 +258,9 @@ def sync_shadow(staging: Path, shadow: Path, known: dict[str, str]) -> tuple[dic
                 local_changed = local_hash != previous
                 remote_changed = remote_hash != previous
                 if local_changed and remote_changed:
+                    if publish_state(target) == "processing":
+                        active_files[rel] = target
+                        continue
                     conflicts.append(rel)
                     continue
                 copy_remote = remote_changed and not local_changed
