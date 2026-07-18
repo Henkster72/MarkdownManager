@@ -3947,6 +3947,29 @@
         return { start, end, text: ta.value.slice(start, end) };
     };
 
+    const normalizeHeadingText = (value) => {
+        let text = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+        let prev = '';
+        while (text && text !== prev) {
+            prev = text;
+            text = text
+                .replace(/^\s*(?:\*\*|__)\s*(.*?)\s*(?:\*\*|__)\s*$/s, '$1')
+                .replace(/^\s*(?:\*|_)\s*(.*?)\s*(?:\*|_)\s*$/s, '$1')
+                .trim();
+        }
+        return text
+            .replace(/(\*\*|__)([^*_].*?)\1/g, '$2')
+            .replace(/(^|[\s([{])([*_])([^*_]+)\2(?=$|[\s)\]},.!?:;])/g, '$1$3')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    const normalizeMarkdownHeadingLine = (line) => {
+        const m = String(line || '').match(/^(\s*#{1,6})(\s+)(.*)$/);
+        if (!m) return String(line || '');
+        return `${m[1]}${m[2]}${normalizeHeadingText(m[3])}`;
+    };
+
     const setSelection = (start, end) => {
         ta.setSelectionRange(Math.max(0, start), Math.max(0, end));
     };
@@ -3979,7 +4002,7 @@
         const lines = value.split('\n').map((line) => {
             const absStart = offset;
             offset += line.length + 1;
-            const next = cleanMarkdownHeadingLine(line);
+            const next = normalizeMarkdownHeadingLine(line);
             if (next === line) return line;
             changed = true;
             const delta = next.length - line.length;
@@ -4245,7 +4268,7 @@
             const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
             if (!m) {
                 if (delta > 0) {
-                    const out = '## ' + cleanHeadingText(line);
+                    const out = '## ' + normalizeHeadingText(line);
                     deltas.push({ absStart, delta: out.length - line.length });
                     return out;
                 }
@@ -4255,7 +4278,7 @@
 
             const indent = m[1] || '';
             const hashes = m[2] || '';
-            const rest = cleanHeadingText(m[3] || '');
+            const rest = normalizeHeadingText(m[3] || '');
             const level = hashes.length;
             const rawNextLevel = level + delta;
             const nextLevel = rawNextLevel <= 1 ? 0 : Math.max(2, Math.min(6, rawNextLevel));
@@ -4307,7 +4330,7 @@
             const m = line.match(/^(\s*)(#{1,6})\s*(.*)$/);
             const indent = m ? (m[1] || '') : (line.match(/^(\s*)/)?.[1] || '');
             const restRaw = m ? (m[3] || '') : line.slice(indent.length);
-            const rest = cleanHeadingText(restRaw.replace(/^\s+/, ''));
+            const rest = normalizeHeadingText(restRaw.replace(/^\s+/, ''));
             const out = indent + '#'.repeat(level) + ' ' + rest;
             deltas.push({ absStart, delta: out.length - line.length });
             return out;
