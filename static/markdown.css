@@ -191,6 +191,16 @@
     margin: 0.15rem 0;
 }
 
+.md-checklist {
+    list-style: none;
+    margin: 0.35rem 0;
+    padding: 0;
+}
+
+.md-checklist .md-li {
+    margin: 0.1rem 0;
+}
+
 .md-math-block {
     margin: 0.5rem 0;
     overflow-x: auto;

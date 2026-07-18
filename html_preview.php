@@ -3440,11 +3440,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         }
     }
 
-    $openList = function($tag, $indent) use (&$html, &$listStack, $p) {
+    $openList = function($tag, $indent, $isChecklist = false) use (&$html, &$listStack, $p) {
         $listClass = $tag === 'ol' ? ($p['ol_class'] ?? '') : ($p['ul_class'] ?? '');
+        if ($isChecklist) $listClass = md_join_classes($listClass, 'md-checklist');
         $attr = $listClass ? ' class="'.htmlspecialchars($listClass, ENT_QUOTES, 'UTF-8').'"' : '';
         $html[] = "<$tag$attr>";
-        $listStack[] = ['tag' => $tag, 'indent' => (int)$indent, 'liOpen' => false];
+        $listStack[] = ['tag' => $tag, 'indent' => (int)$indent, 'liOpen' => false, 'checklist' => $isChecklist];
     };
     $closeOneList = function() use (&$html, &$listStack) {
         if (empty($listStack)) return;
@@ -3826,6 +3827,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $tag = $isOrdered ? 'ol' : 'ul';
             $indent = md_indent_width($m[1] ?? '');
             $content = (string)($m[3] ?? '');
+            $isChecklist = !$isOrdered && preg_match('/^✅\s+/u', $content) === 1;
             $inlineAttrs = null;
             $trailing = mdw_attr_list_extract_trailing($content);
             if (is_array($trailing)) {
@@ -3841,21 +3843,24 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             }
 
             if (empty($listStack)) {
-                $openList($tag, $indent);
+                $openList($tag, $indent, $isChecklist);
             } else {
                 if ($indent > $listStack[count($listStack) - 1]['indent']) {
-                    $openList($tag, $indent);
+                    $openList($tag, $indent, $isChecklist);
                 } else if ($indent < $listStack[count($listStack) - 1]['indent']) {
                     $closeToIndent($indent);
                 }
 
                 if (empty($listStack)) {
-                    $openList($tag, $indent);
-                } else if ($listStack[count($listStack) - 1]['indent'] === $indent && $listStack[count($listStack) - 1]['tag'] !== $tag) {
+                    $openList($tag, $indent, $isChecklist);
+                } else if (
+                    $listStack[count($listStack) - 1]['indent'] === $indent
+                    && ($listStack[count($listStack) - 1]['tag'] !== $tag || !empty($listStack[count($listStack) - 1]['checklist']) !== $isChecklist)
+                ) {
                     $closeOneList();
-                    $openList($tag, $indent);
+                    $openList($tag, $indent, $isChecklist);
                 } else if ($listStack[count($listStack) - 1]['indent'] !== $indent) {
-                    $openList($tag, $indent);
+                    $openList($tag, $indent, $isChecklist);
                 }
             }
 
