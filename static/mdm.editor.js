@@ -348,6 +348,7 @@
     const setupPublishControlsPlacement = () => {
         const publishBtn = document.getElementById('publishBtn');
         const publishStateSelect = document.getElementById('publishStateSelect');
+        const submitForProcessingBtn = document.getElementById('submitForProcessingBtn');
         if (!(publishBtn instanceof HTMLElement) || !(publishStateSelect instanceof HTMLElement)) return;
         if (document.body?.classList.contains('hide-markdown-editor')) return;
         const headerActions = document.querySelector('#paneMarkdown .pane-header-actions');
@@ -357,6 +358,9 @@
 
         const moveToToolbar = () => {
             if (publishBtn.parentElement === toolbarLeft) return;
+            if (submitForProcessingBtn instanceof HTMLElement) {
+                revertBtn.insertAdjacentElement('afterend', submitForProcessingBtn);
+            }
             revertBtn.insertAdjacentElement('afterend', publishBtn);
             publishBtn.insertAdjacentElement('afterend', publishStateSelect);
         };
@@ -1884,6 +1888,7 @@
     };
 
     const publishBtn = document.getElementById('publishBtn');
+    const submitForProcessingBtn = document.getElementById('submitForProcessingBtn');
     const publishStateSelect = document.getElementById('publishStateSelect');
     const publishStateOverride = document.getElementById('publishStateOverride');
     let currentPublishState = '';
@@ -1959,6 +1964,9 @@
             || !!String((editorForm instanceof HTMLFormElement ? editorForm.querySelector('input[name="file"]') : null)?.value || '').trim();
         if (publishBtn instanceof HTMLButtonElement || publishBtn instanceof HTMLInputElement) {
             publishBtn.disabled = !hasFile || state.toLowerCase() !== 'concept';
+        }
+        if (submitForProcessingBtn instanceof HTMLButtonElement || submitForProcessingBtn instanceof HTMLInputElement) {
+            submitForProcessingBtn.disabled = !hasFile || state.toLowerCase() !== 'concept';
         }
         updatePublishBadge(state);
         if (typeof window.__mdwUpdateWpmPublicPageLink === 'function') {
@@ -2133,6 +2141,18 @@
             (submitter instanceof HTMLElement && submitter.getAttribute('name') === 'publish_action') ||
             (active && active.getAttribute('name') === 'publish_action')
         );
+        const publishAction = String((submitter instanceof HTMLElement ? submitter.getAttribute('value') : '')
+            || (active ? active.getAttribute('value') : '') || '');
+        if (publishAction === 'submit_for_processing') {
+            e.preventDefault();
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'publish_action';
+            actionInput.value = publishAction;
+            editorForm.appendChild(actionInput);
+            ajaxSave().finally(() => actionInput.remove());
+            return;
+        }
         if (isPublish) return;
         e.preventDefault();
         ajaxSave();

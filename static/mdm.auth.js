@@ -590,6 +590,15 @@
         return false;
     };
 
+    const canSubmitForProcessing = () => {
+        const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object')
+            ? window.MDW_AUTH_META
+            : { has_user: false, has_superuser: false };
+        if (!(meta.has_user || meta.has_superuser)) return false;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        return !!auth && auth.role === 'user';
+    };
+
     const applyPublishPermissions = () => {
         const allow = canPublish();
         document.querySelectorAll('[data-auth-publish="1"]').forEach((el) => {
@@ -611,12 +620,21 @@
             (active && active.getAttribute('name') === 'publish_action')
         );
         if (!isPublish) return;
+        const action = String((submitter instanceof HTMLElement ? submitter.getAttribute('value') : '')
+            || (active ? active.getAttribute('value') : '') || '');
+        if (action === 'submit_for_processing') {
+            if (canSubmitForProcessing()) return;
+            e.preventDefault();
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
         if (canPublish()) return;
         e.preventDefault();
         if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
     }, true);
 
     window.__mdwCanPublish = canPublish;
+    window.__mdwCanSubmitForProcessing = canSubmitForProcessing;
     window.__mdwApplyPublishPermissions = applyPublishPermissions;
     applyPublishPermissions();
 })();

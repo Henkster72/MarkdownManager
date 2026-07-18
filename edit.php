@@ -896,6 +896,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $desiredPublishState = null;
                 $allowedPublishStates = ['Concept', 'Processing', 'Published'];
                 $canPublish = false;
+                $canSubmitForProcessing = false;
                 $publishStateCandidate = null;
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $authRequired = function_exists('mdw_auth_has_role')
@@ -903,8 +904,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         : false;
                     $allowUserPublish = !array_key_exists('allow_user_publish', $MDW_SETTINGS) ? false : !empty($MDW_SETTINGS['allow_user_publish']);
                     $canPublish = !$authRequired || $authIsSuperuser || ($authIsUser && $allowUserPublish);
+                    $canSubmitForProcessing = $authRequired && $authIsUser && !$authIsSuperuser;
 
                     if ($canPublish && $publishAction === 'publish') {
+                        $desiredPublishState = 'Processing';
+                    } else if ($canSubmitForProcessing && $publishAction === 'submit_for_processing') {
                         $desiredPublishState = 'Processing';
                     } else if ($authIsSuperuser && $publishStateOverride && $publishStateInput !== '') {
                         $candidate = mdw_publisher_normalize_publishstate($publishStateInput);
@@ -915,7 +919,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
 
                     if ($desiredPublishState === null) {
-                        $desiredPublishState = 'Concept';
+                        $desiredPublishState = $existingPublishState;
                     }
                 }
                 $finalPublishState = null;
@@ -926,12 +930,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $isPublishAttempt = false;
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $isPublishAttempt = ($canPublish && $publishAction === 'publish')
+                        || ($canSubmitForProcessing && $publishAction === 'submit_for_processing')
                         || ($publishStateCandidate !== null && $publishStateCandidate !== 'Concept');
                 }
 
                 $author = '';
                 if (!empty($MDW_PUBLISHER_MODE)) {
-                    $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
+                    $defaultAuthor = isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '';
+                    $metadataAuthor = trim((string)($submittedMeta['author'] ?? $existingMeta['author'] ?? ''));
+                    $author = $postedAuthor !== '' ? $postedAuthor : ($metadataAuthor !== '' ? $metadataAuthor : $defaultAuthor);
                     $publisherWarnings = [];
                     if ($author === '') {
                         $publisherWarnings[] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
@@ -1496,7 +1503,7 @@ window.mermaid = mermaid;
                             <input type="hidden" name="publish_state_override" id="publishStateOverride" value="0">
                         <?php endif; ?>
 
-                        <?php $editorToolbar = function() use ($requested, $MDW_PUBLISHER_MODE, $tocButtonEnabled) { ?>
+                        <?php $editorToolbar = function() use ($requested, $MDW_PUBLISHER_MODE, $tocButtonEnabled, $current_publish_state_lower) { ?>
                         <div class="editor-toolbar">
                             <div class="editor-toolbar-left">
                                 <button type="submit" form="editor-form" class="btn btn-ghost" id="saveBtn">
@@ -1568,6 +1575,11 @@ window.mermaid = mermaid;
                                     <span class="pi pi-recycle"></span>
                                     <span class="btn-label"><?=h(mdw_t('edit.toolbar.revert','Revert'))?></span>
                                 </button>
+                                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
+                                <button type="submit" form="editor-form" class="btn btn-ghost" id="submitForProcessingBtn" name="publish_action" value="submit_for_processing" data-auth-regular="1" <?= (!$requested || $current_publish_state_lower !== 'concept') ? 'disabled' : '' ?> title="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>" aria-label="<?=h(mdw_t('edit.toolbar.publish_title','Send to processing'))?>">
+                                    <span class="pi pi-send"></span>
+                                </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php }; ?>
