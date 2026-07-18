@@ -1410,6 +1410,13 @@ function mdw_toc_collect_h3($text) {
             continue;
         }
 
+        if (preg_match('/^\s*(?:[-*]|\d+\.)\s+(#{1,6})\s+(.*)$/', $line, $m)) {
+            if (strlen($m[1]) === 3) {
+                $items[] = ['text' => trim((string)$m[2]), 'id' => ''];
+            }
+            continue;
+        }
+
     }
     return $items;
 }
@@ -3753,7 +3760,22 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             $liClass = $p['li_class'] ?? '';
             $liAttr = $liClass ? ' class="'.htmlspecialchars($liClass, ENT_QUOTES, 'UTF-8').'"' : '';
             $srcAttr = $srcAttrsFor($i, $i);
-            $liHtml = '<li'.$liAttr.$srcAttr.'>' . inline_md($content, $mdPath, $profile, $context);
+            $contentHtml = inline_md($content, $mdPath, $profile, $context);
+            if (preg_match('/^(#{1,6})\s+(.*)$/', $content, $headingMatch)) {
+                $level = strlen($headingMatch[1]);
+                $headingClassMap = $p['heading_classes'] ?? [];
+                $headingClass = $headingClassMap[$level] ?? ($profile === 'view' ? 'font-bold mt-4 mb-2' : 'md-heading');
+                $headingClassAttr = $headingClass ? ' class="'.htmlspecialchars($headingClass, ENT_QUOTES, 'UTF-8').'"' : '';
+                $headingIdAttr = '';
+                if ($tocRequested && $tocActive && $level === 3 && isset($tocItems[$tocIndex])) {
+                    $headingIdAttr = ' id="' . htmlspecialchars((string)$tocItems[$tocIndex]['id'], ENT_QUOTES, 'UTF-8') . '"';
+                    $tocIndex++;
+                }
+                $contentHtml = '<h'.$level.$headingIdAttr.$headingClassAttr.'>'
+                    . inline_md($headingMatch[2], $mdPath, $profile, $context)
+                    . '</h'.$level.'>';
+            }
+            $liHtml = '<li'.$liAttr.$srcAttr.'>' . $contentHtml;
             if ($inlineAttrs) {
                 $liHtml = mdw_apply_attr_list_to_html($liHtml, $inlineAttrs);
             }
