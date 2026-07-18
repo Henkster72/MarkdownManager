@@ -59,7 +59,9 @@
     };
 
     const updateSuperuserUi = () => {
-        const allow = isSuperuser();
+        const { role, token } = getStoredAuth();
+        const allow = role === 'superuser' && !!token;
+        document.body?.classList.toggle('mdw-auth-user', role === 'user' && !!token);
         document.querySelectorAll('[data-auth-superuser="1"]').forEach((el) => {
             if (!(el instanceof HTMLElement)) return;
             el.style.display = allow ? '' : 'none';

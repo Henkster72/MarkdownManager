@@ -1131,10 +1131,18 @@ body.app-body .find-replace-modal {
   width: auto;
   min-width: 7.5rem;
 }
-.pane-header-actions > :not(:first-child),
-.pane-header-actions .editor-toolbar + *,
-.pane-header-actions .editor-toolbar-left > * + * {
-  border-left: 1px solid var(--border-soft);
+#paneMarkdown .pane-header-actions > :not(:first-child),
+#paneMarkdown .pane-header-actions .editor-toolbar + *,
+#paneMarkdown .pane-header-actions .editor-toolbar-left > * + *,
+#panePreview .pane-header-actions > :not(:first-child),
+#panePreview .pane-header-actions .editor-toolbar + *,
+#panePreview .pane-header-actions .editor-toolbar-left > * + * {
+  border-left: 1px solid var(--border-strong);
+}
+
+.edit-page.hide-markdown-editor.mdw-auth-user #paneMarkdown .pane-title,
+.edit-page.hide-markdown-editor.mdw-auth-user #panePreview .pane-title {
+  display: none;
 }
 
 .pane-header-actions .publish-state-select.input,
