@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.953
+
+- WPM publication workflow: normal users can submit edited notes for Processing, superusers see Concept and Processing notes first, and the shared publisher synchronizes Markdown safely before rendering only reviewed Processing files.
+- WPM instance operations: the publisher can use per-instance `.env` settings, synchronize vbook-owned CSS/JS assets and image collections without deleting unrelated live files, and records per-instance sync status.
+- WPM status: added a status command with local-time sync/change summaries plus `--changes` and `--limit` for recent editor and site files; the shared Jinja-environment sync helper is available for renderer deployments.
+- Jinja export and preview: preview-only metadata and automatic sections are excluded from exported templates, preventing duplicate base-template CTAs; recursive blockquote rendering no longer inserts automatic sections per quote.
+- WPM new Markdown: the creation modal now uses configured Article metadata defaults, fills `post_date` with today in the configured display format, preserves submitted metadata on validation errors, and uses friendly article labels for common fields.
+
 ## 0.952
 
 - WPM visual preview: rendered Jinja macro cards now preserve their original source when visual content is written back to Markdown, including macros nested inside `:::` containers.

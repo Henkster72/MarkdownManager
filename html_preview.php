@@ -2670,7 +2670,13 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     if ($useProvidedContentHtml && isset($opts['content_html']) && is_string($opts['content_html']) && trim((string)$opts['content_html']) !== '') {
         $bodyHtml = mdw_html_strip_source_map_attrs((string)$opts['content_html']);
     } else {
-        $rendered = md_to_html($bodyMarkdown, $mdPath, 'edit', ['source_map' => false]);
+        // Auto sections and metadata are preview affordances. The target base template
+        // owns them, so exporting either would duplicate rendered site content.
+        $rendered = md_to_html($bodyMarkdown, $mdPath, 'edit', [
+            'source_map' => false,
+            'render_metadata' => false,
+            'expand_auto_sections' => false,
+        ]);
         $rendered = mdw_html_strip_source_map_attrs($rendered);
         $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
     }
@@ -3170,6 +3176,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $context = is_array($context) ? $context : [];
     $sourceMapEnabled = !array_key_exists('source_map', $context) || !empty($context['source_map']);
     $renderMetadata = !array_key_exists('render_metadata', $context) || !empty($context['render_metadata']);
+    $expandAutoSections = !array_key_exists('expand_auto_sections', $context) || !empty($context['expand_auto_sections']);
 
     $meta = [];
     $lineMap = null;
@@ -3195,7 +3202,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $text = str_replace(["\r\n","\r"], "\n", $body);
     $sectionIncludesExpanded = false;
     $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
-    $text = mdw_preview_expand_auto_sections($text, $mdPath, $meta, $sectionIncludesExpanded);
+    if ($expandAutoSections) {
+        $text = mdw_preview_expand_auto_sections($text, $mdPath, $meta, $sectionIncludesExpanded);
+    }
     $templateVars = mdw_preview_collect_jinja_vars($text, $meta);
     $templateSource = $text;
     // The overview macro renders page_picture as its header background. Do not also
@@ -3699,7 +3708,11 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 }
             }
             $inner = implode("\n", $bq);
-            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false, 'render_metadata' => false])) . "\n" . '</blockquote>';
+            $bqHtml = '<blockquote>' . "\n" . md_to_html($inner, $mdPath, $profile, array_merge($context, [
+                'source_map' => false,
+                'render_metadata' => false,
+                'expand_auto_sections' => false,
+            ])) . "\n" . '</blockquote>';
             $bqHtml = $applySrcAttrs($bqHtml, $bqStartLine, $bqEndLine);
             if ($bqAttrs) {
                 $bqHtml = mdw_apply_attr_list_to_html($bqHtml, $bqAttrs);

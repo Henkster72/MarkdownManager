@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -83,6 +84,37 @@ def pull_markdown(editor_env: dict[str, str], staging: Path) -> None:
     run(command)
 
 
+def sync_static_assets(editor_env: dict[str, str], shadow_dir: Path) -> None:
+    configured = editor_env.get("WPM_SYNC_LOCAL_STATIC_DIR", "").strip()
+    static_dir = Path(configured).expanduser() if configured else shadow_dir.parent / "static"
+    if not static_dir.is_dir():
+        return
+
+    remote_suffix = editor_env.get("WPM_SYNC_REMOTE_STATIC_DIR", "static").strip("/") or "static"
+    remote_static = remote_spec(editor_env, remote_suffix).rstrip("/")
+    local_images = static_dir / "images"
+    local_images.mkdir(parents=True, exist_ok=True)
+
+    # Preserve vbook's version for same-named files while importing live-only images.
+    run(ssh_prefix(editor_env) + [
+        "rsync", "-az", "--ignore-existing",
+        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
+        f"{remote_static}/images/", f"{local_images}/",
+    ])
+
+    # Editor assets are authored on vbook; never delete unrelated live static files.
+    run(ssh_prefix(editor_env) + [
+        "rsync", "-az", "--exclude=images/",
+        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
+        f"{static_dir}/", f"{remote_static}/",
+    ])
+    run(ssh_prefix(editor_env) + [
+        "rsync", "-az",
+        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
+        f"{local_images}/", f"{remote_static}/images/",
+    ])
+
+
 def load_state(path: Path) -> dict[str, str]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -90,6 +122,28 @@ def load_state(path: Path) -> dict[str, str]:
         return {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def write_status(shadow_dir: Path, active_files: dict[str, Path], processed: list[str]) -> None:
+    latest_rel = ""
+    latest_mtime = 0.0
+    for rel, path in active_files.items():
+        mtime = path.stat().st_mtime
+        if mtime > latest_mtime:
+            latest_rel, latest_mtime = rel, mtime
+
+    payload = {
+        "last_sync_at": datetime.now(timezone.utc).isoformat(),
+        "last_result": "success",
+        "markdown_files": len(active_files),
+        "last_markdown_change_at": datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat() if latest_mtime else "",
+        "last_markdown_change": latest_rel,
+        "published": processed,
+    }
+    status_path = shadow_dir.parent / ".wpm-status.json"
+    temp_path = status_path.with_suffix(".json.tmp")
+    temp_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temp_path.replace(status_path)
 
 
 def sync_shadow(staging: Path, shadow: Path, known: dict[str, str]) -> tuple[dict[str, Path], dict[str, Path], list[str]]:
@@ -134,7 +188,8 @@ def render_site(site_dir: Path) -> None:
         "import sys; from pathlib import Path; "
         "site=Path(sys.argv[1]).resolve(); sys.path.insert(0, str(site.parent)); "
         "import main; from jinja_env.site_builder import run_site_build; "
-        "main._write_faq_template(main._load_faq_data()); "
+        "(main._write_faq_template(main._load_faq_data()) "
+        "if hasattr(main, '_write_faq_template') and hasattr(main, '_load_faq_data') else None); "
         "run_site_build(site, main.load_site_config(), prod_mode=True, full_render=False, purge=False, upload=False)"
     )
     run([sys.executable, "-c", driver, str(site_dir)], cwd=site_dir)
@@ -191,13 +246,21 @@ def push_markdown(editor_env: dict[str, str], source: Path, rel: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--site-dir", type=Path, required=True)
-    parser.add_argument("--shadow-dir", type=Path, required=True)
-    parser.add_argument("--editor-url", required=True)
+    parser.add_argument("--instance-env", type=Path)
+    parser.add_argument("--site-dir", type=Path)
+    parser.add_argument("--shadow-dir", type=Path)
+    parser.add_argument("--editor-url")
     args = parser.parse_args()
 
-    site_dir, shadow_dir = args.site_dir.resolve(), args.shadow_dir.resolve()
-    editor_env = load_env(shadow_dir / ".env")
+    instance_env = load_env(args.instance_env) if args.instance_env else {}
+    site_arg = args.site_dir or instance_env.get("WPM_SITE_DIR")
+    shadow_arg = args.shadow_dir or instance_env.get("WPM_SYNC_LOCAL_EDIT_DIR")
+    editor_url = args.editor_url or instance_env.get("WPM_EDITOR_URL", "")
+    if not site_arg or not shadow_arg or not editor_url:
+        parser.error("provide --site-dir, --shadow-dir and --editor-url, or configure them in --instance-env")
+
+    site_dir, shadow_dir = Path(site_arg).resolve(), Path(shadow_arg).resolve()
+    editor_env = instance_env or load_env(shadow_dir / ".env")
     site_env = load_env(site_dir / ".env")
     state_dir = site_dir / ".wpm-publish"
     staging = state_dir / "remote"
@@ -205,6 +268,7 @@ def main() -> int:
     state_dir.mkdir(parents=True, exist_ok=True)
     staging.mkdir(parents=True, exist_ok=True)
 
+    sync_static_assets(editor_env, shadow_dir)
     pull_markdown(editor_env, staging)
     known = load_state(state_path)
     remote_files, active_files, conflicts = sync_shadow(staging, shadow_dir, known)
@@ -216,7 +280,7 @@ def main() -> int:
         if publish_state(source) != "processing":
             continue
         template = site_dir / "templates" / Path(rel).with_suffix(".html")
-        export_template(args.editor_url, rel, source, template)
+        export_template(editor_url, rel, source, template)
         render_site(site_dir)
         upload_outputs(site_env, site_dir, rel)
         set_published(source)
@@ -227,6 +291,7 @@ def main() -> int:
     for rel in processed:
         next_state[rel] = digest(active_files[rel])
     state_path.write_text(json.dumps({"files": next_state}, indent=2) + "\n", encoding="utf-8")
+    write_status(shadow_dir, active_files, processed)
     print("WPM publish: " + (", ".join(processed) if processed else "no Processing files"))
     return 0
 

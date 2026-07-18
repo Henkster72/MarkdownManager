@@ -1422,6 +1422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
                 $draftTitle = isset($_POST['new_title']) ? (string)$_POST['new_title'] : '';
                 $draftSlug = isset($_POST['new_slug']) ? (string)$_POST['new_slug'] : (isset($_POST['new_file']) ? (string)$_POST['new_file'] : '');
                 $draftContent = isset($_POST['new_content']) ? (string)$_POST['new_content'] : '';
+                $draftMetadata = isset($_POST['new_meta']) && is_array($_POST['new_meta']) ? $_POST['new_meta'] : [];
                 $titleInput = trim((string)($draftTitle ?? ''));
                 $titleInput = preg_replace('/\\s+/u', ' ', $titleInput);
             if (trim($postedPath) === '') {
@@ -1524,16 +1525,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		                $authIsUser = function_exists('mdw_auth_verify_token')
 		                    ? mdw_auth_verify_token('user', $authToken)
 		                    : false;
-		                $postedAuthor = isset($_POST['publisher_author']) ? trim((string)$_POST['publisher_author']) : '';
+		                $postedAuthor = trim((string)($draftMetadata['author'] ?? ($_POST['publisher_author'] ?? '')));
 		                $author = '';
 		                if (!empty($MDW_PUBLISHER_MODE)) {
-		                    $author = $authIsUser ? $postedAuthor : ($postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : ''));
+		                    $author = $postedAuthor !== '' ? $postedAuthor : (isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '');
 		                    if (($authIsUser && $author === '') || $author === '') {
 		                        $_SESSION['new_md_draft'] = [
 		                            'folder' => $draftFolder,
 		                            'title' => $draftTitle,
 		                            'slug' => $draftSlug,
 		                            'content' => $draftContent,
+		                            'metadata' => $draftMetadata,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
 		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
@@ -1546,6 +1548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		                            'title' => $draftTitle,
 		                            'slug' => $draftSlug,
 		                            'content' => $draftContent,
+		                            'metadata' => $draftMetadata,
 		                            'prefix_date' => $prefixDate ? 1 : 0,
 		                        ];
 		                        $_SESSION['flash_error'] = mdw_t('flash.publisher_requires_subtitle', 'WPM requires a subtitle line starting with "##".', ['app' => $APP_NAME]);
@@ -1561,6 +1564,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		                }
 		                if (!empty($MDW_PUBLISHER_MODE)) {
 		                    $opts['inject_obligatory'] = true;
+		                    $fields = function_exists('mdw_metadata_all_field_configs') ? mdw_metadata_all_field_configs(true) : [];
+		                    foreach ($draftMetadata as $rawKey => $rawValue) {
+		                        $key = strtolower(trim((string)$rawKey));
+		                        if ($key === '' || !isset($fields[$key]) || in_array($key, ['date', 'creationdate', 'changedate', 'published_date', 'publishstate'], true)) continue;
+		                        $opts['set'][$key] = trim((string)$rawValue);
+		                    }
 		                    $pageTitleCandidate = trim((string)($titleInput ?? ''));
 		                    if ($pageTitleCandidate === '') {
 		                        $pageTitleCandidate = preg_replace('/\.md$/i', '', basename($sanNew));
@@ -1572,9 +1581,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		                        $contentMeta = [];
 		                        mdw_hidden_meta_extract_and_remove_all($content, $contentMeta);
 		                        $existingPageTitle = trim((string)($contentMeta['page_title'] ?? ''));
-		                        if ($existingPageTitle === '') {
-		                            $opts['set']['page_title'] = $pageTitleCandidate;
-		                        }
+		                        if ($existingPageTitle === '') $opts['set']['page_title'] = $pageTitleCandidate;
 		                    }
 		                }
 		                $content = mdw_hidden_meta_ensure_block($content, $sanNew, $opts);
@@ -1604,7 +1611,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
                 'folder' => $draftFolder,
                 'title' => $draftTitle,
                 'slug' => $draftSlug,
-                'content' => $draftContent,
+            'content' => $draftContent,
+				'metadata' => $draftMetadata,
                 'prefix_date' => $prefixDate ? 1 : 0,
             ];
 	        redirect($returnAfterCreateError);
@@ -1742,6 +1750,7 @@ if ($requested) {
         $new_md_title_value = '';
         $new_md_slug_value = '';
         $new_md_content_value = '';
+        $new_md_metadata_values = [];
         $new_md_prefix_checked = empty($MDW_PUBLISHER_MODE) && empty($hideMarkdownEditor);
         if (is_array($new_md_draft)) {
             $draftFolder = sanitize_folder_name((string)($new_md_draft['folder'] ?? '')) ?? 'root';
@@ -1751,6 +1760,7 @@ if ($requested) {
             $new_md_title_value = (string)($new_md_draft['title'] ?? $new_md_title_value);
             $new_md_slug_value = (string)($new_md_draft['slug'] ?? (string)($new_md_draft['file'] ?? $new_md_slug_value));
             $new_md_content_value = (string)($new_md_draft['content'] ?? '');
+            $new_md_metadata_values = is_array($new_md_draft['metadata'] ?? null) ? $new_md_draft['metadata'] : [];
             $new_md_prefix_checked = !empty($new_md_draft['prefix_date']) && empty($hideMarkdownEditor);
         }
 
@@ -2175,6 +2185,8 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
         'content' => $new_md_content_value,
         'prefix_checked' => $new_md_prefix_checked,
         'hide_markdown_editor' => $hideMarkdownEditor,
+        'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+        'metadata_values' => $new_md_metadata_values,
         'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
     ]);
     ?>
@@ -2248,6 +2260,8 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
         'content' => $new_md_content_value,
         'prefix_checked' => $new_md_prefix_checked,
         'hide_markdown_editor' => $hideMarkdownEditor,
+        'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+        'metadata_values' => $new_md_metadata_values,
         'error_message' => $open_new_panel ? ($flash_error ?? '') : '',
     ]);
     ?>
