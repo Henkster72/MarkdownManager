@@ -8,6 +8,7 @@
 - Jinja export and preview: preview-only metadata and automatic sections are excluded from exported templates, preventing duplicate base-template CTAs; recursive blockquote rendering no longer inserts automatic sections per quote.
 - WPM new Markdown: the creation modal now uses configured Article metadata defaults, fills `post_date` with today in the configured display format, preserves submitted metadata on validation errors, and uses friendly article labels for common fields.
 - Pane headers: superusers can choose toolbar-left/title-right (the default) or the reverse for all users; titles yield space before toolbar actions so controls remain visible.
+- Pane header toolbar: actions use a compact divider treatment with consistent control sizing and a fully right-aligned pane title.
 
 ## 0.952
 
