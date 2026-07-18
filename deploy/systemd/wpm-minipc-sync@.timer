@@ -1,0 +1,10 @@
+[Unit]
+Description=Run vBook WPM minipc synchronization for %i every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
