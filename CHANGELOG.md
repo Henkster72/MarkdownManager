@@ -6,7 +6,7 @@
 - WPM macro handling: `None`/`null` macro arguments no longer render as visible links or button labels, and `special.bigheader(...)` now has a matching non-editable visual preview component.
 - WPM page pictures: an `overview.add_header` macro is now the sole preview owner of its `page_picture`, preventing a duplicate standalone metadata image.
 - WPM blog previews: blog metadata now follows the template header order of image, title, subtitle, and date instead of the generic metadata order; instance preview CSS can retain its own site typography over the selected editor skin.
-- Markdown editor search: added `Ctrl+Shift+F` for find and `Ctrl+Shift+H` for find and replace. Both modes use one toggleable modal, and replacing one or all matches requires confirmation.
+- Markdown editor search: added `Ctrl+Shift+F` for find and `Ctrl+Shift+H` for find and replace. Both modes use one compact popup beside the Markdown pane, keep matches visible, support next/skip/replace/all actions, and require confirmation before replacement.
 - Translations: find, replace, match-status, and replacement-warning text is available in English, Dutch, German, French, Spanish, Italian, and Portuguese.
 
 ## 0.951

@@ -1973,8 +1973,8 @@ window.mermaid = mermaid;
 			    </div>
 			</div>
 
-			<div class="modal-overlay no-blur" id="replaceModalOverlay" hidden></div>
-			<div class="modal modal-small" id="replaceModal" role="dialog" aria-modal="true" aria-labelledby="replaceModalTitle" hidden>
+			<div class="modal-overlay no-blur find-replace-overlay" id="replaceModalOverlay" hidden></div>
+			<div class="modal modal-small find-replace-modal" id="replaceModal" role="dialog" aria-modal="false" aria-labelledby="replaceModalTitle" hidden>
 			    <div class="modal-header">
 			        <div class="modal-title" id="replaceModalTitle"><?=h(mdw_t('replace_modal.find_title','Find'))?></div>
 			        <button type="button" class="btn btn-ghost icon-button" id="replaceModalClose" aria-label="<?=h(mdw_t('common.close','Close'))?>">
@@ -1994,8 +1994,9 @@ window.mermaid = mermaid;
 			    </div>
 			    <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
 			        <button type="button" class="btn btn-ghost btn-small" id="findNextBtn" disabled><?=h(mdw_t('replace_modal.find_next','Find next'))?></button>
+			        <button type="button" class="btn btn-ghost btn-small" id="replaceSkipBtn" disabled hidden><?=h(mdw_t('replace_modal.skip','Skip'))?></button>
 			        <button type="button" class="btn btn-ghost btn-small" id="replaceAllBtn" disabled hidden><?=h(mdw_t('replace_modal.replace_all','Replace all'))?></button>
-			        <button type="button" class="btn btn-primary btn-small" id="replaceNextBtn" disabled><?=h(mdw_t('replace_modal.replace_next','Replace next'))?></button>
+			        <button type="button" class="btn btn-primary btn-small" id="replaceNextBtn" disabled><?=h(mdw_t('replace_modal.replace_current','Replace'))?></button>
 			    </div>
 			</div>
 

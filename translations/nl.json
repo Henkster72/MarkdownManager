@@ -362,9 +362,9 @@
   },
   "replace_modal": {
     "title": "Zoeken en vervangen", "find_title": "Zoeken", "find_label": "Zoeken", "replace_label": "Vervangen door",
-    "find_next": "Volgende zoeken", "replace_next": "Volgende vervangen", "replace_all": "Alles vervangen",
+    "find_next": "Volgende zoeken", "skip": "Overslaan", "replace_current": "Vervangen", "replace_next": "Volgende vervangen", "replace_all": "Alles vervangen",
     "match_found": "Overeenkomst gevonden.", "no_matches": "Geen overeenkomsten gevonden.", "replaced": "Vervangen.", "replaced_count": "{count} vervangen.",
-    "confirm_next": "De volgende overeenkomst van \"{find}\" vervangen door \"{replace}\"?", "confirm_all": "Alle {count} overeenkomsten van \"{find}\" vervangen door \"{replace}\"?"
+    "confirm_next": "De geselecteerde overeenkomst van \"{find}\" vervangen door \"{replace}\"?", "confirm_all": "Alle {count} overeenkomsten van \"{find}\" vervangen door \"{replace}\"?"
   },
   "image_modal": {
     "title": "Afbeelding invoegen",

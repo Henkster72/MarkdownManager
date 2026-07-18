@@ -1414,6 +1414,7 @@
     const closeBtn = document.getElementById('replaceModalClose');
     const titleEl = document.getElementById('replaceModalTitle');
     const findNextBtn = document.getElementById('findNextBtn');
+    const replaceSkipBtn = document.getElementById('replaceSkipBtn');
     const replaceNextBtn = document.getElementById('replaceNextBtn');
     const replaceAllBtn = document.getElementById('replaceAllBtn');
     const findInput = document.getElementById('replaceFindInput');
@@ -1421,7 +1422,7 @@
     const replaceWithField = document.getElementById('replaceWithField');
     const statusEl = document.getElementById('replaceModalStatus');
     const editor = document.getElementById('editor');
-    if (!modal || !overlay || !findNextBtn || !replaceNextBtn || !replaceAllBtn || !findInput || !replaceInput || !replaceWithField || !editor) return;
+    if (!modal || !overlay || !findNextBtn || !replaceSkipBtn || !replaceNextBtn || !replaceAllBtn || !findInput || !replaceInput || !replaceWithField || !editor) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
     let replaceMode = false;
 
@@ -1437,6 +1438,7 @@
         const needle = String(findInput.value || '');
         const hasNeedle = needle.trim() !== '';
         findNextBtn.disabled = !hasNeedle;
+        replaceSkipBtn.disabled = !replaceMode || !hasNeedle;
         replaceNextBtn.disabled = !replaceMode || !hasNeedle;
         replaceAllBtn.disabled = !replaceMode || !hasNeedle;
     };
@@ -1445,12 +1447,26 @@
         replaceMode = !!nextReplaceMode;
         replaceWithField.hidden = !replaceMode;
         findNextBtn.hidden = replaceMode;
+        replaceSkipBtn.hidden = !replaceMode;
         replaceNextBtn.hidden = !replaceMode;
         replaceAllBtn.hidden = !replaceMode;
         if (titleEl) titleEl.textContent = replaceMode
             ? t('replace_modal.title', 'Find and replace')
             : t('replace_modal.find_title', 'Find');
         updateButtons();
+    };
+
+    const positionNearEditor = () => {
+        if (modal.hidden) return;
+        const pane = document.getElementById('paneMarkdown');
+        if (!(pane instanceof HTMLElement)) return;
+        const rect = pane.getBoundingClientRect();
+        const width = Math.min(320, Math.max(240, rect.width - 24));
+        modal.style.setProperty('width', `${width}px`, 'important');
+        modal.style.setProperty('right', 'auto', 'important');
+        modal.style.setProperty('bottom', 'auto', 'important');
+        modal.style.setProperty('left', `${Math.max(8, rect.right - width - 12)}px`, 'important');
+        modal.style.setProperty('top', `${Math.max(8, rect.top + 52)}px`, 'important');
     };
 
     const open = (nextReplaceMode = false) => {
@@ -1468,6 +1484,7 @@
         mdmModalOpen(true);
         setStatus('');
         setMode(nextReplaceMode);
+        positionNearEditor();
 
         const start = editor.selectionStart ?? 0;
         const end = editor.selectionEnd ?? 0;
@@ -1522,25 +1539,18 @@
         setStatus(t('replace_modal.match_found', 'Match found.'), 'ok');
     };
 
-    const replaceNext = () => {
+    const replaceCurrent = () => {
         const needle = String(findInput.value || '');
         if (!needle) return;
         const replacement = String(replaceInput.value || '');
-        if (!window.confirm(t('replace_modal.confirm_next', 'Replace the next occurrence of "{find}" with "{replace}"?', { find: needle, replace: replacement }))) return;
         const selStart = editor.selectionStart ?? 0;
         const selEnd = editor.selectionEnd ?? 0;
-        if (selEnd > selStart && editor.value.slice(selStart, selEnd) === needle) {
-            replaceRange(selStart, selEnd, replacement);
-            setStatus(t('replace_modal.replaced', 'Replaced.'), 'ok');
+        if (selEnd <= selStart || editor.value.slice(selStart, selEnd) !== needle) {
+            findNext();
             return;
         }
-
-        const idx = findNextIndex(needle);
-        if (idx === -1) {
-            setStatus(t('replace_modal.no_matches', 'No matches found.'), 'error');
-            return;
-        }
-        replaceRange(idx, idx + needle.length, replacement);
+        if (!window.confirm(t('replace_modal.confirm_next', 'Replace the selected occurrence of "{find}" with "{replace}"?', { find: needle, replace: replacement }))) return;
+        replaceRange(selStart, selEnd, replacement);
         setStatus(t('replace_modal.replaced', 'Replaced.'), 'ok');
     };
 
@@ -1587,7 +1597,8 @@
     overlay.addEventListener('click', close);
     closeBtn?.addEventListener('click', close);
     findNextBtn.addEventListener('click', findNext);
-    replaceNextBtn.addEventListener('click', replaceNext);
+    replaceSkipBtn.addEventListener('click', findNext);
+    replaceNextBtn.addEventListener('click', replaceCurrent);
     replaceAllBtn.addEventListener('click', replaceAll);
     findInput.addEventListener('input', updateButtons);
     replaceInput.addEventListener('input', updateButtons);
@@ -1616,7 +1627,7 @@
     modal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            if (replaceMode && !replaceNextBtn.disabled) replaceNext();
+            if (replaceMode && !replaceNextBtn.disabled) replaceCurrent();
             else if (!replaceMode && !findNextBtn.disabled) findNext();
         }
         if (replaceMode && e.key === 'Enter' && e.shiftKey) {
@@ -1624,6 +1635,8 @@
             if (!replaceAllBtn.disabled) replaceAll();
         }
     });
+
+    window.addEventListener('resize', positionNearEditor);
 })();
 
 // Rename modal (edit.php, superuser only)

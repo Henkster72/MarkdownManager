@@ -322,6 +322,37 @@ body.app-body .modal {
   -webkit-backdrop-filter: none;
 }
 
+/* Find/replace stays beside the Markdown source so matches remain visible. */
+.find-replace-overlay {
+  background: transparent;
+  pointer-events: none;
+}
+
+body.app-body .find-replace-modal {
+  left: auto !important;
+  top: auto !important;
+  right: 1rem !important;
+  bottom: 1rem !important;
+  transform: none !important;
+  width: min(20rem, calc(100vw - 2rem)) !important;
+  max-height: none !important;
+  z-index: 121;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.find-replace-modal .modal-header,
+.find-replace-modal .modal-footer {
+  padding: 0.55rem 0.7rem;
+}
+
+.find-replace-modal .modal-body {
+  padding: 0.65rem 0.7rem;
+}
+
+.find-replace-modal .modal-field {
+  margin-bottom: 0.55rem;
+}
+
 .auth-locked body.app-body {
   overflow: hidden;
 }

@@ -344,9 +344,9 @@
   },
   "replace_modal": {
     "title": "Suchen und ersetzen", "find_title": "Suchen", "find_label": "Suchen", "replace_label": "Ersetzen durch",
-    "find_next": "Nächstes suchen", "replace_next": "Nächstes ersetzen", "replace_all": "Alle ersetzen",
+    "find_next": "Nächstes suchen", "skip": "Überspringen", "replace_current": "Ersetzen", "replace_next": "Nächstes ersetzen", "replace_all": "Alle ersetzen",
     "match_found": "Treffer gefunden.", "no_matches": "Keine Treffer gefunden.", "replaced": "Ersetzt.", "replaced_count": "{count} ersetzt.",
-    "confirm_next": "Nächstes Vorkommen von \"{find}\" durch \"{replace}\" ersetzen?", "confirm_all": "Alle {count} Vorkommen von \"{find}\" durch \"{replace}\" ersetzen?"
+    "confirm_next": "Ausgewähltes Vorkommen von \"{find}\" durch \"{replace}\" ersetzen?", "confirm_all": "Alle {count} Vorkommen von \"{find}\" durch \"{replace}\" ersetzen?"
   },
   "image_modal": {
     "title": "Bild einfügen",
