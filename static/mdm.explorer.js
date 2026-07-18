@@ -2157,8 +2157,13 @@
         if (row.querySelector('.user-visibility-toggle')) return;
 
         const hidden = isUserHiddenRow(row);
-        const actions = document.createElement('div');
-        actions.className = 'note-actions user-visibility-actions';
+        let actions = row.querySelector(':scope > .note-actions');
+        if (!(actions instanceof HTMLElement)) {
+            actions = document.createElement('div');
+            actions.className = 'note-actions';
+            actions.dataset.userVisibilityOnly = '1';
+            row.appendChild(actions);
+        }
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `btn btn-ghost icon-button user-visibility-toggle${hidden ? ' is-hidden' : ''}`;
@@ -2174,7 +2179,6 @@
         button.appendChild(icon);
         actions.appendChild(button);
         row.classList.add('has-user-visibility');
-        row.appendChild(actions);
     };
     const syncUserVisibilityControls = () => {
         const canManage = canManageUserVisibility();
@@ -2185,7 +2189,8 @@
                 return;
             }
             row.classList.remove('has-user-visibility');
-            row.querySelector('.user-visibility-actions')?.remove();
+            row.querySelector('.user-visibility-toggle')?.remove();
+            row.querySelector(':scope > .note-actions[data-user-visibility-only="1"]')?.remove();
         });
     };
     const clearLazyExplorerCache = () => {

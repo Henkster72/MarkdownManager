@@ -11,6 +11,7 @@
 - Pane header toolbar: actions use a compact divider treatment with consistent control sizing and a fully right-aligned pane title.
 - WPM visual editor: regular users no longer see redundant pane titles in hide-Markdown mode, while superusers retain them.
 - Action groups: app-header and explorer controls now share the compact, divider-only toolbar treatment.
+- Explorer note actions: superuser visibility controls now share the edit/delete action group and its spacing.
 
 ## 0.952
 

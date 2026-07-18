@@ -1545,15 +1545,11 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 .note-row.has-user-visibility {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0;
 }
 
 .note-row.has-user-visibility > .note-link {
   flex: 1 1 auto;
-}
-
-.user-visibility-actions {
-  flex: 0 0 auto;
 }
 
 .user-visibility-toggle .pi {
@@ -1676,7 +1672,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 .index-page .note-row {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0;
   margin: 0.3rem 0.7rem;
 }
 
@@ -1684,20 +1680,39 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   flex: 1 1 auto;
 }
 
-.index-page .note-actions {
+#links_md_overview .note-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding-top: 0;
+  flex: 0 0 auto;
+  gap: 0;
+  margin: 0 0 0 0.25rem;
+  padding: 0;
 }
 
-.index-page .note-actions form {
+#links_md_overview .note-actions form {
   margin: 0;
 }
 
-.index-page .note-actions .icon-button {
-  width: 1.55rem;
-  height: 1.55rem;
+#links_md_overview .note-actions .icon-button {
+  width: 1.7rem;
+  height: 1.7rem;
+  min-width: 1.7rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  justify-content: center;
+}
+
+#links_md_overview .note-actions .icon-button:hover,
+#links_md_overview .note-actions .icon-button:focus-visible {
+  background: transparent;
+}
+
+#links_md_overview .note-actions > .icon-button,
+#links_md_overview .note-actions > form > .icon-button {
+  border-left: 1px solid var(--border-strong);
 }
 
 .note-title {
