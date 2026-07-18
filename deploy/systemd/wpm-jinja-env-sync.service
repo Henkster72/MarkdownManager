@@ -1,0 +1,6 @@
+[Unit]
+Description=Synchronize the shared Jinja environment from minipc to vBook
+
+[Service]
+Type=oneshot
+ExecStart=/home/henk/Documents/php_websites/markdownmanager/output/bin/sync_jinja_env_to_host.sh /home/henk/Documents/jinja_websites/jinja_env henk@192.168.1.110:/home/henk/jinja_websites/jinja_env
