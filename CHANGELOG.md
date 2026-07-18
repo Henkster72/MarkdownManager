@@ -10,6 +10,7 @@
 - Pane headers: superusers can choose toolbar-left/title-right (the default) or the reverse for all users; titles yield space before toolbar actions so controls remain visible.
 - Pane header toolbar: actions use a compact divider treatment with consistent control sizing and a fully right-aligned pane title.
 - WPM visual editor: regular users no longer see redundant pane titles in hide-Markdown mode, while superusers retain them.
+- Action groups: app-header and explorer controls now share the compact, divider-only toolbar treatment.
 
 ## 0.952
 

@@ -1145,6 +1145,42 @@ body.app-body .find-replace-modal {
   display: none;
 }
 
+/* Keep action clusters visually quiet while retaining clear control boundaries. */
+body.app-body .app-header-actions,
+.nav-file-actions,
+.nav-toolbar-row .nav-toolbar-actions {
+  gap: 0;
+}
+body.app-body .app-header-actions .btn,
+.nav-file-actions .btn {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body.app-body .app-header-actions .btn:hover,
+body.app-body .app-header-actions .btn:focus-visible,
+.nav-file-actions .btn:hover,
+.nav-file-actions .btn:focus-visible {
+  background: transparent;
+}
+body.app-body .app-header-actions > .btn,
+body.app-body .app-header-actions > form > .btn,
+.nav-file-actions > .btn,
+.nav-file-actions > form > .btn {
+  border-left: 1px solid var(--border-strong);
+}
+.nav-toolbar-row .nav-toolbar-actions .btn {
+  flex: 0 0 var(--editor-toolbar-control-height);
+  width: var(--editor-toolbar-control-height);
+  min-width: var(--editor-toolbar-control-height);
+  padding-inline: 0;
+  justify-content: center;
+}
+.nav-toolbar-row .nav-toolbar-actions .btn-label {
+  display: none;
+}
+
 .pane-header-actions .publish-state-select.input,
 .editor-toolbar-left .publish-state-select.input {
   flex: 0 0 auto;
