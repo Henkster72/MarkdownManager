@@ -16,6 +16,7 @@
 - Action dividers: compact pane, header, navigation, and explorer action controls use a dedicated subtle divider without weakening general borders.
 - WPM keyboard navigation: normal users skip `user_hidden` Markdown files when moving through index previews with the arrow keys; superusers retain access to all notes.
 - WPM overview-header previews: macro-generated call-to-action links now retain the corresponding `default-button` plus `accentbutton` or `freebutton` classes, so instance button styling applies consistently.
+- WPM template reconciliation: generated page templates carry a Markdown source marker; before rendering, template-only edits are returned to Markdown as Concept while simultaneous Markdown/template changes stop as conflicts. A minipc sync helper mirrors editor Markdown and only these managed templates.
 
 ## 0.952
 

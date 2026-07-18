@@ -2695,6 +2695,12 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
 
     $lines = [];
+    if ($mdPath !== null && $mdPath !== '') {
+        $managedPath = trim(str_replace('\\', '/', $mdPath), '/');
+        if ($managedPath !== '' && !str_contains($managedPath, "\n")) {
+            $lines[] = '{# mdw-managed: source=' . $managedPath . ' #}';
+        }
+    }
     $extendsValue = trim((string)($effectiveMeta['extends'] ?? ''));
     if ($extendsValue === '') $extendsValue = 'base.html';
     $lines[] = '{% extends ' . mdw_jinja_quote_string($extendsValue, 'double') . ' %}';

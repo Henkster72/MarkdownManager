@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -18,6 +19,10 @@ from pathlib import Path
 
 CORE_MARKDOWN = {"README.md", "CHANGELOG.md", "voorbeeld_markdown.md", "tutorial_markdowneditor.md"}
 PUBLISHSTATE_RE = re.compile(r"^\{\s*publishstate\s*:\s*.*?\s*\}$", re.IGNORECASE | re.MULTILINE)
+MANAGED_TEMPLATE_RE = re.compile(r"\{#\s*mdw-managed:\s*source=([^\s#]+)\s*#\}")
+EXTENDS_RE = re.compile(r"\{%\s*extends\s+([\"'])(.*?)\1\s*%\}")
+SET_RE = re.compile(r"^\s*\{%\s*set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*%\}\s*$", re.MULTILINE)
+CONTENT_BLOCK_RE = re.compile(r"\{%\s*block\s+content\s*%\}(.*?)\{%\s*endblock(?:\s+content)?\s*%\}", re.DOTALL)
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -115,13 +120,103 @@ def sync_static_assets(editor_env: dict[str, str], shadow_dir: Path) -> None:
     ])
 
 
-def load_state(path: Path) -> dict[str, str]:
+def load_state(path: Path) -> dict[str, object]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        files = data.get("files", {}) if isinstance(data, dict) else {}
-        return {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {}
+        if not isinstance(data, dict):
+            return {"files": {}, "templates": {}}
+        files = data.get("files", {})
+        templates = data.get("templates", {})
+        return {
+            "files": {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {},
+            "templates": templates if isinstance(templates, dict) else {},
+        }
     except (OSError, json.JSONDecodeError):
+        return {"files": {}, "templates": {}}
+
+
+def managed_template_source(path: Path) -> str:
+    match = MANAGED_TEMPLATE_RE.search(path.read_text(encoding="utf-8", errors="replace"))
+    return match.group(1).strip() if match else ""
+
+
+def jinja_value(value: str) -> str | None:
+    raw = value.strip()
+    if raw.lower() in {"true", "false"}:
+        return raw.title()
+    try:
+        parsed = ast.literal_eval(raw)
+    except (SyntaxError, ValueError):
+        return None
+    return str(parsed)
+
+
+def template_to_markdown(template: Path, rel: str) -> str:
+    source = template.read_text(encoding="utf-8")
+    body_match = CONTENT_BLOCK_RE.search(source)
+    if not body_match:
+        raise RuntimeError(f"managed template has no content block: {template}")
+
+    metadata: dict[str, str] = {}
+    extends_match = EXTENDS_RE.search(source)
+    if extends_match:
+        metadata["extends"] = extends_match.group(2).strip()
+    for match in SET_RE.finditer(source):
+        key, value = match.group(1).lower(), jinja_value(match.group(2))
+        if value is not None:
+            metadata[key] = value
+    metadata["publishstate"] = "Concept"
+
+    preferred = ["extends", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author", "blog"]
+    lines = [f"{{{key}: {metadata.pop(key)}}}" for key in preferred if metadata.get(key, "") != ""]
+    lines.extend(f"{{{key}: {value}}}" for key, value in sorted(metadata.items()) if value != "")
+    body = body_match.group(1).strip()
+    if not body:
+        raise RuntimeError(f"managed template has an empty content block: {template}")
+    return "\n".join(lines) + "\n\n" + body + "\n"
+
+
+def reconcile_templates(site_dir: Path, active_files: dict[str, Path], template_state: dict[str, object]) -> list[str]:
+    templates_root = site_dir / "templates"
+    if not templates_root.is_dir():
+        return []
+    imported: list[str] = []
+    conflicts: list[str] = []
+    for template in templates_root.rglob("*.html"):
+        rel = managed_template_source(template)
+        if not rel or rel not in active_files:
+            continue
+        previous = template_state.get(rel, {})
+        if not isinstance(previous, dict):
+            continue
+        old_md = str(previous.get("markdown", ""))
+        old_template = str(previous.get("template", ""))
+        if not old_md or not old_template:
+            continue
+        md_changed = digest(active_files[rel]) != old_md
+        template_changed = digest(template) != old_template
+        if md_changed and template_changed:
+            conflicts.append(rel)
+            continue
+        if template_changed:
+            active_files[rel].write_text(template_to_markdown(template, rel), encoding="utf-8")
+            imported.append(rel)
+    if conflicts:
+        raise RuntimeError("WPM template conflict: " + ", ".join(sorted(conflicts)))
+    return imported
+
+
+def managed_template_state(site_dir: Path, active_files: dict[str, Path]) -> dict[str, dict[str, str]]:
+    templates_root = site_dir / "templates"
+    if not templates_root.is_dir():
         return {}
+    state: dict[str, dict[str, str]] = {}
+    for template in templates_root.rglob("*.html"):
+        rel = managed_template_source(template)
+        source = active_files.get(rel)
+        if rel and source and source.is_file():
+            state[rel] = {"markdown": digest(source), "template": digest(template)}
+    return state
 
 
 def write_status(shadow_dir: Path, active_files: dict[str, Path], processed: list[str]) -> None:
@@ -270,10 +365,16 @@ def main() -> int:
 
     sync_static_assets(editor_env, shadow_dir)
     pull_markdown(editor_env, staging)
-    known = load_state(state_path)
+    state = load_state(state_path)
+    known = state["files"] if isinstance(state.get("files"), dict) else {}
+    template_state = state["templates"] if isinstance(state.get("templates"), dict) else {}
     remote_files, active_files, conflicts = sync_shadow(staging, shadow_dir, known)
     if conflicts:
         raise RuntimeError("WPM sync conflict: " + ", ".join(conflicts))
+
+    imported = reconcile_templates(site_dir, active_files, template_state)
+    for rel in imported:
+        push_markdown(editor_env, active_files[rel], rel)
 
     processed: list[str] = []
     for rel, source in active_files.items():
@@ -287,10 +388,11 @@ def main() -> int:
         push_markdown(editor_env, source, rel)
         processed.append(rel)
 
-    next_state = {rel: digest(path) for rel, path in remote_files.items()}
-    for rel in processed:
-        next_state[rel] = digest(active_files[rel])
-    state_path.write_text(json.dumps({"files": next_state}, indent=2) + "\n", encoding="utf-8")
+    next_state = {rel: digest(path) for rel, path in active_files.items()}
+    state_path.write_text(json.dumps({
+        "files": next_state,
+        "templates": managed_template_state(site_dir, active_files),
+    }, indent=2) + "\n", encoding="utf-8")
     write_status(shadow_dir, active_files, processed)
     print("WPM publish: " + (", ".join(processed) if processed else "no Processing files"))
     return 0
