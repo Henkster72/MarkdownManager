@@ -320,17 +320,29 @@ function mdw_preview_render_course_image_macro($args, $vars) {
         '" alt="' . $altEsc . '" loading="lazy"></figure>';
 }
 
+function mdw_preview_render_bigheader_macro($args, $vars) {
+    $positional = isset($args['_positional']) && is_array($args['_positional']) ? $args['_positional'] : [];
+    $rawText = isset($args['text']) ? $args['text'] : ($positional[0] ?? '');
+    $text = mdw_preview_resolve_jinja_value((string)$rawText, $vars);
+    if ($text === '') return '';
+
+    return '<section class="relative py-8 corner-decorations corners-tl-br bg-light" data-mdw-macro="special.bigheader">' .
+        '<div class="section-content mx-auto bg-base p-8 w-full md:w-1/2 corner-decorations corners-tr-bl">' .
+        '<div class="bigheader">' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</div></div></section>';
+}
+
 function mdw_preview_render_macro_calls($text, $vars) {
     $rendered = (string)preg_replace('/\{%\s*macro\b.*?%\}.*?\{%\s*endmacro\s*%\}/s', '', (string)$text);
     $rendered = (string)preg_replace_callback(
-        '/\{\{\s*(overview\.add_header|form\.contact_form|audio_player|course_image)\s*\(((?:[^()]|\([^()]*\))*)\)\s*\}\}/s',
+        '/\{\{\s*(overview\.add_header|form\.contact_form|audio_player|course_image|special\.bigheader)\s*\(((?:[^()]|\([^()]*\))*)\)\s*\}\}/s',
         function($m) use ($vars) {
             $args = mdw_preview_parse_macro_args((string)($m[2] ?? ''));
             $name = (string)($m[1] ?? '');
             if ($name === 'overview.add_header') $rendered = mdw_preview_render_overview_macro($args, $vars);
             else if ($name === 'form.contact_form') $rendered = mdw_preview_render_form_macro($args, $vars);
             else if ($name === 'audio_player') $rendered = mdw_preview_render_audio_macro($args, $vars);
-            else $rendered = mdw_preview_render_course_image_macro($args, $vars);
+            else if ($name === 'course_image') $rendered = mdw_preview_render_course_image_macro($args, $vars);
+            else $rendered = mdw_preview_render_bigheader_macro($args, $vars);
             $source = base64_encode(trim((string)($m[0] ?? '')));
             return "\n\n<div data-mdw-macro-source=\"{$source}\">" . $rendered . "</div>\n\n";
         },

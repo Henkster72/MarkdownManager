@@ -10,6 +10,8 @@ $markdown = implode("\n", [
     '{page_picture: banner.jpg}',
     '',
     "{% import 'macros/macro_overviewheader.html' as overview %} {{ overview.add_header(header_title=page_title, header_subtitle=page_subtitle, button_link=None, button_text=None, depth=depth) }}",
+    '',
+    '{{ special.bigheader("Preview headline") }}',
 ]);
 
 $html = md_to_html($markdown, 'test.md');
@@ -27,6 +29,10 @@ if (!preg_match('/data-mdw-macro-source="[A-Za-z0-9+\/=]+"/', $html)) {
 }
 if (substr_count($html, 'images/banner.jpg') !== 1) {
     fwrite(STDERR, "Overview macro must be the only preview renderer for page_picture\n");
+    exit(1);
+}
+if (!str_contains($html, 'data-mdw-macro="special.bigheader"') || !str_contains($html, '>Preview headline</div>')) {
+    fwrite(STDERR, "Special bigheader macro is missing from the preview\n");
     exit(1);
 }
 
