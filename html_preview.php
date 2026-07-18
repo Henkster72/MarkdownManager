@@ -94,6 +94,17 @@ function html_preview_images_dir() {
     return $cache;
 }
 
+function html_preview_static_dir() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = mdw_asset_relative_path('static_path', 'STATIC_PATH', 'static');
+    return $cache;
+}
+
+function mdw_is_static_download_path($path) {
+    return preg_match('/\.(?:csv|docx?|epub|ods|odt|pdf|pptx?|rtf|txt|xlsx?|zip)$/i', trim((string)$path)) === 1;
+}
+
 function html_preview_expand_image_token($url) {
     $url = trim((string)$url);
     if ($url === '') return $url;
@@ -188,6 +199,8 @@ function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     $value = $expr;
     if (strtolower((string)$forAttr) === 'src') {
         $value = html_preview_expand_image_token('{{ ' . $value . ' }}');
+    } else if (strtolower((string)$forAttr) === 'href' && mdw_is_static_download_path($value)) {
+        $value = rtrim(html_preview_static_dir(), '/') . '/' . ltrim($value, '/');
     }
     return $value;
 }
@@ -2533,6 +2546,13 @@ function mdw_jinja_link_token_path_from_href($href) {
         $path = mdw_jinja_sanitize_token_path($path);
         if ($path === '') return '';
         if (preg_match('~(?:^|/)(?:index|edit)\.php$~i', $path)) return '';
+        if (mdw_is_static_download_path($path)) {
+            $staticDir = trim(mdw_jinja_sanitize_token_path(html_preview_static_dir()), '/');
+            if ($staticDir !== '' && str_starts_with($path, $staticDir . '/')) {
+                $path = substr($path, strlen($staticDir) + 1);
+            }
+            return trim($path, '/');
+        }
         return mdw_jinja_to_template_href_path($path);
     }
 
