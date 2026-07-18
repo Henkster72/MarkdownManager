@@ -2520,6 +2520,7 @@
     const blockMarkdown = (node, depth = 0, orderedIndex = 1) => {
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
         if (!(node instanceof Element)) return '';
+        if (node.hasAttribute('data-mdw-auto-section')) return '';
         const sectionInclude = node.getAttribute('data-mdw-section-include');
         if (sectionInclude) return `{% include "${sectionInclude}" %}`;
         const macroSource = node.getAttribute('data-mdw-macro-source');
