@@ -3908,6 +3908,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             if (!$stayInLi) $closeAllLists();
 
             $pClass = $p['p_class'] ?? '';
+            if (preg_match('/^\s*✅\s+/u', $line)) {
+                $pClass = md_join_classes($pClass, 'p-narrow');
+            }
             $pAttr = $pClass ? ' class="'.htmlspecialchars($pClass, ENT_QUOTES, 'UTF-8').'"' : '';
             $srcAttr = $srcAttrsFor($i, $i);
             $html[]='<p'.$pAttr.$srcAttr.'>'.inline_md($line, $mdPath, $profile, $context).'</p>';
