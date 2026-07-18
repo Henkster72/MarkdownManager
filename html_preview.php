@@ -3188,6 +3188,10 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $pictureInserted = false;
         $mappedMetaKeys = [];
         $isBlogPage = in_array(strtolower(trim((string)($meta['blog'] ?? ''))), ['1', 'true', 'yes', 'on'], true);
+        if ($hasOverviewHeaderMacro) {
+            // overview.add_header owns these values in the site template.
+            foreach (['page_title', 'page_subtitle', 'page_picture'] as $key) $mappedMetaKeys[$key] = true;
+        }
         if ($publisherMode) {
             $pictureValue = isset($meta['page_picture']) ? trim((string)$meta['page_picture']) : '';
             if ($pictureValue !== '') {
