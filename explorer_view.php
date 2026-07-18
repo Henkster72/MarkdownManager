@@ -669,19 +669,6 @@ function explorer_view_render_tree($opts) {
                 <span class="note-text">
                     <span class="note-title">
                         <span><?=explorer_view_escape($t)?></span>
-                        <span class="note-badges">
-                            <?php if ($publisher_mode): ?>
-                                <span class="badge-publish <?=explorer_view_escape($publishClass)?>">
-                                    <?php if ($publishIcon !== ''): ?>
-                                        <span class="pi <?=explorer_view_escape($publishIcon)?>" aria-hidden="true"></span>
-                                    <?php endif; ?>
-                                    <span><?=explorer_view_escape($publishStateLabel ?? $publishState ?? '')?></span>
-                                </span>
-                            <?php endif; ?>
-                            <?php if ($isSecret): ?>
-                                <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
-                            <?php endif; ?>
-                        </span>
                     </span>
                     <span class="nav-item-path">
                         <span class="nav-item-slug"><?=explorer_view_escape($p)?></span>
@@ -691,6 +678,21 @@ function explorer_view_render_tree($opts) {
                     </span>
                 </span>
             </a>
+            <?php if ($publisher_mode || $isSecret): ?>
+            <span class="note-badges">
+                <?php if ($publisher_mode): ?>
+                    <span class="badge-publish <?=explorer_view_escape($publishClass)?>">
+                        <?php if ($publishIcon !== ''): ?>
+                            <span class="pi <?=explorer_view_escape($publishIcon)?>" aria-hidden="true"></span>
+                        <?php endif; ?>
+                        <span><?=explorer_view_escape($publishStateLabel ?? $publishState ?? '')?></span>
+                    </span>
+                <?php endif; ?>
+                <?php if ($isSecret): ?>
+                    <span class="badge-secret"><?=explorer_view_escape(explorer_view_t('common.secret','secret'))?></span>
+                <?php endif; ?>
+            </span>
+            <?php endif; ?>
             <?php if ($show_actions && $csrf_token): ?>
             <div class="note-actions">
                 <a href="edit.php?file=<?=rawurlencode($p)?>&folder=<?=rawurlencode(explorer_view_folder_from_path($p))?>" class="btn btn-ghost icon-button" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>">

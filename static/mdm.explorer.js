@@ -2481,7 +2481,6 @@
             secretBadge.textContent = t('common.secret', 'secret');
             badges.appendChild(secretBadge);
         }
-        noteTitle.appendChild(badges);
         noteText.appendChild(noteTitle);
 
         const pathWrap = document.createElement('span');
@@ -2501,6 +2500,7 @@
         link.appendChild(leading);
         link.appendChild(noteText);
         li.appendChild(link);
+        if (badges.childElementCount) li.appendChild(badges);
 
         if (showNoteActions && csrfToken) {
             const actions = document.createElement('div');

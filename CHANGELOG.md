@@ -12,6 +12,7 @@
 - WPM visual editor: regular users no longer see redundant pane titles in hide-Markdown mode, while superusers retain them.
 - Action groups: app-header and explorer controls now share the compact, divider-only toolbar treatment.
 - Explorer note actions: superuser visibility controls now share the edit/delete action group and its spacing.
+- Explorer note rows: publication and secret badges are centered with their adjacent action controls.
 
 ## 0.952
 

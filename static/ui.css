@@ -1669,14 +1669,14 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   background: var(--active-bg);
 }
 
-.index-page .note-row {
+#links_md_overview .note-row {
   display: flex;
   align-items: center;
   gap: 0;
   margin: 0.3rem 0.7rem;
 }
 
-.index-page .note-link-main {
+#links_md_overview .note-link-main {
   flex: 1 1 auto;
 }
 
@@ -1732,8 +1732,10 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 .note-badges {
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 0.35rem;
   flex-shrink: 0;
+  margin: 0 0 0 0.35rem;
 }
 
 .nav-item-path {
