@@ -3186,6 +3186,8 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
 
         $pagePictureHtml = '';
         $pictureInserted = false;
+        $mappedMetaKeys = [];
+        $isBlogPage = in_array(strtolower(trim((string)($meta['blog'] ?? ''))), ['1', 'true', 'yes', 'on'], true);
         if ($publisherMode) {
             $pictureValue = isset($meta['page_picture']) ? trim((string)$meta['page_picture']) : '';
             if ($pictureValue !== '') {
@@ -3203,12 +3205,32 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             }
         }
 
-        $mappedMetaKeys = [];
+        if ($isBlogPage) {
+            $title = trim((string)($meta['page_title'] ?? ''));
+            $subtitle = trim((string)($meta['page_subtitle'] ?? ''));
+            $postDate = trim((string)($meta['post_date'] ?? ''));
+            if ($title !== '' || $subtitle !== '' || $postDate !== '' || $pagePictureHtml !== '') {
+                $html[] = '<header class="mdw-preview-blog-header blog mx-auto px-8" data-mdw-generated="blog-header">';
+                if ($pagePictureHtml !== '') {
+                    $html[] = str_replace('class="md-img"', 'class="md-img mx-auto page-main-image"', $pagePictureHtml);
+                    $pictureInserted = true;
+                }
+                if ($title !== '') $html[] = '<h1 class="blogheader">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>';
+                if ($subtitle !== '') $html[] = '<h3>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h3>';
+                if ($postDate !== '') {
+                    $html[] = '<em class="text-sm link text-right">' . htmlspecialchars(mdw_format_post_date_value($postDate, $settings['post_date_format'] ?? 'mdy_short'), ENT_QUOTES, 'UTF-8') . '</em>';
+                }
+                $html[] = '</header>';
+            }
+            foreach (['page_title', 'page_subtitle', 'page_picture', 'post_date', 'author'] as $key) $mappedMetaKeys[$key] = true;
+        }
+
         if ($publisherMode) {
             $htmlMap = (isset($pcfg['html_map']) && is_array($pcfg['html_map'])) ? $pcfg['html_map'] : [];
             if (!empty($htmlMap)) {
                 foreach ($order as $k) {
                     if (!isset($meta[$k])) continue;
+                    if (isset($mappedMetaKeys[$k])) continue;
                     $spec = (isset($htmlMap[$k]) && is_array($htmlMap[$k])) ? $htmlMap[$k] : null;
                     if (!$spec) continue;
                     if (array_key_exists('enabled', $spec) && !$spec['enabled']) continue;
