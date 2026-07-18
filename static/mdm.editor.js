@@ -2547,7 +2547,7 @@
         if (macroSource) {
             try { return atob(macroSource); } catch { return ''; }
         }
-        if (node.matches('.md-meta, [data-mdw-generated="metadata"]')) return '';
+        if (node.matches('.md-meta, [data-mdw-generated]')) return '';
         if (node.matches('.md-toc-side, .md-toc-wrap[data-mdw-toc="1"]')) return '';
         if (node.matches('.md-toc-layout')) {
             const body = node.querySelector(':scope > .md-toc-body');
@@ -2583,7 +2583,7 @@
         };
         if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
             const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
-            return `${'#'.repeat(level)} ${cleanHeadingText(node.textContent || inlineMarkdown(node))}`;
+            return `${'#'.repeat(level)} ${escapeMd(inlineMarkdown(node))}`;
         }
         if (tag === 'div' || tag === 'section' || tag === 'article') {
             const containsGeneratedTemplate = !!node.querySelector('[data-mdw-section-include], [data-mdw-macro-source]');
@@ -2663,7 +2663,7 @@
         return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
     };
     const markPreviewGeneratedContent = () => {
-        prev.querySelectorAll('.md-meta, [data-mdw-generated="metadata"]').forEach((node) => {
+        prev.querySelectorAll('.md-meta, [data-mdw-generated]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
         prev.querySelectorAll('.md-toc-layout').forEach((node) => {
@@ -3948,20 +3948,7 @@
     };
 
     const normalizeHeadingText = (value) => {
-        let text = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-        let prev = '';
-        while (text && text !== prev) {
-            prev = text;
-            text = text
-                .replace(/^\s*(?:\*\*|__)\s*(.*?)\s*(?:\*\*|__)\s*$/s, '$1')
-                .replace(/^\s*(?:\*|_)\s*(.*?)\s*(?:\*|_)\s*$/s, '$1')
-                .trim();
-        }
-        return text
-            .replace(/(\*\*|__)([^*_].*?)\1/g, '$2')
-            .replace(/(^|[\s([{])([*_])([^*_]+)\2(?=$|[\s)\]},.!?:;])/g, '$1$3')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
     };
 
     const normalizeMarkdownHeadingLine = (line) => {
@@ -3979,16 +3966,6 @@
         ta.setRangeText(replacement, start, end, 'preserve');
         ta.scrollTop = scrollTop;
         dispatchInput();
-    };
-
-    const selectionIntersectsMarkdownHeading = () => {
-        const value = ta.value;
-        const selStart = ta.selectionStart ?? 0;
-        const selEnd = ta.selectionEnd ?? selStart;
-        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
-        let blockEnd = value.indexOf('\n', selEnd);
-        if (blockEnd === -1) blockEnd = value.length;
-        return value.slice(blockStart, blockEnd).split('\n').some((line) => /^\s*#{1,6}\s+\S/.test(line));
     };
 
     const normalizeMarkdownHeadingFormatting = () => {
@@ -5266,17 +5243,7 @@
 
     boldBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
-            if (window.__mdwIsVisualSelectionInHeading?.()) {
-                window.__mdwSyncVisualPreviewToTextarea?.();
-                window.__mdwSendPreview?.();
-                return;
-            }
             window.__mdwRunVisualCommand?.('bold');
-            return;
-        }
-        if (selectionIntersectsMarkdownHeading()) {
-            runFormatAction(normalizeMarkdownHeadingFormatting);
-            ta.focus();
             return;
         }
         runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
@@ -5436,10 +5403,6 @@
         // Bold: Ctrl+Alt+B
         if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
             e.preventDefault();
-            if (selectionIntersectsMarkdownHeading()) {
-                runFormatAction(normalizeMarkdownHeadingFormatting);
-                return;
-            }
             runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
             return;
         }
