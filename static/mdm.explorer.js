@@ -700,9 +700,21 @@
         togglePicker.type = 'button';
         togglePicker.className = 'btn btn-ghost btn-small';
         togglePicker.textContent = t('image_modal.title', 'Insert image');
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.hidden = true;
+        const chooseFile = document.createElement('button');
+        chooseFile.type = 'button';
+        chooseFile.className = 'btn btn-ghost btn-small';
+        chooseFile.textContent = t('image_modal.choose_file', 'Choose file');
+        const upload = document.createElement('button');
+        upload.type = 'button';
+        upload.className = 'btn btn-primary btn-small';
+        upload.textContent = t('image_modal.upload', 'Upload');
         const status = document.createElement('span');
         status.className = 'status-text';
-        tools.append(togglePicker, status);
+        tools.append(togglePicker, fileInput, chooseFile, upload, status);
         const picker = document.createElement('div');
         picker.hidden = true;
         picker.style.marginTop = '0.55rem';
@@ -720,6 +732,51 @@
         picker.append(filter, list);
         newMdPictureWrap.append(tools, picker);
         filter.addEventListener('input', () => renderNewMdImages(list, filter));
+        chooseFile.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files?.[0];
+            status.textContent = file ? file.name : '';
+        });
+        upload.addEventListener('click', async () => {
+            const file = fileInput.files?.[0];
+            if (!file) {
+                status.textContent = t('image_modal.choose_first', 'Choose an image first.');
+                chooseFile.focus();
+                return;
+            }
+            const csrf = newMdForm?.querySelector?.('input[name="csrf"]')?.value || '';
+            const api = window.MDM?.api;
+            if (!csrf || !api || typeof api.form !== 'function') {
+                status.textContent = !csrf
+                    ? t('image_modal.missing_csrf', 'Missing CSRF token. Reload the page.')
+                    : t('image_modal.upload_failed', 'Upload failed.');
+                return;
+            }
+            upload.disabled = true;
+            status.textContent = t('image_modal.uploading', 'Uploading…');
+            try {
+                const formData = new FormData();
+                formData.append('action', 'upload');
+                formData.append('csrf', csrf);
+                formData.append('image', file);
+                const uploaded = await api.form('image_manager.php', formData);
+                if (!uploaded || uploaded.ok !== true) throw new Error('upload');
+                const token = newMdImageToken(uploaded);
+                if (!token) throw new Error('upload');
+                newMdPicture.value = token;
+                newMdPicture.dispatchEvent(new Event('input', { bubbles: true }));
+                newMdImages = [{ file: uploaded.file, path: uploaded.path, alt: uploaded.alt }, ...(Array.isArray(newMdImages) ? newMdImages : [])];
+                newMdImagesPromise = null;
+                fileInput.value = '';
+                status.textContent = t('image_modal.uploaded', 'Uploaded.');
+                if (!picker.hidden) renderNewMdImages(list, filter);
+                newMdPicture.focus();
+            } catch (error) {
+                status.textContent = t('image_modal.upload_failed', 'Upload failed.');
+            } finally {
+                upload.disabled = false;
+            }
+        });
         togglePicker.addEventListener('click', async () => {
             picker.hidden = !picker.hidden;
             if (picker.hidden) return;
