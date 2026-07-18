@@ -275,7 +275,7 @@ def export_template(editor_url: str, rel: str, source: Path, target: Path) -> No
     url = f"{editor_url}?file={urllib.parse.quote(rel, safe='/')}&preview=1&template=jinja"
     result = run(["curl", "--fail", "--silent", "--show-error", "-F", f"content=<{source}", url], capture=True)
     template = result.stdout
-    if not template.lstrip().startswith("{% extends"):
+    if not re.match(r"\s*(?:\{#[\s\S]*?#\}\s*)*\{%\s*extends\b", template):
         raise RuntimeError(f"AW-SSG export returned no Jinja template for {rel}")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(template, encoding="utf-8")
