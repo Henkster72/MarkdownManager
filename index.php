@@ -474,7 +474,7 @@ function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode
         ? $entry['basename']
         : basename($p);
     $wantMeta = $publisherMode
-        ? ['publishstate', 'page_title', 'post_date', 'creationdate']
+        ? ['publishstate', 'page_title', 'post_date', 'creationdate', 'user_hidden']
         : ['post_date', 'published_date'];
     $info = explorer_view_extract_md_title_and_meta_from_file(
         __DIR__ . '/' . $p,
@@ -521,6 +521,7 @@ function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode
         'date_label' => $dateLabel,
         'publish_state' => $publisherMode ? strtolower((string)$publishState) : '',
         'is_secret' => isset($secretMap[$p]),
+        'user_hidden' => mdw_hidden_meta_is_truthy($info['meta']['user_hidden'] ?? ''),
     ];
 }
 

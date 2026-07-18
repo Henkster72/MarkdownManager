@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Nieuwe map maken"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Verbergen voor gebruikers",
+      "show_to_users": "Tonen aan gebruikers",
+      "update_failed": "Bestandszichtbaarheid kon niet worden bijgewerkt."
+    }
+  },
   "edit": {
     "unsaved_title": "Niet-opgeslagen wijzigingen",
     "toolbar": {

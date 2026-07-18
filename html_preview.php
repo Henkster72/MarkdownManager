@@ -1280,6 +1280,10 @@ function mdw_hidden_meta_match($line, &$keyOut = null, &$valueOut = null) {
     return true;
 }
 
+function mdw_hidden_meta_is_truthy($value) {
+    return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on'], true);
+}
+
 function mdw_hidden_meta_extract_and_remove_all($raw, &$metaOut = null, &$lineMapOut = null) {
     $raw = str_replace(["\r\n", "\r"], "\n", (string)$raw);
     $lines = explode("\n", $raw);
@@ -2972,12 +2976,20 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
     $settings = (isset($opts['settings']) && is_array($opts['settings'])) ? $opts['settings'] : mdw_metadata_settings();
     $publisherMode = !empty($settings['publisher_mode']);
     $publisherDefaultAuthor = isset($settings['publisher_default_author']) ? trim((string)$settings['publisher_default_author']) : '';
+    $preserveOnly = !empty($opts['preserve_only']);
 
     if (!empty($opts['set'])) {
         foreach ((array)$opts['set'] as $k => $v) {
             $kk = strtolower((string)$k);
             if ($kk === 'publishstate') $kk = 'publishstate';
             $meta[$kk] = (string)$v;
+        }
+    }
+
+    if (!empty($opts['unset'])) {
+        foreach ((array)$opts['unset'] as $k) {
+            $kk = strtolower(trim((string)$k));
+            if ($kk !== '') unset($meta[$kk]);
         }
     }
 
@@ -2990,7 +3002,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         }
     }
 
-    if (!isset($meta['date']) || trim((string)$meta['date']) === '') {
+    if (!$preserveOnly && (!isset($meta['date']) || trim((string)$meta['date']) === '')) {
         $fileDate = null;
         if (is_string($mdPath) && $mdPath !== '') {
             $base = basename(str_replace("\\", "/", $mdPath));
@@ -3001,7 +3013,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         $meta['date'] = $fileDate ?: $today;
     }
 
-    if ($publisherMode) {
+    if ($publisherMode && !$preserveOnly) {
         if (!isset($meta['creationdate']) || trim((string)$meta['creationdate']) === '') {
             $meta['creationdate'] = $now;
         }
@@ -3019,7 +3031,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
                 }
             }
         }
-    } else {
+    } else if (!$preserveOnly) {
         // If these fields already exist, keep them but do not inject new ones.
         if (isset($meta['changedate']) && trim((string)$meta['changedate']) !== '') {
             // Do not auto-update changedate outside publisher mode.
@@ -3059,7 +3071,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
 
     $body = ltrim((string)$body, "\n");
     if ($body !== '') {
-        $outLines[] = '';
+        if ($outLines) $outLines[] = '';
         $outLines[] = $body;
     }
 

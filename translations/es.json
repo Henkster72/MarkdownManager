@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Crear una nueva carpeta"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Ocultar a los usuarios",
+      "show_to_users": "Mostrar a los usuarios",
+      "update_failed": "No se pudo actualizar la visibilidad del archivo."
+    }
+  },
   "edit": {
     "unsaved_title": "Cambios sin guardar",
     "toolbar": {

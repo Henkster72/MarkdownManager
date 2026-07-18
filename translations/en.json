@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Create a new folder"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Hide from users",
+      "show_to_users": "Show to users",
+      "update_failed": "Could not update file visibility."
+    }
+  },
   "edit": {
     "unsaved_title": "Unsaved changes",
     "toolbar": {

@@ -1418,6 +1418,36 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   margin-bottom: 0.25rem;
 }
 
+.note-row.has-user-visibility {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.note-row.has-user-visibility > .note-link {
+  flex: 1 1 auto;
+}
+
+.user-visibility-actions {
+  flex: 0 0 auto;
+}
+
+.user-visibility-toggle .pi {
+  position: relative;
+}
+
+.user-visibility-toggle.is-hidden .pi::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -0.12em;
+  width: 1.25em;
+  height: 0.12em;
+  background: currentColor;
+  transform: rotate(-42deg);
+  transform-origin: center;
+}
+
 .note-link {
   display: flex;
   align-items: flex-start;

@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Neuen Ordner erstellen"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Vor Benutzern verbergen",
+      "show_to_users": "Benutzern anzeigen",
+      "update_failed": "Die Dateisichtbarkeit konnte nicht aktualisiert werden."
+    }
+  },
   "edit": {
     "unsaved_title": "Nicht gespeicherte Änderungen",
     "toolbar": {

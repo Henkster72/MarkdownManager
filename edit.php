@@ -1436,6 +1436,7 @@ window.mermaid = mermaid;
 			                                'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
 			                                'folder_filter' => $folder_filter,
 			                                'current_file' => $requested,
+			                                'csrf_token' => $CSRF_TOKEN,
 			                                'show_actions' => false,
 			                                'plugins_enabled' => false,
                                             'show_filter_row' => true,

@@ -1960,7 +1960,88 @@
         return Number.isFinite(raw) && raw >= 0 ? raw : 300000;
     })();
     const showNoteActions = contentList?.dataset.noteActions === '1';
+    const showUserVisibilityActions = contentList?.dataset.userVisibilityActions === '1';
     const csrfToken = String(window.MDW_CSRF || '');
+    const canManageUserVisibility = () => isPublisherMode()
+        && showUserVisibilityActions
+        && !!csrfToken
+        && typeof window.__mdwIsSuperuser === 'function'
+        && window.__mdwIsSuperuser();
+    const isUserHiddenRow = (row) => row instanceof HTMLElement && row.dataset.userHidden === 'true';
+    const makeUserVisibilityControl = (row) => {
+        if (!(row instanceof HTMLElement) || !canManageUserVisibility()) return;
+        if (row.querySelector('.user-visibility-toggle')) return;
+
+        const hidden = isUserHiddenRow(row);
+        const actions = document.createElement('div');
+        actions.className = 'note-actions user-visibility-actions';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `btn btn-ghost icon-button user-visibility-toggle${hidden ? ' is-hidden' : ''}`;
+        button.dataset.userVisibilityToggle = '1';
+        button.title = hidden
+            ? t('explorer.visibility.show_to_users', 'Show to users')
+            : t('explorer.visibility.hide_from_users', 'Hide from users');
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        const icon = document.createElement('span');
+        icon.className = 'pi pi-eye';
+        icon.setAttribute('aria-hidden', 'true');
+        button.appendChild(icon);
+        actions.appendChild(button);
+        row.classList.add('has-user-visibility');
+        row.appendChild(actions);
+    };
+    const syncUserVisibilityControls = () => {
+        const canManage = canManageUserVisibility();
+        overview.querySelectorAll('.note-row[data-file]').forEach((row) => {
+            if (!(row instanceof HTMLElement)) return;
+            if (canManage) {
+                makeUserVisibilityControl(row);
+                return;
+            }
+            row.classList.remove('has-user-visibility');
+            row.querySelector('.user-visibility-actions')?.remove();
+        });
+    };
+    const clearLazyExplorerCache = () => {
+        try { mdwStorageRemove('mdw_explorer_dataset_v3'); } catch {}
+    };
+    overview.addEventListener('click', async (event) => {
+        const target = event.target instanceof Element ? event.target.closest('[data-user-visibility-toggle]') : null;
+        if (!(target instanceof HTMLButtonElement)) return;
+        event.preventDefault();
+        const row = target.closest('.note-row[data-file]');
+        if (!(row instanceof HTMLElement)) return;
+        if (!canManageUserVisibility()) {
+            if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+            return;
+        }
+        const auth = typeof window.__mdwAuthState === 'function' ? window.__mdwAuthState() : null;
+        const file = String(row.dataset.file || '').trim();
+        if (!file || !auth?.token || !mdmApi || typeof mdmApi.json !== 'function') return;
+
+        target.disabled = true;
+        try {
+            await mdmApi.json('note_visibility.php', {
+                file,
+                user_hidden: !isUserHiddenRow(row),
+                csrf: csrfToken,
+                auth_token: auth.token,
+            });
+            clearLazyExplorerCache();
+            window.location.reload();
+        } catch (error) {
+            target.disabled = false;
+            const message = t('explorer.visibility.update_failed', 'Could not update file visibility.');
+            if (typeof window.__mdwShowErrorModal === 'function') {
+                window.__mdwShowErrorModal(message, '');
+            } else {
+                alert(message);
+            }
+            if (typeof window.__mdwReportNetworkError === 'function') window.__mdwReportNetworkError(error);
+        }
+    });
     const lazyListsByFolder = new Map();
     if (lazyRequested) {
         overview.querySelectorAll('.notes-list[data-folder-notes]').forEach((listEl) => {
@@ -2129,6 +2210,7 @@
         li.dataset.kind = 'md';
         li.dataset.file = file;
         li.dataset.secret = isSecret ? 'true' : 'false';
+        li.dataset.userHidden = note?.user_hidden ? 'true' : 'false';
         li.dataset.title = title;
         li.dataset.slug = basename;
         li.dataset.date = String(note?.date_key || '');
@@ -2257,6 +2339,7 @@
             lazyRenderState.set(listEl, { signature, token: null });
             refreshDocEntries();
             if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+            syncUserVisibilityControls();
             return;
         }
 
@@ -2276,6 +2359,7 @@
             }
             refreshDocEntries();
             if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+            syncUserVisibilityControls();
         };
         push();
     };
@@ -2333,6 +2417,7 @@
                     date_label: String(raw?.date_label || ''),
                     publish_state: normalizeSort(raw?.publish_state || ''),
                     is_secret: !!raw?.is_secret,
+                    user_hidden: !!raw?.user_hidden,
                 };
                 row.search = `${row.title}\n${row.basename}\n${row.path}`.toLowerCase();
                 lazyNotesByFolder.get(folder)?.push(row);
@@ -2361,6 +2446,7 @@
         }
 
         let visible = 0;
+        let totalVisible = 0;
         const visibleBySection = new Map();
         const bumpVisible = (section, amount) => {
             if (!(section instanceof HTMLElement) || amount <= 0) return;
@@ -2376,9 +2462,11 @@
             const listEl = lazyListsByFolder.get(folder);
             if (!(listEl instanceof HTMLElement)) continue;
             const source = lazyNotesByFolder.get(folder) || [];
+            const accessible = source.filter((note) => !isPublisherMode() || !note.user_hidden || canManageUserVisibility());
+            totalVisible += accessible.length;
 
             if (filtering) {
-                const matches = source.filter((note) => note.search.includes(q));
+                const matches = accessible.filter((note) => note.search.includes(q));
                 visible += matches.length;
                 bumpVisible(section, matches.length);
                 lazyRenderList(listEl, matches, lazySig('f', currentSortMode, q, matches));
@@ -2386,7 +2474,7 @@
             }
 
             if (getFolderOpen(section)) {
-                lazyRenderList(listEl, source, lazySig('a', currentSortMode, '', source));
+                lazyRenderList(listEl, accessible, lazySig('a', currentSortMode, '', accessible));
             }
         }
 
@@ -2394,7 +2482,7 @@
             ? (visible === 1
                 ? t('common.item_count_one', '{n} item', { n: visible })
                 : t('common.item_count_other', '{n} items', { n: visible }))
-            : t('common.total_items', '{n} total items', { n: lazyTotalItems });
+            : t('common.total_items', '{n} total items', { n: totalVisible });
 
         if (filterReset) filterReset.disabled = !filtering;
         if (filterClear) filterClear.style.display = filtering ? '' : 'none';
@@ -2474,7 +2562,7 @@
         const visibleBySection = new Map();
 
         for (const { el, text, section } of docEntries) {
-            const match = !filtering || text.includes(q);
+            const match = (!isPublisherMode() || !isUserHiddenRow(el) || canManageUserVisibility()) && (!filtering || text.includes(q));
             const nextDisplay = match ? '' : 'none';
             if (el.style.display !== nextDisplay) el.style.display = nextDisplay;
             if (!match) continue;
@@ -2926,6 +3014,11 @@
     }
 
     update();
+    syncUserVisibilityControls();
+    document.addEventListener('mdw-auth-change', () => {
+        update();
+        syncUserVisibilityControls();
+    });
     if (!focusRequestedRow() && lazyNotesMode) {
         let attempts = 0;
         const pollFocus = () => {

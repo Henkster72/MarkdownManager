@@ -82,6 +82,7 @@
         if (typeof window.__mdwSyncFolderDragState === 'function') {
             window.__mdwSyncFolderDragState();
         }
+        document.dispatchEvent(new CustomEvent('mdw-auth-change', { detail: { superuser: allow } }));
     };
 
     window.__mdwShowAuthModal = () => {

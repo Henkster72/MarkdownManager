@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Créer un nouveau dossier"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Masquer aux utilisateurs",
+      "show_to_users": "Afficher aux utilisateurs",
+      "update_failed": "La visibilité du fichier n’a pas pu être mise à jour."
+    }
+  },
   "edit": {
     "unsaved_title": "Modifications non enregistrées",
     "toolbar": {

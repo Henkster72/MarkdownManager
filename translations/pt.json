@@ -49,6 +49,13 @@
     },
     "new_folder_title": "Criar uma nova pasta"
   },
+  "explorer": {
+    "visibility": {
+      "hide_from_users": "Ocultar dos utilizadores",
+      "show_to_users": "Mostrar aos utilizadores",
+      "update_failed": "Não foi possível atualizar a visibilidade do ficheiro."
+    }
+  },
   "edit": {
     "unsaved_title": "Alterações não guardadas",
     "toolbar": {

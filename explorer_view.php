@@ -583,6 +583,9 @@ function explorer_view_render_tree($opts) {
         }
         $lazyAttrs .= ' data-lazy-cache-ttl-ms="' . (int)$lazy_cache_ttl_ms . '"';
     }
+    if ($publisher_mode && $csrf_token) {
+        $lazyAttrs .= ' data-user-visibility-actions="1"';
+    }
     if ($show_actions && $csrf_token) {
         $lazyAttrs .= ' data-note-actions="1"';
     }
@@ -597,7 +600,7 @@ function explorer_view_render_tree($opts) {
         <?php foreach($list as $entry):
             $p   = $entry['path'];
             $wantMeta = $publisher_mode
-                ? ['publishstate', 'page_title', 'post_date', 'creationdate']
+                ? ['publishstate', 'page_title', 'post_date', 'creationdate', 'user_hidden']
                 : ['post_date', 'published_date'];
             $info = explorer_view_extract_md_title_and_meta_from_file(
                 __DIR__ . '/' . $p,
@@ -633,6 +636,7 @@ function explorer_view_render_tree($opts) {
                 $entry['dd'] ?? null
             );
             $isSecret = isset($secretMap[$p]);
+            $isUserHidden = mdw_hidden_meta_is_truthy($info['meta']['user_hidden'] ?? '');
             $isCurrent = ($current_file !== null && $current_file === $p);
             $publishClass = '';
             if ($publisher_mode) {
@@ -656,7 +660,7 @@ function explorer_view_render_tree($opts) {
                 }
             }
         ?>
-        <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>" data-publish-state="<?=explorer_view_escape($publisher_mode ? strtolower((string)$publishState) : '')?>">
+        <li class="note-item doclink note-row <?= $isCurrent ? 'nav-item-current' : '' ?>" data-kind="md" data-file="<?=explorer_view_escape($p)?>" data-secret="<?= $isSecret ? 'true' : 'false' ?>" data-user-hidden="<?= $isUserHidden ? 'true' : 'false' ?>" data-title="<?=explorer_view_escape($t)?>" data-slug="<?=explorer_view_escape($entry['basename'])?>" data-date="<?=explorer_view_escape($dateKey)?>" data-publish-state="<?=explorer_view_escape($publisher_mode ? strtolower((string)$publishState) : '')?>">
             <a href="<?=explorer_view_escape($mdHref($p))?>" class="note-link note-link-main kbd-item <?= $isCurrent ? 'active' : '' ?>" draggable="true">
                 <span class="note-leading">
                     <span class="note-caret-spacer" aria-hidden="true"></span>
