@@ -1941,6 +1941,8 @@ function mdw_metadata_normalize_config($cfg) {
     if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign = 'left';
     $folderIconStyle = isset($inSettings['folder_icon_style']) ? strtolower(trim((string)$inSettings['folder_icon_style'])) : 'folder';
     if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
+    $paneHeaderOrder = isset($inSettings['pane_header_order']) ? strtolower(trim((string)$inSettings['pane_header_order'])) : 'actions_left';
+    if (!in_array($paneHeaderOrder, ['actions_left', 'title_left'], true)) $paneHeaderOrder = 'actions_left';
     $indexDualPaneOverview = !array_key_exists('index_dual_pane_overview', $inSettings) ? true : (bool)$inSettings['index_dual_pane_overview'];
     $hideMarkdownEditor = !array_key_exists('hide_markdown_editor', $inSettings) ? false : (bool)$inSettings['hide_markdown_editor'];
     $customFormat = mdw_custom_format_normalize($inSettings['custom_format'] ?? null);
@@ -1982,6 +1984,7 @@ function mdw_metadata_normalize_config($cfg) {
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,
+        'pane_header_order' => $paneHeaderOrder,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'custom_format' => $customFormat,
@@ -2257,6 +2260,7 @@ function mdw_metadata_settings() {
         'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
         'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
         'folder_icon_style' => isset($s['folder_icon_style']) ? strtolower(trim((string)$s['folder_icon_style'])) : 'folder',
+        'pane_header_order' => isset($s['pane_header_order']) ? strtolower(trim((string)$s['pane_header_order'])) : 'actions_left',
         'index_dual_pane_overview' => !array_key_exists('index_dual_pane_overview', $s) ? true : (bool)$s['index_dual_pane_overview'],
         'hide_markdown_editor' => !array_key_exists('hide_markdown_editor', $s) ? false : (bool)$s['hide_markdown_editor'],
         'custom_format' => mdw_custom_format_normalize($s['custom_format'] ?? null),
@@ -2275,6 +2279,7 @@ function mdw_metadata_settings() {
     if (!in_array($out['post_date_format'], ['mdy_short', 'dmy_long'], true)) $out['post_date_format'] = 'mdy_short';
     if (!in_array($out['post_date_align'], ['left', 'center', 'right'], true)) $out['post_date_align'] = 'left';
     if (!in_array($out['folder_icon_style'], ['folder', 'caret'], true)) $out['folder_icon_style'] = 'folder';
+    if (!in_array($out['pane_header_order'], ['actions_left', 'title_left'], true)) $out['pane_header_order'] = 'actions_left';
     if (!in_array($out['copy_html_mode'], ['dry', 'medium', 'wet'], true)) $out['copy_html_mode'] = 'dry';
     if (!in_array($out['toc_menu'], ['inline', 'left', 'right'], true)) $out['toc_menu'] = 'inline';
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';

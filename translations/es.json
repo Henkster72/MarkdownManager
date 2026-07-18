@@ -124,6 +124,15 @@
       "saved": "Guardado",
       "save_failed": "Error al guardar"
     },
+    "pane_header": {
+      "label": "Orden de la cabecera del panel",
+      "actions_left": "Barra de herramientas a la izquierda, título a la derecha",
+      "title_left": "Título a la izquierda, barra de herramientas a la derecha",
+      "hint": "Guardado para todos los usuarios. La barra de herramientas sigue visible cuando falta espacio.",
+      "saving": "Guardando…",
+      "saved": "Guardado",
+      "save_failed": "Error al guardar"
+    },
     "kbd_modifier": {
       "label": "Sistema de atajos de teclado",
       "option": "Windows / Linux (Ctrl + Alt)",

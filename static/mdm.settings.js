@@ -939,6 +939,8 @@
     const postDateAlignStatus = document.getElementById('postDateAlignStatus');
     const folderIconStyleSelect = document.getElementById('folderIconStyleSelect');
     const folderIconStyleStatus = document.getElementById('folderIconStyleStatus');
+    const paneHeaderOrderSelect = document.getElementById('paneHeaderOrderSelect');
+    const paneHeaderOrderStatus = document.getElementById('paneHeaderOrderStatus');
     const indexDualPaneToggle = document.getElementById('indexDualPaneToggle');
     const hideMarkdownEditorToggle = document.getElementById('hideMarkdownEditorToggle');
     const indexLayoutStatus = document.getElementById('indexLayoutStatus');
@@ -1018,6 +1020,13 @@
         if (!(customFormatStatus instanceof HTMLElement)) return;
         customFormatStatus.textContent = String(msg || '');
         customFormatStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+    const setPaneHeaderOrderStatus = (msg, kind = 'info') => {
+        if (!(paneHeaderOrderStatus instanceof HTMLElement)) return;
+        paneHeaderOrderStatus.textContent = String(msg || '');
+        paneHeaderOrderStatus.style.color = kind === 'error'
             ? 'var(--danger)'
             : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
     };
@@ -1181,6 +1190,14 @@
         const s = getSettings();
         const v = s && typeof s.folder_icon_style === 'string' ? s.folder_icon_style.trim().toLowerCase() : '';
         return (v === 'caret' || v === 'folder') ? v : 'folder';
+    };
+    const readPaneHeaderOrderSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.pane_header_order === 'string' ? s.pane_header_order.trim().toLowerCase() : '';
+        return (v === 'actions_left' || v === 'title_left') ? v : 'actions_left';
+    };
+    const applyPaneHeaderOrder = (value) => {
+        document.body?.classList.toggle('pane-header-title-left', value === 'title_left');
     };
     const readIndexDualPaneSetting = () => {
         const s = getSettings();
@@ -1450,6 +1467,11 @@
         if (folderIconStyleSelect instanceof HTMLSelectElement) {
             folderIconStyleSelect.value = readFolderIconStyleSetting();
         }
+        if (paneHeaderOrderSelect instanceof HTMLSelectElement) {
+            const value = readPaneHeaderOrderSetting();
+            paneHeaderOrderSelect.value = value;
+            applyPaneHeaderOrder(value);
+        }
         if (indexDualPaneToggle instanceof HTMLInputElement) {
             indexDualPaneToggle.checked = readIndexDualPaneSetting();
         }
@@ -1476,6 +1498,7 @@
         setPostDateFormatStatus(t('theme.post_date_format.hint', 'Saved for all users.'), 'info');
         setPostDateAlignStatus(t('theme.post_date_align.hint', 'Saved for all users.'), 'info');
         setFolderIconStyleStatus(t('theme.folder_icons.hint', 'Saved for all users.'), 'info');
+        setPaneHeaderOrderStatus(t('theme.pane_header.hint', 'Saved for all users. Toolbar remains visible when space is limited.'), 'info');
         setIndexLayoutStatus(t('theme.index_layout.hint', 'Turn off to use the classic overview-only index page.'), 'info');
         setSettingsIoStatus('', 'info');
 
@@ -1977,6 +2000,33 @@
             return false;
         }
     };
+    const savePaneHeaderOrderSetting = async (nextValue) => {
+        setPaneHeaderOrderStatus(t('theme.pane_header.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setPaneHeaderOrderStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = nextValue === 'title_left' ? 'title_left' : 'actions_left';
+            const result = await saveSettingsToServer({ pane_header_order: value });
+            if (!result.ok) throw new Error(result.message || t('theme.pane_header.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.pane_header_order = value;
+            }
+            applyPaneHeaderOrder(value);
+            setPaneHeaderOrderStatus(t('theme.pane_header.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('pane header order save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.pane_header.save_failed', 'Save failed');
+            setPaneHeaderOrderStatus(msg, 'error');
+            return false;
+        }
+    };
     const saveIndexDualPaneSetting = async (nextValue) => {
         setIndexLayoutStatus(t('theme.index_layout.saving', 'Saving…'), 'info');
         try {
@@ -2333,6 +2383,12 @@
             if (!(folderIconStyleSelect instanceof HTMLSelectElement)) return;
             const next = String(folderIconStyleSelect.value || '').trim();
             await saveFolderIconStyleSetting(next);
+        });
+        paneHeaderOrderSelect?.addEventListener('change', async () => {
+            if (!(paneHeaderOrderSelect instanceof HTMLSelectElement)) return;
+            const next = String(paneHeaderOrderSelect.value || '').trim();
+            const ok = await savePaneHeaderOrderSetting(next);
+            if (!ok) paneHeaderOrderSelect.value = readPaneHeaderOrderSetting();
         });
         indexDualPaneToggle?.addEventListener('change', async () => {
             if (!(indexDualPaneToggle instanceof HTMLInputElement)) return;
@@ -2802,6 +2858,13 @@
                 const next = String(folderIconStyleSelect.value || '').trim();
                 if (next !== readFolderIconStyleSetting()) {
                     const ok = await saveFolderIconStyleSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (paneHeaderOrderSelect instanceof HTMLSelectElement) {
+                const next = String(paneHeaderOrderSelect.value || '').trim();
+                if (next !== readPaneHeaderOrderSetting()) {
+                    const ok = await savePaneHeaderOrderSetting(next);
                     if (!ok) return false;
                 }
             }

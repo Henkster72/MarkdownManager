@@ -124,6 +124,15 @@
       "saved": "Guardado",
       "save_failed": "Falha ao guardar"
     },
+    "pane_header": {
+      "label": "Ordem do cabeçalho do painel",
+      "actions_left": "Barra de ferramentas à esquerda, título à direita",
+      "title_left": "Título à esquerda, barra de ferramentas à direita",
+      "hint": "Guardado para todos os utilizadores. A barra de ferramentas mantém-se visível com pouco espaço.",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
     "kbd_modifier": {
       "label": "Sistema de atalhos",
       "option": "Windows / Linux (Ctrl + Alt)",

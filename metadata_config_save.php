@@ -265,6 +265,10 @@ if (is_array($settingsIn)) {
         ? strtolower(trim((string)($settingsIn['folder_icon_style'] ?? '')))
         : strtolower(trim((string)($curSettings['folder_icon_style'] ?? 'folder')));
     if ($folderIconStyle !== 'caret' && $folderIconStyle !== 'folder') $folderIconStyle = 'folder';
+    $paneHeaderOrder = array_key_exists('pane_header_order', $settingsIn)
+        ? strtolower(trim((string)($settingsIn['pane_header_order'] ?? '')))
+        : strtolower(trim((string)($curSettings['pane_header_order'] ?? 'actions_left')));
+    if (!in_array($paneHeaderOrder, ['actions_left', 'title_left'], true)) $paneHeaderOrder = 'actions_left';
     $indexDualPaneOverview = array_key_exists('index_dual_pane_overview', $settingsIn)
         ? (bool)$settingsIn['index_dual_pane_overview']
         : (!array_key_exists('index_dual_pane_overview', $curSettings) ? true : (bool)$curSettings['index_dual_pane_overview']);
@@ -350,6 +354,7 @@ if (is_array($settingsIn)) {
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
         'folder_icon_style' => $folderIconStyle,
+        'pane_header_order' => $paneHeaderOrder,
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'custom_format' => $customFormat,

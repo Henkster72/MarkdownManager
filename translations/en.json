@@ -136,6 +136,15 @@
       "saved": "Saved",
       "save_failed": "Save failed"
     },
+    "pane_header": {
+      "label": "Pane header order",
+      "actions_left": "Toolbar left, title right",
+      "title_left": "Title left, toolbar right",
+      "hint": "Saved for all users. Toolbar remains visible when space is limited.",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
     "index_layout": {
       "hide_markdown": "Hide markdown"
     },

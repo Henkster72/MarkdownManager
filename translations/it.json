@@ -124,6 +124,15 @@
       "saved": "Salvato",
       "save_failed": "Errore di salvataggio"
     },
+    "pane_header": {
+      "label": "Ordine dell'intestazione del riquadro",
+      "actions_left": "Barra degli strumenti a sinistra, titolo a destra",
+      "title_left": "Titolo a sinistra, barra degli strumenti a destra",
+      "hint": "Salvato per tutti gli utenti. La barra degli strumenti resta visibile con spazio limitato.",
+      "saving": "Salvataggio…",
+      "saved": "Salvato",
+      "save_failed": "Errore di salvataggio"
+    },
     "kbd_modifier": {
       "label": "Sistema di scorciatoie da tastiera",
       "option": "Windows / Linux (Ctrl + Alt)",

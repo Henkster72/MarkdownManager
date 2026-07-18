@@ -136,6 +136,15 @@
       "saved": "Opgeslagen",
       "save_failed": "Opslaan mislukt"
     },
+    "pane_header": {
+      "label": "Paneelkop-indeling",
+      "actions_left": "Werkbalk links, titel rechts",
+      "title_left": "Titel links, werkbalk rechts",
+      "hint": "Opgeslagen voor alle gebruikers. De werkbalk blijft zichtbaar bij beperkte ruimte.",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
     "index_layout": {
       "hide_markdown": "Verberg markdown"
     },

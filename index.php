@@ -170,6 +170,8 @@ if (!in_array($postDateAlign, ['left', 'center', 'right'], true)) $postDateAlign
 $folderIconStyle = isset($MDW_SETTINGS['folder_icon_style']) ? strtolower(trim((string)$MDW_SETTINGS['folder_icon_style'])) : 'folder';
 if ($folderIconStyle !== 'caret') $folderIconStyle = 'folder';
 $folderIconClass = $folderIconStyle === 'caret' ? 'folder-icons-caret' : 'folder-icons-folder';
+$paneHeaderOrder = isset($MDW_SETTINGS['pane_header_order']) ? strtolower(trim((string)$MDW_SETTINGS['pane_header_order'])) : 'actions_left';
+if (!in_array($paneHeaderOrder, ['actions_left', 'title_left'], true)) $paneHeaderOrder = 'actions_left';
 $indexDualPaneEnabled = !array_key_exists('index_dual_pane_overview', $MDW_SETTINGS) || !empty($MDW_SETTINGS['index_dual_pane_overview']);
 $hideMarkdownEditor = !empty($MDW_SETTINGS['hide_markdown_editor']);
 $customFormat = mdw_custom_format_normalize($MDW_SETTINGS['custom_format'] ?? null);
@@ -1914,7 +1916,7 @@ window.mermaid = mermaid;
 </script>
 </head>
 
-<body class="app-body index-page <?=h($folderIconClass)?> <?= $indexSplitLayout ? 'index-split-layout' : '' ?> <?= $hideMarkdownEditor ? 'hide-markdown-editor' : '' ?>">
+<body class="app-body index-page <?=h($folderIconClass)?> <?= $paneHeaderOrder === 'title_left' ? 'pane-header-title-left' : '' ?> <?= $indexSplitLayout ? 'index-split-layout' : '' ?> <?= $hideMarkdownEditor ? 'hide-markdown-editor' : '' ?>">
 
 	<header class="app-header">
 	    <div class="app-header-inner">
@@ -2505,16 +2507,27 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 			                </div>
 			            </div>
 
-			            <div class="modal-field" data-auth-superuser="1">
-			                <label class="modal-label" for="folderIconStyleSelect"><?=h(mdw_t('theme.folder_icons.label','Folder icons'))?></label>
+		            <div class="modal-field" data-auth-superuser="1">
+		                <label class="modal-label" for="folderIconStyleSelect"><?=h(mdw_t('theme.folder_icons.label','Folder icons'))?></label>
 			                <select id="folderIconStyleSelect" class="input" data-auth-superuser-enable="1">
 			                    <option value="folder" <?= $folderIconStyle === 'folder' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_folder','Folder'))?></option>
 			                    <option value="caret" <?= $folderIconStyle === 'caret' ? 'selected' : '' ?>><?=h(mdw_t('theme.folder_icons.option_caret','Caret'))?></option>
 			                </select>
-			                <div id="folderIconStyleStatus" class="status-text" style="margin-top: 0.35rem;">
-			                    <?=h(mdw_t('theme.folder_icons.hint','Saved for all users.'))?>
-			                </div>
-			            </div>
+		                <div id="folderIconStyleStatus" class="status-text" style="margin-top: 0.35rem;">
+		                    <?=h(mdw_t('theme.folder_icons.hint','Saved for all users.'))?>
+		                </div>
+		            </div>
+
+		            <div class="modal-field" data-auth-superuser="1">
+		                <label class="modal-label" for="paneHeaderOrderSelect"><?=h(mdw_t('theme.pane_header.label','Pane header order'))?></label>
+		                <select id="paneHeaderOrderSelect" class="input" data-auth-superuser-enable="1">
+		                    <option value="actions_left" <?= $paneHeaderOrder === 'actions_left' ? 'selected' : '' ?>><?=h(mdw_t('theme.pane_header.actions_left','Toolbar left, title right'))?></option>
+		                    <option value="title_left" <?= $paneHeaderOrder === 'title_left' ? 'selected' : '' ?>><?=h(mdw_t('theme.pane_header.title_left','Title left, toolbar right'))?></option>
+		                </select>
+		                <div id="paneHeaderOrderStatus" class="status-text" style="margin-top: 0.35rem;">
+		                    <?=h(mdw_t('theme.pane_header.hint','Saved for all users. Toolbar remains visible when space is limited.'))?>
+		                </div>
+		            </div>
 
             <div class="modal-field" data-auth-superuser="1">
                 <div class="modal-label"><?=h(mdw_t('theme.index_layout.label','Index overview layout'))?></div>

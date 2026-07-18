@@ -7,6 +7,7 @@
 - WPM status: added a status command with local-time sync/change summaries plus `--changes` and `--limit` for recent editor and site files; the shared Jinja-environment sync helper is available for renderer deployments.
 - Jinja export and preview: preview-only metadata and automatic sections are excluded from exported templates, preventing duplicate base-template CTAs; recursive blockquote rendering no longer inserts automatic sections per quote.
 - WPM new Markdown: the creation modal now uses configured Article metadata defaults, fills `post_date` with today in the configured display format, preserves submitted metadata on validation errors, and uses friendly article labels for common fields.
+- Pane headers: superusers can choose toolbar-left/title-right (the default) or the reverse for all users; titles yield space before toolbar actions so controls remain visible.
 
 ## 0.952
 

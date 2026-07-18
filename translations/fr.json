@@ -124,6 +124,15 @@
       "saved": "Enregistré",
       "save_failed": "Échec de l'enregistrement"
     },
+    "pane_header": {
+      "label": "Ordre de l’en-tête de panneau",
+      "actions_left": "Barre d’outils à gauche, titre à droite",
+      "title_left": "Titre à gauche, barre d’outils à droite",
+      "hint": "Enregistré pour tous les utilisateurs. La barre d’outils reste visible lorsque l’espace est limité.",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
     "kbd_modifier": {
       "label": "Système de raccourcis",
       "option": "Windows / Linux (Ctrl + Alt)",

@@ -124,6 +124,15 @@
       "saved": "Gespeichert",
       "save_failed": "Speichern fehlgeschlagen"
     },
+    "pane_header": {
+      "label": "Reihenfolge der Bereichskopfzeile",
+      "actions_left": "Werkzeugleiste links, Titel rechts",
+      "title_left": "Titel links, Werkzeugleiste rechts",
+      "hint": "Für alle Benutzer gespeichert. Die Werkzeugleiste bleibt bei wenig Platz sichtbar.",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
     "kbd_modifier": {
       "label": "Tastenkürzel-System",
       "option": "Windows / Linux (Strg + Alt)",
