@@ -456,6 +456,19 @@ function mdw_preview_render_inline_template_vars($text, $vars) {
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
     $protected = [];
     $text = preg_replace_callback(
+        '/(\[[^\]\n]*\]\([^\)\n]*?)\{\{\s*([^{}]+?)\s*\}\}([^\)\n]*\))/',
+        function($m) use ($vars, &$protected) {
+            $value = mdw_preview_resolve_jinja_value((string)$m[2], $vars);
+            if (!mdw_is_static_download_path($value)) return (string)$m[0];
+            $token = '@@MDW_PREVIEW_DOWNLOAD_TOKEN_' . count($protected) . '@@';
+            $protected[$token] = (string)$m[1]
+                . mdw_preview_resolve_jinja_value((string)$m[2], $vars, 'href')
+                . (string)$m[3];
+            return $token;
+        },
+        $text
+    );
+    $text = preg_replace_callback(
         '/(!\[[^\]\n]*\]\([^)\n]*?)\{\{\s*([^{}]+?)\s*\}\}([^)\n]*\))/',
         function($m) use ($vars, &$protected) {
             $value = mdw_preview_resolve_jinja_value((string)$m[2], $vars);
