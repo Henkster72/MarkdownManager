@@ -15,6 +15,7 @@
 - Explorer note rows: publication and secret badges are centered with their adjacent action controls.
 - Action dividers: compact pane, header, navigation, and explorer action controls use a dedicated subtle divider without weakening general borders.
 - WPM keyboard navigation: normal users skip `user_hidden` Markdown files when moving through index previews with the arrow keys; superusers retain access to all notes.
+- WPM overview-header previews: macro-generated call-to-action links now retain the corresponding `default-button` plus `accentbutton` or `freebutton` classes, so instance button styling applies consistently.
 
 ## 0.952
 
