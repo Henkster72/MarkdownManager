@@ -929,8 +929,11 @@ body.app-body .find-replace-modal {
   min-height: 100%;
   outline: none;
 }
-.edit-page.hide-markdown-editor #preview[contenteditable="true"]:focus {
-  box-shadow: none;
+.edit-page.hide-markdown-editor #preview[contenteditable="true"]:focus,
+.edit-page.hide-markdown-editor #preview .md-toc-body[contenteditable="true"]:focus,
+.edit-page.hide-markdown-editor #preview .md-toc-body[contenteditable="true"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 .edit-page.hide-markdown-editor #preview img.is-selected {
   outline: 3px solid var(--accent);
