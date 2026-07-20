@@ -16,27 +16,6 @@
     if (!(editor instanceof HTMLTextAreaElement) || !(form instanceof HTMLFormElement)) return;
 
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
-    const getStatusHold = () => {
-        if (window.__mdwStatusHold && typeof window.__mdwStatusHold.isHeld === 'function') {
-            return window.__mdwStatusHold;
-        }
-        const state = { until: 0 };
-        const api = {
-            hold(ms) {
-                const next = Date.now() + Math.max(0, ms || 0);
-                if (next > state.until) state.until = next;
-                return state.until;
-            },
-            isHeld() {
-                return Date.now() < state.until;
-            },
-        };
-        window.__mdwStatusHold = api;
-        return api;
-    };
-    const statusHold = getStatusHold();
-    const warningHoldMs = 10000;
-
     const parseMetaEntries = (line) => {
         const normalized = String(line ?? '')
             .replace(/\u00a0/g, ' ')
@@ -160,7 +139,6 @@
         const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
         const meta = {};
         const bodyLines = [];
-        const { known } = getKnownKeysAndOrder();
         const bufferedLeading = [];
         let inMeta = true;
         let seenMeta = false;
@@ -171,20 +149,11 @@
             if (inMeta) {
             const parsedEntries = parseMetaEntries(line);
             if (parsedEntries) {
-                let hasKnown = false;
-                let hasUnknown = false;
                 parsedEntries.forEach(({ key, value }) => {
-                    if (known.has(key)) {
-                        meta[key] = value;
-                        hasKnown = true;
-                    } else {
-                        hasUnknown = true;
-                    }
+                    meta[key] = value;
                 });
-                if (hasKnown && !hasUnknown) {
-                    seenMeta = true;
-                    continue;
-                }
+                seenMeta = true;
+                continue;
             }
                 if (!seenMeta && normalized.trim() === '') {
                     bufferedLeading.push(line);
@@ -253,10 +222,15 @@
     };
 
     const buildMetaBlock = (meta, includeKeys) => {
-        const { order } = getKnownKeysAndOrder();
+        const keys = [];
+        const add = (key) => {
+            const normalized = String(key || '').trim().toLowerCase();
+            if (normalized && !keys.includes(normalized)) keys.push(normalized);
+        };
+        (Array.isArray(includeKeys) ? includeKeys : []).forEach(add);
+        Object.keys(meta || {}).forEach(add);
         const out = [];
-        for (const k of order) {
-            if (!includeKeys.includes(k)) continue;
+        for (const k of keys) {
             const v = String(meta?.[k] ?? '').trim();
             if (!v) continue;
             out.push(`{${k}: ${v}}`);
@@ -265,52 +239,19 @@
     };
 
     let metaStore = extractMetaAndBody(editor.value).meta;
-    const liveStatus = document.getElementById('liveStatus');
-    let metaWarnTimer = null;
     let applyTimer = null;
     let isApplying = false;
-    let hasAppliedOnce = false;
-    const warnHiddenMeta = (keys) => {
-        if (!keys.length || !(liveStatus instanceof HTMLElement)) return;
-        statusHold.hold(warningHoldMs);
-        liveStatus.textContent = `Hidden metadata removed: ${keys.join(', ')}.`;
-        liveStatus.style.color = 'var(--danger)';
-        if (metaWarnTimer) clearTimeout(metaWarnTimer);
-        metaWarnTimer = setTimeout(() => {
-            liveStatus.textContent = '';
-            liveStatus.style.color = '';
-        }, warningHoldMs);
-    };
 
     const applyMetaVisibility = () => {
         const baseCfg = getBaseCfg();
         const pubCfg = getPublisherCfg();
         const publisherMode = isPublisherMode();
         const { meta, body } = extractMetaAndBody(editor.value);
-        const hiddenKeys = new Set();
-        Object.entries(baseCfg || {}).forEach(([k, f]) => {
-            if (!f || typeof f !== 'object') return;
-            if (!isMarkdownVisible(f)) hiddenKeys.add(String(k).toLowerCase());
-        });
-        if (publisherMode) {
-            Object.entries(pubCfg || {}).forEach(([k, f]) => {
-                if (!f || typeof f !== 'object') return;
-                if (!isMarkdownVisible(f)) hiddenKeys.add(String(k).toLowerCase());
-            });
-        }
-
         const filteredMeta = {};
-        const blockedKeys = [];
         Object.entries(meta || {}).forEach(([k, v]) => {
             const key = String(k).toLowerCase();
-            const isHidden = hiddenKeys.has(key);
-            if (isHidden) {
-                if (hasAppliedOnce) blockedKeys.push(key);
-                return;
-            }
             filteredMeta[key] = v;
         });
-        if (blockedKeys.length) warnHiddenMeta(blockedKeys);
 
         const { order } = getKnownKeysAndOrder();
         const includeKeys = order.filter((k) => {
@@ -342,7 +283,6 @@
             isApplying = false;
         }
         updateAppTitleFromEditor();
-        hasAppliedOnce = true;
     };
 
     const setupPublishControlsPlacement = () => {
@@ -807,7 +747,6 @@
     };
     window.__mdwResetMetaStore = () => {
         metaStore = extractMetaAndBody(editor.value).meta;
-        hasAppliedOnce = false;
         applyMetaVisibility();
     };
     applyMetaVisibility();
@@ -2769,20 +2708,29 @@
         if (!text) return null;
 
         const source = String(ta.value || '');
+        const plainMarkdown = (value) => String(value || '')
+            .replace(/!\[([^\]]*)\]\([^\n)]*(?:\([^\n)]*\)[^\n)]*)*\)/g, '$1')
+            .replace(/\[([^\]]+)\]\([^\n)]*(?:\([^\n)]*\)[^\n)]*)*\)/g, '$1')
+            .replace(/\{:\s*[^}]*\}/g, '')
+            .replace(/^\s*(?:#{1,6}\s+|[-+*]\s+|>\s?|\d+[.)]\s+)/gm, '')
+            .replace(/[*_`~]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
         const candidates = [];
-        let index = source.indexOf(text);
-        while (index !== -1) {
-            candidates.push(index);
-            index = source.indexOf(text, index + Math.max(1, text.length));
-        }
+        let offset = 0;
+        source.split(/\n{2,}/).forEach((rawBlock) => {
+            const start = source.indexOf(rawBlock, offset);
+            offset = start + rawBlock.length;
+            const plain = plainMarkdown(rawBlock);
+            if (!plain || (plain !== text && !plain.includes(text))) return;
+            candidates.push(start + rawBlock.length);
+        });
         if (!candidates.length) return null;
         const current = Number(ta.selectionStart || 0);
-        const start = candidates.reduce((best, candidate) => (
+        const end = candidates.reduce((best, candidate) => (
             Math.abs(candidate - current) < Math.abs(best - current) ? candidate : best
         ), candidates[0]);
-        const end = source.indexOf('\n', start + text.length);
-        const lineEnd = end === -1 ? source.length : end;
-        return { start: lineEnd, end: lineEnd };
+        return { start: end, end };
     };
     const markdownImageSrc = (src) => {
         const raw = String(src || '').trim();
