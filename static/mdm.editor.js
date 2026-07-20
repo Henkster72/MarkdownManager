@@ -277,10 +277,15 @@
         if (editor.value !== next) {
             const pos = editor.selectionStart;
             isApplying = true;
-            editor.value = next;
-            try { editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length); } catch {}
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
-            isApplying = false;
+            window.__mdwMetaApplying = true;
+            try {
+                editor.value = next;
+                try { editor.selectionStart = editor.selectionEnd = Math.min(pos, editor.value.length); } catch {}
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+            } finally {
+                window.__mdwMetaApplying = false;
+                isApplying = false;
+            }
         }
         updateAppTitleFromEditor();
     };
@@ -2950,7 +2955,7 @@
     ta.addEventListener('input', function(){
         updateLineNumbers();
         recomputeDirty();
-        if (!visualPreviewInputActive) schedulePreview();
+        if (!visualPreviewInputActive && !window.__mdwMetaApplying) schedulePreview();
         scheduleBracketOverlay();
         scheduleLinkSuggest();
     });
