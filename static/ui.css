@@ -930,7 +930,7 @@ body.app-body .find-replace-modal {
   outline: none;
 }
 .edit-page.hide-markdown-editor #preview[contenteditable="true"]:focus {
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: none;
 }
 .edit-page.hide-markdown-editor #preview img.is-selected {
   outline: 3px solid var(--accent);
