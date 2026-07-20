@@ -1893,6 +1893,16 @@ window.mermaid = mermaid;
 	                        $entries = array_values(array_filter($entries, static function($entry) {
 	                            return is_array($entry) && mdw_link_picker_is_linkable_note($entry['path'] ?? '');
 	                        }));
+	                        foreach ($entries as &$entry) {
+	                            $entry['picker_title'] = mdw_link_picker_title(
+	                                $entry['path'] ?? '',
+	                                $entry['basename'] ?? basename((string)($entry['path'] ?? ''))
+	                            );
+	                        }
+	                        unset($entry);
+	                        usort($entries, static function($left, $right) {
+	                            return strnatcasecmp((string)($left['picker_title'] ?? ''), (string)($right['picker_title'] ?? ''));
+	                        });
 	                        if (empty($entries)) return;
 	                        $groupId = 'linkpicker-' . substr(sha1('picker:' . $groupTitle), 0, 10);
 	                        ?>
@@ -1904,7 +1914,7 @@ window.mermaid = mermaid;
 	                            <ul class="notes-list" id="<?=h($groupId)?>">
 	                            <?php foreach ($entries as $entry):
 	                                $p = $entry['path'];
-	                                $pickerTitle = mdw_link_picker_title($p, $entry['basename'] ?? basename($p));
+	                                $pickerTitle = (string)($entry['picker_title'] ?? '');
 	                                $pickerSearch = trim($pickerTitle . ' ' . preg_replace('/\.md$/i', '', (string)$p));
 	                                $isSecret = isset($secretMap[$p]);
 	                            ?>
