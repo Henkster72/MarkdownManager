@@ -52,15 +52,26 @@ def copy_template(source: str, destination: str) -> None:
     run(["scp", "-q", "-p", "-o", "StrictHostKeyChecking=accept-new", source, destination])
 
 
-def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: dict, local_state: dict) -> tuple[int, int]:
+def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: dict, local_state: dict) -> tuple[int, int, int]:
     remote_templates = remote_state.get("templates", {})
     if not isinstance(remote_templates, dict):
-        return (0, 0)
+        return (0, 0, 0)
     previous = local_state.get("templates", {})
     if not isinstance(previous, dict):
         previous = {}
     next_state: dict[str, str] = {}
-    pulled = pushed = 0
+    pulled = pushed = deleted = 0
+
+    for rel, previous_hash in previous.items():
+        if not isinstance(rel, str) or rel in remote_templates:
+            continue
+        local_template = site_dir / "templates" / rel
+        if not local_template.exists():
+            continue
+        if digest(local_template) != str(previous_hash):
+            raise RuntimeError(f"WPM minipc template delete conflict: {rel}")
+        local_template.unlink()
+        deleted += 1
 
     for rel, data in remote_templates.items():
         if not isinstance(rel, str) or not isinstance(data, dict):
@@ -98,7 +109,7 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
         next_state[rel] = local_hash or remote_hash
 
     local_state["templates"] = next_state
-    return (pulled, pushed)
+    return (pulled, pushed, deleted)
 
 
 def main() -> int:
@@ -117,9 +128,9 @@ def main() -> int:
     local_state = load_json(state_path)
     pull_markdown(args.remote, args.remote_edit, args.local_edit.resolve())
     remote_state = pull_remote_state(args.remote, args.remote_site)
-    pulled, pushed = sync_templates(args.remote, args.remote_site, site_dir, remote_state, local_state)
+    pulled, pushed, deleted = sync_templates(args.remote, args.remote_site, site_dir, remote_state, local_state)
     state_path.write_text(json.dumps(local_state, indent=2) + "\n", encoding="utf-8")
-    print(f"WPM minipc sync: markdown=pulled templates_pulled={pulled} templates_pushed={pushed}")
+    print(f"WPM minipc sync: markdown=pulled templates_pulled={pulled} templates_pushed={pushed} templates_deleted={deleted}")
     return 0
 
 
