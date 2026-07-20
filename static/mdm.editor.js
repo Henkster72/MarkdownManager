@@ -2160,8 +2160,10 @@
     }
 
     let previewTimer = null;
+    let previewGeneration = 0;
     let visualPreviewInputActive = false;
     const cancelScheduledPreview = () => {
+        previewGeneration += 1;
         if (!previewTimer) return;
         clearTimeout(previewTimer);
         previewTimer = null;
@@ -2379,6 +2381,7 @@
     }
 
     async function sendPreview() {
+        const generation = ++previewGeneration;
         try {
             if (!mdmApi || typeof mdmApi.form !== 'function') {
                 throw new Error('network');
@@ -2389,6 +2392,7 @@
                 : ta.value;
             fd.set('content', previewContent);
             const html = await mdmApi.form('edit.php?file=' + encodeURIComponent(window.CURRENT_FILE) + '&preview=1', fd);
+            if (generation !== previewGeneration) return;
             if (typeof window.__mdwMarkOnline === 'function') {
                 window.__mdwMarkOnline();
             }
@@ -2646,6 +2650,7 @@
     const syncVisualPreviewToTextarea = () => {
         const next = previewHtmlToMarkdown();
         if (ta.value === next) return;
+        cancelScheduledPreview();
         visualPreviewInputActive = true;
         try {
             ta.value = next;
