@@ -129,8 +129,12 @@ function mdw_section_snippets($dir) {
         if (!is_file($path)) continue;
         $ext = strtolower((string)pathinfo($item, PATHINFO_EXTENSION));
         if (!in_array($ext, ['html', 'md', 'txt'], true)) continue;
-        $content = @file_get_contents($path);
-        if (!is_string($content) || trim($content) === '') continue;
+        if ($ext === 'html') {
+            $content = '{% include "' . $item . '" %}';
+        } else {
+            $content = @file_get_contents($path);
+            if (!is_string($content) || trim($content) === '') continue;
+        }
         $snippets[] = [
             'label' => mdw_section_snippet_label($item),
             'snippet' => $content,
