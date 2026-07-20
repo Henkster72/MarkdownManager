@@ -2712,6 +2712,7 @@
             .replace(/!\[([^\]]*)\]\([^\n)]*(?:\([^\n)]*\)[^\n)]*)*\)/g, '$1')
             .replace(/\[([^\]]+)\]\([^\n)]*(?:\([^\n)]*\)[^\n)]*)*\)/g, '$1')
             .replace(/\{:\s*[^}]*\}/g, '')
+            .replace(/<br\s*\/?>/gi, '')
             .replace(/^\s*(?:#{1,6}\s+|[-+*]\s+|>\s?|\d+[.)]\s+)/gm, '')
             .replace(/[*_`~]/g, '')
             .replace(/\s+/g, ' ')
@@ -2904,9 +2905,9 @@
                 e.preventDefault();
                 if (!insertion) return;
                 const scrollTop = ta.scrollTop;
-                ta.setRangeText('\n\n', insertion.start, insertion.end, 'preserve');
+                ta.setRangeText('<br>', insertion.start, insertion.end, 'preserve');
                 ta.scrollTop = scrollTop;
-                ta.setSelectionRange(insertion.start + 2, insertion.start + 2);
+                ta.setSelectionRange(insertion.start + 4, insertion.start + 4);
                 ta.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
