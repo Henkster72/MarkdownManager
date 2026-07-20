@@ -2854,11 +2854,46 @@
         syncVisualPreviewToTextarea();
         return true;
     };
+    const insertVisualMarkdownBlock = (markdown) => {
+        const text = String(markdown || '').trim();
+        if (!text || !isVisualEditorMode()) return false;
+        restoreVisualSelection();
+        const sel = window.getSelection?.();
+        if (!sel || sel.rangeCount < 1) return false;
+        const range = sel.getRangeAt(0);
+        if (!isRangeInPreview(range)) return false;
+        const node = range.startContainer instanceof Element
+            ? range.startContainer
+            : range.startContainer.parentElement;
+        const block = node instanceof Element ? node.closest('h1,h2,h3,h4,h5,h6,p,li,blockquote') : null;
+        if (!(block instanceof HTMLElement) || !prev.contains(block)) return false;
+
+        const beforeRange = document.createRange();
+        beforeRange.selectNodeContents(block);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
+        const marker = document.createElement('p');
+        marker.textContent = text;
+        if (beforeRange.toString().length === 0) {
+            block.before(marker);
+        } else {
+            block.after(marker);
+        }
+
+        const nextRange = document.createRange();
+        nextRange.selectNodeContents(marker);
+        nextRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(nextRange);
+        visualSelectionRange = nextRange.cloneRange();
+        syncVisualPreviewToTextarea();
+        return true;
+    };
     window.__mdwVisualEditorMode = isVisualEditorMode;
     window.__mdwSaveVisualSelection = saveVisualSelection;
     window.__mdwGetVisualSelectionText = getVisualSelectedText;
     window.__mdwGetVisualInsertionRange = getVisualInsertionRange;
     window.__mdwInsertMarkdownAtSelection = insertVisualMarkdown;
+    window.__mdwInsertMarkdownBlockAtSelection = insertVisualMarkdownBlock;
     window.__mdwInsertVisualTable = insertVisualTable;
     window.__mdwToggleVisualBlockquote = toggleVisualBlockquote;
     window.__mdwRunVisualCommand = runVisualCommand;
@@ -5027,10 +5062,11 @@
         if (!raw) return;
         const visualMode = typeof isUsingVisualEditor === 'function' && isUsingVisualEditor();
         const sectionInclude = /^\s*\{%\s*include\s+(?:"[^"]+"|'[^']+')\s*%\}\s*$/.test(raw);
-        if (visualMode && sectionInclude && typeof window.__mdwInsertMarkdownAtSelection === 'function') {
-            window.__mdwInsertMarkdownAtSelection(`\n\n${raw.trim()}\n\n`);
-            pendingCustomFormatSelection = null;
-            window.__mdwSendPreview?.();
+        if (visualMode && sectionInclude && typeof window.__mdwInsertMarkdownBlockAtSelection === 'function') {
+            if (window.__mdwInsertMarkdownBlockAtSelection(raw)) {
+                pendingCustomFormatSelection = null;
+                window.__mdwSendPreview?.();
+            }
             return;
         }
         if (visualMode) {
