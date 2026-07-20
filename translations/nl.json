@@ -61,6 +61,15 @@
     "toolbar": {
       "link": "Link",
       "image": "Afbeelding",
+      "bold": "Vet",
+      "italic": "Cursief",
+      "underline": "Onderstrepen",
+      "align": "Uitlijning",
+      "heading": "Kopniveau",
+      "blockquote": "Citaatblok",
+      "ordered_list": "Genummerde lijst",
+      "unordered_list": "Opsomming",
+      "table": "Tabel invoegen",
       "save": "Opslaan",
       "article_meta_title": "Artikelmetadata",
       "toc": "TOC",
@@ -72,10 +81,10 @@
       "rename": "Hernoem",
       "revert": "Terugzetten",
       "delete": "Verwijderen",
-      "wrap": "Wrap",
+      "wrap": "Tekstterugloop",
       "wrap_title": "Regelafbreking",
       "custom_css": "Custom secties",
-      "custom_format": "Custom format",
+      "custom_format": "Aangepaste opmaak",
       "lines": "Regels",
       "lines_title": "Regelnummers"
     },
@@ -184,8 +193,10 @@
     "asset_paths": {
       "title": "Assetpaden",
       "static_label": "Pad naar static-map",
-      "images_label": "Pad naar afbeeldingenmap",
-      "hint": "Relatief aan de editormap, bijvoorbeeld ../static en ../static/images."
+        "images_label": "Pad naar afbeeldingenmap",
+        "logo_label": "App-logo",
+        "logo_hint": "Kies een PNG of SVG uit de afbeeldingenmap. Laat leeg voor het standaardlogo.",
+        "hint": "Relatief aan de editormap, bijvoorbeeld ../static en ../static/images."
     },
     "editor_view": {
       "title": "Editorweergave"
@@ -230,6 +241,9 @@
       "option_inline": "Inline (standaard)",
       "option_left": "Linker zijbalk",
       "option_right": "Rechter zijbalk",
+      "export_label": "TOC-exportformaat",
+      "export_list": "Lijst",
+      "export_flat_links": "Platte links",
       "show_button": "Toon TOC-knop in toolbar",
       "hint": "Zijmenu verschijnt in preview/weergave en wordt alleen geëxporteerd in wet HTML.",
       "saving": "Opslaan…",

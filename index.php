@@ -162,6 +162,8 @@ if (is_string($exportClassPrefix) && strlen($exportClassPrefix) > 24) $exportCla
 $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($MDW_SETTINGS['jinja_meta_prefix'] ?? 'page_');
 $tocMenu = isset($MDW_SETTINGS['toc_menu']) ? strtolower(trim((string)$MDW_SETTINGS['toc_menu'])) : 'inline';
 if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+$tocExportStyle = isset($MDW_SETTINGS['toc_export_style']) ? strtolower(trim((string)$MDW_SETTINGS['toc_export_style'])) : 'list';
+if (!in_array($tocExportStyle, ['list', 'flat_links'], true)) $tocExportStyle = 'list';
 $tocButtonEnabled = !empty($MDW_SETTINGS['toc_button_enabled']);
 $postDateFormat = isset($MDW_SETTINGS['post_date_format']) ? trim((string)$MDW_SETTINGS['post_date_format']) : 'mdy_short';
 if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
@@ -180,6 +182,8 @@ $customFormatSections = !empty($customFormat['sections']);
 $instanceFontAssets = mdw_font_assets_normalize($MDW_SETTINGS['font_assets'] ?? []);
 $assetStaticPath = mdw_asset_relative_path('static_path', 'STATIC_PATH', $STATIC_DIR);
 $assetImagesPath = mdw_asset_relative_path('images_path', 'IMAGES_PATH', $IMAGES_DIR);
+$appLogoFile = mdw_app_logo_normalize($MDW_SETTINGS['app_logo'] ?? '');
+$appLogoUrl = $appLogoFile === '' ? '' : rtrim($assetImagesPath, '/') . '/' . implode('/', array_map('rawurlencode', explode('/', $appLogoFile)));
 $MDW_AUTH = function_exists('mdw_auth_config') ? mdw_auth_config() : ['user_hash' => '', 'superuser_hash' => ''];
 $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
@@ -1797,6 +1801,7 @@ if ($requested) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($APP_NAME)?> • <?=h($article_title)?></title>
+<link rel="icon" href="<?=h($appLogoUrl !== '' ? $appLogoUrl : 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23334155%22/%3E%3Cpath d=%22M8 24V8h4l4 7 4-7h4v16h-4v-9l-4 7-4-7v9z%22 fill=%22white%22/%3E%3C/svg%3E')?>">
 
 <script>
 // Namespace localStorage per app base URL to avoid cross-instance collisions.
@@ -1933,6 +1938,9 @@ window.mermaid = mermaid;
 	    <div class="app-header-inner">
 	        <div class="app-header-main">
 		            <a class="app-logo" href="index.php" aria-label="Go to index">
+		                <?php if ($appLogoUrl !== ''): ?>
+		                    <img class="app-logo-image" src="<?=h($appLogoUrl)?>" alt="">
+		                <?php else: ?>
 		                <svg fill="none" version="1.1" viewBox="0 0 833 607" xmlns="http://www.w3.org/2000/svg">
 		                 <style><![CDATA[.B{stroke-linejoin:round}.C{stroke-linecap:round}]]></style>
 		                 <g stroke="#fff" stroke-width="20">
@@ -1945,6 +1953,7 @@ window.mermaid = mermaid;
 		                  <path class="B" d="M72 222c0-8 7-15 15-15h300c8 0 15 7 15 15v62c0 8-7 15-15 15H87c-8-.06-15-7-15-15z"/>
 		                 </g>
 		                </svg>
+		                <?php endif; ?>
 		            </a>
 	            <div class="app-header-text">
 	                <div class="app-title-row">
@@ -2358,7 +2367,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 		<div class="auth-overlay" id="wpmUserOverlay" hidden>
 			<div class="modal auth-modal" id="wpmUserModal" role="dialog" aria-modal="true" aria-labelledby="wpmUserTitle">
 				<div class="modal-header">
-					<div class="modal-title" id="wpmUserTitle"><?=h(mdw_t('wpm.setup_title','WPM setup'))?></div>
+					<div class="modal-title auth-modal-title" id="wpmUserTitle"><?php if ($appLogoUrl !== ''): ?><img class="auth-modal-logo" src="<?=h($appLogoUrl)?>" alt=""><?php endif; ?><span class="auth-modal-title-text"><?=h(mdw_t('wpm.setup_title','WPM setup'))?></span></div>
 				</div>
 				<div class="modal-body">
 					<div class="status-text" style="margin-bottom: 0.6rem;">
@@ -2398,7 +2407,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 		<div class="auth-overlay" id="authOverlay" hidden>
 			<div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
 				<div class="modal-header">
-					<div class="modal-title" id="authModalTitle"><?=h($APP_NAME)?></div>
+					<div class="modal-title auth-modal-title" id="authModalTitle"><?php if ($appLogoUrl !== ''): ?><img class="auth-modal-logo" src="<?=h($appLogoUrl)?>" alt=""><?php endif; ?><span class="auth-modal-title-text"><?=h($APP_NAME)?></span></div>
 				</div>
 				<form class="modal-body" id="authForm" autocomplete="on">
 					<div id="authSetupFields" hidden>
@@ -2578,6 +2587,11 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                 <input id="staticPathInput" type="text" class="input" value="<?=h($assetStaticPath)?>" data-auth-superuser-enable="1">
                 <label class="modal-label" for="imagesPathInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.asset_paths.images_label','Images folder path'))?></label>
                 <input id="imagesPathInput" type="text" class="input" value="<?=h($assetImagesPath)?>" data-auth-superuser-enable="1">
+                <label class="modal-label" for="appLogoInput" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.asset_paths.logo_label','App logo'))?></label>
+                <input id="appLogoInput" type="text" class="input" list="appLogoImageOptions" value="<?=h($appLogoFile)?>" placeholder="logo.svg" data-auth-superuser-enable="1">
+                <datalist id="appLogoImageOptions"></datalist>
+                <img id="appLogoPreview" class="settings-logo-preview" alt="" hidden>
+                <div class="status-text" style="margin-top: 0.35rem;"><?=h(mdw_t('theme.asset_paths.logo_hint','Choose a PNG or SVG from the images folder. Leave empty for the default logo.'))?></div>
                 <div class="status-text" style="margin-top: 0.35rem;"><?=h(mdw_t('theme.asset_paths.hint','Relative to the editor folder, for example ../static and ../static/images.'))?></div>
             </div>
 
@@ -2634,6 +2648,11 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 					                    <option value="inline" <?= $tocMenu === 'inline' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_inline','Inline (default)'))?></option>
 					                    <option value="left" <?= $tocMenu === 'left' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_left','Left sidebar'))?></option>
 					                    <option value="right" <?= $tocMenu === 'right' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.option_right','Right sidebar'))?></option>
+					                </select>
+					                <label class="modal-label" for="tocExportStyleSelect" style="margin-top: 0.5rem;"><?=h(mdw_t('theme.toc_menu.export_label','TOC export format'))?></label>
+					                <select id="tocExportStyleSelect" class="input" data-auth-superuser-enable="1">
+					                    <option value="list" <?= $tocExportStyle === 'list' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.export_list','List'))?></option>
+					                    <option value="flat_links" <?= $tocExportStyle === 'flat_links' ? 'selected' : '' ?>><?=h(mdw_t('theme.toc_menu.export_flat_links','Flat links'))?></option>
 					                </select>
 					                <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
 					                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
@@ -2900,6 +2919,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 		window.MDW_AUTH_META = <?= mdw_json_for_script($MDW_AUTH_META) ?>;
 		window.MDW_META_CONFIG = <?= mdw_json_for_script($META_CFG_CLIENT) ?>;
 		window.MDW_META_PUBLISHER_CONFIG = <?= mdw_json_for_script($META_PUBLISHER_CFG) ?>;
+		window.MDW_IMAGES_URL = <?= mdw_json_for_script($assetImagesPath) ?>;
 		</script>
 
 	<script defer src="<?=h(mdw_static_asset('mdm.dom.js'))?>"></script>

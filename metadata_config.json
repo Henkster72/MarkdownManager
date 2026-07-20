@@ -17,6 +17,7 @@
         "copy_include_meta": true,
         "copy_html_mode": "dry",
         "toc_menu": "inline",
+        "toc_export_style": "list",
         "post_date_format": "mdy_short",
         "post_date_align": "left",
         "folder_icon_style": "folder",

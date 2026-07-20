@@ -250,6 +250,10 @@ if (is_array($settingsIn)) {
         ? strtolower(trim((string)($settingsIn['toc_menu'] ?? '')))
         : strtolower(trim((string)($curSettings['toc_menu'] ?? 'inline')));
     if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+    $tocExportStyle = array_key_exists('toc_export_style', $settingsIn)
+        ? strtolower(trim((string)($settingsIn['toc_export_style'] ?? '')))
+        : strtolower(trim((string)($curSettings['toc_export_style'] ?? 'list')));
+    if (!in_array($tocExportStyle, ['list', 'flat_links'], true)) $tocExportStyle = 'list';
     $tocButtonEnabled = array_key_exists('toc_button_enabled', $settingsIn)
         ? (bool)$settingsIn['toc_button_enabled']
         : (!array_key_exists('toc_button_enabled', $curSettings) ? false : (bool)$curSettings['toc_button_enabled']);
@@ -329,6 +333,9 @@ if (is_array($settingsIn)) {
     $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($jinjaMetaPrefix);
     $staticPath = mdw_asset_sanitize_path($settingsIn['static_path'] ?? ($curSettings['static_path'] ?? 'static'), 'static');
     $imagesPath = mdw_asset_sanitize_path($settingsIn['images_path'] ?? ($curSettings['images_path'] ?? 'images'), 'images');
+    $appLogo = array_key_exists('app_logo', $settingsIn)
+        ? mdw_app_logo_normalize($settingsIn['app_logo'] ?? '')
+        : mdw_app_logo_normalize($curSettings['app_logo'] ?? '');
 
     if ($publisherMode && $defaultAuthor === '') {
         json(['ok' => false, 'error' => 'publisher_author_required'], 400);
@@ -350,6 +357,7 @@ if (is_array($settingsIn)) {
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
         'toc_menu' => $tocMenu,
+        'toc_export_style' => $tocExportStyle,
         'toc_button_enabled' => (bool)$tocButtonEnabled,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
@@ -366,6 +374,7 @@ if (is_array($settingsIn)) {
         'font_assets' => $fontAssets,
         'static_path' => $staticPath,
         'images_path' => $imagesPath,
+        'app_logo' => $appLogo,
         'app_title' => $appTitle,
         'internal_link_prefix' => $internalLinkPrefix,
         'export_class_prefix' => $exportClassPrefix,

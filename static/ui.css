@@ -28,7 +28,7 @@ html, body {
   --index-shortcuts-scale: 1;
   --app-header-height: 56px;
   --app-header-gap: var(--app-header-height);
-  --editor-toolbar-control-height: 1.8rem;
+  --editor-toolbar-control-height: 2rem;
 }
 
 body.app-body {
@@ -195,6 +195,15 @@ a:hover {
   display: block;
   width: 2.15rem;
   height: 1.55rem;
+}
+
+.app-logo-image {
+  display: block;
+  width: 2.15rem;
+  height: 1.55rem;
+  max-width: 2.15rem;
+  max-height: 1.55rem;
+  object-fit: contain;
 }
 
 .app-logo svg g {
@@ -385,6 +394,30 @@ body.app-body .find-replace-modal {
   transform: translate(-50%, -50%);
   width: min(420px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
+}
+
+.auth-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-modal-logo {
+  width: 2rem;
+  height: 2rem;
+  max-width: 2rem;
+  max-height: 2rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.settings-logo-preview {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  margin-top: 0.5rem;
+  object-fit: contain;
+  border: 1px solid var(--border-soft);
 }
 
 .auth-logout-icon {
@@ -1076,6 +1109,7 @@ body.app-body .find-replace-modal {
 #paneMarkdown .pane-title,
 #panePreview .pane-title {
   display: flex;
+  gap: 0.35rem;
   justify-content: flex-end;
   text-align: right;
 }
@@ -1105,6 +1139,13 @@ body.app-body .find-replace-modal {
 #panePreview .pane-header-actions .btn:focus-visible,
 #panePreview .pane-header-actions .input:focus-visible {
   background: transparent;
+}
+#paneMarkdown .pane-header-actions .format-btn.is-active,
+#paneMarkdown .pane-header-actions .editor-toolbar-select.is-active,
+#panePreview .pane-header-actions .format-btn.is-active,
+#panePreview .pane-header-actions .editor-toolbar-select.is-active {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 #paneMarkdown .pane-header-actions .btn,
 #panePreview .pane-header-actions .btn {
@@ -2103,6 +2144,14 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   padding-block: 0;
 }
 
+.editor-toolbar .pi {
+  font-size: 1.08rem;
+}
+
+.editor-toolbar .format-letter {
+  font-size: 1.02rem;
+}
+
 .editor-toolbar-left .format-btn {
   padding-inline: 0.3vw;
 }
@@ -2576,8 +2625,8 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
 
   .edit-page .editor-toolbar-left .btn,
   .edit-page .editor-toolbar-left .editor-toolbar-select.input {
-    height: 1.8rem;
-    min-height: 1.8rem;
+    height: var(--editor-toolbar-control-height);
+    min-height: var(--editor-toolbar-control-height);
   }
 
   .edit-page .editor-toolbar-left .btn {
@@ -2589,11 +2638,11 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   }
 
   .edit-page .editor-toolbar .pi {
-    font-size: 1.05rem;
+    font-size: 1.08rem;
   }
 
   .edit-page .editor-toolbar .format-letter {
-    font-size: 0.95rem;
+    font-size: 1.02rem;
   }
 
   .edit-page .editor-toolbar-left > * {

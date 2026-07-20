@@ -61,7 +61,21 @@
     "toolbar": {
       "link": "Link",
       "image": "Bild",
+      "bold": "Fett",
+      "italic": "Kursiv",
+      "underline": "Unterstreichen",
+      "align": "Ausrichtung",
+      "heading": "Überschriftenebene",
+      "blockquote": "Zitatblock",
+      "ordered_list": "Nummerierte Liste",
+      "unordered_list": "Aufzählung",
+      "table": "Tabelle einfügen",
       "save": "Speichern",
+      "article_meta_title": "Artikelmetadaten",
+      "toc": "Inhaltsverzeichnis",
+      "toc_no_headings": "Noch keine H3-Überschriften vorhanden.",
+      "show_markdown_title": "Markdown-Quelltext anzeigen",
+      "hide_markdown_title": "Visuellen Editor anzeigen",
       "publish": "Veröffentlichen",
       "publish_title": "Zur Verarbeitung senden",
       "rename": "Umbenennen",
@@ -169,8 +183,10 @@
     "asset_paths": {
       "title": "Asset-Pfade",
       "static_label": "Pfad zum Static-Ordner",
-      "images_label": "Pfad zum Bilderordner",
-      "hint": "Relativ zum Editorordner, zum Beispiel ../static und ../static/images."
+        "images_label": "Pfad zum Bilderordner",
+        "logo_label": "App-Logo",
+        "logo_hint": "Wählen Sie ein PNG oder SVG aus dem Bilderordner. Leer lassen für das Standardlogo.",
+        "hint": "Relativ zum Editorordner, zum Beispiel ../static und ../static/images."
     },
     "editor_view": {
       "title": "Editor-Ansicht"
@@ -215,6 +231,9 @@
       "option_inline": "Inline (Standard)",
       "option_left": "Linke Seitenleiste",
       "option_right": "Rechte Seitenleiste",
+      "export_label": "TOC-Exportformat",
+      "export_list": "Liste",
+      "export_flat_links": "Flache Links",
       "hint": "Seitenmenü erscheint in Vorschau/Ansicht und wird nur in Wet-HTML exportiert.",
       "saving": "Speichern…",
       "saved": "Gespeichert",

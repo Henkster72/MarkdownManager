@@ -168,7 +168,8 @@
             ? t('auth.setup_title', 'Set passwords')
             : t('auth.login_title', 'Login');
         const appTitle = getAppTitle();
-        titleEl.textContent = appTitle ? `${appTitle} • ${modeLabel}` : modeLabel;
+        const titleTextEl = titleEl?.querySelector('.auth-modal-title-text');
+        (titleTextEl instanceof HTMLElement ? titleTextEl : titleEl).textContent = appTitle ? `${appTitle} • ${modeLabel}` : modeLabel;
     };
 
     const setMode = (mode) => {
@@ -572,13 +573,6 @@
 })();
 
 (function(){
-    const readAllowUserPublish = () => {
-        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
-        const s = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
-        if (!s || typeof s !== 'object') return false;
-        return !Object.prototype.hasOwnProperty.call(s, 'allow_user_publish') ? false : !!s.allow_user_publish;
-    };
-
     const canPublish = () => {
         const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object')
             ? window.MDW_AUTH_META
@@ -588,7 +582,7 @@
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
         if (!auth || !auth.role) return false;
         if (auth.role === 'superuser') return true;
-        if (auth.role === 'user') return readAllowUserPublish();
+        if (auth.role === 'user') return false;
         return false;
     };
 

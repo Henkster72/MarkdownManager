@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.956
+
+- WPM publication and synchronization: reviewed Processing content is prioritized during vBook/live reconciliation; managed Jinja templates are reconciled safely before rendering, and the shared Jinja environment plus Markdown/template mirrors have reusable systemd timer templates.
+- WPM page creation: the new-page modal now opens from an empty visual preview, includes the same image search/upload flow as Article metadata, and preserves configured metadata defaults and today's post date.
+- Visual editor toolbar: pane actions have consistent spacing, dividers, responsive sizing, configurable placement, clear translated tooltips in all supported UI languages, and clearer active states for headings, alignment, bold, italic, and underline formatting.
+- Branding: superusers can select a PNG or SVG app logo from the configured images folder; it is size-contained in the app header and reused in the authentication modal title.
+- Preview fidelity: visual previews preserve heading formatting, render standalone checkmark lines compactly, keep overview-header button classes, and resolve static download tokens correctly.
+- Explorer workflow: normal WPM users skip user-hidden Markdown files during keyboard navigation, while superusers retain full access.
+- Documentation and languages: refreshed release notes and language support copy; added a Dutch normal-user guide for the WPM editing workflow.
+
 ## 0.953
 
 - WPM publication workflow: normal users can submit edited notes for Processing, superusers see Concept and Processing notes first, and the shared publisher synchronizes Markdown safely before rendering only reviewed Processing files.

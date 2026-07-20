@@ -5110,6 +5110,16 @@
     const insertTableBtn = document.getElementById('insertTableBtn');
     const tocBtn = document.getElementById('toggleTocBtn');
     const customFormat = document.getElementById('customFormat');
+    document.querySelectorAll('.editor-toolbar button, .editor-toolbar select').forEach((control) => {
+        if (!(control instanceof HTMLElement) || control.title) return;
+        const label = String(
+            control.getAttribute('aria-label')
+            || control.querySelector('.btn-label')?.textContent
+            || control.textContent
+            || ''
+        ).trim();
+        if (label) control.title = label;
+    });
     const isUsingVisualEditor = () => typeof window.__mdwVisualEditorMode === 'function' && window.__mdwVisualEditorMode();
     const saveVisualSelectionBeforeToolbar = (el) => {
         if (!(el instanceof HTMLElement)) return;
@@ -5177,10 +5187,30 @@
         };
     };
     let toolbarSyncScheduled = false;
+    const setToolbarControlState = (control, active) => {
+        if (!(control instanceof HTMLElement)) return;
+        control.classList.toggle('is-active', active);
+        if (control instanceof HTMLButtonElement) control.setAttribute('aria-pressed', active ? 'true' : 'false');
+    };
+    const visualCommandIsActive = (command, fallbackSelector) => {
+        try {
+            if (document.queryCommandState(command)) return true;
+        } catch {}
+        const sel = window.getSelection?.();
+        if (!sel || !sel.rangeCount || !(previewElForToolbar instanceof HTMLElement)) return false;
+        const nodes = [sel.anchorNode, sel.focusNode, sel.getRangeAt(0).commonAncestorContainer];
+        return nodes.some((node) => {
+            const el = node instanceof Element ? node : node?.parentElement;
+            return el instanceof Element && previewElForToolbar.contains(el) && !!el.closest(fallbackSelector);
+        });
+    };
     const syncToolbarFromSelection = () => {
         toolbarSyncScheduled = false;
         let heading = '';
         let align = 'left';
+        let bold = false;
+        let italic = false;
+        let underline = false;
         const sel = window.getSelection?.();
         if (isUsingVisualEditor() && sel && sel.rangeCount && previewElForToolbar instanceof HTMLElement && previewElForToolbar.contains(sel.anchorNode)) {
             const block = closestEditableBlock(sel.anchorNode);
@@ -5189,6 +5219,9 @@
                 if (/^h[2-6]$/.test(tag)) heading = tag.slice(1);
                 align = readAlignFromElement(block);
             }
+            bold = visualCommandIsActive('bold', 'strong,b');
+            italic = visualCommandIsActive('italic', 'em,i');
+            underline = visualCommandIsActive('underline', 'u');
         } else if (document.activeElement === ta) {
             const info = currentMarkdownLineInfo();
             heading = info.heading;
@@ -5196,6 +5229,11 @@
         }
         if (headingSelect instanceof HTMLSelectElement) headingSelect.value = heading;
         if (alignSelect instanceof HTMLSelectElement) alignSelect.value = align;
+        setToolbarControlState(headingSelect, heading !== '');
+        setToolbarControlState(alignSelect, align !== 'left');
+        setToolbarControlState(boldBtn, bold);
+        setToolbarControlState(italicBtn, italic);
+        setToolbarControlState(underlineBtn, underline);
     };
     const scheduleToolbarSync = () => {
         if (toolbarSyncScheduled) return;
@@ -5244,6 +5282,7 @@
     boldBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
             window.__mdwRunVisualCommand?.('bold');
+            setTimeout(scheduleToolbarSync, 0);
             return;
         }
         runFormatAction(() => wrapOrUnwrap('**', '**', { lineWiseOnMultiline: true }));
@@ -5252,6 +5291,7 @@
     italicBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
             window.__mdwRunVisualCommand?.('italic');
+            setTimeout(scheduleToolbarSync, 0);
             return;
         }
         runFormatAction(() => wrapOrUnwrap('*', '*', {
@@ -5267,6 +5307,7 @@
     underlineBtn?.addEventListener('click', () => {
         if (isUsingVisualEditor()) {
             window.__mdwRunVisualCommand?.('underline');
+            setTimeout(scheduleToolbarSync, 0);
             return;
         }
         runFormatAction(() => wrapOrUnwrap('<u>', '</u>', { lineWiseOnMultiline: true }));

@@ -1713,9 +1713,11 @@ function mdw_rewrite_md_class_prefix_in_html($html, $prefix, $dropMdClassesWhenP
     }, $html);
 }
 
-function mdw_export_normalize_toc_template_html($html) {
+function mdw_export_normalize_toc_template_html($html, $format = 'list') {
     $html = (string)$html;
     if ($html === '' || stripos($html, 'md-toc') === false) return $html;
+    $format = strtolower(trim((string)$format));
+    $flatLinks = $format === 'flat_links';
 
     $html = (string)preg_replace_callback('/\sclass\s*=\s*(["\'])(.*?)\1/si', function($m) {
         $quote = (string)($m[1] ?? '"');
@@ -1761,6 +1763,26 @@ function mdw_export_normalize_toc_template_html($html) {
         if (!$mapped) return '';
         return ' class=' . $quote . htmlspecialchars(implode(' ', $mapped), ENT_QUOTES, 'UTF-8') . $quote;
     }, $html);
+
+    if ($flatLinks) {
+        $html = (string)preg_replace_callback(
+            '/<div\b[^>]*\bdata-mdw-toc\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)[^>]*>(.*?)<\/div>/is',
+            function($m) {
+                $links = [];
+                if (preg_match_all('/<a\b[^>]*\bhref\s*=\s*(["\'])(#[^"\']+)\1[^>]*>(.*?)<\/a>/is', (string)($m[1] ?? ''), $matches, PREG_SET_ORDER)) {
+                    foreach ($matches as $match) {
+                        $href = html_entity_decode((string)($match[2] ?? ''), ENT_QUOTES, 'UTF-8');
+                        $label = trim(html_entity_decode(strip_tags((string)($match[3] ?? '')), ENT_QUOTES, 'UTF-8'));
+                        if ($href === '' || $label === '') continue;
+                        $links[] = '<a href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '" class="nlbulletlink">'
+                            . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</a><br>';
+                    }
+                }
+                return implode("\n", $links);
+            },
+            $html
+        );
+    }
 
     $html = (string)preg_replace(
         '/<nav\b([^>]*)\bclass\s*=\s*(["\'])toc-side\2([^>]*)>\s*(<!--\s*Table of contents\s*-->\s*)?<div\b([^>]*)\bclass\s*=\s*(["\'])toc-wrap\6([^>]*)>/i',
@@ -1846,6 +1868,7 @@ function mdw_metadata_default_config() {
             'copy_include_meta' => true,
             'copy_html_mode' => 'dry',
             'toc_menu' => 'inline',
+            'toc_export_style' => 'list',
             'toc_button_enabled' => false,
             'post_date_format' => 'mdy_short',
             'post_date_align' => 'left',
@@ -1862,6 +1885,7 @@ function mdw_metadata_default_config() {
             'font_assets' => ['stylesheet' => '', 'family' => ''],
             'static_path' => 'static',
             'images_path' => 'images',
+            'app_logo' => '',
             'app_title' => '',
             'internal_link_prefix' => '',
             'export_class_prefix' => '',
@@ -1940,6 +1964,13 @@ function mdw_font_assets_normalize($raw) {
     return $out;
 }
 
+function mdw_app_logo_normalize($raw) {
+    $file = trim(str_replace('\\', '/', (string)$raw));
+    if ($file === '' || str_contains($file, '..')) return '';
+    if (!preg_match('~^[A-Za-z0-9][A-Za-z0-9._/-]*\.(?:png|svg)$~i', $file)) return '';
+    return ltrim($file, '/');
+}
+
 function mdw_metadata_normalize_config($cfg) {
     $def = mdw_metadata_default_config();
     $out = $def;
@@ -1965,6 +1996,8 @@ function mdw_metadata_normalize_config($cfg) {
     if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
     $tocMenu = isset($inSettings['toc_menu']) ? strtolower(trim((string)$inSettings['toc_menu'])) : 'inline';
     if (!in_array($tocMenu, ['inline', 'left', 'right'], true)) $tocMenu = 'inline';
+    $tocExportStyle = isset($inSettings['toc_export_style']) ? strtolower(trim((string)$inSettings['toc_export_style'])) : 'list';
+    if (!in_array($tocExportStyle, ['list', 'flat_links'], true)) $tocExportStyle = 'list';
     $tocButtonEnabled = !array_key_exists('toc_button_enabled', $inSettings) ? false : (bool)$inSettings['toc_button_enabled'];
     $postDateFormat = isset($inSettings['post_date_format']) ? trim((string)$inSettings['post_date_format']) : 'mdy_short';
     if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
@@ -2000,6 +2033,7 @@ function mdw_metadata_normalize_config($cfg) {
     $jinjaMetaPrefix = mdw_normalize_jinja_meta_prefix($inSettings['jinja_meta_prefix'] ?? 'page_');
     $staticPath = mdw_asset_sanitize_path($inSettings['static_path'] ?? 'static', 'static');
     $imagesPath = mdw_asset_sanitize_path($inSettings['images_path'] ?? 'images', 'images');
+    $appLogo = mdw_app_logo_normalize($inSettings['app_logo'] ?? '');
     $out['_settings'] = [
         'publisher_mode' => (bool)$publisherMode,
         'publisher_default_author' => $publisherDefaultAuthor,
@@ -2011,6 +2045,7 @@ function mdw_metadata_normalize_config($cfg) {
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,
         'toc_menu' => $tocMenu,
+        'toc_export_style' => $tocExportStyle,
         'toc_button_enabled' => (bool)$tocButtonEnabled,
         'post_date_format' => $postDateFormat,
         'post_date_align' => $postDateAlign,
@@ -2027,6 +2062,7 @@ function mdw_metadata_normalize_config($cfg) {
         'font_assets' => $fontAssets,
         'static_path' => $staticPath,
         'images_path' => $imagesPath,
+        'app_logo' => $appLogo,
         'app_title' => $appTitle,
         'internal_link_prefix' => $internalLinkPrefix,
         'export_class_prefix' => $exportClassPrefix,
@@ -2287,6 +2323,7 @@ function mdw_metadata_settings() {
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],
         'copy_html_mode' => isset($s['copy_html_mode']) ? trim((string)$s['copy_html_mode']) : 'dry',
         'toc_menu' => isset($s['toc_menu']) ? strtolower(trim((string)$s['toc_menu'])) : 'inline',
+        'toc_export_style' => isset($s['toc_export_style']) ? strtolower(trim((string)$s['toc_export_style'])) : 'list',
         'toc_button_enabled' => !array_key_exists('toc_button_enabled', $s) ? false : (bool)$s['toc_button_enabled'],
         'post_date_format' => isset($s['post_date_format']) ? trim((string)$s['post_date_format']) : 'mdy_short',
         'post_date_align' => isset($s['post_date_align']) ? trim((string)$s['post_date_align']) : 'left',
@@ -2313,6 +2350,7 @@ function mdw_metadata_settings() {
     if (!in_array($out['pane_header_order'], ['actions_left', 'title_left'], true)) $out['pane_header_order'] = 'actions_left';
     if (!in_array($out['copy_html_mode'], ['dry', 'medium', 'wet'], true)) $out['copy_html_mode'] = 'dry';
     if (!in_array($out['toc_menu'], ['inline', 'left', 'right'], true)) $out['toc_menu'] = 'inline';
+    if (!in_array($out['toc_export_style'], ['list', 'flat_links'], true)) $out['toc_export_style'] = 'list';
     if ($out['ui_language'] !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $out['ui_language'])) $out['ui_language'] = '';
     if ($out['ui_theme'] !== 'dark' && $out['ui_theme'] !== 'light') $out['ui_theme'] = '';
     if ($out['theme_preset'] === '') $out['theme_preset'] = 'default';
@@ -2591,7 +2629,7 @@ function mdw_jinja_image_token_path_from_src($src) {
     $src = mdw_jinja_sanitize_token_path($src);
     if ($src === '') return '';
 
-    $imagesDir = trim((string)html_preview_images_dir(), '/');
+    $imagesDir = mdw_jinja_sanitize_token_path(html_preview_images_dir());
     if ($imagesDir !== '' && str_starts_with($src, $imagesDir . '/')) {
         $src = substr($src, strlen($imagesDir) + 1);
     }
@@ -2655,7 +2693,9 @@ function mdw_jinja_prepare_body_html($bodyHtml, $meta = []) {
             }
         }
 
-        return '{{' . $tokenPath . '}}';
+        $nextAttrs = mdw_html_set_attr($attrs, 'src', '{{' . $tokenPath . '}}');
+        $nextAttrs = trim((string)$nextAttrs);
+        return '<img' . ($nextAttrs !== '' ? ' ' . $nextAttrs : '') . '>';
     }, $bodyHtml);
 
     $bodyHtml = preg_replace_callback('/<a\b([^>]*)>/i', function($m) {
@@ -2693,14 +2733,6 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $meta = [];
     $bodyMarkdown = mdw_hidden_meta_extract_and_remove_all((string)$rawMarkdown, $meta);
     $effectiveMeta = $meta;
-    if (!empty($settings['publisher_mode'])) {
-        $requiredDefaults = mdw_metadata_obligatory_defaults(true, $mdPath);
-        foreach ($requiredDefaults as $k => $v) {
-            $cur = isset($effectiveMeta[$k]) ? trim((string)$effectiveMeta[$k]) : '';
-            if ($cur !== '') continue;
-            $effectiveMeta[$k] = (string)$v;
-        }
-    }
     $activePageValue = trim((string)($effectiveMeta['active_page'] ?? ''));
     if ($activePageValue === '') {
         $activePageValue = mdw_active_page_from_md_path($mdPath);
@@ -2724,7 +2756,7 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
         $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
     }
     $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
-    $bodyHtml = mdw_export_normalize_toc_template_html($bodyHtml);
+    $bodyHtml = mdw_export_normalize_toc_template_html($bodyHtml, $settings['toc_export_style'] ?? 'list');
     $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
 
     $lines = [];
@@ -3522,7 +3554,11 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
             }
             if ($closeIndex !== null) {
                 $inner = implode("\n", array_slice($lines, $i + 1, $closeIndex - $i - 1));
-                $innerHtml = md_to_html($inner, $mdPath, $profile, array_merge($context, ['source_map' => false, 'render_metadata' => false]));
+                $innerHtml = md_to_html($inner, $mdPath, $profile, array_merge($context, [
+                    'source_map' => false,
+                    'render_metadata' => false,
+                    'expand_auto_sections' => false,
+                ]));
                 $attrs = mdw_pandoc_div_attrs_from_spec((string)($m[1] ?? ''));
                 $html[] = $applySrcAttrs('<div' . $attrs . '>' . "\n" . $innerHtml . "\n" . '</div>', $i, $closeIndex);
                 $i = $closeIndex;

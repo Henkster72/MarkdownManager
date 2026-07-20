@@ -189,7 +189,8 @@
         const titleEl = document.getElementById('wpmUserTitle');
         if (titleEl) {
             const appTitle = getAppTitle();
-            titleEl.textContent = appTitle ? `${appTitle} • ${t('wpm.setup_title', 'WPM setup')}` : t('wpm.setup_title', 'WPM setup');
+            const titleTextEl = titleEl.querySelector('.auth-modal-title-text');
+            (titleTextEl instanceof HTMLElement ? titleTextEl : titleEl).textContent = appTitle ? `${appTitle} • ${t('wpm.setup_title', 'WPM setup')}` : t('wpm.setup_title', 'WPM setup');
         }
         setStatus(t('wpm.setup_hint', 'Set your author name and UI language.'), 'info');
         if (authorInput instanceof HTMLInputElement) {
@@ -927,6 +928,7 @@
     const exportClassPrefixStatus = document.getElementById('exportClassPrefixStatus');
     const copySettingsStatus = document.getElementById('copySettingsStatus');
     const tocMenuSelect = document.getElementById('tocMenuSelect');
+    const tocExportStyleSelect = document.getElementById('tocExportStyleSelect');
     const tocButtonToggle = document.getElementById('tocButtonToggle');
     const tocMenuStatus = document.getElementById('tocMenuStatus');
     const settingsExportBtn = document.getElementById('settingsExportBtn');
@@ -946,6 +948,9 @@
     const indexLayoutStatus = document.getElementById('indexLayoutStatus');
     const staticPathInput = document.getElementById('staticPathInput');
     const imagesPathInput = document.getElementById('imagesPathInput');
+    const appLogoInput = document.getElementById('appLogoInput');
+    const appLogoImageOptions = document.getElementById('appLogoImageOptions');
+    const appLogoPreview = document.getElementById('appLogoPreview');
 
     const inputs = {
         previewBg: document.getElementById('themePreviewBg'),
@@ -961,6 +966,37 @@
         editorAccent: document.getElementById('themeEditorAccent'),
         customCss: document.getElementById('themeCustomCss'),
     };
+
+    const appLogoUrl = (file) => {
+        const path = String(file || '').trim().replace(/^\/+/, '');
+        if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*\.(png|svg)$/i.test(path) || path.includes('..')) return '';
+        const base = String(window.MDW_IMAGES_URL || 'images').replace(/\/$/, '');
+        return `${base}/${path.split('/').map(encodeURIComponent).join('/')}`;
+    };
+    const refreshAppLogoPreview = () => {
+        if (!(appLogoPreview instanceof HTMLImageElement)) return;
+        const url = appLogoUrl(appLogoInput instanceof HTMLInputElement ? appLogoInput.value : '');
+        appLogoPreview.hidden = !url;
+        if (url) appLogoPreview.src = url;
+        else appLogoPreview.removeAttribute('src');
+    };
+    const loadAppLogoOptions = async () => {
+        if (!(appLogoImageOptions instanceof HTMLDataListElement) || !mdmApi || typeof mdmApi.get !== 'function') return;
+        try {
+            const data = await mdmApi.get('image_manager.php?action=list');
+            const images = Array.isArray(data?.images) ? data.images : [];
+            appLogoImageOptions.replaceChildren(...images
+                .map((image) => String(image?.file || '').trim())
+                .filter((file) => /\.(png|svg)$/i.test(file))
+                .sort((a, b) => a.localeCompare(b))
+                .map((file) => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    return option;
+                }));
+        } catch {}
+    };
+    appLogoInput?.addEventListener('input', refreshAppLogoPreview);
 
     let overridesStatusTimer = null;
     const setOverridesStatus = (msg, kind = 'info') => {
@@ -1171,6 +1207,11 @@
         const s = getSettings();
         const v = s && typeof s.toc_menu === 'string' ? s.toc_menu.trim().toLowerCase() : '';
         return (v === 'left' || v === 'right' || v === 'inline') ? v : 'inline';
+    };
+    const readTocExportStyleSetting = () => {
+        const s = getSettings();
+        const v = s && typeof s.toc_export_style === 'string' ? s.toc_export_style.trim().toLowerCase() : '';
+        return v === 'flat_links' ? v : 'list';
     };
     const readTocButtonSetting = () => {
         const s = getSettings();
@@ -1425,6 +1466,9 @@
         const assetSettings = getSettings() || {};
         if (staticPathInput instanceof HTMLInputElement) staticPathInput.value = String(assetSettings.static_path || 'static');
         if (imagesPathInput instanceof HTMLInputElement) imagesPathInput.value = String(assetSettings.images_path || 'images');
+        if (appLogoInput instanceof HTMLInputElement) appLogoInput.value = String(assetSettings.app_logo || '');
+        refreshAppLogoPreview();
+        loadAppLogoOptions();
         if (appTitleInput instanceof HTMLInputElement) {
             appTitleInput.value = readAppTitleSetting();
         }
@@ -1454,6 +1498,9 @@
         }
         if (tocMenuSelect instanceof HTMLSelectElement) {
             tocMenuSelect.value = readTocMenuSetting();
+        }
+        if (tocExportStyleSelect instanceof HTMLSelectElement) {
+            tocExportStyleSelect.value = readTocExportStyleSetting();
         }
         if (tocButtonToggle instanceof HTMLInputElement) {
             tocButtonToggle.checked = readTocButtonSetting();
@@ -1881,6 +1928,33 @@
         }
     };
 
+    const saveTocExportStyleSetting = async (nextValue) => {
+        setTocMenuStatus(t('theme.toc_menu.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setTocMenuStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const value = nextValue === 'flat_links' ? nextValue : 'list';
+            const result = await saveSettingsToServer({ toc_export_style: value });
+            if (!result.ok) throw new Error(result.message || t('theme.toc_menu.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.toc_export_style = value;
+            }
+            setTocMenuStatus(t('theme.toc_menu.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('toc export style save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.toc_menu.save_failed', 'Save failed');
+            setTocMenuStatus(msg, 'error');
+            return false;
+        }
+    };
+
     const saveTocButtonSetting = async (enabled) => {
         setTocMenuStatus(t('theme.toc_menu.saving', 'Saving…'), 'info');
         try {
@@ -2274,6 +2348,12 @@
             if (!(tocMenuSelect instanceof HTMLSelectElement)) return;
             const next = String(tocMenuSelect.value || '').trim();
             await saveTocMenuSetting(next);
+        });
+
+        tocExportStyleSelect?.addEventListener('change', async () => {
+            if (!(tocExportStyleSelect instanceof HTMLSelectElement)) return;
+            const next = String(tocExportStyleSelect.value || '').trim();
+            await saveTocExportStyleSetting(next);
         });
 
         tocButtonToggle?.addEventListener('change', async () => {
@@ -2885,9 +2965,10 @@
             if (staticPathInput instanceof HTMLInputElement && imagesPathInput instanceof HTMLInputElement) {
                 const nextStatic = String(staticPathInput.value || '').trim() || 'static';
                 const nextImages = String(imagesPathInput.value || '').trim() || 'images';
+                const nextLogo = String(appLogoInput?.value || '').trim();
                 const current = getSettings() || {};
-                if (nextStatic !== String(current.static_path || 'static') || nextImages !== String(current.images_path || 'images')) {
-                    const result = await saveSettingsToServer({ static_path: nextStatic, images_path: nextImages });
+                if (nextStatic !== String(current.static_path || 'static') || nextImages !== String(current.images_path || 'images') || nextLogo !== String(current.app_logo || '')) {
+                    const result = await saveSettingsToServer({ static_path: nextStatic, images_path: nextImages, app_logo: nextLogo });
                     if (!result.ok) return false;
                 }
             }

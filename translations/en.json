@@ -61,6 +61,15 @@
     "toolbar": {
       "link": "Link",
       "image": "Image",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "align": "Alignment",
+      "heading": "Heading level",
+      "blockquote": "Blockquote",
+      "ordered_list": "Ordered list",
+      "unordered_list": "Bulleted list",
+      "table": "Insert table",
       "save": "Save",
       "article_meta_title": "Article metadata",
       "toc": "TOC",
@@ -193,8 +202,10 @@
     "asset_paths": {
       "title": "Asset paths",
       "static_label": "Static folder path",
-      "images_label": "Images folder path",
-      "hint": "Relative to the editor folder, for example ../static and ../static/images."
+        "images_label": "Images folder path",
+        "logo_label": "App logo",
+        "logo_hint": "Choose a PNG or SVG from the images folder. Leave empty for the default logo.",
+        "hint": "Relative to the editor folder, for example ../static and ../static/images."
     },
     "editor_view": {
       "title": "Editor view"
@@ -239,6 +250,9 @@
       "option_inline": "Inline (default)",
       "option_left": "Left sidebar",
       "option_right": "Right sidebar",
+      "export_label": "TOC export format",
+      "export_list": "List",
+      "export_flat_links": "Flat links",
       "show_button": "Show TOC toolbar button",
       "hint": "Side menu appears in preview/view and only exports in wet HTML.",
       "saving": "Saving…",

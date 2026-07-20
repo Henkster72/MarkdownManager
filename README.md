@@ -1,4 +1,4 @@
-# MarkdownManager v0.953
+# MarkdownManager v0.956
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.956: WPM synchronization now reconciles reviewed Markdown and managed Jinja templates safely before rendering, with reusable minipc/Jinja sync timers. The visual editor has translated tooltips, clearer active formatting controls, optional superuser-managed PNG/SVG branding, improved preview fidelity for headings, checkmarks and download assets, and a Dutch normal-user workflow guide.
 - v0.953: WPM now supports a conflict-aware, instance-configured publication runner with five-minute status reporting, safe static/image synchronization, and a reusable onboarding path. Authors can submit work for processing, superusers see pending work first, and new WPM pages use the same configured metadata defaults as Article metadata, including today's post date.
 - v0.952: WPM preview now preserves supported Jinja macro source during visual editing, renders common site macros such as `special.bigheader`, prevents duplicate page pictures, and aligns blog metadata headers with the source template order. The Markdown pane now supports localized find (`Ctrl+Shift+F`) and confirmed find/replace (`Ctrl+Shift+H`).
 - v0.951: WPM now applies trailing image classes directly to images, preserves responsive Tailwind class syntax in fenced divs and attribute lists, and prevents duplicate legacy bullet rendering in blockquotes.
@@ -81,7 +82,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.953 extends the WPM authoring workflow with configured metadata defaults and clearer metadata labels; version 0.952 adds localized find/replace actions, match feedback, and replacement confirmations; earlier releases refreshed labels for WPM visual-editor controls, article metadata editing, TOC toolbar options, WPM settings text, link editing, custom sections, and editor stability fixes.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.956 retains those language-specific UI labels while adding clearer visual-editor formatting feedback and a Dutch guide for normal WPM users at `docs/GEBRUIKERSHANDLEIDING_NL.md`. Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
 
 ## Security warning (read this)
 
@@ -174,6 +175,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
+- 0.956: safer WPM Markdown/template reconciliation and renderer sync templates, translated visual-editor toolbar tooltips and clearer toolbar states, superuser-managed PNG/SVG branding, improved preview fidelity for headings/checkmarks/download assets, hidden-note keyboard navigation, and a Dutch normal-user guide.
 - 0.951: WPM image classes now apply directly to images, responsive Tailwind class syntax is preserved in fenced divs and attribute lists, and repeated quote attributes no longer create duplicate legacy bullets.
 - 0.95: WPM visual preview resolves supported Jinja macros and reusable sections while hiding unresolved legacy syntax; custom format sources are configurable; nested instances support relative asset paths, local fonts, optional shared authentication, reliable image JSON, preserved inline style URLs, and preview CSS that cannot reposition editor dialogs.
 - 0.93: WPM explorer date sorting now uses `post_date` before `creationdate`/filename fallback and keeps newest articles first, publish-state grouping no longer overrides default date sort, Dutch/English display dates parse correctly, the image insertion tip is hidden in hide-Markdown mode, and Article metadata now shows slug in the title with an inline `page_picture` image picker.

@@ -61,7 +61,21 @@
     "toolbar": {
       "link": "Ligação",
       "image": "Imagem",
+      "bold": "Negrito",
+      "italic": "Itálico",
+      "underline": "Sublinhar",
+      "align": "Alinhamento",
+      "heading": "Nível de título",
+      "blockquote": "Bloco de citação",
+      "ordered_list": "Lista numerada",
+      "unordered_list": "Lista com marcadores",
+      "table": "Inserir tabela",
       "save": "Guardar",
+      "article_meta_title": "Metadados do artigo",
+      "toc": "Índice",
+      "toc_no_headings": "Ainda não existem títulos H3.",
+      "show_markdown_title": "Mostrar código-fonte Markdown",
+      "hide_markdown_title": "Mostrar editor visual",
       "publish": "Publicar",
       "publish_title": "Enviar para processamento",
       "rename": "Renomear",
@@ -169,8 +183,10 @@
     "asset_paths": {
       "title": "Caminhos dos recursos",
       "static_label": "Caminho da pasta static",
-      "images_label": "Caminho da pasta de imagens",
-      "hint": "Relativo à pasta do editor, por exemplo ../static e ../static/images."
+        "images_label": "Caminho da pasta de imagens",
+        "logo_label": "Logótipo da aplicação",
+        "logo_hint": "Escolha um PNG ou SVG da pasta de imagens. Deixe vazio para o logótipo predefinido.",
+        "hint": "Relativo à pasta do editor, por exemplo ../static e ../static/images."
     },
     "editor_view": {
       "title": "Vista do editor"
@@ -215,6 +231,9 @@
       "option_inline": "Em linha (padrão)",
       "option_left": "Barra lateral esquerda",
       "option_right": "Barra lateral direita",
+      "export_label": "Formato de exportação do sumário",
+      "export_list": "Lista",
+      "export_flat_links": "Ligações simples",
       "hint": "O menu lateral aparece na pré-visualização/visualização e só é exportado em HTML wet.",
       "saving": "A guardar…",
       "saved": "Guardado",

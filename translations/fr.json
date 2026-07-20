@@ -61,7 +61,21 @@
     "toolbar": {
       "link": "Lien",
       "image": "Image",
+      "bold": "Gras",
+      "italic": "Italique",
+      "underline": "Souligner",
+      "align": "Alignement",
+      "heading": "Niveau de titre",
+      "blockquote": "Bloc de citation",
+      "ordered_list": "Liste numérotée",
+      "unordered_list": "Liste à puces",
+      "table": "Insérer un tableau",
       "save": "Enregistrer",
+      "article_meta_title": "Métadonnées de l'article",
+      "toc": "Sommaire",
+      "toc_no_headings": "Aucun titre H3 pour le moment.",
+      "show_markdown_title": "Afficher le code source Markdown",
+      "hide_markdown_title": "Afficher l'éditeur visuel",
       "publish": "Publier",
       "publish_title": "Envoyer au traitement",
       "rename": "Renommer",
@@ -169,8 +183,10 @@
     "asset_paths": {
       "title": "Chemins des ressources",
       "static_label": "Chemin du dossier static",
-      "images_label": "Chemin du dossier d'images",
-      "hint": "Relatif au dossier de l'éditeur, par exemple ../static et ../static/images."
+        "images_label": "Chemin du dossier d'images",
+        "logo_label": "Logo de l'application",
+        "logo_hint": "Choisissez un PNG ou SVG dans le dossier d'images. Laissez vide pour le logo par défaut.",
+        "hint": "Relatif au dossier de l'éditeur, par exemple ../static et ../static/images."
     },
     "editor_view": {
       "title": "Vue de l'éditeur"
@@ -215,6 +231,9 @@
       "option_inline": "En ligne (par défaut)",
       "option_left": "Barre latérale gauche",
       "option_right": "Barre latérale droite",
+      "export_label": "Format d'export du sommaire",
+      "export_list": "Liste",
+      "export_flat_links": "Liens simples",
       "hint": "Le menu latéral apparaît en aperçu/lecture et n’est exporté qu’en HTML wet.",
       "saving": "Enregistrement…",
       "saved": "Enregistré",

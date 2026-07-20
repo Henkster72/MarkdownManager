@@ -61,7 +61,21 @@
     "toolbar": {
       "link": "Enlace",
       "image": "Imagen",
+      "bold": "Negrita",
+      "italic": "Cursiva",
+      "underline": "Subrayado",
+      "align": "Alineación",
+      "heading": "Nivel de encabezado",
+      "blockquote": "Bloque de cita",
+      "ordered_list": "Lista numerada",
+      "unordered_list": "Lista con viñetas",
+      "table": "Insertar tabla",
       "save": "Guardar",
+      "article_meta_title": "Metadatos del artículo",
+      "toc": "Tabla de contenido",
+      "toc_no_headings": "Aún no hay encabezados H3.",
+      "show_markdown_title": "Mostrar código fuente Markdown",
+      "hide_markdown_title": "Mostrar editor visual",
       "publish": "Publicar",
       "publish_title": "Enviar a procesamiento",
       "rename": "Renombrar",
@@ -178,8 +192,10 @@
     "asset_paths": {
       "title": "Rutas de recursos",
       "static_label": "Ruta de la carpeta static",
-      "images_label": "Ruta de la carpeta de imágenes",
-      "hint": "Relativa a la carpeta del editor, por ejemplo ../static y ../static/images."
+        "images_label": "Ruta de la carpeta de imágenes",
+        "logo_label": "Logotipo de la aplicación",
+        "logo_hint": "Elija un PNG o SVG de la carpeta de imágenes. Déjelo vacío para el logotipo predeterminado.",
+        "hint": "Relativa a la carpeta del editor, por ejemplo ../static y ../static/images."
     },
     "editor_view": {
       "title": "Vista del editor"
@@ -224,6 +240,9 @@
       "option_inline": "En línea (predeterminado)",
       "option_left": "Barra lateral izquierda",
       "option_right": "Barra lateral derecha",
+      "export_label": "Formato de exportación del índice",
+      "export_list": "Lista",
+      "export_flat_links": "Enlaces simples",
       "hint": "El menú lateral aparece en la vista previa/vista y solo se exporta en HTML wet.",
       "saving": "Guardando…",
       "saved": "Guardado",
