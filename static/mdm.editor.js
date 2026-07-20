@@ -2460,7 +2460,7 @@
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
         const text = Array.from(node.childNodes).map(inlineMarkdown).join('');
-        if (tag === 'br') return '\n';
+        if (tag === 'br') return '<br>';
         if (tag === 'strong' || tag === 'b') return text.trim() ? `**${text.trim()}**` : '';
         if (tag === 'em' || tag === 'i') return text.trim() ? `*${text.trim()}*` : '';
         if (tag === 'u') return text.trim() ? `<u>${text.trim()}</u>` : '';
@@ -2900,17 +2900,6 @@
         });
         document.addEventListener('selectionchange', saveVisualSelection);
         prev.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                const insertion = getVisualInsertionRange();
-                e.preventDefault();
-                if (!insertion) return;
-                const scrollTop = ta.scrollTop;
-                ta.setRangeText('<br>', insertion.start, insertion.end, 'preserve');
-                ta.scrollTop = scrollTop;
-                ta.setSelectionRange(insertion.start + 4, insertion.start + 4);
-                ta.dispatchEvent(new Event('input', { bubbles: true }));
-                return;
-            }
             if ((e.key === 'Backspace' || e.key === 'Delete') && deleteSelectedVisualImage()) {
                 e.preventDefault();
                 return;
