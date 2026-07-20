@@ -95,11 +95,11 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
         if remote_hash == local_hash:
             next_state[rel] = remote_hash
             continue
-        if previous_hash == "" and local_hash:
-            run(["ssh", "-o", "StrictHostKeyChecking=accept-new", remote, "mkdir", "-p", f"{remote_site.rstrip('/')}/templates/{Path(template_rel).parent.as_posix()}"])
-            copy_template(str(local_template), f"{remote}:{remote_site.rstrip('/')}/templates/{template_rel}")
-            next_state[rel] = previous_hash
-            pushed += 1
+        if previous_hash == "":
+            local_template.parent.mkdir(parents=True, exist_ok=True)
+            copy_template(f"{remote}:{remote_site.rstrip('/')}/templates/{template_rel}", str(local_template))
+            next_state[rel] = digest(local_template)
+            pulled += 1
             continue
         if remote_changed or not local_template.exists():
             local_template.parent.mkdir(parents=True, exist_ok=True)
