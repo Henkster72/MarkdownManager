@@ -2757,6 +2757,33 @@
         if (!isRangeInPreview(range)) return '';
         return String(sel.toString() || '');
     };
+    const getVisualInsertionRange = () => {
+        restoreVisualSelection();
+        const sel = window.getSelection?.();
+        if (!sel || sel.rangeCount < 1) return null;
+        const range = sel.getRangeAt(0);
+        if (!isRangeInPreview(range)) return null;
+        const node = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+        const block = node instanceof Element ? node.closest('h1,h2,h3,h4,h5,h6,p,li,blockquote') : null;
+        const text = String(block?.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text) return null;
+
+        const source = String(ta.value || '');
+        const candidates = [];
+        let index = source.indexOf(text);
+        while (index !== -1) {
+            candidates.push(index);
+            index = source.indexOf(text, index + Math.max(1, text.length));
+        }
+        if (!candidates.length) return null;
+        const current = Number(ta.selectionStart || 0);
+        const start = candidates.reduce((best, candidate) => (
+            Math.abs(candidate - current) < Math.abs(best - current) ? candidate : best
+        ), candidates[0]);
+        const end = source.indexOf('\n', start + text.length);
+        const lineEnd = end === -1 ? source.length : end;
+        return { start: lineEnd, end: lineEnd };
+    };
     const markdownImageSrc = (src) => {
         const raw = String(src || '').trim();
         const imageBase = String(window.MDW_IMAGES_URL || 'images').replace(/\\/g, '/').replace(/\/$/, '');
@@ -2871,6 +2898,7 @@
     window.__mdwVisualEditorMode = isVisualEditorMode;
     window.__mdwSaveVisualSelection = saveVisualSelection;
     window.__mdwGetVisualSelectionText = getVisualSelectedText;
+    window.__mdwGetVisualInsertionRange = getVisualInsertionRange;
     window.__mdwInsertMarkdownAtSelection = insertVisualMarkdown;
     window.__mdwInsertVisualTable = insertVisualTable;
     window.__mdwToggleVisualBlockquote = toggleVisualBlockquote;
@@ -5038,16 +5066,15 @@
     const insertCustomCssSnippet = (snippet) => {
         const raw = String(snippet || '');
         if (!raw) return;
-        const visualMode = typeof isUsingVisualEditor === 'function' && isUsingVisualEditor();
-        if (visualMode && !classAttrSnippet(raw)) {
-            if (typeof window.__mdwInsertMarkdownAtSelection === 'function') {
-                window.__mdwInsertMarkdownAtSelection(raw.replace(CUSTOM_CSS_CURSOR, ''));
+        if (typeof isUsingVisualEditor === 'function' && isUsingVisualEditor()) {
+            const attr = classAttrSnippet(raw);
+            const visualRange = !attr && typeof window.__mdwGetVisualInsertionRange === 'function'
+                ? window.__mdwGetVisualInsertionRange()
+                : null;
+            if (visualRange) {
                 pendingCustomFormatSelection = null;
-                return;
-            }
-        }
-        if (visualMode) {
-            if (!restoreCustomFormatSelection() && typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
+                ta.setSelectionRange(visualRange.start, visualRange.end);
+            } else if (!restoreCustomFormatSelection() && typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
                 window.__mdwSyncPreviewSelectionToTextarea();
             }
         }
