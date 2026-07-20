@@ -2903,8 +2903,11 @@
                 const insertion = getVisualInsertionRange();
                 e.preventDefault();
                 if (!insertion) return;
-                replaceRange(insertion.start, insertion.end, '\n\n');
-                setSelection(insertion.start + 2, insertion.start + 2);
+                const scrollTop = ta.scrollTop;
+                ta.setRangeText('\n\n', insertion.start, insertion.end, 'preserve');
+                ta.scrollTop = scrollTop;
+                ta.setSelectionRange(insertion.start + 2, insertion.start + 2);
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
             if ((e.key === 'Backspace' || e.key === 'Delete') && deleteSelectedVisualImage()) {
