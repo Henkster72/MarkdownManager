@@ -5038,7 +5038,15 @@
     const insertCustomCssSnippet = (snippet) => {
         const raw = String(snippet || '');
         if (!raw) return;
-        if (typeof isUsingVisualEditor === 'function' && isUsingVisualEditor()) {
+        const visualMode = typeof isUsingVisualEditor === 'function' && isUsingVisualEditor();
+        if (visualMode && !classAttrSnippet(raw)) {
+            if (typeof window.__mdwInsertMarkdownAtSelection === 'function') {
+                window.__mdwInsertMarkdownAtSelection(raw.replace(CUSTOM_CSS_CURSOR, ''));
+                pendingCustomFormatSelection = null;
+                return;
+            }
+        }
+        if (visualMode) {
             if (!restoreCustomFormatSelection() && typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
                 window.__mdwSyncPreviewSelectionToTextarea();
             }
