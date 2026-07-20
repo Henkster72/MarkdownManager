@@ -5024,11 +5024,22 @@
         return true;
     };
 
+    let pendingCustomFormatSelection = null;
+
+    const restoreCustomFormatSelection = () => {
+        if (!isUsingVisualEditor() || !pendingCustomFormatSelection) return false;
+        const { start, end } = pendingCustomFormatSelection;
+        pendingCustomFormatSelection = null;
+        if (!Number.isInteger(start) || !Number.isInteger(end)) return false;
+        ta.setSelectionRange(start, end);
+        return true;
+    };
+
     const insertCustomCssSnippet = (snippet) => {
         const raw = String(snippet || '');
         if (!raw) return;
         if (typeof isUsingVisualEditor === 'function' && isUsingVisualEditor()) {
-            if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
+            if (!restoreCustomFormatSelection() && typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
                 window.__mdwSyncPreviewSelectionToTextarea();
             }
         }
@@ -5123,10 +5134,21 @@
     const isUsingVisualEditor = () => typeof window.__mdwVisualEditorMode === 'function' && window.__mdwVisualEditorMode();
     const saveVisualSelectionBeforeToolbar = (el) => {
         if (!(el instanceof HTMLElement)) return;
-        el.addEventListener('mousedown', () => {
+        const rememberInsertionPoint = () => {
+            if (!isUsingVisualEditor()) return;
             if (typeof window.__mdwSaveVisualSelection === 'function') window.__mdwSaveVisualSelection();
             if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') window.__mdwSyncPreviewSelectionToTextarea();
-        });
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            if (el === customFormat && Number.isInteger(start) && Number.isInteger(end)) {
+                pendingCustomFormatSelection = { start, end };
+            }
+        };
+        if ('PointerEvent' in window) {
+            el.addEventListener('pointerdown', rememberInsertionPoint);
+        } else {
+            el.addEventListener('mousedown', rememberInsertionPoint);
+        }
     };
     [
         headingSelect,
