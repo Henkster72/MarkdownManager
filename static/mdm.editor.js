@@ -5025,7 +5025,15 @@
     const insertCustomCssSnippet = (snippet) => {
         const raw = String(snippet || '');
         if (!raw) return;
-        if (typeof isUsingVisualEditor === 'function' && isUsingVisualEditor()) {
+        const visualMode = typeof isUsingVisualEditor === 'function' && isUsingVisualEditor();
+        const sectionInclude = /^\s*\{%\s*include\s+(?:"[^"]+"|'[^']+')\s*%\}\s*$/.test(raw);
+        if (visualMode && sectionInclude && typeof window.__mdwInsertMarkdownAtSelection === 'function') {
+            window.__mdwInsertMarkdownAtSelection(`\n\n${raw.trim()}\n\n`);
+            pendingCustomFormatSelection = null;
+            window.__mdwSendPreview?.();
+            return;
+        }
+        if (visualMode) {
             const attr = classAttrSnippet(raw);
             const visualRange = !attr && typeof window.__mdwGetVisualInsertionRange === 'function'
                 ? window.__mdwGetVisualInsertionRange()
