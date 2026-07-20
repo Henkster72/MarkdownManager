@@ -303,6 +303,33 @@ function mdw_editor_title_from_raw($raw, $publisherMode = false, $filePath = '')
     return $fileTitle !== '' ? $fileTitle : $fallback;
 }
 
+function mdw_link_picker_is_linkable_note($path) {
+    $path = trim(str_replace('\\', '/', (string)$path));
+    if ($path === '' || str_starts_with($path, '.')) return false;
+    $parts = array_values(array_filter(explode('/', $path), static fn($part) => $part !== ''));
+    if (empty($parts)) return false;
+    $helperFolders = [
+        'bin', 'deploy', 'docs', 'example-notes', 'plugins', 'sections', 'tests', 'tools',
+    ];
+    foreach (array_slice($parts, 0, -1) as $folder) {
+        if (in_array(strtolower($folder), $helperFolders, true)) return false;
+    }
+    $basename = strtolower((string)end($parts));
+    if (in_array($basename, [
+        'agents.md', 'changelog.md', 'readme.md', 'tutorial_markdowneditor.md', 'voorbeeld_markdown.md',
+    ], true)) return false;
+    return preg_match('/^(?:macro|section)[_-]/i', $basename) !== 1;
+}
+
+function mdw_link_picker_title($path, $fallbackBasename) {
+    $fullPath = __DIR__ . '/' . ltrim(str_replace('\\', '/', (string)$path), '/');
+    $raw = is_file($fullPath) ? @file_get_contents($fullPath) : false;
+    if (is_string($raw)) {
+        return mdw_editor_title_from_raw($raw, !empty($GLOBALS['MDW_PUBLISHER_MODE']), (string)$path);
+    }
+    return mdw_title_from_path($fallbackBasename);
+}
+
 /* DATE PARSE */
 function parse_ymd_from_filename($basename) {
     if (preg_match('/^(\d{2})-(\d{2})-(\d{2})-/', $basename, $m)) {
@@ -1862,7 +1889,10 @@ window.mermaid = mermaid;
 	            </div>
 	            <div class="link-picker" id="linkPicker">
 	                <?php
-	                    $renderPickerGroup = function($groupTitle, $entries) use ($secretMap, $hideMarkdownEditor) {
+	                    $renderPickerGroup = function($groupTitle, $entries) use ($secretMap) {
+	                        $entries = array_values(array_filter($entries, static function($entry) {
+	                            return is_array($entry) && mdw_link_picker_is_linkable_note($entry['path'] ?? '');
+	                        }));
 	                        if (empty($entries)) return;
 	                        $groupId = 'linkpicker-' . substr(sha1('picker:' . $groupTitle), 0, 10);
 	                        ?>
@@ -1874,12 +1904,7 @@ window.mermaid = mermaid;
 	                            <ul class="notes-list" id="<?=h($groupId)?>">
 	                            <?php foreach ($entries as $entry):
 	                                $p = $entry['path'];
-	                                $t = function_exists('explorer_view_extract_md_title_from_file')
-	                                    ? explorer_view_extract_md_title_from_file(__DIR__ . '/' . $p, $entry['basename'])
-	                                    : $entry['basename'];
-	                                $pickerTitle = $hideMarkdownEditor
-	                                    ? preg_replace('/\.md$/i', '', (string)$t)
-	                                    : (string)$t;
+	                                $pickerTitle = mdw_link_picker_title($p, $entry['basename'] ?? basename($p));
 	                                $pickerSearch = trim($pickerTitle . ' ' . preg_replace('/\.md$/i', '', (string)$p));
 	                                $isSecret = isset($secretMap[$p]);
 	                            ?>
