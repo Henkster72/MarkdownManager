@@ -2899,6 +2899,14 @@
         });
         document.addEventListener('selectionchange', saveVisualSelection);
         prev.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                const insertion = getVisualInsertionRange();
+                e.preventDefault();
+                if (!insertion) return;
+                replaceRange(insertion.start, insertion.end, '\n\n');
+                setSelection(insertion.start + 2, insertion.start + 2);
+                return;
+            }
             if ((e.key === 'Backspace' || e.key === 'Delete') && deleteSelectedVisualImage()) {
                 e.preventDefault();
                 return;
