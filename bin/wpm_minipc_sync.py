@@ -52,6 +52,11 @@ def copy_template(source: str, destination: str) -> None:
     run(["scp", "-q", "-p", "-o", "StrictHostKeyChecking=accept-new", source, destination])
 
 
+def template_path(rel: str) -> str:
+    path = Path(rel)
+    return path.with_suffix(".html").as_posix() if path.suffix.lower() == ".md" else path.as_posix()
+
+
 def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: dict, local_state: dict) -> tuple[int, int, int]:
     remote_templates = remote_state.get("templates", {})
     if not isinstance(remote_templates, dict):
@@ -65,7 +70,7 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
     for rel, previous_hash in previous.items():
         if not isinstance(rel, str) or rel in remote_templates:
             continue
-        local_template = site_dir / "templates" / rel
+        local_template = site_dir / "templates" / template_path(rel)
         if not local_template.exists():
             continue
         if digest(local_template) != str(previous_hash):
@@ -79,7 +84,8 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
         remote_hash = str(data.get("template", ""))
         if not remote_hash:
             continue
-        local_template = site_dir / "templates" / rel
+        template_rel = template_path(rel)
+        local_template = site_dir / "templates" / template_rel
         local_hash = digest(local_template) if local_template.is_file() else ""
         previous_hash = str(previous.get(rel, ""))
         remote_changed = previous_hash != "" and remote_hash != previous_hash
@@ -90,19 +96,19 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
             next_state[rel] = remote_hash
             continue
         if previous_hash == "" and local_hash:
-            run(["ssh", "-o", "StrictHostKeyChecking=accept-new", remote, "mkdir", "-p", f"{remote_site.rstrip('/')}/templates/{Path(rel).parent.as_posix()}"])
-            copy_template(str(local_template), f"{remote}:{remote_site.rstrip('/')}/templates/{rel}")
+            run(["ssh", "-o", "StrictHostKeyChecking=accept-new", remote, "mkdir", "-p", f"{remote_site.rstrip('/')}/templates/{Path(template_rel).parent.as_posix()}"])
+            copy_template(str(local_template), f"{remote}:{remote_site.rstrip('/')}/templates/{template_rel}")
             next_state[rel] = previous_hash
             pushed += 1
             continue
         if remote_changed or not local_template.exists():
             local_template.parent.mkdir(parents=True, exist_ok=True)
-            copy_template(f"{remote}:{remote_site.rstrip('/')}/templates/{rel}", str(local_template))
+            copy_template(f"{remote}:{remote_site.rstrip('/')}/templates/{template_rel}", str(local_template))
             local_hash = digest(local_template)
             pulled += 1
         elif local_changed:
-            run(["ssh", "-o", "StrictHostKeyChecking=accept-new", remote, "mkdir", "-p", f"{remote_site.rstrip('/')}/templates/{Path(rel).parent.as_posix()}"])
-            copy_template(str(local_template), f"{remote}:{remote_site.rstrip('/')}/templates/{rel}")
+            run(["ssh", "-o", "StrictHostKeyChecking=accept-new", remote, "mkdir", "-p", f"{remote_site.rstrip('/')}/templates/{Path(template_rel).parent.as_posix()}"])
+            copy_template(str(local_template), f"{remote}:{remote_site.rstrip('/')}/templates/{template_rel}")
             next_state[rel] = previous_hash
             pushed += 1
             continue
