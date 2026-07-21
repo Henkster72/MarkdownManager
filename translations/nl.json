@@ -147,6 +147,15 @@
       "boolean_on": "Aan",
       "boolean_off": "Uit"
     },
+    "critical_sections": {
+      "label": "Kritische custom sections",
+      "hint": "Waarschuw normale gebruikers voordat zij Markdown met deze secties naar verwerking sturen.",
+      "overview_header": "Overzicht-header macro",
+      "template_form": "Templateformulier macro",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen",
+      "save_failed": "Opslaan mislukt"
+    },
     "pane_header": {
       "label": "Paneelkop-indeling",
       "actions_left": "Werkbalk links, titel rechts",
@@ -539,6 +548,9 @@
     "release_093": "v0.93: WPM sorteert nieuwe artikelen nu bovenaan op post_date, daarna aanmaakdatum/bestandsnaam, verbergt de afbeeldingstip in visuele modus en voegt een plaatjeskiezer toe aan Artikelmetadata."
   },
   "wpm": {
+    "critical_sections": {
+      "warning": "Deze pagina gebruikt kritische custom sections die op de live site anders kunnen renderen:\n\n{sections}\n\nToch naar verwerking sturen?"
+    },
     "setup_title": "instellen",
     "setup_hint": "Vul je auteurnaam en UI-taal in.",
     "author_label": "Auteurnaam",

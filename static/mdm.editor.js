@@ -2115,6 +2115,31 @@
         }
     };
 
+    const criticalSectionsInContent = () => {
+        const settings = window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object'
+            ? window.MDW_META_CONFIG._settings
+            : null;
+        const configured = settings && Array.isArray(settings.critical_sections)
+            ? settings.critical_sections
+            : [];
+        const content = String(ta.value || '').toLowerCase();
+        return configured
+            .map((entry) => String(entry || '').trim())
+            .filter((entry) => entry && content.includes(entry.toLowerCase()));
+    };
+
+    const shouldConfirmCriticalSections = () => {
+        const auth = typeof window.__mdwAuthState === 'function' ? window.__mdwAuthState() : null;
+        if (!auth || auth.role !== 'user') return true;
+        const matches = criticalSectionsInContent();
+        if (!matches.length) return true;
+        return window.confirm(t(
+            'wpm.critical_sections.warning',
+            'This page uses critical custom sections that may render differently on the live site:\n\n{sections}\n\nSend it to processing anyway?',
+            { sections: matches.join('\n') }
+        ));
+    };
+
     editorForm?.addEventListener('submit', (e) => {
         if (!(editorForm instanceof HTMLFormElement)) return;
         const submitter = e.submitter;
@@ -2126,6 +2151,10 @@
         const publishAction = String((submitter instanceof HTMLElement ? submitter.getAttribute('value') : '')
             || (active ? active.getAttribute('value') : '') || '');
         if (publishAction === 'submit_for_processing') {
+            if (!shouldConfirmCriticalSections()) {
+                e.preventDefault();
+                return;
+            }
             e.preventDefault();
             const actionInput = document.createElement('input');
             actionInput.type = 'hidden';

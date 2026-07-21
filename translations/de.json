@@ -140,6 +140,15 @@
       "boolean_on": "Ein",
       "boolean_off": "Aus"
     },
+    "critical_sections": {
+      "label": "Kritische benutzerdefinierte Abschnitte",
+      "hint": "Normale Benutzer vor dem Senden von Markdown mit diesen Abschnitten warnen.",
+      "overview_header": "Makro für Übersichtsheader",
+      "template_form": "Formularmakro",
+      "saving": "Speichern…",
+      "saved": "Gespeichert",
+      "save_failed": "Speichern fehlgeschlagen"
+    },
     "pane_header": {
       "label": "Reihenfolge der Bereichskopfzeile",
       "actions_left": "Werkzeugleiste links, Titel rechts",
@@ -525,6 +534,9 @@
     "release_093": "v0.93: WPM sortiert neue Artikel jetzt zuerst nach post_date, dann nach Erstellungsdatum/Dateiname, blendet den Bildhinweis im visuellen Modus aus und ergänzt eine Bildauswahl in den Artikelmetadaten."
   },
   "wpm": {
+    "critical_sections": {
+      "warning": "Diese Seite verwendet kritische benutzerdefinierte Abschnitte, die auf der Live-Website anders gerendert werden können:\n\n{sections}\n\nTrotzdem zur Verarbeitung senden?"
+    },
     "setup_title": "einrichten",
     "setup_hint": "Legen Sie Ihren Autorennamen und die UI-Sprache fest.",
     "author_label": "Autorenname",

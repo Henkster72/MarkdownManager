@@ -282,6 +282,9 @@ if (is_array($settingsIn)) {
     $customFormat = array_key_exists('custom_format', $settingsIn)
         ? mdw_custom_format_normalize($settingsIn['custom_format'])
         : mdw_custom_format_normalize($curSettings['custom_format'] ?? null);
+    $criticalSections = array_key_exists('critical_sections', $settingsIn)
+        ? mdw_critical_sections_normalize($settingsIn['critical_sections'])
+        : mdw_critical_sections_normalize($curSettings['critical_sections'] ?? []);
     $uiLanguage = array_key_exists('ui_language', $settingsIn)
         ? trim((string)($settingsIn['ui_language'] ?? ''))
         : trim((string)($curSettings['ui_language'] ?? ''));
@@ -366,6 +369,7 @@ if (is_array($settingsIn)) {
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'custom_format' => $customFormat,
+        'critical_sections' => $criticalSections,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,

@@ -140,6 +140,15 @@
       "boolean_on": "Activé",
       "boolean_off": "Désactivé"
     },
+    "critical_sections": {
+      "label": "Sections personnalisées critiques",
+      "hint": "Avertir les utilisateurs avant l'envoi d'un Markdown contenant ces sections.",
+      "overview_header": "Macro d'en-tête d'aperçu",
+      "template_form": "Macro de formulaire",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré",
+      "save_failed": "Échec de l'enregistrement"
+    },
     "pane_header": {
       "label": "Ordre de l’en-tête de panneau",
       "actions_left": "Barre d’outils à gauche, titre à droite",
@@ -525,6 +534,9 @@
     "release_093": "v0.93 : WPM trie désormais les articles les plus récents d'abord par post_date, puis par date de création/nom de fichier, masque l'astuce image en mode visuel et ajoute un sélecteur d'image aux métadonnées d'article."
   },
   "wpm": {
+    "critical_sections": {
+      "warning": "Cette page utilise des sections personnalisées critiques qui peuvent être rendues différemment sur le site en ligne :\n\n{sections}\n\nEnvoyer quand même au traitement ?"
+    },
     "setup_title": "configuration",
     "setup_hint": "Définissez votre nom d'auteur et la langue de l'UI.",
     "author_label": "Nom de l'auteur",

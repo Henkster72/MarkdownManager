@@ -27,6 +27,7 @@
             "custom_css": true,
             "sections": false
         },
+        "critical_sections": [],
         "ui_language": "nl",
         "ui_theme": "",
         "theme_preset": "default",

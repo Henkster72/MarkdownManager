@@ -667,6 +667,102 @@
         return next;
     };
 
+    const normalizeCriticalSections = (raw) => {
+        if (!Array.isArray(raw)) return [];
+        const seen = new Set();
+        raw.forEach((entry) => {
+            const value = String(entry || '').trim().replace(/\\/g, '/');
+            if (!/^(?:section_[A-Za-z0-9_.-]+|macros\/macro_[A-Za-z0-9_.-]+)\.html$/.test(value)) return;
+            seen.add(value);
+        });
+        return Array.from(seen);
+    };
+
+    const readCriticalSectionsSetting = () => {
+        const s = getSettings();
+        return normalizeCriticalSections(s && s.critical_sections);
+    };
+
+    const writeCriticalSectionsSetting = (value) => {
+        const next = normalizeCriticalSections(value);
+        if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+            window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+            window.MDW_META_CONFIG._settings.critical_sections = next;
+        }
+        return next;
+    };
+
+    const criticalSectionOptions = () => {
+        const options = [];
+        const seen = new Set();
+        const add = (value, label) => {
+            if (seen.has(value)) return;
+            seen.add(value);
+            options.push({ value, label });
+        };
+        (Array.isArray(window.MDW_SECTION_SNIPPETS) ? window.MDW_SECTION_SNIPPETS : []).forEach((entry) => {
+            const snippet = String(entry && entry.snippet || '');
+            const match = snippet.match(/\{%\s*include\s+["']([^"']+)["']\s*%\}/i);
+            if (!match || !/^section_[A-Za-z0-9_.-]+\.html$/.test(match[1])) return;
+            add(match[1], String(entry.label || match[1]));
+        });
+        add('macros/macro_overviewheader.html', t('theme.critical_sections.overview_header', 'Overview header macro'));
+        add('macros/macro_form.html', t('theme.critical_sections.template_form', 'Template form macro'));
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+    };
+
+    const renderCriticalSections = () => {
+        if (!(criticalSectionsList instanceof HTMLElement)) return;
+        const selected = new Set(readCriticalSectionsSetting());
+        criticalSectionsList.textContent = '';
+        criticalSectionOptions().forEach(({ value, label }) => {
+            const labelEl = document.createElement('label');
+            labelEl.style.cssText = 'display:flex; align-items:center; gap:0.5rem;';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.value = value;
+            input.checked = selected.has(value);
+            input.dataset.criticalSection = '1';
+            input.setAttribute('data-auth-superuser-enable', '1');
+            const text = document.createElement('span');
+            text.className = 'status-text';
+            text.textContent = label;
+            labelEl.append(input, text);
+            criticalSectionsList.appendChild(labelEl);
+        });
+    };
+
+    const selectedCriticalSections = () => Array.from(
+        document.querySelectorAll('input[data-critical-section="1"]:checked')
+    ).map((input) => String(input.value || '').trim());
+
+    const setCriticalSectionsStatus = (msg, kind = 'info') => {
+        if (!(criticalSectionsStatus instanceof HTMLElement)) return;
+        criticalSectionsStatus.textContent = String(msg || '');
+        criticalSectionsStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const saveCriticalSectionsSetting = async (value) => {
+        setCriticalSectionsStatus(t('theme.critical_sections.saving', 'Saving…'), 'info');
+        try {
+            const next = normalizeCriticalSections(value);
+            const result = await saveSettingsToServer({ critical_sections: next });
+            if (!result.ok) throw new Error(result.message || t('theme.critical_sections.save_failed', 'Save failed'));
+            writeCriticalSectionsSetting(next);
+            setCriticalSectionsStatus(t('theme.critical_sections.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.critical_sections.save_failed', 'Save failed');
+            setCriticalSectionsStatus(msg, 'error');
+            renderCriticalSections();
+            return false;
+        }
+    };
+
     const ensureStyleEl = () => {
         let el = document.getElementById(STYLE_ID);
         if (el && el.tagName === 'STYLE') return el;
@@ -920,6 +1016,8 @@
     const customFormatCustomCssToggle = document.getElementById('customFormatCustomCssToggle');
     const customFormatSectionsToggle = document.getElementById('customFormatSectionsToggle');
     const customFormatStatus = document.getElementById('customFormatStatus');
+    const criticalSectionsList = document.getElementById('criticalSectionsList');
+    const criticalSectionsStatus = document.getElementById('criticalSectionsStatus');
     const copyButtonsToggle = document.getElementById('copyButtonsToggle');
     const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
     const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
@@ -1463,6 +1561,7 @@
         if (customFormatSectionsToggle instanceof HTMLInputElement) {
             customFormatSectionsToggle.checked = customFormat.sections;
         }
+        renderCriticalSections();
         const assetSettings = getSettings() || {};
         if (staticPathInput instanceof HTMLInputElement) staticPathInput.value = String(assetSettings.static_path || 'static');
         if (imagesPathInput instanceof HTMLInputElement) imagesPathInput.value = String(assetSettings.images_path || 'images');
@@ -1539,6 +1638,7 @@
         syncDeleteAfterUi();
         setAllowUserDeleteStatus(t('theme.permissions.hint', 'Saved for all users.'), 'info');
         setCustomFormatStatus(t('theme.custom_format.hint', 'Choose which sources appear in the custom format toolbar.'), 'info');
+        setCriticalSectionsStatus(t('theme.critical_sections.hint', 'Warn regular users before they send Markdown containing these sections.'), 'info');
         setCopySettingsStatus(t('theme.copy.hint', 'Saved for all users.'), 'info');
         setExportClassPrefixStatus(t('theme.copy.class_prefix_hint', 'Applies to medium/wet HTML export; dry export removes all classes.'), 'info');
         setJinjaMetaPrefixStatus(t('theme.metadata.jinja_prefix_hint', 'Maps metadata keys like page_picture -> blog_picture in Template download (default: page_).'), 'info');
@@ -2917,6 +3017,14 @@
                 const current = readCustomFormatSetting();
                 if (next.custom_css !== current.custom_css || next.sections !== current.sections) {
                     const ok = await saveCustomFormatSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (criticalSectionsList instanceof HTMLElement) {
+                const next = normalizeCriticalSections(selectedCriticalSections());
+                const current = readCriticalSectionsSetting();
+                if (next.join('\n') !== current.join('\n')) {
+                    const ok = await saveCriticalSectionsSetting(next);
                     if (!ok) return false;
                 }
             }

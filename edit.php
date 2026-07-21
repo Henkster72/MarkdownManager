@@ -2311,6 +2311,11 @@ window.mermaid = mermaid;
                     <?=h(mdw_t('theme.custom_format.hint','Choose which sources appear in the custom format toolbar.'))?>
                 </div>
             </div>
+            <div class="modal-field" data-auth-superuser="1">
+                <div class="modal-label"><?=h(mdw_t('theme.critical_sections.label','Critical custom sections'))?></div>
+                <div id="criticalSectionsList" style="display:flex; flex-direction:column; gap:0.35rem;"></div>
+                <div id="criticalSectionsStatus" class="status-text" style="margin-top:0.35rem;"><?=h(mdw_t('theme.critical_sections.hint','Warn regular users before they send Markdown containing these sections.'))?></div>
+            </div>
             <?php endif; ?>
 
             <div class="modal-field" data-auth-superuser="1">

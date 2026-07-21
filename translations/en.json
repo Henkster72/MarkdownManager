@@ -147,6 +147,15 @@
       "boolean_on": "On",
       "boolean_off": "Off"
     },
+    "critical_sections": {
+      "label": "Critical custom sections",
+      "hint": "Warn regular users before they send Markdown containing these sections.",
+      "overview_header": "Overview header macro",
+      "template_form": "Template form macro",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "save_failed": "Save failed"
+    },
     "pane_header": {
       "label": "Pane header order",
       "actions_left": "Toolbar left, title right",
@@ -548,6 +557,9 @@
     "release_093": "v0.93: WPM now sorts newest articles first by post_date, then creation date/filename, hides the image tip in visual mode, and adds an image picker to Article metadata."
   },
   "wpm": {
+    "critical_sections": {
+      "warning": "This page uses critical custom sections that may render differently on the live site:\n\n{sections}\n\nSend it to processing anyway?"
+    },
     "setup_title": "setup",
     "setup_hint": "Set your author name and UI language.",
     "author_label": "Author name",

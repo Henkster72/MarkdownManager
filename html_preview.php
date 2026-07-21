@@ -1876,6 +1876,7 @@ function mdw_metadata_default_config() {
             'index_dual_pane_overview' => true,
             'hide_markdown_editor' => false,
             'custom_format' => ['custom_css' => true, 'sections' => false],
+            'critical_sections' => [],
             // Global (cross-device) UI defaults, used when publisher_mode is enabled.
             'ui_language' => '',
             'ui_theme' => '', // 'dark' | 'light' | ''
@@ -1930,6 +1931,20 @@ function mdw_custom_format_normalize($raw) {
     if (array_key_exists('custom_css', $raw)) $out['custom_css'] = (bool)$raw['custom_css'];
     if (array_key_exists('sections', $raw)) $out['sections'] = (bool)$raw['sections'];
     return $out;
+}
+
+function mdw_critical_sections_normalize($raw) {
+    if (!is_array($raw)) return [];
+    $out = [];
+    foreach ($raw as $value) {
+        if (!is_string($value)) continue;
+        $value = trim(str_replace('\\', '/', $value));
+        if ($value === '' || str_contains($value, '..')) continue;
+        if (!preg_match('~^(?:section_[A-Za-z0-9_.-]+|macros/macro_[A-Za-z0-9_.-]+)\\.html$~', $value)) continue;
+        $out[$value] = true;
+        if (count($out) >= 40) break;
+    }
+    return array_keys($out);
 }
 
 function mdw_sanitize_custom_css($css) {
@@ -2010,6 +2025,7 @@ function mdw_metadata_normalize_config($cfg) {
     $indexDualPaneOverview = !array_key_exists('index_dual_pane_overview', $inSettings) ? true : (bool)$inSettings['index_dual_pane_overview'];
     $hideMarkdownEditor = !array_key_exists('hide_markdown_editor', $inSettings) ? false : (bool)$inSettings['hide_markdown_editor'];
     $customFormat = mdw_custom_format_normalize($inSettings['custom_format'] ?? null);
+    $criticalSections = mdw_critical_sections_normalize($inSettings['critical_sections'] ?? []);
     $uiLanguage = isset($inSettings['ui_language']) ? trim((string)$inSettings['ui_language']) : '';
     if ($uiLanguage !== '' && !preg_match('/^[a-z]{2}(-[A-Za-z0-9]+)?$/', $uiLanguage)) $uiLanguage = '';
     $uiTheme = isset($inSettings['ui_theme']) ? strtolower(trim((string)$inSettings['ui_theme'])) : '';
@@ -2054,6 +2070,7 @@ function mdw_metadata_normalize_config($cfg) {
         'index_dual_pane_overview' => (bool)$indexDualPaneOverview,
         'hide_markdown_editor' => (bool)$hideMarkdownEditor,
         'custom_format' => $customFormat,
+        'critical_sections' => $criticalSections,
         'ui_language' => $uiLanguage,
         'ui_theme' => $uiTheme,
         'theme_preset' => $themePreset,

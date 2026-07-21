@@ -140,6 +140,15 @@
       "boolean_on": "Ligado",
       "boolean_off": "Desligado"
     },
+    "critical_sections": {
+      "label": "Secções personalizadas críticas",
+      "hint": "Avisar utilizadores normais antes de enviarem Markdown com estas secções.",
+      "overview_header": "Macro de cabeçalho de visão geral",
+      "template_form": "Macro de formulário",
+      "saving": "A guardar…",
+      "saved": "Guardado",
+      "save_failed": "Falha ao guardar"
+    },
     "pane_header": {
       "label": "Ordem do cabeçalho do painel",
       "actions_left": "Barra de ferramentas à esquerda, título à direita",
@@ -525,6 +534,9 @@
     "release_093": "v0.93: o WPM agora ordena os artigos mais recentes primeiro por post_date, depois por data de criação/nome do ficheiro, oculta a dica de imagem no modo visual e adiciona um seletor de imagens aos metadados do artigo."
   },
   "wpm": {
+    "critical_sections": {
+      "warning": "Esta página usa secções personalizadas críticas que podem ser renderizadas de forma diferente no site em direto:\n\n{sections}\n\nEnviar para processamento mesmo assim?"
+    },
     "setup_title": "configuração",
     "setup_hint": "Defina o seu nome de autor e o idioma da UI.",
     "author_label": "Nome do autor",
