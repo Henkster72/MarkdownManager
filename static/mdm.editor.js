@@ -644,19 +644,50 @@
             label.setAttribute('for', `articleMeta_${key}`);
             label.textContent = labelText;
 
+            const rawValue = String(value ?? '').trim();
+            const booleanKeys = new Set([
+                'cta', 'ctagratis', 'bigfooter', 'blurmenu', 'blog', 'sociallinks',
+                'suppressmodal', 'hide_vergoedingen_cta', 'show_vergoedingen_cta',
+            ]);
+            const isBoolean = booleanKeys.has(String(metaKey || key).toLowerCase())
+                || /^(true|false)$/i.test(rawValue);
             const input = document.createElement('input');
             input.id = `articleMeta_${key}`;
-            input.className = 'input';
-            input.type = 'text';
             input.name = metaKey || key;
-            input.value = String(value ?? '');
             if (metaKey) input.dataset.metaKey = metaKey;
+            if (isBoolean) {
+                input.type = 'checkbox';
+                input.checked = rawValue.toLowerCase() === 'true';
+                input.dataset.metaBoolean = '1';
+                input.setAttribute('aria-label', labelText);
+            } else {
+                input.className = 'input';
+                input.type = 'text';
+                input.value = rawValue;
+            }
             if (readonly) {
                 input.readOnly = true;
                 input.setAttribute('aria-readonly', 'true');
             }
 
-            wrap.append(label, input);
+            wrap.append(label);
+            if (isBoolean) {
+                const toggle = document.createElement('label');
+                toggle.className = 'article-meta-boolean-toggle';
+                const state = document.createElement('span');
+                state.className = 'status-text';
+                const syncState = () => {
+                    state.textContent = input.checked
+                        ? t('theme.metadata.boolean_on', 'On')
+                        : t('theme.metadata.boolean_off', 'Off');
+                };
+                input.addEventListener('change', syncState);
+                syncState();
+                toggle.append(input, state);
+                wrap.append(toggle);
+            } else {
+                wrap.append(input);
+            }
             if (key === 'page_picture') {
                 attachPagePicturePicker(wrap, input);
             }
@@ -701,7 +732,9 @@
                 if (!(input instanceof HTMLInputElement)) return;
                 const key = String(input.dataset.metaKey || '').trim().toLowerCase();
                 if (!key) return;
-                const value = String(input.value || '').trim();
+                const value = input.dataset.metaBoolean === '1'
+                    ? (input.checked ? 'True' : 'False')
+                    : String(input.value || '').trim();
                 if (value === '') delete nextMeta[key];
                 else nextMeta[key] = value;
             });

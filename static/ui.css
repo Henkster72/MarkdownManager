@@ -2223,6 +2223,25 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   gap: 0.75rem;
 }
 
+#articleMetaForm {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#articleMetaForm > .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.article-meta-boolean-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+}
+
 .article-meta-field .input {
   width: 100%;
 }
