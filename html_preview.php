@@ -2674,6 +2674,39 @@ function mdw_jinja_image_token_path_from_src($src) {
     return trim((string)$src, '/');
 }
 
+function mdw_export_protect_jinja_directives($markdown, &$imports, &$directives) {
+    $imports = [];
+    $directives = [];
+    $markdown = (string)$markdown;
+
+    $markdown = (string)preg_replace_callback('/\{%\s*(?:import|from)\b[^%]*%\}/', function($m) use (&$imports) {
+        $directive = trim((string)($m[0] ?? ''));
+        if ($directive !== '' && !in_array($directive, $imports, true)) $imports[] = $directive;
+        return '';
+    }, $markdown);
+
+    $pattern = '/\{%\s*include\s+(?:"[^"]+"|\'[^\']+\')\s*%\}|\{\{\s*(?:overview\.add_header|form\.contact_form|audio_player|course_image|special\.bigheader)\s*\(((?:[^()]|\([^()]*\))*)\)\s*\}\}/s';
+    return (string)preg_replace_callback($pattern, function($m) use (&$directives) {
+        $token = '@@MDW_EXPORT_DIRECTIVE_' . count($directives) . '@@';
+        $directives[$token] = trim((string)($m[0] ?? ''));
+        return "\n\n{$token}\n\n";
+    }, $markdown);
+}
+
+function mdw_export_restore_jinja_directives($html, $directives) {
+    $html = (string)$html;
+    if (!is_array($directives)) return $html;
+    foreach ($directives as $token => $directive) {
+        $token = (string)$token;
+        $directive = trim((string)$directive);
+        if ($token === '' || $directive === '') continue;
+        $quotedToken = preg_quote($token, '/');
+        $html = (string)preg_replace('/<p\b[^>]*>\s*' . $quotedToken . '\s*<\/p>/i', $directive, $html);
+        $html = str_replace($token, $directive, $html);
+    }
+    return $html;
+}
+
 function mdw_jinja_prepare_body_html($bodyHtml, $meta = []) {
     $bodyHtml = trim((string)$bodyHtml);
     if ($bodyHtml === '') return '<div class="preview-content"></div>';
@@ -2770,6 +2803,9 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
 
     $meta = [];
     $bodyMarkdown = mdw_hidden_meta_extract_and_remove_all((string)$rawMarkdown, $meta);
+    $jinjaImports = [];
+    $jinjaDirectives = [];
+    $renderMarkdown = mdw_export_protect_jinja_directives($bodyMarkdown, $jinjaImports, $jinjaDirectives);
     $effectiveMeta = $meta;
     $activePageValue = trim((string)($effectiveMeta['active_page'] ?? ''));
     if ($activePageValue === '') {
@@ -2785,7 +2821,7 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     } else {
         // Auto sections and metadata are preview affordances. The target base template
         // owns them, so exporting either would duplicate rendered site content.
-        $rendered = md_to_html($bodyMarkdown, $mdPath, 'edit', [
+        $rendered = md_to_html($renderMarkdown, $mdPath, 'edit', [
             'source_map' => false,
             'render_metadata' => false,
             'expand_auto_sections' => false,
@@ -2793,6 +2829,7 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
         $rendered = mdw_html_strip_source_map_attrs($rendered);
         $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
     }
+    $bodyHtml = mdw_export_restore_jinja_directives($bodyHtml, $jinjaDirectives);
     $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
     $bodyHtml = mdw_export_normalize_toc_template_html($bodyHtml, $settings['toc_export_style'] ?? 'list');
     $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
@@ -2855,6 +2892,10 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
         $varName = mdw_jinja_map_meta_var_name($key, $mappedPrefix);
         $quoteMode = ($key === 'active_page') ? 'single' : 'double';
         $lines[] = '{% set ' . $varName . ' = ' . mdw_jinja_value_literal($value, $quoteMode) . ' %}';
+    }
+
+    foreach ($jinjaImports as $directive) {
+        $lines[] = $directive;
     }
 
     $lines[] = '{% block content %}';

@@ -70,4 +70,20 @@ if ($feedbackPos === false || $footerPos === false || $feedbackPos > $footerPos)
     exit(1);
 }
 
+$exportMarkdown = implode("\n", [
+    '{page_title: Test title}',
+    '{page_subtitle: Test subtitle}',
+    '{page_picture: banner.jpg}',
+    '',
+    "{% import 'macros/macro_overviewheader.html' as overview %}",
+    '{{ overview.add_header(header_title=page_title, header_subtitle=page_subtitle, depth=depth) }}',
+    '',
+    '{% include "section_sharingcaring.html" %}',
+]);
+$template = mdw_export_markdown_jinja_template($exportMarkdown, ['md_path' => 'test.md']);
+if (str_contains($template, 'data-mdw-') || !str_contains($template, "{% import 'macros/macro_overviewheader.html' as overview %}") || !str_contains($template, '{{ overview.add_header(') || !str_contains($template, '{% include "section_sharingcaring.html" %}')) {
+    fwrite(STDERR, "Jinja exports must preserve macros and section includes without preview markers\n");
+    exit(1);
+}
+
 echo "WPM preview macro regression checks passed\n";
