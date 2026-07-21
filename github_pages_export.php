@@ -364,10 +364,15 @@ try {
 
     $baseCss = ghpx_read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/htmlpreview.css');
     $popiconCss = ghpx_read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.css');
+    $popbrandCss = ghpx_read_file(mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popbrand.css');
     $baseHref = trim($baseHref);
     $fontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popicon.woff2' : '/popicon.woff2';
     if ($popiconCss !== '') {
         $popiconCss = preg_replace('~url\\((["\\\']?)popicon\\.woff2\\1\\)~', 'url("' . $fontHref . '")', $popiconCss);
+    }
+    if ($popbrandCss !== '') {
+        $popbrandFontHref = $baseHref !== '' ? rtrim($baseHref, '/') . '/popbrand.woff2' : '/popbrand.woff2';
+        $popbrandCss = str_replace(['/static/popbrand.woff2', 'popbrand.woff2'], $popbrandFontHref, $popbrandCss);
     }
     $themeName = ghpx_find_theme_name($themesDir, $themePreset);
     $themeCss = $themeName ? ghpx_read_file($root . '/' . trim($themesDir, '/\\') . '/' . $themeName . '_htmlpreview.css') : '';
@@ -376,7 +381,7 @@ try {
     $repoLabel = (string)(env_str('MDM_EXPORT_REPO_LABEL', '') ?? '');
     $repoFooter = ghpx_build_repo_footer($repoUrl, $repoLabel);
     $repoCss = $repoFooter !== '' ? ".export-footer{margin-top:1.5rem;font-size:0.78em;opacity:0.7;}\n.export-footer a{text-decoration:none;}" : '';
-    $cssChunks = array_filter([$popiconCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
+    $cssChunks = array_filter([$popiconCss, $popbrandCss, $baseCss, $themeCss, $overridesCss, $customCss, $repoCss], fn($c) => trim((string)$c) !== '');
     $cssCombined = implode("\n\n", $cssChunks);
     $cssCombined = mdw_rewrite_md_class_prefix_in_css($cssCombined, $exportClassPrefix);
     $css = ghpx_sanitize_css_for_style_tag($cssCombined);
@@ -413,6 +418,10 @@ try {
     $popiconFont = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popicon.woff2';
     if (is_file($popiconFont)) {
         @copy($popiconFont, ghpx_normalize_path($outDir) . '/popicon.woff2');
+    }
+    $popbrandFont = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $staticDir) . '/popbrand.woff2';
+    if (is_file($popbrandFont)) {
+        @copy($popbrandFont, ghpx_normalize_path($outDir) . '/popbrand.woff2');
     }
 
     json([

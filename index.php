@@ -1881,6 +1881,7 @@ if ($requested) {
 <link rel="stylesheet" href="<?=h(mdw_static_asset('markdown.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('htmlpreview.css'))?>">
 <link rel="stylesheet" href="<?=h(mdw_static_asset('popicon.css'))?>">
+<link rel="stylesheet" href="<?=h(mdw_static_asset('popbrand.css'))?>">
 <?php if ($instanceFontAssets['stylesheet'] !== ''): ?>
 <link rel="stylesheet" href="<?=h(mdw_static_asset($instanceFontAssets['stylesheet']))?>">
 <?php endif; ?>

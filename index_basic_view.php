@@ -59,6 +59,8 @@ $publisherDefaultAuthor = trim((string)($MDW_SETTINGS['publisher_default_author'
     <link rel="stylesheet" href="<?= h(mdw_static_asset('ui.css')) ?>">
     <link rel="stylesheet" href="<?= h(mdw_static_asset('markdown.css')) ?>">
     <link rel="stylesheet" href="<?= h(mdw_static_asset('htmlpreview.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('popicon.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('popbrand.css')) ?>">
 </head>
 <body class="app-body index-page basic-mode">
     <header class="app-header">

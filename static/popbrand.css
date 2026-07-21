@@ -1,0 +1,51 @@
+@font-face {
+  font-family: "Pop Brand";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("popbrand.woff2") format("woff2");
+}
+
+.pb,
+.pb::before,
+[class^="pb-"]::before,
+[class*=" pb-"]::before {
+  font-family: "Pop Brand" !important;
+  font-style: normal !important;
+  font-weight: 400 !important;
+  font-variant: normal !important;
+  text-transform: none !important;
+  line-height: 1 !important;
+}
+
+/* The pi-* aliases keep existing brand markup working after loading this file. */
+.pb-ideal::before, .pi-ideal::before { content: "\e90d"; font-family: "Pop Brand" !important; }
+.pb-tiktok::before, .pi-tiktok::before { content: "\e90e"; font-family: "Pop Brand" !important; }
+.pb-x::before, .pi-x::before { content: "\e90f"; font-family: "Pop Brand" !important; }
+.pb-facebook::before, .pi-facebook::before { content: "\e910"; font-family: "Pop Brand" !important; }
+.pb-linkedin::before, .pi-linkedin::before { content: "\e911"; font-family: "Pop Brand" !important; }
+.pb-youtube::before, .pi-youtube::before { content: "\e912"; font-family: "Pop Brand" !important; }
+.pb-instagram::before, .pi-instagram::before { content: "\e913"; font-family: "Pop Brand" !important; }
+.pb-tumbler::before, .pi-tumbler::before { content: "\e914"; font-family: "Pop Brand" !important; }
+.pb-wordpress::before, .pi-wordpress::before { content: "\e915"; font-family: "Pop Brand" !important; }
+.pb-google::before, .pi-google::before { content: "\e916"; font-family: "Pop Brand" !important; }
+.pb-pinterest::before, .pi-pinterest::before { content: "\e917"; font-family: "Pop Brand" !important; }
+.pb-whatsapp::before, .pi-whatsapp::before { content: "\e918"; font-family: "Pop Brand" !important; }
+.pb-snapchat::before, .pi-snapchat::before { content: "\e919"; font-family: "Pop Brand" !important; }
+.pb-bitcoin::before, .pi-bitcoin::before { content: "\e91a"; font-family: "Pop Brand" !important; }
+.pb-deepl::before, .pi-deepl::before { content: "\e92d"; font-family: "Pop Brand" !important; }
+.pb-chatgpt::before, .pi-chatgpt::before { content: "\e956"; font-family: "Pop Brand" !important; }
+.pb-wikipedia::before, .pi-wikipedia::before { content: "\e962"; font-family: "Pop Brand" !important; }
+.pb-reddit::before, .pi-reddit::before { content: "\e963"; font-family: "Pop Brand" !important; }
+.pb-linux::before, .pi-linux::before { content: "\e992"; font-family: "Pop Brand" !important; }
+.pb-signal::before, .pi-signal::before { content: "\e989"; font-family: "Pop Brand" !important; }
+.pb-opensuse::before, .pi-opensuse::before { content: "\e993"; font-family: "Pop Brand" !important; }
+.pb-git::before, .pi-git::before { content: "\e994"; font-family: "Pop Brand" !important; }
+.pb-apple::before, .pi-apple::before { content: "\e995"; font-family: "Pop Brand" !important; }
+.pb-allround::before, .pi-allround::before { content: "\e996"; font-family: "Pop Brand" !important; }
+.pb-windows::before, .pi-windows::before { content: "\e997"; font-family: "Pop Brand" !important; }
+.pb-wero::before, .pi-wero::before { content: "\e998"; font-family: "Pop Brand" !important; }
+.pb-ubuntu::before, .pi-ubuntu::before { content: "\e999"; font-family: "Pop Brand" !important; }
+.pb-redhat::before, .pi-redhat::before { content: "\e99a"; font-family: "Pop Brand" !important; }
+.pb-github::before, .pi-github::before { content: "\e99b"; font-family: "Pop Brand" !important; }
+.pb-android::before, .pi-android::before { content: "\e99c"; font-family: "Pop Brand" !important; }

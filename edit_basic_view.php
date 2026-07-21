@@ -50,6 +50,8 @@ if ($requestedSafe !== '') {
     <link rel="stylesheet" href="<?= h(mdw_static_asset('ui.css')) ?>">
     <link rel="stylesheet" href="<?= h(mdw_static_asset('markdown.css')) ?>">
     <link rel="stylesheet" href="<?= h(mdw_static_asset('htmlpreview.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('popicon.css')) ?>">
+    <link rel="stylesheet" href="<?= h(mdw_static_asset('popbrand.css')) ?>">
 </head>
 <body class="app-body edit-page basic-mode <?= h($folderIconClass) ?>">
     <header class="app-header">
