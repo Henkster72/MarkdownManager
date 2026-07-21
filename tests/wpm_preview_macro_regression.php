@@ -35,8 +35,34 @@ if (!str_contains($html, 'mdw-preview-overview-header headerimage basegradient')
     fwrite(STDERR, "Overview macro must retain the live header layout hooks\n");
     exit(1);
 }
+if (substr_count($html, '<section class="mdw-preview-overview-header') !== 1) {
+    fwrite(STDERR, "Overview macro must render exactly one preview header\n");
+    exit(1);
+}
+if (mdw_preview_markdown_has_parent_folder(dirname(__DIR__) . '/root.md')) {
+    fwrite(STDERR, "Root Markdown files must not enable folder-only auto sections\n");
+    exit(1);
+}
+if (!mdw_preview_markdown_has_parent_folder(dirname(__DIR__) . '/blog/test.md')) {
+    fwrite(STDERR, "Nested Markdown files must enable folder-only auto sections\n");
+    exit(1);
+}
 if (!str_contains($html, 'data-mdw-macro="special.bigheader"') || !str_contains($html, '>Preview headline</div>')) {
     fwrite(STDERR, "Special bigheader macro is missing from the preview\n");
+    exit(1);
+}
+
+$feedbackHtml = md_to_html(implode("\n", [
+    '{feedbackpopup: True}',
+    '',
+    '<div data-mdw-feedback-slot="after-sharing"></div>',
+    '',
+    'Footer content',
+]), 'test.md');
+$feedbackPos = strpos($feedbackHtml, 'mdw-preview-feedback-widget');
+$footerPos = strpos($feedbackHtml, 'Footer content');
+if ($feedbackPos === false || $footerPos === false || $feedbackPos > $footerPos) {
+    fwrite(STDERR, "Feedback widget must use the sharing section placement slot\n");
     exit(1);
 }
 

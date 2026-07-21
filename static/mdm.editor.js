@@ -2510,6 +2510,21 @@
     const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
         && !document.body.classList.contains('mdw-show-markdown-source');
     const escapeMd = (value) => String(value || '').replace(/\u00a0/g, ' ').trim();
+    const restoreJinjaImports = (markdown) => {
+        const original = String(ta.value || '');
+        const importPattern = /^\s*{%\s*(?:import|from)\b[^%]*%}\s*$/gm;
+        const imports = Array.from(original.matchAll(importPattern)).map((match) => match[0].trim());
+        if (!imports.length) return markdown;
+
+        const existing = new Set(Array.from(String(markdown || '').matchAll(importPattern)).map((match) => match[0].trim()));
+        const missing = imports.filter((line) => !existing.has(line));
+        if (!missing.length) return markdown;
+
+        const source = String(markdown || '');
+        const metaPrefix = source.match(/^(?:(?:\{[^\r\n{}]+\}\r?\n)+\r?\n*)/);
+        const offset = metaPrefix ? metaPrefix[0].length : 0;
+        return source.slice(0, offset) + missing.join('\n') + '\n\n' + source.slice(offset);
+    };
     const cleanHeadingText = (value) => {
         let text = String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
         let prev = '';
@@ -2556,6 +2571,7 @@
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
         if (!(node instanceof Element)) return '';
         if (node.hasAttribute('data-mdw-auto-section')) return '';
+        if (node.hasAttribute('data-mdw-feedback-slot') || node.hasAttribute('data-mdw-feedbackpopup')) return '';
         const sectionInclude = node.getAttribute('data-mdw-section-include');
         if (sectionInclude) return `{% include "${sectionInclude}" %}`;
         const macroSource = node.getAttribute('data-mdw-macro-source');
@@ -2617,7 +2633,27 @@
                     : content;
             }
         }
-        if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
+        if (tag === 'p') {
+            const blocks = [];
+            const text = [];
+            const flushText = () => {
+                const markdown = escapeMd(text.join(''));
+                if (markdown) blocks.push(withAlignAttr(markdown, node));
+                text.length = 0;
+            };
+            Array.from(node.childNodes).forEach((child) => {
+                if (child instanceof HTMLImageElement) {
+                    flushText();
+                    const image = inlineMarkdown(child).trim();
+                    if (image) blocks.push(`${image}\n{: class="w-full h-auto"}`);
+                    return;
+                }
+                text.push(inlineMarkdown(child));
+            });
+            flushText();
+            return blocks.join('\n\n');
+        }
+        if (tag === 'div' || tag === 'section' || tag === 'article') {
             return withAlignAttr(escapeMd(inlineMarkdown(node)), node);
         }
         if (tag === 'blockquote') {
@@ -2675,10 +2711,10 @@
             .map((node) => blockMarkdown(node))
             .map((s) => String(s || '').trim())
             .filter(Boolean);
-        return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+        return restoreJinjaImports(blocks.join('\n\n').trimEnd()) + '\n';
     };
     const markPreviewGeneratedContent = () => {
-        prev.querySelectorAll('.md-meta, [data-mdw-generated]').forEach((node) => {
+        prev.querySelectorAll('.md-meta, [data-mdw-generated], [data-mdw-feedback-slot], [data-mdw-feedbackpopup]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
         prev.querySelectorAll('.md-toc-layout').forEach((node) => {

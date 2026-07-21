@@ -556,9 +556,12 @@ function mdw_preview_expand_section_includes($text, $mdPath = null, $meta = [], 
 
             $expanded = true;
             $includeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+            $feedbackSlot = strtolower(basename($name)) === 'section_sharingcaring.html'
+                ? '<div data-mdw-feedback-slot="after-sharing"></div>'
+                : '';
             return "\n\n<div data-mdw-section-include=\"{$includeName}\">"
                 . mdw_preview_render_section_template($html, $vars)
-                . "</div>\n\n";
+                . "</div>" . $feedbackSlot . "\n\n";
         },
         $text
     );
@@ -603,7 +606,7 @@ function mdw_preview_expand_auto_sections($text, $mdPath = null, $meta = [], &$e
     if (!is_array($items)) return (string)$text;
 
     $vars = mdw_preview_collect_jinja_vars((string)$text, $meta);
-    $hasFolder = is_string($mdPath) && trim((string)dirname(str_replace('\\', '/', $mdPath))) !== '.';
+    $hasFolder = mdw_preview_markdown_has_parent_folder($mdPath);
     $before = [];
     $after = [];
 
@@ -642,6 +645,17 @@ function mdw_preview_expand_auto_sections($text, $mdPath = null, $meta = [], &$e
 
     if (!$before && !$after) return (string)$text;
     return implode("\n\n", array_merge($before, [(string)$text], $after));
+}
+
+function mdw_preview_markdown_has_parent_folder($mdPath) {
+    if (!is_string($mdPath) || trim($mdPath) === '') return false;
+    $path = str_replace('\\', '/', trim($mdPath));
+    $root = str_replace('\\', '/', (string)(realpath(__DIR__) ?: __DIR__));
+    if (str_starts_with($path, rtrim($root, '/') . '/')) {
+        $path = substr($path, strlen(rtrim($root, '/')) + 1);
+    }
+    $parent = trim((string)dirname(trim($path, '/')));
+    return $parent !== '' && $parent !== '.' && $parent !== '/';
 }
 
 function resolve_rel_url_from_md($url, $mdPath) {
@@ -2909,6 +2923,11 @@ function mdw_attr_list_extract_trailing($text) {
 
 function mdw_apply_attr_list_to_html($html, $attrs) {
     if (!is_string($html) || !$attrs || !is_array($attrs)) return $html;
+    // Attribute lists immediately after a standalone Markdown image belong to the
+    // image, not to the paragraph wrapper created by the block renderer.
+    if (preg_match('/^(<p\\b[^>]*>\\s*)(<img\\b[^>]*>)(\\s*<\\/p>)$/is', $html, $imageMatch)) {
+        return $imageMatch[1] . mdw_apply_attr_list_to_html($imageMatch[2], $attrs) . $imageMatch[3];
+    }
     if (!preg_match('/^<([A-Za-z][A-Za-z0-9:-]*)([^>]*)>/', $html, $m)) return $html;
     $tag = $m[1];
     $attrStr = (string)($m[2] ?? '');
@@ -4063,7 +4082,13 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $output = implode("\n",$html);
     $feedbackPopupValue = strtolower(trim((string)($meta['feedbackpopup'] ?? '')));
     if (in_array($feedbackPopupValue, ['1', 'true', 'yes', 'on'], true)) {
-        $output .= "\n" . '<aside class="mdw-preview-feedback-widget" data-mdw-feedbackpopup="true"><span class="pi pi-info"></span><span>FeedbackCompany</span></aside>';
+        $feedbackWidget = '<aside class="mdw-preview-feedback-widget" data-mdw-feedbackpopup="true"><span class="pi pi-info"></span><span>FeedbackCompany</span></aside>';
+        $feedbackSlotPattern = '~<div\\b(?=[^>]*\\bdata-mdw-feedback-slot="after-sharing")[^>]*></div>~';
+        if (preg_match($feedbackSlotPattern, $output)) {
+            $output = (string)preg_replace($feedbackSlotPattern, $feedbackWidget, $output, 1);
+        } else {
+            $output .= "\n" . $feedbackWidget;
+        }
     }
     if ($tocRequested && $tocLayout !== '' && !empty($tocItems)) {
         $layoutClass = 'md-toc-layout md-toc-' . $tocLayout;
