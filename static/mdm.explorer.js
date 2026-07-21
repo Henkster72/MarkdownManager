@@ -2262,6 +2262,19 @@
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
     };
+    const stateRank = (stateRaw) => {
+        const state = normalizeSort(stateRaw || '');
+        if (state === 'concept') return 0;
+        if (
+            state === 'processing'
+            || state === 'to publish' || state === 'topublish' || state === 'to-publish'
+            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
+        ) return 1;
+        if (state === 'published') return 2;
+        return 3;
+    };
+    const isSuperuser = () => typeof window.__mdwIsSuperuser === 'function' && window.__mdwIsSuperuser();
+    const shouldPrioritizePending = () => isPublisherMode() && isSuperuser();
     const compareNoteData = (a, b, mode) => {
         const dateA = String(a?.date_key || '');
         const dateB = String(b?.date_key || '');
