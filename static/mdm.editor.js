@@ -409,6 +409,13 @@
             const pubCfg = getPublisherCfg();
             return pubCfg[key] || baseCfg[key] || {};
         };
+        const articleMetaBooleanKeys = new Set([
+            'cta', 'ctagratis', 'bigfooter', 'blurmenu', 'blog', 'sociallinks',
+            'suppressmodal', 'feedbackpopup', 'hide_vergoedingen_cta', 'show_vergoedingen_cta',
+        ]);
+        const isArticleMetaBoolean = (key, cfg, value = '') => articleMetaBooleanKeys.has(String(key || '').toLowerCase())
+            || /^(true|false)$/i.test(String(value ?? '').trim())
+            || /^(true|false)$/i.test(String(cfg?.default_value ?? '').trim());
         const fieldLabel = (key, cfg) => {
             const friendly = {
                 page_title: 'Pagina titel',
@@ -427,7 +434,10 @@
         };
         const visibleFields = () => {
             const { order } = getKnownKeysAndOrder();
-            const visible = order.filter((key) => isMarkdownVisible(getFieldConfig(key)));
+            const visible = order.filter((key) => {
+                const cfg = getFieldConfig(key);
+                return isMarkdownVisible(cfg) || isArticleMetaBoolean(key, cfg);
+            });
             const preferred = ['page_title', 'page_subtitle', 'page_picture', 'author', 'post_date'];
             const out = [];
             preferred.forEach((key) => {
@@ -645,12 +655,7 @@
             label.textContent = labelText;
 
             const rawValue = String(value ?? '').trim();
-            const booleanKeys = new Set([
-                'cta', 'ctagratis', 'bigfooter', 'blurmenu', 'blog', 'sociallinks',
-                'suppressmodal', 'hide_vergoedingen_cta', 'show_vergoedingen_cta',
-            ]);
-            const isBoolean = booleanKeys.has(String(metaKey || key).toLowerCase())
-                || /^(true|false)$/i.test(rawValue);
+            const isBoolean = isArticleMetaBoolean(metaKey || key, getFieldConfig(metaKey || key), rawValue);
             const input = document.createElement('input');
             input.id = `articleMeta_${key}`;
             input.name = metaKey || key;

@@ -14,6 +14,17 @@
 }
 
 /* Keep expanded section includes visually transparent in the editor. */
+
+.preview-content .mdw-preview-feedback-widget {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 1rem 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
 .preview-content [data-mdw-section-include] {
     display: contents;
 }

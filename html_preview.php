@@ -4039,6 +4039,10 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     }
 
     $output = implode("\n",$html);
+    $feedbackPopupValue = strtolower(trim((string)($meta['feedbackpopup'] ?? '')));
+    if (in_array($feedbackPopupValue, ['1', 'true', 'yes', 'on'], true)) {
+        $output .= "\n" . '<aside class="mdw-preview-feedback-widget" data-mdw-feedbackpopup="true"><span class="pi pi-info"></span><span>FeedbackCompany</span></aside>';
+    }
     if ($tocRequested && $tocLayout !== '' && !empty($tocItems)) {
         $layoutClass = 'md-toc-layout md-toc-' . $tocLayout;
         $layoutAttr = htmlspecialchars($tocLayout, ENT_QUOTES, 'UTF-8');
