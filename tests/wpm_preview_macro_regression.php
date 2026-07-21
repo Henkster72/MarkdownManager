@@ -85,5 +85,9 @@ if (str_contains($template, 'data-mdw-') || !str_contains($template, "{% import 
     fwrite(STDERR, "Jinja exports must preserve macros and section includes without preview markers\n");
     exit(1);
 }
+if (str_contains($template, 'class="preview-content"')) {
+    fwrite(STDERR, "Published Jinja exports must not retain the editor preview wrapper\n");
+    exit(1);
+}
 
 echo "WPM preview macro regression checks passed\n";

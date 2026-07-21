@@ -2827,7 +2827,9 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
             'expand_auto_sections' => false,
         ]);
         $rendered = mdw_html_strip_source_map_attrs($rendered);
-        $bodyHtml = '<div class="preview-content">' . "\n" . trim((string)$rendered) . "\n" . '</div>';
+        // preview-content belongs to the editor surface only. Published Jinja
+        // receives the rendered article blocks without that editor wrapper.
+        $bodyHtml = trim((string)$rendered);
     }
     $bodyHtml = mdw_export_restore_jinja_directives($bodyHtml, $jinjaDirectives);
     $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
