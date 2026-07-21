@@ -281,7 +281,9 @@ function mdw_preview_render_overview_macro($args, $vars) {
         ? $accentValue
         : !in_array(strtolower(trim((string)$accentValue)), ['0', 'false', 'no', 'off'], true);
     $image = mdw_preview_macro_image_src($banner);
-    $imageStyle = $image !== '' ? ' style="--mdw-preview-header-image: url(\'' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '\');"' : '';
+    // Keep the generic preview hook and the target site's live header hook in
+    // sync. Instance CSS commonly overrides the pseudo-element with --bg.
+    $imageStyle = $image !== '' ? ' style="--mdw-preview-header-image: url(\'' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '\'); --bg: url(\'' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '\');"' : '';
     $mirrorClass = $mirror ? ' spiegel' : '';
     $out = '<section class="mdw-preview-overview-header headerimage basegradient' . $mirrorClass . '" data-mdw-macro="overview.add_header"' . $imageStyle . '>';
     $out .= '<div class="headercontent mdw-preview-overview-header-content"><div class="headerinner mdw-preview-overview-header-inner"><div class="headertext mdw-preview-overview-header-text">';

@@ -27,12 +27,16 @@ if (!preg_match('/data-mdw-macro-source="[A-Za-z0-9+\/=]+"/', $html)) {
     fwrite(STDERR, "Preview macro source marker is missing\n");
     exit(1);
 }
-if (substr_count($html, 'images/banner.jpg') !== 1) {
+if (substr_count($html, '--mdw-preview-header-image') !== 1 || str_contains($html, '<img class="md-img" src="images/banner.jpg"')) {
     fwrite(STDERR, "Overview macro must be the only preview renderer for page_picture\n");
     exit(1);
 }
 if (!str_contains($html, 'mdw-preview-overview-header headerimage basegradient') || !str_contains($html, 'headercontent mdw-preview-overview-header-content')) {
     fwrite(STDERR, "Overview macro must retain the live header layout hooks\n");
+    exit(1);
+}
+if (!str_contains($html, "--bg: url('images/banner.jpg')")) {
+    fwrite(STDERR, "Overview macro must populate the target header background variable\n");
     exit(1);
 }
 if (substr_count($html, '<section class="mdw-preview-overview-header') !== 1) {
