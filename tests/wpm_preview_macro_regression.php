@@ -81,7 +81,7 @@ $exportMarkdown = implode("\n", [
     '{% include "section_sharingcaring.html" %}',
 ]);
 $template = mdw_export_markdown_jinja_template($exportMarkdown, ['md_path' => 'test.md']);
-if (str_contains($template, 'data-mdw-') || !str_contains($template, "{% import 'macros/macro_overviewheader.html' as overview %}") || !str_contains($template, '{{ overview.add_header(') || !str_contains($template, '{% include "section_sharingcaring.html" %}')) {
+if (str_contains($template, 'data-mdw-') || !str_contains($template, "{% import 'macros/macro_overviewheader.html' as overview with context %}") || !str_contains($template, '{{ overview.add_header(') || !str_contains($template, '{% include "section_sharingcaring.html" %}')) {
     fwrite(STDERR, "Jinja exports must preserve macros and section includes without preview markers\n");
     exit(1);
 }

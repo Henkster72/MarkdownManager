@@ -2681,6 +2681,9 @@ function mdw_export_protect_jinja_directives($markdown, &$imports, &$directives)
 
     $markdown = (string)preg_replace_callback('/\{%\s*(?:import|from)\b[^%]*%\}/', function($m) use (&$imports) {
         $directive = trim((string)($m[0] ?? ''));
+        if (preg_match('/\{%\s*import\s+["\']macros\/macro_overviewheader\.html["\']\s+as\s+overview\s*%\}/i', $directive)) {
+            $directive = preg_replace('/\s*%\}$/', ' with context %}', $directive);
+        }
         if ($directive !== '' && !in_array($directive, $imports, true)) $imports[] = $directive;
         return '';
     }, $markdown);
