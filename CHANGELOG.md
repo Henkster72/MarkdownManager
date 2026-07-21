@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.957
+
+- WPM visual preview stability: visual-to-Markdown sync preserves Jinja imports, explicit line breaks, standalone images, and generated macro/section boundaries without duplicating overview headers or collapsing article content.
+- WPM preview fidelity: overview-header previews now use the target header background variable, feedback widgets are placed directly after the sharing section, root notes no longer receive folder-only automatic sections, and standalone image attributes apply to the image itself.
+- WPM Jinja export: macro calls and section includes are preserved as Jinja directives rather than exported preview HTML; editor-only `preview-content` wrappers are excluded from published templates.
+- WPM publication safety: selecting Processing makes the reviewed Markdown revision the template source of truth, while a fail-closed publisher guard rejects any export containing editor preview markers before an existing template can be overwritten.
+- Overview header rendering: exported overview macro imports retain caller context, so page metadata such as the selected header image is available to the site macro, including root-level pages.
+
 ## 0.956
 
 - WPM publication and synchronization: reviewed Processing content is prioritized during vBook/live reconciliation; managed Jinja templates are reconciled safely before rendering, and the shared Jinja environment plus Markdown/template mirrors have reusable systemd timer templates.
