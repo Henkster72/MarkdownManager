@@ -23,6 +23,11 @@ MANAGED_TEMPLATE_RE = re.compile(r"\{#\s*mdw-managed:\s*source=([^\s#]+)\s*#\}")
 EXTENDS_RE = re.compile(r"\{%\s*extends\s+([\"'])(.*?)\1\s*%\}")
 SET_RE = re.compile(r"^\s*\{%\s*set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*%\}\s*$", re.MULTILINE)
 CONTENT_BLOCK_RE = re.compile(r"\{%\s*block\s+content\s*%\}(.*?)\{%\s*endblock(?:\s+content)?\s*%\}", re.DOTALL)
+PREVIEW_EXPORT_MARKERS = (
+    "data-mdw-",
+    "mdw-preview-",
+    "md-meta",
+)
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -176,6 +181,14 @@ def template_to_markdown(template: Path, rel: str) -> str:
     return "\n".join(lines) + "\n\n" + body + "\n"
 
 
+def ensure_publishable_template(template: str, rel: str) -> None:
+    found = [marker for marker in PREVIEW_EXPORT_MARKERS if marker in template]
+    if found:
+        raise RuntimeError(
+            f"AW-SSG export contains editor preview markup for {rel}: {', '.join(found)}"
+        )
+
+
 def reconcile_templates(site_dir: Path, active_files: dict[str, Path], template_state: dict[str, object]) -> list[str]:
     templates_root = site_dir / "templates"
     if not templates_root.is_dir():
@@ -281,6 +294,7 @@ def export_template(editor_url: str, rel: str, source: Path, target: Path) -> No
     template = result.stdout
     if not re.match(r"\s*(?:\{#[\s\S]*?#\}\s*)*\{%\s*extends\b", template):
         raise RuntimeError(f"AW-SSG export returned no Jinja template for {rel}")
+    ensure_publishable_template(template, rel)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(template, encoding="utf-8")
 
