@@ -31,6 +31,10 @@ if (substr_count($html, 'images/banner.jpg') !== 1) {
     fwrite(STDERR, "Overview macro must be the only preview renderer for page_picture\n");
     exit(1);
 }
+if (!str_contains($html, 'mdw-preview-overview-header headerimage basegradient') || !str_contains($html, 'headercontent mdw-preview-overview-header-content')) {
+    fwrite(STDERR, "Overview macro must retain the live header layout hooks\n");
+    exit(1);
+}
 if (!str_contains($html, 'data-mdw-macro="special.bigheader"') || !str_contains($html, '>Preview headline</div>')) {
     fwrite(STDERR, "Special bigheader macro is missing from the preview\n");
     exit(1);

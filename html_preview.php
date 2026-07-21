@@ -272,22 +272,27 @@ function mdw_preview_render_overview_macro($args, $vars) {
     $banner = mdw_preview_macro_arg($args, 'header_banner', $vars, (string)($vars['page_picture'] ?? 'banner.jpg'));
     $buttonLink = (string)mdw_preview_macro_arg($args, 'button_link', $vars, '');
     $buttonText = (string)mdw_preview_macro_arg($args, 'button_text', $vars, '');
+    $mirrorValue = mdw_preview_macro_arg($args, 'mirror', $vars, false);
+    $mirror = is_bool($mirrorValue)
+        ? $mirrorValue
+        : in_array(strtolower(trim((string)$mirrorValue)), ['1', 'true', 'yes', 'on'], true);
     $accentValue = mdw_preview_macro_arg($args, 'accent', $vars, true);
     $accent = is_bool($accentValue)
         ? $accentValue
         : !in_array(strtolower(trim((string)$accentValue)), ['0', 'false', 'no', 'off'], true);
     $image = mdw_preview_macro_image_src($banner);
     $imageStyle = $image !== '' ? ' style="--mdw-preview-header-image: url(\'' . htmlspecialchars($image, ENT_QUOTES, 'UTF-8') . '\');"' : '';
-    $out = '<section class="mdw-preview-overview-header" data-mdw-macro="overview.add_header"' . $imageStyle . '>';
-    $out .= '<div class="mdw-preview-overview-header-inner"><div class="mdw-preview-overview-header-text">';
+    $mirrorClass = $mirror ? ' spiegel' : '';
+    $out = '<section class="mdw-preview-overview-header headerimage basegradient' . $mirrorClass . '" data-mdw-macro="overview.add_header"' . $imageStyle . '>';
+    $out .= '<div class="headercontent mdw-preview-overview-header-content"><div class="headerinner mdw-preview-overview-header-inner"><div class="headertext mdw-preview-overview-header-text">';
     $out .= '<h1>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>';
     if ($subtitle !== '') $out .= '<h3>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h3>';
     $out .= '</div>';
     if ($buttonLink !== '' && $buttonText !== '') {
         $buttonVariant = $accent ? 'accentbutton' : 'freebutton';
-        $out .= '<div class="mdw-preview-overview-header-actions"><a class="mdw-preview-overview-button default-button ' . $buttonVariant . '" href="' . htmlspecialchars(normalize_md_link_url($buttonLink), ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . htmlspecialchars($buttonText, ENT_QUOTES, 'UTF-8') . '<span aria-hidden="true">&rarr;</span></a></div>';
+        $out .= '<div class="buttonrow mt-8 mdw-preview-overview-header-actions"><a class="mdw-preview-overview-button default-button ' . $buttonVariant . '" href="' . htmlspecialchars(normalize_md_link_url($buttonLink), ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener">' . htmlspecialchars($buttonText, ENT_QUOTES, 'UTF-8') . '<span class="ml-2 pi pi-rightwardsarrow" aria-hidden="true"></span></a></div>';
     }
-    $out .= '</div></section>';
+    $out .= '</div></div></section>';
     return $out;
 }
 
