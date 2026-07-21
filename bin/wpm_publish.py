@@ -388,7 +388,13 @@ def main() -> int:
         if publish_state(source) != "processing":
             continue
         template = site_dir / "templates" / Path(rel).with_suffix(".html")
-        export_template(editor_url, rel, source, template)
+        # A hand-written Jinja template can contain macros, blocks and site
+        # behavior that cannot be reconstructed from Markdown. Only generate
+        # templates that WPM previously marked as managed (or new templates).
+        if not template.exists() or managed_template_source(template) == rel:
+            export_template(editor_url, rel, source, template)
+        else:
+            print(f"WPM publish: preserving hand-written template for {rel}")
         render_site(site_dir)
         upload_outputs(site_env, site_dir, rel)
         set_published(source)
