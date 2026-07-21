@@ -143,7 +143,9 @@
       "hint": "Choose which sources appear in the custom format toolbar.",
       "saving": "Saving…",
       "saved": "Saved",
-      "save_failed": "Save failed"
+      "save_failed": "Save failed",
+      "boolean_on": "On",
+      "boolean_off": "Off"
     },
     "pane_header": {
       "label": "Pane header order",
@@ -528,8 +530,8 @@
     "file_create_failed": "Could not create file.",
     "publisher_requires_subtitle": "{app} requires a subtitle line starting with \"##\".",
     "publisher_author_required": "{app} requires an author name.",
-    "publisher_requires_page_title": "{app} requires a page_title metadata line.",
-    "publisher_requires_page_picture": "{app} requires a page_picture metadata line."
+    "publisher_requires_page_title": "Page title is required before you can submit.",
+    "publisher_requires_page_picture": "Page picture is required before you can submit."
   },
   "secret": {
     "wrong_password": "Wrong password.",

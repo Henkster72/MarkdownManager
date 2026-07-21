@@ -136,7 +136,9 @@
       "hint": "Wählen Sie, welche Quellen in der Format-Symbolleiste erscheinen.",
       "saving": "Speichern…",
       "saved": "Gespeichert",
-      "save_failed": "Speichern fehlgeschlagen"
+      "save_failed": "Speichern fehlgeschlagen",
+      "boolean_on": "Ein",
+      "boolean_off": "Aus"
     },
     "pane_header": {
       "label": "Reihenfolge der Bereichskopfzeile",
@@ -505,8 +507,8 @@
     "file_create_failed": "Datei konnte nicht erstellt werden.",
     "publisher_requires_subtitle": "{app} erfordert eine Untertitelzeile, die mit \"##\" beginnt.",
     "publisher_author_required": "{app} erfordert einen Autorennamen.",
-    "publisher_requires_page_title": "{app} erfordert eine page_title-Metadatenzeile.",
-    "publisher_requires_page_picture": "{app} erfordert eine page_picture-Metadatenzeile."
+    "publisher_requires_page_title": "Seitentitel ist vor dem Senden erforderlich.",
+    "publisher_requires_page_picture": "Kopfbild ist vor dem Senden erforderlich."
   },
   "secret": {
     "wrong_password": "Falsches Passwort.",

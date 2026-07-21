@@ -2573,6 +2573,10 @@
                     cfg[key].default_value = String(input.value || '').trim();
                     return;
                 }
+                if (field === 'default_value_boolean') {
+                    cfg[key].default_value = input.checked ? 'True' : 'False';
+                    return;
+                }
                 if (input.type !== 'checkbox') return;
                 if (field === 'markdown') cfg[key].markdown_visible = input.checked;
                 if (field === 'html') cfg[key].html_visible = input.checked;
@@ -2645,14 +2649,24 @@
         const bindMetaInputs = (inputs, toggleInputs) => {
             if (!inputs.length) return;
             inputs.forEach((input) => {
+                const syncBooleanDefaultLabel = () => {
+                    if (String(input.dataset.metaField || '') !== 'default_value_boolean') return;
+                    const label = input.parentElement?.querySelector?.('[data-meta-boolean-label]');
+                    if (!(label instanceof HTMLElement)) return;
+                    label.textContent = input.checked
+                        ? t('theme.metadata.boolean_on', 'On')
+                        : t('theme.metadata.boolean_off', 'Off');
+                };
                 const onAnyChange = () => {
                     syncMetaUiRules(toggleInputs);
+                    syncBooleanDefaultLabel();
                     setMetaStatus('', 'info');
                 };
                 input.addEventListener('change', onAnyChange);
                 if (input.type !== 'checkbox') {
                     input.addEventListener('input', onAnyChange);
                 }
+                syncBooleanDefaultLabel();
             });
             syncMetaUiRules(toggleInputs);
         };

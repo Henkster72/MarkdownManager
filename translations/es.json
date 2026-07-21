@@ -136,7 +136,9 @@
       "hint": "Elige qué fuentes aparecen en la barra del formato personalizado.",
       "saving": "Guardando…",
       "saved": "Guardado",
-      "save_failed": "Error al guardar"
+      "save_failed": "Error al guardar",
+      "boolean_on": "Activado",
+      "boolean_off": "Desactivado"
     },
     "pane_header": {
       "label": "Orden de la cabecera del panel",
@@ -513,8 +515,8 @@
     "file_create_failed": "No se pudo crear el archivo.",
     "publisher_requires_subtitle": "{app} requiere una línea de subtítulo que comience con \"##\".",
     "publisher_author_required": "{app} requiere un nombre de autor.",
-    "publisher_requires_page_title": "{app} requiere una línea de metadatos page_title.",
-    "publisher_requires_page_picture": "{app} requiere una línea de metadatos page_picture."
+    "publisher_requires_page_title": "El título de página es obligatorio antes de enviar.",
+    "publisher_requires_page_picture": "La imagen de cabecera es obligatoria antes de enviar."
   },
   "secret": {
     "wrong_password": "Contraseña incorrecta.",

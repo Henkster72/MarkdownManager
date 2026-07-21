@@ -136,7 +136,9 @@
       "hint": "Scegli quali fonti mostrare nella barra del formato personalizzato.",
       "saving": "Salvataggio…",
       "saved": "Salvato",
-      "save_failed": "Errore di salvataggio"
+      "save_failed": "Errore di salvataggio",
+      "boolean_on": "Attivo",
+      "boolean_off": "Disattivo"
     },
     "pane_header": {
       "label": "Ordine dell'intestazione del riquadro",
@@ -513,8 +515,8 @@
     "file_create_failed": "Impossibile creare il file.",
     "publisher_requires_subtitle": "{app} richiede una riga di sottotitolo che inizi con \"##\".",
     "publisher_author_required": "{app} richiede un nome autore.",
-    "publisher_requires_page_title": "{app} richiede una riga di metadati page_title.",
-    "publisher_requires_page_picture": "{app} richiede una riga di metadati page_picture."
+    "publisher_requires_page_title": "Il titolo della pagina è obbligatorio prima dell'invio.",
+    "publisher_requires_page_picture": "L'immagine di intestazione è obbligatoria prima dell'invio."
   },
   "secret": {
     "wrong_password": "Password errata.",

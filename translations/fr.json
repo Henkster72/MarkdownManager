@@ -136,7 +136,9 @@
       "hint": "Choisissez les sources affichées dans la barre du format personnalisé.",
       "saving": "Enregistrement…",
       "saved": "Enregistré",
-      "save_failed": "Échec de l'enregistrement"
+      "save_failed": "Échec de l'enregistrement",
+      "boolean_on": "Activé",
+      "boolean_off": "Désactivé"
     },
     "pane_header": {
       "label": "Ordre de l’en-tête de panneau",
@@ -505,8 +507,8 @@
     "file_create_failed": "Impossible de créer le fichier.",
     "publisher_requires_subtitle": "{app} nécessite une ligne de sous-titre commençant par \"##\".",
     "publisher_author_required": "{app} nécessite un nom d'auteur.",
-    "publisher_requires_page_title": "{app} nécessite une ligne de métadonnées page_title.",
-    "publisher_requires_page_picture": "{app} nécessite une ligne de métadonnées page_picture."
+    "publisher_requires_page_title": "Le titre de page est requis avant l'envoi.",
+    "publisher_requires_page_picture": "L'image d'en-tête est requise avant l'envoi."
   },
   "secret": {
     "wrong_password": "Mot de passe incorrect.",

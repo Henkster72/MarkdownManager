@@ -136,7 +136,9 @@
       "hint": "Escolha as fontes apresentadas na barra do formato personalizado.",
       "saving": "A guardar…",
       "saved": "Guardado",
-      "save_failed": "Falha ao guardar"
+      "save_failed": "Falha ao guardar",
+      "boolean_on": "Ligado",
+      "boolean_off": "Desligado"
     },
     "pane_header": {
       "label": "Ordem do cabeçalho do painel",
@@ -505,8 +507,8 @@
     "file_create_failed": "Não foi possível criar o ficheiro.",
     "publisher_requires_subtitle": "{app} requer uma linha de subtítulo a começar com \"##\".",
     "publisher_author_required": "{app} requer um nome de autor.",
-    "publisher_requires_page_title": "{app} requer uma linha de metadados page_title.",
-    "publisher_requires_page_picture": "{app} requer uma linha de metadados page_picture."
+    "publisher_requires_page_title": "O título da página é obrigatório antes de enviar.",
+    "publisher_requires_page_picture": "A imagem de cabeçalho é obrigatória antes de enviar."
   },
   "secret": {
     "wrong_password": "Palavra-passe incorreta.",

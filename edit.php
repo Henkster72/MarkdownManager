@@ -2553,6 +2553,7 @@ window.mermaid = mermaid;
 				                            $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
 				                            $obligatory = !empty($f['obligatory']);
 				                            $defaultValue = trim((string)($f['default_value'] ?? ''));
+				                            $defaultIsBoolean = in_array(strtolower($defaultValue), ['true', 'false'], true);
 				                        ?>
 				                        <div><?=h($label)?></div>
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -2564,7 +2565,14 @@ window.mermaid = mermaid;
 				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
 				                        </label>
+				                        <?php if ($defaultIsBoolean): ?>
+				                        <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:flex-start; gap:0.4rem;">
+				                            <input type="checkbox" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="default_value_boolean" <?= strtolower($defaultValue) === 'true' ? 'checked' : '' ?> aria-label="<?=h(mdw_t('theme.metadata.default_value','Default value'))?>">
+				                            <span class="status-text" data-meta-boolean-label></span>
+				                        </label>
+				                        <?php else: ?>
 				                        <input type="text" class="input" data-meta-scope="base" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
+				                        <?php endif; ?>
 				                    <?php endforeach; ?>
 				                </div>
 				                <div id="publisherMetaFields" style="<?= $publisherMode ? '' : 'display:none;' ?> border-top: 1px solid var(--border-soft); padding-top: 0.75rem; margin-top: 0.25rem;">
@@ -2583,6 +2591,7 @@ window.mermaid = mermaid;
 				                                $htmlVis = !empty($f['html_visible']) && ($mdVis || $allowHtmlNoMd);
 				                                $obligatory = !empty($f['obligatory']);
 				                                $defaultValue = trim((string)($f['default_value'] ?? ''));
+				                                $defaultIsBoolean = in_array(strtolower($defaultValue), ['true', 'false'], true);
 				                            ?>
 				                            <div><?=h($label)?></div>
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
@@ -2594,7 +2603,14 @@ window.mermaid = mermaid;
 				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:center;">
 				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="obligatory" <?= $obligatory ? 'checked' : '' ?>>
 				                            </label>
+				                            <?php if ($defaultIsBoolean): ?>
+				                            <label class="checkbox" style="display:inline-flex; align-items:center; justify-content:flex-start; gap:0.4rem;">
+				                                <input type="checkbox" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="default_value_boolean" <?= strtolower($defaultValue) === 'true' ? 'checked' : '' ?> aria-label="<?=h(mdw_t('theme.metadata.default_value','Default value'))?>">
+				                                <span class="status-text" data-meta-boolean-label></span>
+				                            </label>
+				                            <?php else: ?>
 				                            <input type="text" class="input" data-meta-scope="publisher" data-meta-key="<?=h($k)?>" data-meta-field="default_value" value="<?=h($defaultValue)?>" placeholder="<?=h(mdw_t('theme.metadata.default_value_placeholder','e.g. True'))?>">
+				                            <?php endif; ?>
 				                        <?php endforeach; ?>
 				                    </div>
 				                </div>

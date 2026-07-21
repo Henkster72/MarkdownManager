@@ -143,7 +143,9 @@
       "hint": "Kies welke bronnen in de custom-formatwerkbalk verschijnen.",
       "saving": "Opslaan…",
       "saved": "Opgeslagen",
-      "save_failed": "Opslaan mislukt"
+      "save_failed": "Opslaan mislukt",
+      "boolean_on": "Aan",
+      "boolean_off": "Uit"
     },
     "pane_header": {
       "label": "Paneelkop-indeling",
@@ -519,8 +521,8 @@
     "file_create_failed": "Kon bestand niet aanmaken.",
     "publisher_requires_subtitle": "{app} vereist een subtitelregel die begint met \"##\".",
     "publisher_author_required": "{app} vereist een auteurnaam.",
-    "publisher_requires_page_title": "{app} vereist een page_title metaregel.",
-    "publisher_requires_page_picture": "{app} vereist een page_picture metaregel."
+    "publisher_requires_page_title": "Paginatitel is verplicht voordat je kunt verzenden.",
+    "publisher_requires_page_picture": "Kop plaatje is verplicht voordat je kunt verzenden."
   },
   "secret": {
     "wrong_password": "Onjuist wachtwoord.",

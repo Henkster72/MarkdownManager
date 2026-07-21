@@ -434,6 +434,7 @@ body.app-body .find-replace-modal {
 .modal-footer {
   padding: 0.8rem 0.9rem;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
@@ -454,6 +455,7 @@ body.app-body .find-replace-modal {
 
 .modal-body {
   padding: 0.9rem;
+  min-height: 0;
   overflow: auto;
 }
 
