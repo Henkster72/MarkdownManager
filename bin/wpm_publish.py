@@ -196,6 +196,10 @@ def reconcile_templates(site_dir: Path, active_files: dict[str, Path], template_
         md_changed = digest(active_files[rel]) != old_md
         template_changed = digest(template) != old_template
         if md_changed and template_changed:
+            # A WPM Processing state is an explicit approval to publish the
+            # Markdown revision, so it takes precedence over a stale template.
+            if publish_state(active_files[rel]) == "processing":
+                continue
             conflicts.append(rel)
             continue
         if template_changed:
