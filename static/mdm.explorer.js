@@ -2262,47 +2262,6 @@
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
         return !!(settings && settings.publisher_mode);
     };
-    const stateRank = (stateRaw) => {
-        const state = normalizeSort(stateRaw || '');
-        if (state === 'concept') return 0;
-        if (
-            state === 'processing'
-            || state === 'to publish' || state === 'topublish' || state === 'to-publish'
-            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
-        ) return 1;
-        if (state === 'published') return 2;
-        return 3;
-    };
-    const isSuperuser = () => typeof window.__mdwIsSuperuser === 'function' && window.__mdwIsSuperuser();
-    const shouldPrioritizePending = () => isPublisherMode() && isSuperuser();
-    const isPendingState = (state) => stateRank(state) < 2;
-    let superuserPendingFoldersExpanded = false;
-    const expandPendingFoldersForSuperuser = () => {
-        if (!shouldPrioritizePending() || superuserPendingFoldersExpanded) return;
-        const pendingSections = new Set();
-        if (lazyNotesMode) {
-            for (const [folder, notes] of lazyNotesByFolder.entries()) {
-                if (!notes.some((note) => isPendingState(note?.publish_state))) continue;
-                const section = overview.querySelector(`[data-folder-section="${CSS.escape(folder)}"]`);
-                if (section instanceof HTMLElement) pendingSections.add(section);
-            }
-        } else {
-            overview.querySelectorAll('.note-item[data-publish-state]').forEach((row) => {
-                if (!(row instanceof HTMLElement) || !isPendingState(row.dataset.publishState)) return;
-                const section = row.closest('[data-folder-section]');
-                if (section instanceof HTMLElement) pendingSections.add(section);
-            });
-        }
-        for (const section of pendingSections) {
-            let current = section;
-            while (current instanceof HTMLElement) {
-                current.setAttribute('data-user-open', '1');
-                setFolderOpen(current, true);
-                current = findParentFolderSection(current);
-            }
-        }
-        superuserPendingFoldersExpanded = true;
-    };
     const compareNoteData = (a, b, mode) => {
         const dateA = String(a?.date_key || '');
         const dateB = String(b?.date_key || '');
@@ -2679,8 +2638,6 @@
             return;
         }
 
-        expandPendingFoldersForSuperuser();
-
         let visible = 0;
         let totalVisible = 0;
         const visibleBySection = new Map();
@@ -2787,7 +2744,6 @@
     }
 
     function update() {
-        expandPendingFoldersForSuperuser();
         const q = String(filterInput.value || '').trim().toLowerCase();
         if (lazyNotesMode) {
             lazyRender(q);

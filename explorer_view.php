@@ -907,7 +907,7 @@ function explorer_view_render_tree($opts) {
     <?php if (!empty($rootList)): ?>
     <?php
         $root_children_id = 'folder-children-' . substr(sha1('md:root'), 0, 10);
-        $root_default_open = ($folder_filter === null) || ($current_folder === 'root');
+        $root_default_open = $current_file_path !== '' && $current_folder === 'root';
     ?>
 	    <section id="<?=explorer_view_escape(explorer_view_folder_anchor_id('root'))?>" class="nav-section" data-folder-section="root" data-default-open="<?= $root_default_open ? '1' : '0' ?>">
         <h2 class="note-group-title">
