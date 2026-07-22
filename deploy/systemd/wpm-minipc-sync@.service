@@ -3,4 +3,6 @@ Description=Synchronize vBook WPM content for %i to this minipc
 
 [Service]
 Type=oneshot
+User=henk
+Group=henk
 ExecStart=/usr/bin/python3 /home/henk/.local/bin/wpm_minipc_sync.py --remote henk@192.168.1.110 --remote-site /home/henk/jinja_websites/%i_site --remote-edit /srv/vbook_web/%i/edit --site-dir /home/henk/Documents/jinja_websites/%i_site --local-edit /home/henk/vbook_web/%i/edit

@@ -1,9 +1,8 @@
 [Unit]
-Description=Run vBook WPM minipc synchronization for %i every five minutes
+Description=Synchronize vBook WPM content for %i to this minipc hourly
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=5min
+OnCalendar=hourly
 Persistent=true
 
 [Install]
