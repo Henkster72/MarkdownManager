@@ -2,6 +2,7 @@
 
 ## 0.957
 
+- WPM service boundary: the vBook publisher now only synchronizes Markdown, exports templates, renders HTML, and uploads page output; Tailwind purge/prune and static-asset synchronization remain minipc responsibilities.
 - WPM visual preview stability: visual-to-Markdown sync preserves Jinja imports, explicit line breaks, standalone images, and generated macro/section boundaries without duplicating overview headers or collapsing article content.
 - WPM preview fidelity: overview-header previews now use the target header background variable, feedback widgets are placed directly after the sharing section, root notes no longer receive folder-only automatic sections, and standalone image attributes apply to the image itself.
 - WPM Jinja export: macro calls and section includes are preserved as Jinja directives rather than exported preview HTML; editor-only `preview-content` wrappers are excluded from published templates.

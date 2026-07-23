@@ -94,37 +94,6 @@ def pull_markdown(editor_env: dict[str, str], staging: Path) -> None:
     run(command)
 
 
-def sync_static_assets(editor_env: dict[str, str], shadow_dir: Path) -> None:
-    configured = editor_env.get("WPM_SYNC_LOCAL_STATIC_DIR", "").strip()
-    static_dir = Path(configured).expanduser() if configured else shadow_dir.parent / "static"
-    if not static_dir.is_dir():
-        return
-
-    remote_suffix = editor_env.get("WPM_SYNC_REMOTE_STATIC_DIR", "static").strip("/") or "static"
-    remote_static = remote_spec(editor_env, remote_suffix).rstrip("/")
-    local_images = static_dir / "images"
-    local_images.mkdir(parents=True, exist_ok=True)
-
-    # Preserve vbook's version for same-named files while importing live-only images.
-    run(ssh_prefix(editor_env) + [
-        "rsync", "-az", "--ignore-existing",
-        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
-        f"{remote_static}/images/", f"{local_images}/",
-    ])
-
-    # Editor assets are authored on vbook; never delete unrelated live static files.
-    run(ssh_prefix(editor_env) + [
-        "rsync", "-az", "--exclude=images/",
-        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
-        f"{static_dir}/", f"{remote_static}/",
-    ])
-    run(ssh_prefix(editor_env) + [
-        "rsync", "-az",
-        "-e", "ssh -F /dev/null -o StrictHostKeyChecking=accept-new",
-        f"{local_images}/", f"{remote_static}/images/",
-    ])
-
-
 def load_state(path: Path) -> dict[str, object]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -306,7 +275,7 @@ def render_site(site_dir: Path) -> None:
         "import main; from jinja_env.site_builder import run_site_build; "
         "(main._write_faq_template(main._load_faq_data()) "
         "if hasattr(main, '_write_faq_template') and hasattr(main, '_load_faq_data') else None); "
-        "run_site_build(site, main.load_site_config(), prod_mode=True, full_render=False, purge=True, upload=False)"
+        "run_site_build(site, main.load_site_config(), prod_mode=True, full_render=False, purge=False, upload=False)"
     )
     run([sys.executable, "-c", driver, str(site_dir)], cwd=site_dir)
 
@@ -342,16 +311,6 @@ def upload_outputs(site_env: dict[str, str], site_dir: Path, rel: str) -> None:
         run(command)
     finally:
         Path(files_from).unlink(missing_ok=True)
-
-
-def upload_static_assets(site_dir: Path) -> None:
-    upload_tool = site_dir.parent / "jinja_env" / "upload_output.py"
-    env_file = site_dir / ".env"
-    if not upload_tool.is_file():
-        raise RuntimeError(f"shared upload tool not found: {upload_tool}")
-    if not env_file.is_file():
-        raise RuntimeError(f"site upload environment not found: {env_file}")
-    run([sys.executable, str(upload_tool), str(env_file), "--static-only"], cwd=site_dir)
 
 
 def set_published(path: Path) -> None:
@@ -394,7 +353,6 @@ def main() -> int:
     state_dir.mkdir(parents=True, exist_ok=True)
     staging.mkdir(parents=True, exist_ok=True)
 
-    sync_static_assets(editor_env, shadow_dir)
     pull_markdown(editor_env, staging)
     state = load_state(state_path)
     known = state["files"] if isinstance(state.get("files"), dict) else {}
@@ -422,9 +380,6 @@ def main() -> int:
         processed.append(rel)
 
     if processed:
-        # Purge-generated CSS is shared by all pages. Upload it once after all
-        # page renders; the upload helper also runs the configured cache purge.
-        upload_static_assets(site_dir)
         for rel in processed:
             source = active_files[rel]
             set_published(source)
