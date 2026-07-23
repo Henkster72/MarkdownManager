@@ -262,6 +262,7 @@
         }
         return out.join('\n');
     };
+    window.__mdwBuildMetaBlock = buildMetaBlock;
 
     let metaStore = extractMetaAndBody(editor.value).meta;
     let lastSourceMeta = { ...metaStore };
@@ -2788,8 +2789,8 @@
         const body = blocks.join('\n\n').trimEnd();
         // Metadata is intentionally absent from the visual DOM. Preserve the
         // current source metadata when converting visual edits back to Markdown.
-        const { meta } = extractMetaAndBody(ta.value);
-        const metaBlock = buildMetaBlock(meta, Object.keys(meta));
+        const { meta } = window.__mdwExtractMetaAndBody(ta.value);
+        const metaBlock = window.__mdwBuildMetaBlock(meta, Object.keys(meta));
         const next = metaBlock ? `${metaBlock}\n\n${body}` : body;
         return restoreJinjaImports(next.trimEnd()) + '\n';
     };
