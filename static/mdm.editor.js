@@ -2644,6 +2644,8 @@
         if (!(node instanceof Element)) return '';
         if (node.hasAttribute('data-mdw-auto-section')) return '';
         if (node.hasAttribute('data-mdw-feedback-slot') || node.hasAttribute('data-mdw-feedbackpopup')) return '';
+        const pendingSection = node.getAttribute('data-mdw-pending-section');
+        if (pendingSection) return pendingSection;
         const sectionInclude = node.getAttribute('data-mdw-section-include');
         if (sectionInclude) return `{% include "${sectionInclude}" %}`;
         const macroSource = node.getAttribute('data-mdw-macro-source');
@@ -3064,7 +3066,9 @@
         beforeRange.selectNodeContents(block);
         beforeRange.setEnd(range.startContainer, range.startOffset);
         const marker = document.createElement('p');
-        marker.textContent = text;
+        marker.className = 'mdw-pending-section';
+        marker.dataset.mdwPendingSection = text;
+        marker.innerHTML = '<br>';
         if (beforeRange.toString().length === 0) {
             block.before(marker);
         } else {
