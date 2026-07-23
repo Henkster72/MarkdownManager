@@ -693,6 +693,15 @@ function resolve_rel_url_from_md($url, $mdPath) {
         return url_encode_path($base) . $suffix;
     }
 
+    // Bare image names use the configured images folder. Explicit relative
+    // paths remain document-relative for legacy and custom assets.
+    if ($imagesDir !== ''
+        && preg_match('/\.(?:avif|gif|jpe?g|png|svg|webp)(?:$|[?#])/i', $base)
+        && !str_starts_with($base, './')
+        && !str_starts_with($base, '../')) {
+        return url_encode_path(rtrim($imagesDir, '/') . '/' . ltrim($base, '/')) . $suffix;
+    }
+
     $mdDir = dirname($mdPath);
     if ($mdDir === '.' || $mdDir === '') return url_encode_path($base) . $suffix;
 
