@@ -288,7 +288,7 @@
         const baseCfg = getBaseCfg();
         const pubCfg = getPublisherCfg();
         const publisherMode = isPublisherMode();
-        const { meta } = extractMetaAndBody(editor.value);
+        const { meta, body } = extractMetaAndBody(editor.value);
         const filteredMeta = {};
         Object.entries(meta || {}).forEach(([k, v]) => {
             const key = String(k).toLowerCase();
