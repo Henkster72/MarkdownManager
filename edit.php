@@ -922,6 +922,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $existingRaw = (string)@file_get_contents($full);
                     mdw_hidden_meta_extract_and_remove_all($existingRaw, $existingMeta);
                 }
+                // Visual preview conversion deliberately omits hidden metadata.
+                // Keep existing keys that were absent from the submitted source;
+                // an explicitly submitted empty key may still be cleared.
+                $effectiveMeta = $submittedMeta;
+                foreach ($existingMeta as $key => $value) {
+                    if (!array_key_exists($key, $effectiveMeta)) {
+                        $effectiveMeta[$key] = (string)$value;
+                    }
+                }
                 $contentChanged = false;
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $existingNormalized = str_replace(["\r\n", "\r"], "\n", $existingRaw);
@@ -979,17 +988,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $author = '';
                 if (!empty($MDW_PUBLISHER_MODE)) {
                     $defaultAuthor = isset($MDW_SETTINGS['publisher_default_author']) ? trim((string)$MDW_SETTINGS['publisher_default_author']) : '';
-                    $metadataAuthor = trim((string)($submittedMeta['author'] ?? $existingMeta['author'] ?? ''));
+                    $metadataAuthor = trim((string)($effectiveMeta['author'] ?? ''));
                     $author = $postedAuthor !== '' ? $postedAuthor : ($metadataAuthor !== '' ? $metadataAuthor : $defaultAuthor);
                     $publisherWarnings = [];
                     if ($author === '') {
                         $publisherWarnings[] = mdw_t('flash.publisher_author_required', 'WPM requires an author name.', ['app' => $APP_NAME]);
                     }
-                    $pageTitle = trim((string)($submittedMeta['page_title'] ?? ''));
+                    $pageTitle = trim((string)($effectiveMeta['page_title'] ?? ''));
                     if ($pageTitle === '') {
                         $publisherWarnings[] = mdw_t('flash.publisher_requires_page_title', 'WPM requires a page_title metadata line.', ['app' => $APP_NAME]);
                     }
-                    $pagePicture = trim((string)($submittedMeta['page_picture'] ?? ''));
+                    $pagePicture = trim((string)($effectiveMeta['page_picture'] ?? ''));
                     if ($pagePicture === '') {
                         $publisherWarnings[] = mdw_t('flash.publisher_requires_page_picture', 'WPM requires a page_picture metadata line.', ['app' => $APP_NAME]);
                     }
@@ -1010,6 +1019,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $save_ok_payload['warnings'] = array_values($save_warning);
                     }
                     $metaOverrides = [];
+                    foreach ($existingMeta as $key => $value) {
+                        if (!array_key_exists($key, $submittedMeta) && trim((string)$value) !== '') {
+                            $metaOverrides[strtolower((string)$key)] = (string)$value;
+                        }
+                    }
                     $fieldCfg = function_exists('mdw_metadata_all_field_configs')
                         ? mdw_metadata_all_field_configs(!empty($MDW_PUBLISHER_MODE))
                         : [];
@@ -1035,7 +1049,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $metaOverrides['publishstate'] = $desiredPublishState;
                     }
                     if ($desiredPublishState === 'Published' && $existingPublishState !== 'Published') {
-                        $submittedPublishedDate = trim((string)($submittedMeta['published_date'] ?? ''));
+                        $submittedPublishedDate = trim((string)($effectiveMeta['published_date'] ?? ''));
                         if ($submittedPublishedDate === '') {
                             $metaOverrides['published_date'] = date('Y-m-d');
                             $publishedDateWillChange = true;

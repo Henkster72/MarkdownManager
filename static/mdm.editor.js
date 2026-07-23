@@ -2711,7 +2711,13 @@
             .map((node) => blockMarkdown(node))
             .map((s) => String(s || '').trim())
             .filter(Boolean);
-        return restoreJinjaImports(blocks.join('\n\n').trimEnd()) + '\n';
+        const body = blocks.join('\n\n').trimEnd();
+        // Metadata is intentionally absent from the visual DOM. Preserve the
+        // current source metadata when converting visual edits back to Markdown.
+        const { meta } = extractMetaAndBody(ta.value);
+        const metaBlock = buildMetaBlock(meta, Object.keys(meta));
+        const next = metaBlock ? `${metaBlock}\n\n${body}` : body;
+        return restoreJinjaImports(next.trimEnd()) + '\n';
     };
     const markPreviewGeneratedContent = () => {
         prev.querySelectorAll('.md-meta, [data-mdw-generated], [data-mdw-feedback-slot], [data-mdw-feedbackpopup]').forEach((node) => {
