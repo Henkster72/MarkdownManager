@@ -29,6 +29,8 @@ PREVIEW_EXPORT_MARKERS = (
     "md-meta",
 )
 
+CURRENT_PUBLISH_FILE = ''
+
 
 def load_env(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
@@ -39,6 +41,29 @@ def load_env(path: Path) -> dict[str, str]:
         key, value = line.split("=", 1)
         values[key.strip()] = value.split("|", 1)[0].strip().strip('"').strip("'")
     return values
+
+
+def instance_name(instance_env_path: Path | None) -> str:
+    if instance_env_path is None:
+        return 'unknown'
+    return instance_env_path.parent.parent.name or 'unknown'
+
+
+def notify_ntfy(env: dict[str, str], site: str, title: str, message: str, tags: str) -> None:
+    topic = env.get('WPM_NTFY_TOPIC', '').strip()
+    if not topic:
+        return
+    command = [
+        'curl', '--fail', '--silent', '--show-error', '-X', 'POST',
+        '-H', f'Title: {title}',
+        '-H', f'Tags: {tags}',
+        '-d', message,
+        f'https://ntfy.sh/{topic}',
+    ]
+    try:
+        subprocess.run(command, check=True, text=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f'WPM ntfy notification failed for {site}: {exc}', file=sys.stderr)
 
 
 def digest(path: Path) -> str:
@@ -329,7 +354,8 @@ def push_markdown(editor_env: dict[str, str], source: Path, rel: str) -> None:
     run(ssh_prefix(editor_env) + ["scp", "-O", str(source), remote_file])
 
 
-def main() -> int:
+def _publish_main() -> int:
+    global CURRENT_PUBLISH_FILE
     parser = argparse.ArgumentParser()
     parser.add_argument("--instance-env", type=Path)
     parser.add_argument("--site-dir", type=Path)
@@ -369,6 +395,7 @@ def main() -> int:
     for rel, source in active_files.items():
         if publish_state(source) != "processing":
             continue
+        CURRENT_PUBLISH_FILE = rel
         template = site_dir / "templates" / Path(rel).with_suffix(".html")
         # Processing is the explicit approval to publish the Markdown revision.
         # Before that point, reconciliation still imports hand-written template
@@ -391,8 +418,45 @@ def main() -> int:
         "templates": managed_template_state(site_dir, active_files),
     }, indent=2) + "\n", encoding="utf-8")
     write_status(shadow_dir, active_files, processed)
+    if processed:
+        site = instance_name(args.instance_env)
+        notify_ntfy(
+            instance_env,
+            site,
+            f'WPM {site}: render geslaagd',
+            'Site: ' + site + '\n' +
+            'Bestanden: ' + ', '.join(processed) + '\n' +
+            'Resultaat: gerenderd, live gezet en op Published gezet.',
+            'white_check_mark,computer',
+        )
     print("WPM publish: " + (", ".join(processed) if processed else "no Processing files"))
     return 0
+
+
+def main() -> int:
+    try:
+        return _publish_main()
+    except Exception as exc:
+        instance_env_path = None
+        for index, value in enumerate(sys.argv):
+            if value == '--instance-env' and index + 1 < len(sys.argv):
+                instance_env_path = Path(sys.argv[index + 1])
+                break
+        env = load_env(instance_env_path) if instance_env_path and instance_env_path.is_file() else {}
+        site = instance_name(instance_env_path)
+        file_name = CURRENT_PUBLISH_FILE or 'onbekend bestand'
+        notify_ntfy(
+            env,
+            site,
+            f'WPM {site}: render mislukt',
+            'Site: ' + site + '\n' +
+            'Bestand: ' + file_name + '\n' +
+            'Resultaat: render of live-upload mislukt.\n' +
+            'Fout: ' + str(exc)[:1200],
+            'warning,computer',
+        )
+        print(f'WPM publish failed: {exc}', file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
