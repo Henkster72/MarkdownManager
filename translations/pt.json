@@ -136,9 +136,7 @@
       "hint": "Escolha as fontes apresentadas na barra do formato personalizado.",
       "saving": "A guardar…",
       "saved": "Guardado",
-      "save_failed": "Falha ao guardar",
-      "boolean_on": "Ligado",
-      "boolean_off": "Desligado"
+      "save_failed": "Falha ao guardar"
     },
     "critical_sections": {
       "label": "Secções personalizadas críticas",
@@ -310,7 +308,9 @@
       "save": "Guardar definições de metadados",
       "saving": "A guardar…",
       "saved": "Guardado",
-      "save_failed": "Falha ao guardar"
+      "save_failed": "Falha ao guardar",
+      "boolean_on": "Ligado",
+      "boolean_off": "Desligado"
     },
     "settings_io": {
       "title": "Importar/exportar definições",

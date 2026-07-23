@@ -136,9 +136,7 @@
       "hint": "Scegli quali fonti mostrare nella barra del formato personalizzato.",
       "saving": "Salvataggio…",
       "saved": "Salvato",
-      "save_failed": "Errore di salvataggio",
-      "boolean_on": "Attivo",
-      "boolean_off": "Disattivo"
+      "save_failed": "Errore di salvataggio"
     },
     "critical_sections": {
       "label": "Sezioni personalizzate critiche",
@@ -318,7 +316,9 @@
       "save": "Salva impostazioni metadati",
       "saving": "Salvando…",
       "saved": "Salvato",
-      "save_failed": "Errore di salvataggio"
+      "save_failed": "Errore di salvataggio",
+      "boolean_on": "Attivo",
+      "boolean_off": "Disattivo"
     },
     "settings_io": {
       "title": "Importazione/esportazione impostazioni",

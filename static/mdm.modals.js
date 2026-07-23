@@ -1504,6 +1504,7 @@
         modal.hidden = true;
         mdmModalOpen(false);
         setStatus('');
+        window.__mdwClearEditorSearchHighlight?.();
         editor.focus();
     };
 
@@ -1531,11 +1532,19 @@
         if (!needle) return;
         const idx = findNextIndex(needle);
         if (idx === -1) {
+            window.__mdwClearEditorSearchHighlight?.();
             setStatus(t('replace_modal.no_matches', 'No matches found.'), 'error');
             return;
         }
-        editor.setSelectionRange(idx, idx + needle.length);
-        editor.focus();
+        if (typeof window.__mdwHighlightEditorSearchRange === 'function') {
+            window.__mdwHighlightEditorSearchRange(idx, idx + needle.length);
+            setTimeout(() => {
+                if (!modal.hidden) findInput.focus({ preventScroll: true });
+            }, 0);
+        } else {
+            editor.setSelectionRange(idx, idx + needle.length);
+            editor.focus();
+        }
         setStatus(t('replace_modal.match_found', 'Match found.'), 'ok');
     };
 
@@ -1600,7 +1609,10 @@
     replaceSkipBtn.addEventListener('click', findNext);
     replaceNextBtn.addEventListener('click', replaceCurrent);
     replaceAllBtn.addEventListener('click', replaceAll);
-    findInput.addEventListener('input', updateButtons);
+    findInput.addEventListener('input', () => {
+        window.__mdwClearEditorSearchHighlight?.();
+        updateButtons();
+    });
     replaceInput.addEventListener('input', updateButtons);
 
     document.addEventListener('keydown', (e) => {

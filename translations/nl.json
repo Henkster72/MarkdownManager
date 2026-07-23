@@ -143,9 +143,7 @@
       "hint": "Kies welke bronnen in de custom-formatwerkbalk verschijnen.",
       "saving": "Opslaan…",
       "saved": "Opgeslagen",
-      "save_failed": "Opslaan mislukt",
-      "boolean_on": "Aan",
-      "boolean_off": "Uit"
+      "save_failed": "Opslaan mislukt"
     },
     "critical_sections": {
       "label": "Kritische custom sections",
@@ -321,7 +319,9 @@
       "save": "Metadata-instellingen opslaan",
       "saving": "Opslaan…",
       "saved": "Opgeslagen",
-      "save_failed": "Opslaan mislukt"
+      "save_failed": "Opslaan mislukt",
+      "boolean_on": "Aan",
+      "boolean_off": "Uit"
     },
     "settings_io": {
       "title": "Instellingen importeren/exporteren",

@@ -364,6 +364,19 @@ body.app-body .find-replace-modal {
   margin-bottom: 0.55rem;
 }
 
+.find-replace-modal #replaceFindInput,
+.find-replace-modal #replaceWithInput {
+  color: var(--text-main) !important;
+  background: var(--bg-panel-alt) !important;
+  caret-color: var(--text-main);
+}
+
+.find-replace-modal #replaceFindInput:focus,
+.find-replace-modal #replaceWithInput:focus {
+  outline: 2px solid rgba(220, 38, 38, 0.55);
+  outline-offset: 1px;
+}
+
 .auth-locked body.app-body {
   overflow: hidden;
 }
@@ -2223,6 +2236,21 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   gap: 0.75rem;
 }
 
+.article-meta-boolean-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.45rem 0.7rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--default-br);
+  background: color-mix(in srgb, var(--bg-panel-alt) 72%, transparent);
+}
+
+.article-meta-boolean-field {
+  min-width: 0;
+  margin: 0;
+}
+
 #articleMetaForm {
   display: flex;
   flex: 1 1 auto;
@@ -2240,6 +2268,8 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   align-items: center;
   gap: 0.45rem;
   min-height: 2.25rem;
+  width: 100%;
+  padding: 0.2rem 0.35rem;
 }
 
 .article-meta-field .input {

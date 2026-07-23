@@ -174,6 +174,31 @@
     };
     window.__mdwExtractMetaAndBody = extractMetaAndBody;
 
+    const metadataSourceHasKey = (raw, wantedKey) => {
+        const wanted = String(wantedKey || '').trim().toLowerCase();
+        if (!wanted) return false;
+        const lines = String(raw ?? '').replace(/\r\n?/g, '\n').split('\n');
+        let seenMetadata = false;
+        for (const line of lines) {
+            const trimmed = String(line || '').trim();
+            if (!trimmed) {
+                if (seenMetadata) break;
+                continue;
+            }
+            const parsed = parseMetaEntries(line);
+            if (parsed) {
+                if (parsed.some(({ key }) => key === wanted)) return true;
+                seenMetadata = true;
+                continue;
+            }
+            // Keep scanning metadata-looking lines after a partially edited
+            // entry, so deleting one key cannot remove later keys as well.
+            if (/^[{_]/u.test(trimmed)) continue;
+            break;
+        }
+        return false;
+    };
+
     const normalizeFileTitle = (filePath) => {
         let base = String(filePath || '').trim();
         if (!base) return '';
@@ -239,14 +264,31 @@
     };
 
     let metaStore = extractMetaAndBody(editor.value).meta;
-    let applyTimer = null;
+    let lastSourceMeta = { ...metaStore };
+    const explicitMetaDeletions = new Set();
     let isApplying = false;
+
+    const syncMetaStoreFromSource = () => {
+        const { meta } = extractMetaAndBody(editor.value);
+        Object.keys(lastSourceMeta).forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(meta, key)) {
+                explicitMetaDeletions.delete(key);
+                return;
+            }
+            if (!metadataSourceHasKey(editor.value, key)) {
+                explicitMetaDeletions.add(key);
+            }
+        });
+        Object.keys(meta).forEach((key) => explicitMetaDeletions.delete(key));
+        metaStore = { ...metaStore, ...meta };
+        lastSourceMeta = { ...meta };
+    };
 
     const applyMetaVisibility = () => {
         const baseCfg = getBaseCfg();
         const pubCfg = getPublisherCfg();
         const publisherMode = isPublisherMode();
-        const { meta, body } = extractMetaAndBody(editor.value);
+        const { meta } = extractMetaAndBody(editor.value);
         const filteredMeta = {};
         Object.entries(meta || {}).forEach(([k, v]) => {
             const key = String(k).toLowerCase();
@@ -264,7 +306,8 @@
         });
         includeKeys.forEach((k) => {
             if (!Object.prototype.hasOwnProperty.call(filteredMeta, k)
-                && Object.prototype.hasOwnProperty.call(metaStore, k)) {
+                && Object.prototype.hasOwnProperty.call(metaStore, k)
+                && !metadataSourceHasKey(editor.value, k)) {
                 delete metaStore[k];
             }
         });
@@ -287,6 +330,7 @@
                 isApplying = false;
             }
         }
+        lastSourceMeta = { ...extractMetaAndBody(editor.value).meta };
         updateAppTitleFromEditor();
     };
 
@@ -411,7 +455,7 @@
         };
         const articleMetaBooleanKeys = new Set([
             'cta', 'ctagratis', 'bigfooter', 'blurmenu', 'blog', 'sociallinks',
-            'suppressmodal', 'feedbackpopup', 'hide_vergoedingen_cta', 'show_vergoedingen_cta',
+            'suppressmodal', 'feedbackpopup', 'disclaim', 'hide_vergoedingen_cta', 'show_vergoedingen_cta',
         ]);
         const isArticleMetaBoolean = (key, cfg, value = '') => articleMetaBooleanKeys.has(String(key || '').toLowerCase())
             || /^(true|false)$/i.test(String(value ?? '').trim())
@@ -424,6 +468,7 @@
                 page_picture: 'Kop plaatje',
                 author: 'Auteur',
                 post_date: 'Datum',
+                disclaim: 'Disclaimer',
                 published_date: 'Publicatiedatum',
                 creationdate: 'Aanmaakdatum',
                 changedate: 'Wijzigingsdatum',
@@ -497,6 +542,7 @@
         };
         let articleMetaImages = null;
         let articleMetaImagesPromise = null;
+        let articleMetaBooleanGroup = null;
         const imageTokenForFile = (file, path) => {
             let name = String(file || '').trim();
             if (!name) {
@@ -677,6 +723,7 @@
 
             wrap.append(label);
             if (isBoolean) {
+                wrap.classList.add('article-meta-boolean-field');
                 const toggle = document.createElement('label');
                 toggle.className = 'article-meta-boolean-toggle';
                 const state = document.createElement('span');
@@ -696,12 +743,22 @@
             if (key === 'page_picture') {
                 attachPagePicturePicker(wrap, input);
             }
-            fieldsEl.appendChild(wrap);
+            if (isBoolean) {
+                if (!(articleMetaBooleanGroup instanceof HTMLElement)) {
+                    articleMetaBooleanGroup = document.createElement('div');
+                    articleMetaBooleanGroup.className = 'article-meta-boolean-fields';
+                    fieldsEl.appendChild(articleMetaBooleanGroup);
+                }
+                articleMetaBooleanGroup.appendChild(wrap);
+            } else {
+                fieldsEl.appendChild(wrap);
+            }
         };
         const openModal = () => {
             const fields = visibleFields();
             const { meta } = extractMetaAndBody(editor.value);
             fieldsEl.textContent = '';
+            articleMetaBooleanGroup = null;
             if (emptyEl instanceof HTMLElement) emptyEl.hidden = true;
             updateArticleMetaTitle();
 
@@ -740,8 +797,13 @@
                 const value = input.dataset.metaBoolean === '1'
                     ? (input.checked ? 'True' : 'False')
                     : String(input.value || '').trim();
-                if (value === '') delete nextMeta[key];
-                else nextMeta[key] = value;
+                if (value === '') {
+                    delete nextMeta[key];
+                    explicitMetaDeletions.add(key);
+                } else {
+                    nextMeta[key] = value;
+                    explicitMetaDeletions.delete(key);
+                }
             });
             metaStore = nextMeta;
             const includeKeys = visibleFields();
@@ -783,38 +845,37 @@
             if (Object.prototype.hasOwnProperty.call(metaStore, kk)) {
                 delete metaStore[kk];
             }
+            explicitMetaDeletions.add(kk);
         } else {
             metaStore[kk] = v;
+            explicitMetaDeletions.delete(kk);
         }
         applyMetaVisibility();
     };
     window.__mdwResetMetaStore = () => {
         metaStore = extractMetaAndBody(editor.value).meta;
+        lastSourceMeta = { ...metaStore };
+        explicitMetaDeletions.clear();
         applyMetaVisibility();
     };
+    window.__mdwGetExplicitMetaDeletions = () => Array.from(explicitMetaDeletions);
     applyMetaVisibility();
     setupPublishControlsPlacement();
     setupMarkdownSourceToggle();
     setupArticleMetaModal();
 
-    const scheduleApply = () => {
-        if (isApplying) return;
-        if (applyTimer) clearTimeout(applyTimer);
-        applyTimer = setTimeout(() => {
-            applyTimer = null;
-            applyMetaVisibility();
-        }, 120);
-    };
-
     editor.addEventListener('input', () => {
         if (isApplying) return;
-        scheduleApply();
+        if (!window.__mdwVisualPreviewInputActive && !window.__mdwMetaApplying) {
+            syncMetaStoreFromSource();
+        }
         updateAppTitleFromEditor();
     });
 
     form.addEventListener('submit', (event) => {
-        const { meta, body } = extractMetaAndBody(editor.value);
+        const { meta } = extractMetaAndBody(editor.value);
         const mergedMeta = { ...metaStore, ...meta };
+        explicitMetaDeletions.forEach((key) => delete mergedMeta[key]);
         const submitter = event.submitter;
         const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         let isPublish = (
@@ -847,11 +908,8 @@
                 return;
             }
         }
-        metaStore = mergedMeta;
-        const { order } = getKnownKeysAndOrder();
-        const block = buildMetaBlock(metaStore, order.slice());
-        const cleanedBody = String(body).replace(/^\n+/, '');
-        editor.value = block ? (block + '\n\n' + cleanedBody) : cleanedBody;
+        // Keep direct Markdown edits byte-stable until the user explicitly
+        // applies metadata from the Article Metadata modal.
     }, true);
 })();
 (function(){
@@ -1061,6 +1119,7 @@
         lastText: null,
     };
     let selectionOverlayActive = false;
+    let searchHighlightActive = false;
 
     const initEditorOverlay = () => {
         if (overlayState.overlay || !ta.parentNode) return;
@@ -1382,6 +1441,14 @@
         return rect;
     };
 
+    const scrollEditorPositionIntoView = (pos) => {
+        const rect = ta.getBoundingClientRect();
+        const caret = getCaretRect(pos);
+        const contentY = (caret.top - rect.top) + ta.scrollTop;
+        const target = Math.max(0, contentY - (ta.clientHeight * 0.35));
+        ta.scrollTop = Math.min(target, Math.max(0, ta.scrollHeight - ta.clientHeight));
+    };
+
     const positionLinkSuggest = () => {
         if (!linkSuggestState.open || !linkSuggestEl) return;
         const rect = getCaretRect(linkSuggestState.caret);
@@ -1650,7 +1717,7 @@
         overlayState.lastText = null;
     };
 
-    const renderSelectionOverlay = (text, selStart, selEnd) => {
+    const renderSelectionOverlay = (text, selStart, selEnd, className = 'editor-selection') => {
         if (!overlayState.content) return;
         syncOverlayMetrics();
         const start = Math.max(0, Math.min(selStart, text.length));
@@ -1658,7 +1725,8 @@
         const before = escapeHtml(text.slice(0, start));
         const middle = escapeHtml(text.slice(start, end)) || '&nbsp;';
         const after = escapeHtml(text.slice(end));
-        overlayState.content.innerHTML = before + `<span class="editor-selection">${middle}</span>` + after;
+        const safeClassName = /^[a-z0-9_-]+$/i.test(className) ? className : 'editor-selection';
+        overlayState.content.innerHTML = before + `<span class="${safeClassName}">${middle}</span>` + after;
         overlayState.lastKey = `sel:${start}:${end}`;
         overlayState.lastText = text;
         selectionOverlayActive = true;
@@ -1666,6 +1734,7 @@
     };
 
     const clearSelectionOverlay = () => {
+        searchHighlightActive = false;
         if (!selectionOverlayActive) return;
         selectionOverlayActive = false;
         clearOverlay();
@@ -2034,6 +2103,9 @@
         const fd = new FormData(editorForm);
         if (!fd.has('content')) fd.set('content', ta.value);
         if (!fd.has('action')) fd.set('action', 'save');
+        if (typeof window.__mdwGetExplicitMetaDeletions === 'function') {
+            fd.set('metadata_deleted_keys', JSON.stringify(window.__mdwGetExplicitMetaDeletions()));
+        }
         const fileVal = String(fd.get('file') || '').trim();
         if (!fileVal) {
             const fromState = String(window.CURRENT_FILE || '').trim();
@@ -2766,10 +2838,12 @@
         if (ta.value === next) return;
         cancelScheduledPreview();
         visualPreviewInputActive = true;
+        window.__mdwVisualPreviewInputActive = true;
         try {
             ta.value = next;
             ta.dispatchEvent(new Event('input', { bubbles: true }));
         } finally {
+            window.__mdwVisualPreviewInputActive = false;
             visualPreviewInputActive = false;
         }
     };
@@ -3106,6 +3180,7 @@
     enableVisualPreviewEditing();
 
     ta.addEventListener('input', function(){
+        if (searchHighlightActive) clearSelectionOverlay();
         updateLineNumbers();
         recomputeDirty();
         if (!visualPreviewInputActive && !window.__mdwMetaApplying) schedulePreview();
@@ -3734,6 +3809,10 @@
 
         const syncFromEditor = () => {
             const map = getOffsetMap();
+            if (searchHighlightActive) {
+                syncOverlayScroll();
+                return;
+            }
             const source = map.preview;
             clearSelectionOverlay();
             const start = ta.selectionStart ?? 0;
@@ -3852,6 +3931,35 @@
 
     window.__mdwResetSelectionSync = selectionSync.reset;
     window.__mdwSyncPreviewSelectionToTextarea = selectionSync.syncFromPreview;
+
+    window.__mdwHighlightEditorSearchRange = (start, end) => {
+        const value = ta.value || '';
+        const safeStart = Math.max(0, Math.min(Number(start) || 0, value.length));
+        const safeEnd = Math.max(safeStart, Math.min(Number(end) || safeStart, value.length));
+        ta.focus({ preventScroll: false });
+        ta.setSelectionRange(safeStart, safeEnd);
+
+        // Keep the active match near the middle of the source pane. The
+        // mirror uses the actual font and wrapping rules of the textarea.
+        scrollEditorPositionIntoView(safeStart);
+        syncOverlayMetrics();
+        searchHighlightActive = true;
+        renderSelectionOverlay(value, safeStart, safeEnd, 'editor-search-selection');
+        syncOverlayScroll();
+        const keepVisible = () => {
+            if (ta.selectionStart !== safeStart) return;
+            scrollEditorPositionIntoView(safeStart);
+            syncOverlayScroll();
+        };
+        requestAnimationFrame(keepVisible);
+        setTimeout(keepVisible, 40);
+        return true;
+    };
+
+    window.__mdwClearEditorSearchHighlight = () => {
+        if (!selectionOverlayActive) return;
+        clearSelectionOverlay();
+    };
 
     // Recompute wraps when panes are resized (affects visual line wrapping).
     let resizeTicking = false;

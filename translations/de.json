@@ -136,9 +136,7 @@
       "hint": "Wählen Sie, welche Quellen in der Format-Symbolleiste erscheinen.",
       "saving": "Speichern…",
       "saved": "Gespeichert",
-      "save_failed": "Speichern fehlgeschlagen",
-      "boolean_on": "Ein",
-      "boolean_off": "Aus"
+      "save_failed": "Speichern fehlgeschlagen"
     },
     "critical_sections": {
       "label": "Kritische benutzerdefinierte Abschnitte",
@@ -310,7 +308,9 @@
       "save": "Metadaten-Einstellungen speichern",
       "saving": "Speichern…",
       "saved": "Gespeichert",
-      "save_failed": "Speichern fehlgeschlagen"
+      "save_failed": "Speichern fehlgeschlagen",
+      "boolean_on": "Ein",
+      "boolean_off": "Aus"
     },
     "settings_io": {
       "title": "Einstellungen importieren/exportieren",

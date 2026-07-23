@@ -136,9 +136,7 @@
       "hint": "Choisissez les sources affichées dans la barre du format personnalisé.",
       "saving": "Enregistrement…",
       "saved": "Enregistré",
-      "save_failed": "Échec de l'enregistrement",
-      "boolean_on": "Activé",
-      "boolean_off": "Désactivé"
+      "save_failed": "Échec de l'enregistrement"
     },
     "critical_sections": {
       "label": "Sections personnalisées critiques",
@@ -310,7 +308,9 @@
       "save": "Enregistrer les paramètres de métadonnées",
       "saving": "Enregistrement…",
       "saved": "Enregistré",
-      "save_failed": "Échec de l'enregistrement"
+      "save_failed": "Échec de l'enregistrement",
+      "boolean_on": "Activé",
+      "boolean_off": "Désactivé"
     },
     "settings_io": {
       "title": "Import/export des paramètres",

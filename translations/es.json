@@ -136,9 +136,7 @@
       "hint": "Elige qué fuentes aparecen en la barra del formato personalizado.",
       "saving": "Guardando…",
       "saved": "Guardado",
-      "save_failed": "Error al guardar",
-      "boolean_on": "Activado",
-      "boolean_off": "Desactivado"
+      "save_failed": "Error al guardar"
     },
     "critical_sections": {
       "label": "Secciones personalizadas críticas",
@@ -318,7 +316,9 @@
       "save": "Guardar configuración de metadatos",
       "saving": "Guardando…",
       "saved": "Guardado",
-      "save_failed": "Error al guardar"
+      "save_failed": "Error al guardar",
+      "boolean_on": "Activado",
+      "boolean_off": "Desactivado"
     },
     "settings_io": {
       "title": "Importar/exportar configuración",

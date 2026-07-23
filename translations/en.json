@@ -143,9 +143,7 @@
       "hint": "Choose which sources appear in the custom format toolbar.",
       "saving": "Saving…",
       "saved": "Saved",
-      "save_failed": "Save failed",
-      "boolean_on": "On",
-      "boolean_off": "Off"
+      "save_failed": "Save failed"
     },
     "critical_sections": {
       "label": "Critical custom sections",
@@ -330,7 +328,9 @@
       "save": "Save metadata settings",
       "saving": "Saving…",
       "saved": "Saved",
-      "save_failed": "Save failed"
+      "save_failed": "Save failed",
+      "boolean_on": "On",
+      "boolean_off": "Off"
     },
     "settings_io": {
       "title": "Settings import/export",

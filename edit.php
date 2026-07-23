@@ -912,6 +912,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $content = str_replace(["\r\n", "\r"], "\n", $content);
                 $submittedMeta = [];
                 $submittedBody = mdw_hidden_meta_extract_and_remove_all($content, $submittedMeta);
+                $metadataDeletedKeys = [];
+                $metadataDeletedRaw = isset($_POST['metadata_deleted_keys']) ? (string)$_POST['metadata_deleted_keys'] : '';
+                if ($metadataDeletedRaw !== '') {
+                    $decodedDeleted = json_decode($metadataDeletedRaw, true);
+                    if (is_array($decodedDeleted)) {
+                        foreach ($decodedDeleted as $deletedKey) {
+                            $normalizedDeletedKey = strtolower(trim((string)$deletedKey));
+                            if ($normalizedDeletedKey !== '') {
+                                $metadataDeletedKeys[$normalizedDeletedKey] = true;
+                            }
+                        }
+                    }
+                }
                 $publishAction = isset($_POST['publish_action']) ? trim((string)$_POST['publish_action']) : '';
                 $publishStateInput = isset($_POST['publish_state']) ? trim((string)$_POST['publish_state']) : '';
                 $publishStateOverride = isset($_POST['publish_state_override']) ? trim((string)$_POST['publish_state_override']) : '';
@@ -927,7 +940,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // an explicitly submitted empty key may still be cleared.
                 $effectiveMeta = $submittedMeta;
                 foreach ($existingMeta as $key => $value) {
-                    if (!array_key_exists($key, $effectiveMeta)) {
+                    $normalizedKey = strtolower((string)$key);
+                    if (!array_key_exists($key, $effectiveMeta) && !isset($metadataDeletedKeys[$normalizedKey])) {
                         $effectiveMeta[$key] = (string)$value;
                     }
                 }
@@ -1020,7 +1034,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                     $metaOverrides = [];
                     foreach ($existingMeta as $key => $value) {
-                        if (!array_key_exists($key, $submittedMeta) && trim((string)$value) !== '') {
+                        $normalizedKey = strtolower((string)$key);
+                        if (!array_key_exists($key, $submittedMeta)
+                            && !isset($metadataDeletedKeys[$normalizedKey])
+                            && trim((string)$value) !== '') {
                             $metaOverrides[strtolower((string)$key)] = (string)$value;
                         }
                     }
