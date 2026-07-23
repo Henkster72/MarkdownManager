@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll GitHub-owned site sources for vBook renderers
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+Unit=github-source-deploy.service
+
+[Install]
+WantedBy=timers.target

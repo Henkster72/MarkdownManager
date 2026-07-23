@@ -1,0 +1,10 @@
+[Unit]
+Description=Publish reviewed WPM Markdown for %i
+ConditionPathExists=/srv/vbook_web/%i/edit/.env
+
+[Service]
+Type=oneshot
+User=henk
+Group=henk
+Environment=HOME=/home/henk
+ExecStart=/usr/bin/flock -w 300 /home/henk/.cache/markdownmanager/render.lock /usr/bin/python3 /srv/vbook_web/bin/wpm_publish.py --instance-env /srv/vbook_web/%i/edit/.env
