@@ -306,7 +306,7 @@ def render_site(site_dir: Path) -> None:
         "import main; from jinja_env.site_builder import run_site_build; "
         "(main._write_faq_template(main._load_faq_data()) "
         "if hasattr(main, '_write_faq_template') and hasattr(main, '_load_faq_data') else None); "
-        "run_site_build(site, main.load_site_config(), prod_mode=True, full_render=False, purge=False, upload=False)"
+        "run_site_build(site, main.load_site_config(), prod_mode=True, full_render=False, purge=True, upload=False)"
     )
     run([sys.executable, "-c", driver, str(site_dir)], cwd=site_dir)
 
@@ -342,6 +342,16 @@ def upload_outputs(site_env: dict[str, str], site_dir: Path, rel: str) -> None:
         run(command)
     finally:
         Path(files_from).unlink(missing_ok=True)
+
+
+def upload_static_assets(site_dir: Path) -> None:
+    upload_tool = site_dir.parent / "jinja_env" / "upload_output.py"
+    env_file = site_dir / ".env"
+    if not upload_tool.is_file():
+        raise RuntimeError(f"shared upload tool not found: {upload_tool}")
+    if not env_file.is_file():
+        raise RuntimeError(f"site upload environment not found: {env_file}")
+    run([sys.executable, str(upload_tool), str(env_file), "--static-only"], cwd=site_dir)
 
 
 def set_published(path: Path) -> None:
@@ -409,9 +419,16 @@ def main() -> int:
         export_template(editor_url, rel, source, template)
         render_site(site_dir)
         upload_outputs(site_env, site_dir, rel)
-        set_published(source)
-        push_markdown(editor_env, source, rel)
         processed.append(rel)
+
+    if processed:
+        # Purge-generated CSS is shared by all pages. Upload it once after all
+        # page renders; the upload helper also runs the configured cache purge.
+        upload_static_assets(site_dir)
+        for rel in processed:
+            source = active_files[rel]
+            set_published(source)
+            push_markdown(editor_env, source, rel)
 
     next_state = {rel: digest(path) for rel, path in active_files.items()}
     state_path.write_text(json.dumps({

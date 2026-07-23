@@ -2809,6 +2809,13 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $jinjaImports = [];
     $jinjaDirectives = [];
     $renderMarkdown = mdw_export_protect_jinja_directives($bodyMarkdown, $jinjaImports, $jinjaDirectives);
+    // A Markdown page may use a known macro without repeating its import. Keep
+    // the generated Jinja template executable instead of relying on a manually
+    // maintained page template to provide that context.
+    if (preg_match('/\{\{\s*overview\.add_header\s*\(/', $bodyMarkdown) === 1) {
+        $overviewImport = '{% import "macros/macro_overviewheader.html" as overview with context %}';
+        if (!in_array($overviewImport, $jinjaImports, true)) $jinjaImports[] = $overviewImport;
+    }
     $effectiveMeta = $meta;
     $activePageValue = trim((string)($effectiveMeta['active_page'] ?? ''));
     if ($activePageValue === '') {

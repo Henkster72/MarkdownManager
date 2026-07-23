@@ -90,4 +90,14 @@ if (str_contains($template, 'class="preview-content"')) {
     exit(1);
 }
 
+$implicitImportTemplate = mdw_export_markdown_jinja_template(implode("\n", [
+    '{page_title: Implicit macro import}',
+    '',
+    '{{ overview.add_header(header_title=page_title, depth=depth) }}',
+]), ['md_path' => 'implicit.md']);
+if (!str_contains($implicitImportTemplate, '{% import "macros/macro_overviewheader.html" as overview with context %}')) {
+    fwrite(STDERR, "Overview macro exports must add a missing import\n");
+    exit(1);
+}
+
 echo "WPM preview macro regression checks passed\n";
