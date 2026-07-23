@@ -472,6 +472,19 @@ function mdw_preview_render_section_template($html, $vars) {
 function mdw_preview_render_inline_template_vars($text, $vars) {
     $text = str_replace(["\r\n", "\r"], "\n", (string)$text);
     $protected = [];
+    // Resolve inline HTML asset attributes before the generic Jinja
+    // replacement, so src values use the configured asset folders.
+    $text = preg_replace_callback(
+        '/\b(src|href)\s*=\s*("|\')\s*\{\{\s*([^{}]+?)\s*\}\}\s*\2/i',
+        function($m) use ($vars) {
+            $attr = strtolower((string)$m[1]);
+            $quote = (string)$m[2];
+            $value = mdw_preview_resolve_jinja_value((string)$m[3], $vars, $attr);
+            if ($value === '') $value = $attr === 'href' ? '#' : '';
+            return $attr . '=' . $quote . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . $quote;
+        },
+        $text
+    );
     $text = preg_replace_callback(
         '/(\[[^\]\n]*\]\([^\)\n]*?)\{\{\s*([^{}]+?)\s*\}\}([^\)\n]*\))/',
         function($m) use ($vars, &$protected) {
