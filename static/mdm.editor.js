@@ -2850,7 +2850,16 @@
         const raw = String(src || '').trim();
         const imageBase = String(window.MDW_IMAGES_URL || 'images').replace(/\\/g, '/').replace(/\/$/, '');
         const token = raw.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
-        if (token) return `${imageBase}/${encodeURIComponent(token[1].trim())}`;
+        if (token) {
+            const encodedPath = token[1].trim().split('/').map((segment) => {
+                try {
+                    return encodeURIComponent(decodeURIComponent(segment));
+                } catch (_error) {
+                    return encodeURIComponent(segment);
+                }
+            }).join('/');
+            return `${imageBase}/${encodedPath}`;
+        }
         return raw;
     };
     let selectedVisualImage = null;

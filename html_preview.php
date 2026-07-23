@@ -3,7 +3,8 @@
 function url_encode_path($path) {
     $path = str_replace("\\", "/", (string)$path);
     $segments = explode('/', $path);
-    $segments = array_map('rawurlencode', $segments);
+    // Preserve one layer of encoding for UTF-8 filenames in Markdown tokens.
+    $segments = array_map(static fn($segment) => rawurlencode(rawurldecode($segment)), $segments);
     return implode('/', $segments);
 }
 
@@ -58,12 +59,18 @@ function mdw_asset_sanitize_path($raw, $fallback) {
     }
     $leadingSlash = str_starts_with($raw, '/');
     $parts = array_values(array_filter(explode('/', trim($raw, '/')), fn($part) => $part !== '' && $part !== '.'));
+    $safe = [];
     foreach ($parts as $part) {
-        if ($part === '..') continue;
+        if ($part === '..') {
+            if (!$safe || end($safe) === '..') $safe[] = '..';
+            else array_pop($safe);
+            continue;
+        }
         if (!preg_match('/^[A-Za-z0-9._\\-\\p{L}\\p{N}]+$/u', $part)) return (string)$fallback;
+        $safe[] = $part;
     }
-    if (!$parts) return (string)$fallback;
-    return ($leadingSlash ? '/' : '') . implode('/', $parts);
+    if (!$safe || ($leadingSlash && in_array('..', $safe, true))) return (string)$fallback;
+    return ($leadingSlash ? '/' : '') . implode('/', $safe);
 }
 
 function mdw_asset_relative_path($settingKey, $envKey, $fallback) {
@@ -193,7 +200,10 @@ function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     if (preg_match('/^(?:"([^"]*)"|\'([^\']*)\')$/', $expr, $m)) {
         return isset($m[1]) && $m[1] !== '' ? (string)$m[1] : (string)($m[2] ?? '');
     }
-    if (!preg_match('/^[A-Za-z0-9_.\/-]+$/', $expr)) return '';
+    // Unknown image expressions are literal asset names, including encoded
+    // UTF-8 filenames such as `%C3%AF`.
+    if (!preg_match('/^[A-Za-z0-9._~!$&\'()*+,;=@:%\/\-\p{L}\p{N}]+$/u', $expr)) return '';
+    if (preg_match('/%(?![0-9A-Fa-f]{2})/', $expr)) return '';
     if (preg_match('/\.html(?:[#?].*)?$/i', $expr)) return './' . ltrim($expr, './');
 
     $value = $expr;
