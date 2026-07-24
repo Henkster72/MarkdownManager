@@ -56,6 +56,17 @@ if (!str_contains($html, 'data-mdw-macro="special.bigheader"') || !str_contains(
     exit(1);
 }
 
+$blogDateHtml = md_to_html(implode("\n", [
+    '{blog: True}',
+    '{post_date: 2023-10-28}',
+    '',
+    'Blog content',
+]), 'blog/test.md');
+if (!str_contains($blogDateHtml, '<span class="datum">Oct 28, 2023</span>') || str_contains($blogDateHtml, 'text-sm link text-right')) {
+    fwrite(STDERR, "Blog post dates must use the site-compatible datum span\n");
+    exit(1);
+}
+
 $feedbackHtml = md_to_html(implode("\n", [
     '{feedbackpopup: True}',
     '',

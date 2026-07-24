@@ -3538,7 +3538,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                 if ($title !== '') $html[] = '<h1 class="blogheader">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>';
                 if ($subtitle !== '') $html[] = '<h3>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h3>';
                 if ($postDate !== '') {
-                    $html[] = '<em class="text-sm link text-right">' . htmlspecialchars(mdw_format_post_date_value($postDate, $settings['post_date_format'] ?? 'mdy_short'), ENT_QUOTES, 'UTF-8') . '</em>';
+                    $html[] = '<span class="datum">' . htmlspecialchars(mdw_format_post_date_value($postDate, $settings['post_date_format'] ?? 'mdy_short'), ENT_QUOTES, 'UTF-8') . '</span>';
                 }
                 $html[] = '</header>';
             }
