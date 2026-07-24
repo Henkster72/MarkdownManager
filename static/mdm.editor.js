@@ -2659,11 +2659,12 @@
         if (pixels >= 18) return 3;
         return 4;
     };
-    const inlineMarkdown = (node) => {
+    const inlineMarkdown = (node, context = {}) => {
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
-        const text = Array.from(node.childNodes).map(inlineMarkdown).join('');
+        const childContext = tag === 'a' ? { ...context, inLink: true } : context;
+        const text = Array.from(node.childNodes).map((child) => inlineMarkdown(child, childContext)).join('');
         if (tag === 'br') return '<br>';
         const style = node.style;
         const fontWeight = String(style?.fontWeight || '').trim().toLowerCase();
@@ -2679,7 +2680,7 @@
         const hasStrikeAncestor = !!node.parentElement?.closest('s,strike,del');
         const isBold = !isSemanticBold && !hasBoldAncestor && /^(bold|bolder|[6-9]00)$/.test(fontWeight);
         const isItalic = !isSemanticItalic && !hasItalicAncestor && /^(italic|oblique)$/.test(fontStyle);
-        const isUnderline = !isSemanticUnderline && !hasUnderlineAncestor && textDecoration.includes('underline');
+        const isUnderline = !context.inLink && !isSemanticUnderline && !hasUnderlineAncestor && textDecoration.includes('underline');
         const isStrike = !isSemanticStrike && !hasStrikeAncestor && textDecoration.includes('line-through');
         let formatted = text;
         if (isBold) formatted = wrapInlineMarkdown(formatted, '**');
@@ -2688,7 +2689,7 @@
         if (isStrike) formatted = wrapInlineMarkdown(formatted, '~~');
         if (tag === 'strong' || tag === 'b') return wrapInlineMarkdown(formatted, '**');
         if (tag === 'em' || tag === 'i') return wrapInlineMarkdown(formatted, '*');
-        if (tag === 'u') return wrapInlineMarkdown(formatted, '<u>', '</u>');
+        if (tag === 'u') return context.inLink ? text : wrapInlineMarkdown(formatted, '<u>', '</u>');
         if (tag === 's' || tag === 'strike' || tag === 'del') return wrapInlineMarkdown(formatted, '~~');
         if (tag === 'code') return text.trim() ? '`' + text.trim().replace(/`/g, '\\`') + '`' : '';
         if (tag === 'a') {
