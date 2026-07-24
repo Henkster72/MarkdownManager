@@ -7,6 +7,7 @@
     "cancel": "Annuleren",
     "edit": "Bewerken",
     "delete": "Verwijderen",
+    "rename": "Hernoemen",
     "saved": "Opgeslagen",
     "secret": "geheim",
     "folder": "Map",
@@ -45,7 +46,8 @@
       "slug_locked": "Alleen een superuser kan de slug veranderen na initiele aanmaak.",
       "date_prefix_title": "Voegt een yy-mm-dd- prefix toe aan de bestandsnaam.",
       "filename_placeholder": "mijn-titel",
-      "content_placeholder": "# Titel\n\nBegin met schrijven..."
+      "content_placeholder": "# Titel\n\nBegin met schrijven...",
+      "toggle_title": "Nieuwe Markdown aanmaken"
     },
     "new_folder_title": "Nieuwe map maken"
   },

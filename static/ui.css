@@ -1213,7 +1213,8 @@ body.app-body .app-header-actions,
   gap: 0;
 }
 body.app-body .app-header-actions .btn,
-.nav-file-actions .btn {
+.nav-file-actions .btn,
+.nav-toolbar-row .nav-toolbar-actions .btn {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1222,7 +1223,9 @@ body.app-body .app-header-actions .btn,
 body.app-body .app-header-actions .btn:hover,
 body.app-body .app-header-actions .btn:focus-visible,
 .nav-file-actions .btn:hover,
-.nav-file-actions .btn:focus-visible {
+.nav-file-actions .btn:focus-visible,
+.nav-toolbar-row .nav-toolbar-actions .btn:hover,
+.nav-toolbar-row .nav-toolbar-actions .btn:focus-visible {
   background: transparent;
 }
 body.app-body .app-header-actions > .btn,
@@ -1240,6 +1243,11 @@ body.app-body .app-header-actions > form > .btn,
 }
 .nav-toolbar-row .nav-toolbar-actions .btn-label {
   display: none;
+}
+
+.nav-file-actions .pi,
+.nav-toolbar-row .nav-toolbar-actions .pi {
+  font-size: 1.05rem;
 }
 
 .pane-header-actions .publish-state-select.input,

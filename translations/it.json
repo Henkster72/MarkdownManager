@@ -7,6 +7,7 @@
     "cancel": "Annulla",
     "edit": "Modifica",
     "delete": "Elimina",
+    "rename": "Rinomina",
     "saved": "Salvato",
     "secret": "segreto",
     "folder": "Cartella",
@@ -45,7 +46,8 @@
       "slug_locked": "Solo un superutente può modificare lo slug.",
       "date_prefix_title": "Aggiunge un prefisso yy-mm-dd- al nome file.",
       "filename_placeholder": "mio-titolo",
-      "content_placeholder": "# Titolo\n\nInizia a scrivere..."
+      "content_placeholder": "# Titolo\n\nInizia a scrivere...",
+      "toggle_title": "Crea un nuovo file Markdown"
     },
     "new_folder_title": "Crea una nuova cartella"
   },

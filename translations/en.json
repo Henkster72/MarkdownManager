@@ -7,6 +7,7 @@
     "cancel": "Cancel",
     "edit": "Edit",
     "delete": "Delete",
+    "rename": "Rename",
     "saved": "Saved",
     "secret": "secret",
     "folder": "Folder",
@@ -45,7 +46,8 @@
       "slug_locked": "Only a superuser can edit the slug.",
       "date_prefix_title": "Adds a yy-mm-dd- prefix to the filename.",
       "filename_placeholder": "my-title",
-      "content_placeholder": "# Title\n\nStart writing..."
+      "content_placeholder": "# Title\n\nStart writing...",
+      "toggle_title": "Create a new Markdown file"
     },
     "new_folder_title": "Create a new folder"
   },

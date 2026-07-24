@@ -845,9 +845,9 @@ function explorer_view_render_tree($opts) {
 
             <?php if ($page === 'index' || $page === 'edit'): ?>
             <div class="nav-file-actions nav-file-actions-right nav-toolbar-actions">
-                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small">+<span class="pi pi-documentlabel"></span></button>
+                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>">+<span class="pi pi-documentlabel"></span></button>
                 <?php if ($csrf_token): ?>
-                <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
+                <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
                     <span class="pi pi-folder"></span>
                     <span>+</span>
                 </button>
@@ -863,14 +863,14 @@ function explorer_view_render_tree($opts) {
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="file" id="explorerDeleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
                     <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                    <button type="submit" class="btn btn-ghost btn-small" <?= $has_current_file ? '' : 'disabled' ?>>
+                <button type="submit" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" <?= $has_current_file ? '' : 'disabled' ?>>
                         <span class="pi pi-bin"></span>
                         <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?></span>
                     </button>
                 </form>
                 <?php endif; ?>
                 <?php else: ?>
-                <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" data-auth-superuser="1" <?= $has_current_file ? '' : 'disabled' ?>>
+                <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>" data-auth-superuser="1" <?= $has_current_file ? '' : 'disabled' ?>>
                     <span class="pi pi-edit"></span>
                     <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.rename','Rename'))?></span>
                 </button>
@@ -879,7 +879,7 @@ function explorer_view_render_tree($opts) {
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="file" id="deleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
                     <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                    <button type="submit" class="btn btn-ghost btn-small" <?= $has_current_file ? '' : 'disabled' ?>>
+                    <button type="submit" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" <?= $has_current_file ? '' : 'disabled' ?>>
                         <span class="pi pi-bin"></span>
                         <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.delete','Delete'))?></span>
                     </button>

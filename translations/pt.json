@@ -7,6 +7,7 @@
     "cancel": "Cancelar",
     "edit": "Editar",
     "delete": "Eliminar",
+    "rename": "Mudar o nome",
     "saved": "Guardado",
     "secret": "secreto",
     "folder": "Pasta",
@@ -45,7 +46,8 @@
       "slug_locked": "Apenas um superutilizador pode editar o slug.",
       "date_prefix_title": "Adiciona um prefixo yy-mm-dd- ao nome do ficheiro.",
       "filename_placeholder": "meu-titulo",
-      "content_placeholder": "# Título\n\nComece a escrever..."
+      "content_placeholder": "# Título\n\nComece a escrever...",
+      "toggle_title": "Criar um novo ficheiro Markdown"
     },
     "new_folder_title": "Criar uma nova pasta"
   },

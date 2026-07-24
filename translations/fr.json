@@ -7,6 +7,7 @@
     "cancel": "Annuler",
     "edit": "Modifier",
     "delete": "Supprimer",
+    "rename": "Renommer",
     "saved": "Enregistré",
     "secret": "secret",
     "folder": "Dossier",
@@ -45,7 +46,8 @@
       "slug_locked": "Seul un superutilisateur peut modifier le slug.",
       "date_prefix_title": "Ajoute un préfixe yy-mm-dd- au nom de fichier.",
       "filename_placeholder": "mon-titre",
-      "content_placeholder": "# Titre\n\nCommencez à écrire..."
+      "content_placeholder": "# Titre\n\nCommencez à écrire...",
+      "toggle_title": "Créer un nouveau fichier Markdown"
     },
     "new_folder_title": "Créer un nouveau dossier"
   },
