@@ -1250,6 +1250,10 @@ body.app-body .app-header-actions > form > .btn,
   font-size: 1.05rem;
 }
 
+body.mdw-auth-user #newFolderBtn {
+  display: none !important;
+}
+
 .pane-header-actions .publish-state-select.input,
 .editor-toolbar-left .publish-state-select.input {
   flex: 0 0 auto;
