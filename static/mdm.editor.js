@@ -2619,26 +2619,54 @@
         if (!m) return String(line || '');
         return `${m[1]}${m[2]}${cleanHeadingText(m[3])}`;
     };
+    const wrapInlineMarkdown = (value, open, close = open) => {
+        const text = String(value || '');
+        const match = text.match(/^(\s*)([\s\S]*?)(\s*)$/);
+        if (!match || !match[2]) return text;
+        return `${match[1]}${open}${match[2]}${close}${match[3]}`;
+    };
     const inlineMarkdown = (node) => {
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
         const text = Array.from(node.childNodes).map(inlineMarkdown).join('');
         if (tag === 'br') return '<br>';
-        if (tag === 'strong' || tag === 'b') return text.trim() ? `**${text.trim()}**` : '';
-        if (tag === 'em' || tag === 'i') return text.trim() ? `*${text.trim()}*` : '';
-        if (tag === 'u') return text.trim() ? `<u>${text.trim()}</u>` : '';
+        const style = node.style;
+        const fontWeight = String(style?.fontWeight || '').trim().toLowerCase();
+        const fontStyle = String(style?.fontStyle || '').trim().toLowerCase();
+        const textDecoration = String(style?.textDecoration || style?.textDecorationLine || '').trim().toLowerCase();
+        const isSemanticBold = tag === 'strong' || tag === 'b';
+        const isSemanticItalic = tag === 'em' || tag === 'i';
+        const isSemanticUnderline = tag === 'u';
+        const isSemanticStrike = ['s', 'strike', 'del'].includes(tag);
+        const hasBoldAncestor = !!node.parentElement?.closest('strong,b');
+        const hasItalicAncestor = !!node.parentElement?.closest('em,i');
+        const hasUnderlineAncestor = !!node.parentElement?.closest('u');
+        const hasStrikeAncestor = !!node.parentElement?.closest('s,strike,del');
+        const isBold = !isSemanticBold && !hasBoldAncestor && /^(bold|bolder|[6-9]00)$/.test(fontWeight);
+        const isItalic = !isSemanticItalic && !hasItalicAncestor && /^(italic|oblique)$/.test(fontStyle);
+        const isUnderline = !isSemanticUnderline && !hasUnderlineAncestor && textDecoration.includes('underline');
+        const isStrike = !isSemanticStrike && !hasStrikeAncestor && textDecoration.includes('line-through');
+        let formatted = text;
+        if (isBold) formatted = wrapInlineMarkdown(formatted, '**');
+        if (isItalic) formatted = wrapInlineMarkdown(formatted, '*');
+        if (isUnderline) formatted = wrapInlineMarkdown(formatted, '<u>', '</u>');
+        if (isStrike) formatted = wrapInlineMarkdown(formatted, '~~');
+        if (tag === 'strong' || tag === 'b') return wrapInlineMarkdown(formatted, '**');
+        if (tag === 'em' || tag === 'i') return wrapInlineMarkdown(formatted, '*');
+        if (tag === 'u') return wrapInlineMarkdown(formatted, '<u>', '</u>');
+        if (tag === 's' || tag === 'strike' || tag === 'del') return wrapInlineMarkdown(formatted, '~~');
         if (tag === 'code') return text.trim() ? '`' + text.trim().replace(/`/g, '\\`') + '`' : '';
         if (tag === 'a') {
             const href = node.getAttribute('href') || '';
-            return href ? `[${text.trim() || href}](${href})` : text;
+            return href ? `[${formatted.trim() || href}](${href})` : formatted;
         }
         if (tag === 'img') {
             const src = node.getAttribute('data-mdw-markdown-src') || node.getAttribute('src') || '';
             const alt = node.getAttribute('alt') || '';
             return src ? `![${alt}](${src})` : '';
         }
-        return text;
+        return formatted;
     };
     const blockMarkdown = (node, depth = 0, orderedIndex = 1) => {
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
@@ -2706,6 +2734,18 @@
                 return className && content
                     ? `::: {class="${className}"}\n${content}\n:::`
                     : content;
+            }
+            const blockTags = new Set(['address', 'article', 'blockquote', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'ol', 'p', 'pre', 'section', 'table', 'ul']);
+            const hasNestedBlocks = Array.from(node.children).some((child) => blockTags.has(child.tagName.toLowerCase()));
+            if (hasNestedBlocks) {
+                const content = Array.from(node.childNodes)
+                    .map((child) => child instanceof Element && blockTags.has(child.tagName.toLowerCase())
+                        ? blockMarkdown(child, depth)
+                        : inlineMarkdown(child))
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean)
+                    .join('\n\n');
+                return content;
             }
         }
         if (tag === 'p') {
