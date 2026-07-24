@@ -581,11 +581,21 @@ body.app-body .find-replace-modal {
 .link-pick-item {
   width: 100%;
   text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .link-pick-item.is-selected {
-  border-color: var(--border-strong);
   background: var(--active-bg);
+}
+
+.link-pick-item:hover,
+.link-pick-item:focus-visible {
+  border: 0;
+  background: var(--hover-bg);
+  box-shadow: none;
 }
 
 .mdw-link-suggest {
