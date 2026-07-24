@@ -2625,6 +2625,40 @@
         if (!match || !match[2]) return text;
         return `${match[1]}${open}${match[2]}${close}${match[3]}`;
     };
+    const parseHeadingLevel = (value) => {
+        const level = Number.parseInt(String(value || '').trim(), 10);
+        return level >= 1 && level <= 6 ? level : 0;
+    };
+    const headingLevelFor = (node) => {
+        if (!(node instanceof Element)) return 0;
+        const tag = node.tagName.toLowerCase();
+        if (/^h[1-6]$/.test(tag)) return parseHeadingLevel(tag.slice(1));
+        const explicit = parseHeadingLevel(
+            node.getAttribute('data-heading-level')
+            || node.getAttribute('aria-level')
+            || (node.getAttribute('role') === 'heading' ? node.getAttribute('level') : '')
+        );
+        if (explicit) return explicit;
+        const styleText = String(node.getAttribute('style') || '');
+        const named = styleText.match(/(?:mso-)?style-name\s*:\s*["']?heading\s*([1-6])/i);
+        if (named) return parseHeadingLevel(named[1]);
+
+        const styleSources = [node, ...Array.from(node.querySelectorAll(':scope > span, :scope > font')).slice(0, 1)];
+        const styleValue = (property) => styleSources
+            .map((source) => String(source.style?.[property] || '').trim())
+            .find(Boolean) || '';
+        const weight = styleValue('fontWeight').toLowerCase();
+        if (!/^(bold|bolder|[6-9]00)$/.test(weight)) return 0;
+        const size = styleValue('fontSize').toLowerCase().match(/^([\d.]+)\s*(px|pt|rem)?$/);
+        if (!size) return 0;
+        const rawSize = Number.parseFloat(size[1]);
+        const pixels = size[2] === 'pt' ? rawSize * 1.333 : size[2] === 'rem' ? rawSize * 16 : rawSize;
+        if (!Number.isFinite(pixels) || pixels < 16) return 0;
+        if (pixels >= 26) return 1;
+        if (pixels >= 21) return 2;
+        if (pixels >= 18) return 3;
+        return 4;
+    };
     const inlineMarkdown = (node) => {
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
@@ -2715,8 +2749,9 @@
             const align = alignClassFor(el);
             return align ? `${markdown}\n{: class="${align}" }` : markdown;
         };
-        if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'h5' || tag === 'h6') {
-            const level = Math.max(1, Math.min(6, Number(tag.slice(1)) || 1));
+        const headingLevel = headingLevelFor(node);
+        if (headingLevel) {
+            const level = Math.max(1, Math.min(6, headingLevel));
             return `${'#'.repeat(level)} ${escapeMd(inlineMarkdown(node))}`;
         }
         if (tag === 'div' || tag === 'section' || tag === 'article') {
