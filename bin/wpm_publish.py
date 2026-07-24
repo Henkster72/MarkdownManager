@@ -93,7 +93,7 @@ def run(command: list[str], *, cwd: Path | None = None, capture: bool = False) -
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=capture)
     if result.returncode:
         detail = (result.stderr or result.stdout or "command failed").strip()
-        label = command[2] if len(command) > 2 and command[0] == "sshpass" else command[0]
+        label = next((part for part in command if part in {"ssh", "rsync", "scp"}), command[0])
         raise RuntimeError(f"{label}: {detail}")
     return result
 

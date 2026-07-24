@@ -110,7 +110,8 @@
       "close_files_aria": "Close files",
       "collapse_overview": "Collapse overview",
       "expand_overview": "Expand overview"
-    }
+    },
+    "empty_preview_hint": "Choose a file or add a new file with"
   },
   "article_meta": {
     "title": "Article metadata",

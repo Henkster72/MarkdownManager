@@ -460,6 +460,7 @@ function list_md_by_subdir_sorted(){
         $staticDir => true,
         $imagesDir => true,
         $themesDir => true,
+        'legacy_themes' => true,
         $translationsDir => true,
     ];
 
@@ -697,7 +698,7 @@ if (isset($_SESSION['new_md_draft']) && is_array($_SESSION['new_md_draft'])) {
 }
 
 $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-$excludeFolders = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+$excludeFolders = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, 'legacy_themes', $TRANSLATIONS_DIR];
 $existingFolders = list_existing_folders_sorted($excludeFolders);
 $default_new_folder = 'root';
 if ($requested) {
@@ -1758,8 +1759,15 @@ window.mermaid = mermaid;
                         </div>
                     </header>
                     <div class="pane-body preview-body">
-                        <div id="preview" class="preview-content">
-                            <?=$current_html?>
+                        <div id="preview" class="preview-content<?= trim($current_html) === '' ? ' preview-create-target' : '' ?>"<?= trim($current_html) === '' ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('edit.empty_preview_hint', 'Choose a file or add a new file with')) . '"' : '' ?>>
+                            <?php if (trim($current_html) === ''): ?>
+                                <span class="preview-empty-prompt">
+                                    <span><?=h(mdw_t('edit.empty_preview_hint','Choose a file or add a new file with'))?></span>
+                                    <span class="preview-empty-action" aria-hidden="true">+ <span class="pi pi-documentlabel"></span></span>
+                                </span>
+                            <?php else: ?>
+                                <?=$current_html?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

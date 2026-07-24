@@ -109,7 +109,8 @@
       "close_files_aria": "Cerrar archivos",
       "collapse_overview": "Contraer vista general",
       "expand_overview": "Expandir vista general"
-    }
+    },
+    "empty_preview_hint": "Elige un archivo o añade uno nuevo con"
   },
   "theme": {
     "settings_title": "Configuración",

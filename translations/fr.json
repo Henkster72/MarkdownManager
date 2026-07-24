@@ -109,7 +109,8 @@
       "close_files_aria": "Fermer les fichiers",
       "collapse_overview": "Réduire l'aperçu",
       "expand_overview": "Développer l'aperçu"
-    }
+    },
+    "empty_preview_hint": "Choisissez un fichier ou ajoutez-en un nouveau avec"
   },
   "theme": {
     "settings_title": "Paramètres",

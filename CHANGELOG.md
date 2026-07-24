@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.958
+
+- WPM onboarding: added `WPM_ONBOARDING.md` with the standard instance paths, `.env` contract, publisher/minipc timers, ntfy behavior, template feedback loop, conflict handling, and verification checklist. It explicitly keeps operational helpers outside instance `edit/` folders and supports renderer names that differ from instance names.
+- WPM minipc sync: the shared helper can resolve an instance from `/home/henk/vbook_web/<instance>/edit/.env`, derive the configured renderer name, pull Markdown, reconcile managed templates, and push site-owned `templates/base.html`. The systemd service now uses this instance-aware mode instead of assuming `<instance>_site`.
+- WPM new Markdown: boolean metadata fields now render as translated `Aan/Uit`-style checkboxes with a hidden false value, matching Article metadata behavior. WPM creation no longer renders the non-WPM `new_content` textarea.
+- WPM empty preview: an empty visual preview now provides a translated action prompt and opens the existing new-Markdown modal when clicked or activated from the keyboard.
+- WPM explorer: reserved `legacy_themes` helper folders are excluded from index and edit folder navigation.
+- WPM diagnostics: publisher command errors now identify the actual SSH/rsync/scp operation instead of exposing the wrong command-array position.
+- Languages: the new empty-preview prompt and WPM metadata controls are available in German, English, Spanish, French, Italian, Dutch, and Portuguese.
+
 ## 0.957
 
 - WPM service boundary: the vBook publisher now only synchronizes Markdown, exports templates, renders HTML, and uploads page output; Tailwind purge/prune and static-asset synchronization remain minipc responsibilities.

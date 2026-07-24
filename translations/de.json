@@ -109,7 +109,8 @@
       "close_files_aria": "Dateien schließen",
       "collapse_overview": "Übersicht einklappen",
       "expand_overview": "Übersicht ausklappen"
-    }
+    },
+    "empty_preview_hint": "Wählen Sie eine Datei aus oder fügen Sie eine neue Datei hinzu mit"
   },
   "theme": {
     "settings_title": "Einstellungen",

@@ -13,6 +13,34 @@
     word-break: break-word;
 }
 
+.preview-content.preview-create-target {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
+    cursor: pointer;
+}
+
+.preview-empty-prompt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    max-width: min(32rem, 90%);
+    padding: 1rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.preview-empty-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* Keep expanded section includes visually transparent in the editor. */
 
 .preview-content .mdw-preview-feedback-widget {

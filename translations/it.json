@@ -109,7 +109,8 @@
       "close_files_aria": "Chiudi file",
       "collapse_overview": "Comprimi panoramica",
       "expand_overview": "Espandi panoramica"
-    }
+    },
+    "empty_preview_hint": "Scegli un file o aggiungine uno nuovo con"
   },
   "theme": {
     "settings_title": "Impostazioni",

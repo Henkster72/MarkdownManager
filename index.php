@@ -209,6 +209,7 @@ function mdw_reserved_folder_names() {
         $STATIC_DIR => true,
         $IMAGES_DIR => true,
         $THEMES_DIR => true,
+        'legacy_themes' => true,
         $TRANSLATIONS_DIR => true,
     ];
 }
@@ -425,6 +426,7 @@ function list_md_by_subdir_sorted(){
         $staticDir => true,
         $imagesDir => true,
         $themesDir => true,
+        'legacy_themes' => true,
         $translationsDir => true,
     ];
 
@@ -1374,6 +1376,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
 		            $STATIC_DIR => true,
 		            $IMAGES_DIR => true,
 		            $THEMES_DIR => true,
+		            'legacy_themes' => true,
 		            $TRANSLATIONS_DIR => true,
 		        ];
 		        $reservedHit = isset($reserved[$segments[0] ?? '']);
@@ -1757,7 +1760,7 @@ if ($requested) {
 		$today_prefix = date('y-m-d-');
 			if ($mode === 'index') {
 			    $pluginsDir = env_path('PLUGINS_DIR', __DIR__ . '/plugins', __DIR__);
-			    $exclude = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, $TRANSLATIONS_DIR];
+				    $exclude = [basename($pluginsDir), 'HTML', 'PDF', 'sections', $TOOLS_DIR, $STATIC_DIR, $IMAGES_DIR, $THEMES_DIR, 'legacy_themes', $TRANSLATIONS_DIR];
 				    $existingFolders = list_existing_folders_sorted($exclude);
 			    if ($folder_filter && in_array($folder_filter, $existingFolders, true)) {
 			        $default_new_folder = $folder_filter;

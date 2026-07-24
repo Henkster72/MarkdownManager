@@ -110,7 +110,8 @@
       "close_files_aria": "Sluit bestanden",
       "collapse_overview": "Overzicht inklappen",
       "expand_overview": "Overzicht uitklappen"
-    }
+    },
+    "empty_preview_hint": "Kies een bestand of voeg een nieuw bestand toe met"
   },
   "article_meta": {
     "title": "Artikelmetadata",

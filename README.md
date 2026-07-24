@@ -1,4 +1,4 @@
-# MarkdownManager v0.957
+# MarkdownManager v0.958
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.958: WPM onboarding is now documented as a reusable project workflow. New-page WPM metadata uses translated boolean checkboxes and omits the non-WPM content field, while an empty visual preview opens the new-page modal in all supported UI languages. The minipc template sync now resolves each renderer from its instance `.env`, so sites whose instance and Jinja names differ are synchronized correctly.
 - v0.957: WPM preview and publication bugfixes now preserve Jinja imports, macro calls, section includes, line breaks, and standalone image blocks through visual editing and export. Published templates exclude editor wrappers and preview markers, Processing explicitly publishes the reviewed Markdown source, and a fail-closed publisher guard blocks malformed preview markup before it can replace a live template. Overview headers retain their caller context and selected page image, including root-level pages. The vBook publisher leaves Tailwind purge/prune and static-asset synchronization to the minipc, while the hourly minipc sync pushes the site-owned `templates/base.html` to the vBook renderer. A pull-only GitHub source deployment can update configured structural code without touching WPM Markdown.
 - v0.956: WPM synchronization now reconciles reviewed Markdown and managed Jinja templates safely before rendering, with reusable minipc/Jinja sync timers. The visual editor has translated tooltips, clearer active formatting controls, optional superuser-managed PNG/SVG branding, improved preview fidelity for headings, checkmarks and download assets, and a Dutch normal-user workflow guide.
 - v0.953: WPM now supports a conflict-aware, instance-configured publication runner with five-minute status reporting, separate static/image synchronization, and a reusable onboarding path. Authors can submit work for processing, superusers see pending work first, and new WPM pages use the same configured metadata defaults as Article metadata, including today's post date.
@@ -83,7 +84,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and a Dutch guide for normal WPM users at `docs/GEBRUIKERSHANDLEIDING_NL.md`. Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.958 extends the translated WPM workflow to empty-preview prompts and boolean metadata controls. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and a Dutch guide for normal WPM users at `docs/GEBRUIKERSHANDLEIDING_NL.md`. Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
 
 ## Security warning (read this)
 
@@ -176,6 +177,7 @@ WPM-only plugin that adds a site-scoped Google search box for your public domain
 
 See `CHANGELOG.md` for full details.
 
+- 0.958: reusable WPM onboarding, instance-aware minipc template synchronization, translated WPM new-page boolean checkboxes, no WPM `new_content` field, and localized empty-preview creation prompts.
 - 0.957: WPM visual editing now preserves Jinja imports, macro/section source, line breaks, and standalone images; Jinja export excludes preview wrappers/markers, Processing publishes the approved Markdown revision, and a fail-closed publisher guard prevents preview markup from replacing templates. Overview macros retain page context for selected header images.
 - 0.956: safer WPM Markdown/template reconciliation and renderer sync templates, translated visual-editor toolbar tooltips and clearer toolbar states, superuser-managed PNG/SVG branding, improved preview fidelity for headings/checkmarks/download assets, hidden-note keyboard navigation, and a Dutch normal-user guide.
 - 0.951: WPM image classes now apply directly to images, responsive Tailwind class syntax is preserved in fenced divs and attribute lists, and repeated quote attributes no longer create duplicate legacy bullets.

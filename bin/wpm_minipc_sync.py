@@ -32,6 +32,41 @@ def load_json(path: Path) -> dict:
         return {}
 
 
+def load_env(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def resolve_instance_paths(instance: str) -> tuple[str, str, Path, Path]:
+    env = load_env(Path("/home/henk/vbook_web") / instance / "edit" / ".env")
+    remote_site = env.get("WPM_SITE_DIR", "").strip()
+    if not remote_site:
+        raise RuntimeError(f"WPM_SITE_DIR ontbreekt voor instance: {instance}")
+    site_name = Path(remote_site).name
+    if not site_name or site_name in {".", ".."}:
+        raise RuntimeError(f"Ongeldig WPM_SITE_DIR voor instance: {instance}")
+    return (
+        "henk@192.168.1.110",
+        remote_site,
+        Path("/home/henk/Documents/jinja_websites") / site_name,
+        Path("/home/henk/vbook_web") / instance / "edit",
+    )
+
+
 def pull_markdown(remote: str, remote_edit: str, local_edit: Path) -> None:
     local_edit.mkdir(parents=True, exist_ok=True)
     run([
@@ -139,12 +174,23 @@ def sync_templates(remote: str, remote_site: str, site_dir: Path, remote_state: 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--remote", required=True, help="SSH target, for example henk@192.168.1.110")
-    parser.add_argument("--remote-site", required=True)
-    parser.add_argument("--remote-edit", required=True)
-    parser.add_argument("--site-dir", type=Path, required=True)
-    parser.add_argument("--local-edit", type=Path, required=True)
+    parser.add_argument("--instance", help="Instance name resolved from its local .env")
+    parser.add_argument("--remote", help="SSH target, for example henk@192.168.1.110")
+    parser.add_argument("--remote-site")
+    parser.add_argument("--remote-edit")
+    parser.add_argument("--site-dir", type=Path)
+    parser.add_argument("--local-edit", type=Path)
     args = parser.parse_args()
+
+    if args.instance:
+        remote, remote_site, site_dir, local_edit = resolve_instance_paths(args.instance)
+        args.remote = args.remote or remote
+        args.remote_site = args.remote_site or remote_site
+        args.site_dir = args.site_dir or site_dir
+        args.remote_edit = args.remote_edit or f"/srv/vbook_web/{args.instance}/edit"
+        args.local_edit = args.local_edit or local_edit
+    if not all((args.remote, args.remote_site, args.remote_edit, args.site_dir, args.local_edit)):
+        parser.error("gebruik --instance of geef alle sync-paden expliciet op")
 
     site_dir = args.site_dir.resolve()
     state_dir = site_dir / ".wpm-minipc-sync"

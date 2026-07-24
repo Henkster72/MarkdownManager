@@ -5,6 +5,19 @@
  */
 
 if (!function_exists('mdw_render_new_md_modal')) {
+    function mdw_new_md_is_boolean($key, array $cfg = [], $value = '') {
+        $key = strtolower(trim((string)$key));
+        $booleanKeys = [
+            'cta', 'ctagratis', 'bigfooter', 'blurmenu', 'blog', 'sociallinks',
+            'suppressmodal', 'feedbackpopup', 'disclaim', 'hide_vergoedingen_cta',
+            'show_vergoedingen_cta',
+        ];
+        $candidate = trim((string)$value);
+        if ($candidate === '') $candidate = trim((string)($cfg['default_value'] ?? ''));
+        return in_array($key, $booleanKeys, true)
+            || preg_match('/^(true|false)$/i', $candidate) === 1;
+    }
+
     function mdw_new_md_field_label($key, array $cfg = []) {
         $key = strtolower(trim((string)$key));
         $friendly = [
@@ -57,6 +70,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
                 'key' => $key,
                 'label' => mdw_new_md_field_label($key, $cfg),
                 'value' => $value,
+                'boolean' => mdw_new_md_is_boolean($key, $cfg, $value),
             ];
         }
         return $out;
@@ -158,13 +172,33 @@ if (!function_exists('mdw_render_new_md_modal')) {
                 </div>
 
                 <?php foreach ($publisherFields as $field): ?>
+                    <?php if (!empty($field['boolean'])) continue; ?>
                     <div class="modal-field article-meta-field">
                         <label class="modal-label" for="newMdMeta_<?= $esc($field['key']) ?>"><?= $esc($field['label']) ?></label>
                         <input id="newMdMeta_<?= $esc($field['key']) ?>" class="input" type="text" name="new_meta[<?= $esc($field['key']) ?>]" value="<?= $esc($field['value']) ?>" data-new-md-meta-key="<?= $esc($field['key']) ?>">
                     </div>
                 <?php endforeach; ?>
 
-                <textarea name="new_content" class="input" rows="6" style="height: auto; display: block;" placeholder="<?= $esc($tr('index.new_markdown.content_placeholder', "# Title\n\nStart writing...")) ?>"><?= $esc($contentValue) ?></textarea>
+                <?php $booleanFields = array_values(array_filter($publisherFields, static fn($field) => !empty($field['boolean']))); ?>
+                <?php if (!empty($booleanFields)): ?>
+                    <div class="article-meta-boolean-fields new-md-boolean-fields">
+                        <?php foreach ($booleanFields as $field): ?>
+                            <?php $checked = strtolower(trim((string)$field['value'])) === 'true'; ?>
+                            <div class="modal-field article-meta-field article-meta-boolean-field">
+                                <span class="modal-label"><?= $esc($field['label']) ?></span>
+                                <input type="hidden" name="new_meta[<?= $esc($field['key']) ?>]" value="False">
+                                <label class="article-meta-boolean-toggle" for="newMdMeta_<?= $esc($field['key']) ?>">
+                                    <input id="newMdMeta_<?= $esc($field['key']) ?>" type="checkbox" name="new_meta[<?= $esc($field['key']) ?>]" value="True" <?= $checked ? 'checked' : '' ?> data-new-md-meta-key="<?= $esc($field['key']) ?>" data-meta-boolean="1">
+                                    <span class="status-text"><?= $esc($checked ? $tr('theme.metadata.boolean_on', 'On') : $tr('theme.metadata.boolean_off', 'Off')) ?></span>
+                                </label>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!$publisherMode): ?>
+                    <textarea name="new_content" class="input" rows="6" style="height: auto; display: block;" placeholder="<?= $esc($tr('index.new_markdown.content_placeholder', "# Title\n\nStart writing...")) ?>"><?= $esc($contentValue) ?></textarea>
+                <?php endif; ?>
             </div>
 
             <div class="modal-footer">
