@@ -487,6 +487,7 @@
     "csrf_invalid": "Session invalide (CSRF). Rechargez la page.",
     "invalid_file_path": "Chemin de fichier invalide.",
     "secret_locked": "La note secrète est verrouillée. Déverrouillez d'abord via la visionneuse.",
+    "delete_marked_processing_prefix": "Marqué pour suppression (En traitement) :",
     "deleted_prefix": "Supprimé :",
     "delete_failed": "Impossible de supprimer le fichier.",
     "no_write_permissions": "pas d'autorisations d'écriture",

@@ -500,6 +500,7 @@
     "csrf_invalid": "Ongeldige sessie (CSRF). Herlaad de pagina.",
     "invalid_file_path": "Ongeldig bestandspad.",
     "secret_locked": "Geheime notitie is vergrendeld. Ontgrendel eerst via de viewer.",
+    "delete_marked_processing_prefix": "Gemarkeerd voor verwijdering (Verwerking):",
     "deleted_prefix": "Verwijderd:",
     "delete_failed": "Kon bestand niet verwijderen.",
     "no_write_permissions": "geen schrijfrechten",

@@ -487,6 +487,7 @@
     "csrf_invalid": "Sessão inválida (CSRF). Recarregue a página.",
     "invalid_file_path": "Caminho de ficheiro inválido.",
     "secret_locked": "A nota secreta está bloqueada. Desbloqueie primeiro no visualizador.",
+    "delete_marked_processing_prefix": "Marcado para eliminação (Processamento):",
     "deleted_prefix": "Eliminado:",
     "delete_failed": "Não foi possível eliminar o ficheiro.",
     "no_write_permissions": "sem permissões de escrita",
