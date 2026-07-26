@@ -541,6 +541,10 @@
     "critical_sections": {
       "warning": "Esta página usa secções personalizadas críticas que podem ser renderizadas de forma diferente no site em direto:\n\n{sections}\n\nEnviar para processamento mesmo assim?"
     },
+    "preview": {
+      "section": "Secção",
+      "form": "formulário"
+    },
     "setup_title": "configuração",
     "setup_hint": "Defina o seu nome de autor e o idioma da UI.",
     "author_label": "Nome do autor",

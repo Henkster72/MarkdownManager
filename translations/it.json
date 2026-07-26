@@ -549,6 +549,10 @@
     "critical_sections": {
       "warning": "Questa pagina usa sezioni personalizzate critiche che potrebbero essere renderizzate diversamente sul sito live:\n\n{sections}\n\nInviare comunque alla lavorazione?"
     },
+    "preview": {
+      "section": "Sezione",
+      "form": "modulo"
+    },
     "setup_title": "configurazione",
     "setup_hint": "Imposta il tuo nome autore e la lingua dell'interfaccia.",
     "author_label": "Nome autore",

@@ -555,6 +555,10 @@
     "critical_sections": {
       "warning": "Deze pagina gebruikt kritische custom sections die op de live site anders kunnen renderen:\n\n{sections}\n\nToch naar verwerking sturen?"
     },
+    "preview": {
+      "section": "Sectie",
+      "form": "formulier"
+    },
     "setup_title": "instellen",
     "setup_hint": "Vul je auteurnaam en UI-taal in.",
     "author_label": "Auteurnaam",

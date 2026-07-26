@@ -541,6 +541,10 @@
     "critical_sections": {
       "warning": "Diese Seite verwendet kritische benutzerdefinierte Abschnitte, die auf der Live-Website anders gerendert werden können:\n\n{sections}\n\nTrotzdem zur Verarbeitung senden?"
     },
+    "preview": {
+      "section": "Abschnitt",
+      "form": "Formular"
+    },
     "setup_title": "einrichten",
     "setup_hint": "Legen Sie Ihren Autorennamen und die UI-Sprache fest.",
     "author_label": "Autorenname",

@@ -315,8 +315,11 @@ function mdw_preview_render_form_macro($args, $vars) {
     $submitText = (string)mdw_preview_macro_arg($args, 'submittext', $vars, 'VERSTUUR');
     $listId = (string)mdw_preview_macro_arg($args, 'ac_list_id', $vars, '');
     $integration = $listId !== '' ? ' · ActiveCampaign' : '';
-    $out = '<section class="mdw-preview-form-macro" data-mdw-macro="form.contact_form" aria-label="Template formulier">';
-    $out .= '<div class="mdw-preview-macro-label">Template form' . htmlspecialchars($integration, ENT_QUOTES, 'UTF-8') . '</div>';
+    $sectionLabel = function_exists('mdw_t') ? mdw_t('wpm.preview.section', 'Section') : 'Section';
+    $formLabel = function_exists('mdw_t') ? mdw_t('wpm.preview.form', 'form') : 'form';
+    $previewLabel = trim((string)$sectionLabel . ' ' . (string)$formLabel);
+    $out = '<section class="mdw-preview-form-macro" data-mdw-macro="form.contact_form" aria-label="' . htmlspecialchars($previewLabel, ENT_QUOTES, 'UTF-8') . '">';
+    $out .= '<div class="mdw-preview-macro-label">' . htmlspecialchars($previewLabel, ENT_QUOTES, 'UTF-8') . htmlspecialchars($integration, ENT_QUOTES, 'UTF-8') . '</div>';
     $out .= '<h3>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h3>';
     if ($subtitle !== '') $out .= '<p class="mdw-preview-form-subtitle">' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</p>';
     $out .= '<div class="mdw-preview-form-fields" aria-hidden="true">';

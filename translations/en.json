@@ -564,6 +564,10 @@
     "critical_sections": {
       "warning": "This page uses critical custom sections that may render differently on the live site:\n\n{sections}\n\nSend it to processing anyway?"
     },
+    "preview": {
+      "section": "Section",
+      "form": "form"
+    },
     "setup_title": "setup",
     "setup_hint": "Set your author name and UI language.",
     "author_label": "Author name",
