@@ -2587,6 +2587,31 @@
     const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
         && !document.body.classList.contains('mdw-show-markdown-source');
     const escapeMd = (value) => String(value || '').replace(/\u00a0/g, ' ').trim();
+    const escapeInlineHtmlAttr = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const popIconClasses = (node) => {
+        if (!(node instanceof Element)) return [];
+        const classes = Array.from(node.classList || [])
+            .map((cls) => String(cls || '').trim())
+            .filter((cls) => /^[A-Za-z0-9_:\-\/\[\].%]+$/.test(cls));
+        const hasPiBase = classes.includes('pi');
+        const hasPiIcon = classes.some((cls) => /^pi-[A-Za-z0-9_-]+$/.test(cls));
+        return hasPiBase && hasPiIcon ? classes : [];
+    };
+    const serializePopIcon = (node) => {
+        const classes = popIconClasses(node);
+        if (!classes.length) return '';
+        const tag = node.tagName.toLowerCase() === 'i' ? 'i' : 'span';
+        const attrs = [`class="${escapeInlineHtmlAttr(classes.join(' '))}"`];
+        const title = String(node.getAttribute('title') || '').trim();
+        const ariaHidden = String(node.getAttribute('aria-hidden') || '').trim().toLowerCase();
+        if (title) attrs.push(`title="${escapeInlineHtmlAttr(title)}"`);
+        if (ariaHidden === 'true' || ariaHidden === 'false') attrs.push(`aria-hidden="${ariaHidden}"`);
+        return `<${tag} ${attrs.join(' ')}></${tag}>`;
+    };
     const restoreJinjaImports = (markdown) => {
         const original = String(ta.value || '');
         const importPattern = /^\s*{%\s*(?:import|from)\b[^%]*%}\s*$/gm;
@@ -2667,6 +2692,9 @@
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
+        if ((tag === 'span' || tag === 'i') && popIconClasses(node).length) {
+            return serializePopIcon(node);
+        }
         const childContext = tag === 'a' ? { ...context, inLink: true } : context;
         const text = Array.from(node.childNodes).map((child) => inlineMarkdown(child, childContext)).join('');
         if (tag === 'br') return '<br>';
