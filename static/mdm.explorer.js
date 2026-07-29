@@ -1277,9 +1277,24 @@
 
     let lastFocusedItem = null;
     let lastFocusedTreeItem = null;
+    const scrollExplorerItemIntoView = (el) => {
+        if (!(el instanceof HTMLElement)) return;
+        const scroller = el.closest('.pane-body');
+        if (!(scroller instanceof HTMLElement)) {
+            el.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            return;
+        }
+        const itemRect = el.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        if (itemRect.top < scrollerRect.top) {
+            scroller.scrollTop -= (scrollerRect.top - itemRect.top);
+        } else if (itemRect.bottom > scrollerRect.bottom) {
+            scroller.scrollTop += (itemRect.bottom - scrollerRect.bottom);
+        }
+    };
     const scrollFocus = (el) => {
         try { el.focus({preventScroll: true}); } catch { el.focus(); }
-        el.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        scrollExplorerItemIntoView(el);
         if (el.classList.contains('kbd-item')) {
             lastFocusedItem = el;
         }
@@ -2146,7 +2161,7 @@
         if (!(link instanceof HTMLAnchorElement)) return;
         requestAnimationFrame(() => {
             try { link.focus({ preventScroll: true }); } catch { link.focus(); }
-            link.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            scrollExplorerItemIntoView(link);
         });
     };
     openFromQuery();
@@ -2812,7 +2827,7 @@
         const el = overview.querySelector(`[data-file="${CSS.escape(focusParam)}"] a.kbd-item`);
         if (!(el instanceof HTMLAnchorElement)) return false;
         try { el.focus({ preventScroll: true }); } catch { el.focus(); }
-        el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        scrollExplorerItemIntoView(el);
         syncPreviewEditTarget(focusParam);
         return true;
     }
@@ -2911,7 +2926,7 @@
     const focusCurrentInExplorer = () => {
         const a = overview.querySelector('.nav-item-current a.kbd-item');
         if (a instanceof HTMLAnchorElement) {
-            a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            scrollExplorerItemIntoView(a);
         }
     };
 
@@ -3153,9 +3168,9 @@
             if (activeAnchor instanceof HTMLAnchorElement) {
                 if (hadTreeFocus) {
                     try { activeAnchor.focus({ preventScroll: true }); } catch { activeAnchor.focus(); }
-                    activeAnchor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    scrollExplorerItemIntoView(activeAnchor);
                 } else {
-                    activeAnchor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    scrollExplorerItemIntoView(activeAnchor);
                 }
             }
 

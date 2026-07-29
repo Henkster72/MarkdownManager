@@ -3,6 +3,7 @@
 ## 0.96
 
 - Link modal PDFs: added a PDF mode that reads `.pdf` files from the instance-configured `static_path`, shows filenames with underscores as spaces, uploads PDFs to that same static folder while converting spaces to underscores, and inserts `{{document.pdf}}{:class=pdflink}` for custom instance styling.
+- Explorer scrolling: focused/current notes now scroll only within the explorer pane, preventing the large index split view from jumping upward after opening folders or lazy-loading notes.
 
 ## 0.958
 
