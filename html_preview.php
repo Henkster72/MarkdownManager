@@ -112,6 +112,74 @@ function mdw_is_static_download_path($path) {
     return preg_match('/\.(?:csv|docx?|epub|ods|odt|pdf|pptx?|rtf|txt|xlsx?|zip)$/i', trim((string)$path)) === 1;
 }
 
+function html_preview_static_download_label($path) {
+    $base = basename(str_replace("\\", "/", trim((string)$path)));
+    $base = preg_replace('/\.[A-Za-z0-9]+$/', '', $base);
+    $base = str_replace(['_', '-'], ' ', (string)$base);
+    $base = trim(preg_replace('/\s+/', ' ', $base));
+    return $base !== '' ? $base : 'PDF';
+}
+
+function html_preview_static_download_href($path) {
+    $raw = trim((string)$path);
+    if ($raw === '') return '';
+    if (preg_match('/^\{\{\s*([^{}]+?)\s*\}$/', $raw, $m)) {
+        $raw = trim((string)$m[1]);
+    }
+    if (is_external_url($raw) || str_starts_with($raw, '/') || str_starts_with($raw, '#')) return '';
+
+    $suffix = '';
+    $base = $raw;
+    $qPos = strpos($base, '?');
+    $hPos = strpos($base, '#');
+    $suffixPos = null;
+    if ($qPos !== false && $hPos !== false) $suffixPos = min($qPos, $hPos);
+    else if ($qPos !== false) $suffixPos = $qPos;
+    else if ($hPos !== false) $suffixPos = $hPos;
+    if ($suffixPos !== null) {
+        $suffix = substr($base, $suffixPos);
+        $base = substr($base, 0, $suffixPos);
+    }
+
+    $base = str_replace("\\", "/", rawurldecode(trim($base)));
+    $parts = [];
+    foreach (explode('/', trim($base, '/')) as $part) {
+        $part = trim((string)$part);
+        if ($part === '' || $part === '.' || $part === '..') continue;
+        $part = str_replace(["\0", '{', '}', '"', "'"], '', $part);
+        if ($part !== '') $parts[] = $part;
+    }
+    if (!$parts) return '';
+
+    $clean = implode('/', $parts);
+    $staticDir = trim(html_preview_static_dir(), '/');
+    if ($staticDir !== '' && str_starts_with($clean, $staticDir . '/')) {
+        $clean = substr($clean, strlen($staticDir) + 1);
+    }
+
+    $fsDir = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', 'static');
+    $candidate = rtrim($fsDir, "/\\") . '/' . $clean;
+    if (!is_file($candidate) && !str_contains($clean, '/')) {
+        $matches = [];
+        if (is_dir($fsDir)) {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($fsDir, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $fi) {
+                if (!$fi->isFile()) continue;
+                if (strcasecmp($fi->getFilename(), $clean) !== 0) continue;
+                $full = $fi->getPathname();
+                $rel = ltrim(str_replace(DIRECTORY_SEPARATOR, '/', substr($full, strlen(rtrim($fsDir, "/\\")))), '/');
+                if ($rel !== '' && $rel[0] !== '.' && strpos($rel, '/.') === false) $matches[] = $rel;
+                if (count($matches) > 1) break;
+            }
+        }
+        if (count($matches) === 1) $clean = $matches[0];
+    }
+
+    return url_encode_path(($staticDir !== '' ? ($staticDir . '/') : '') . ltrim($clean, '/')) . $suffix;
+}
+
 function html_preview_expand_image_token($url) {
     $url = trim((string)$url);
     if ($url === '') return $url;
@@ -210,7 +278,7 @@ function mdw_preview_resolve_jinja_value($expr, $vars, $forAttr = '') {
     if (strtolower((string)$forAttr) === 'src') {
         $value = html_preview_expand_image_token('{{ ' . $value . ' }}');
     } else if (strtolower((string)$forAttr) === 'href' && mdw_is_static_download_path($value)) {
-        $value = rtrim(html_preview_static_dir(), '/') . '/' . ltrim($value, '/');
+        $value = html_preview_static_download_href($value);
     }
     return $value;
 }
@@ -512,6 +580,15 @@ function mdw_preview_render_inline_template_vars($text, $vars) {
         $text
     );
     $text = preg_replace_callback(
+        '/\{\{\s*([^{}\n]+?\.pdf(?:[?#][^{}\n]*?)?)\s*\}\}/i',
+        function($m) use (&$protected) {
+            $token = '@@MDW_PREVIEW_PDF_TOKEN_' . count($protected) . '@@';
+            $protected[$token] = '{{' . trim((string)$m[1]) . '}}';
+            return $token;
+        },
+        $text
+    );
+    $text = preg_replace_callback(
         '/\{\{\s*([^{}]+?)\s*\}\}/',
         function($m) use ($vars) {
             $expr = trim((string)$m[1]);
@@ -741,6 +818,13 @@ function resolve_rel_href_from_md_link($url, $mdPath) {
     $url = normalize_md_link_url($url);
     if ($url === '' || $mdPath === null || $mdPath === '') return $url;
     if (is_external_url($url) || str_starts_with($url, '/') || str_starts_with($url, '#')) return $url;
+    if (preg_match('/^\{\{\s*([^{}]+?)\s*\}$/', $url, $tokenMatch)) {
+        $tokenPath = trim((string)$tokenMatch[1]);
+        if (mdw_is_static_download_path($tokenPath)) {
+            $href = html_preview_static_download_href($tokenPath);
+            if ($href !== '') return $href;
+        }
+    }
 
     $qPos = strpos($url, '?');
     $hPos = strpos($url, '#');
@@ -1267,6 +1351,31 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
             return '<a'.$classAttr.' href="'.
                    $urlEsc.
                    '"'.$externalAttr.'>'.$label.'</a>';
+        },
+        $text
+    );
+
+    // {{document.pdf}}{:class=pdflink}
+    $text = preg_replace_callback(
+        '/\{\{\s*([^{}]+?\.pdf(?:[?#][^{}]*?)?)\s*\}\}\s*\{:\s*class\s*=\s*(?:"([^"]+)"|&quot;([^&]+)&quot;|&#039;([^&]+)&#039;|([A-Za-z0-9_:\-\/\[\].%\s]+))\s*\}/i',
+        function($m) use ($linkClass) {
+            $token = html_entity_decode(trim((string)$m[1]), ENT_QUOTES, 'UTF-8');
+            $href = html_preview_static_download_href($token);
+            if ($href === '') return $m[0];
+
+            $rawClass = '';
+            if (isset($m[2]) && $m[2] !== '') $rawClass = $m[2];
+            else if (isset($m[3]) && $m[3] !== '') $rawClass = $m[3];
+            else if (isset($m[4]) && $m[4] !== '') $rawClass = $m[4];
+            else if (isset($m[5]) && $m[5] !== '') $rawClass = $m[5];
+            $rawClass = html_entity_decode($rawClass, ENT_QUOTES, 'UTF-8');
+            $rawClass = preg_replace('/[^A-Za-z0-9_:\-\/\[\].%\s]+/', '', (string)$rawClass);
+            $rawClass = trim(preg_replace('/\s+/', ' ', $rawClass));
+
+            $classAttr = md_join_classes($linkClass, $rawClass);
+            $classAttr = $classAttr !== '' ? ' class="'.$classAttr.'"' : '';
+            $label = htmlspecialchars(html_preview_static_download_label($token), ENT_QUOTES, 'UTF-8');
+            return '<a'.$classAttr.' href="'.htmlspecialchars($href, ENT_QUOTES, 'UTF-8').'">'.$label.'</a>';
         },
         $text
     );

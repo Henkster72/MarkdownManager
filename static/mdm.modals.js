@@ -30,11 +30,20 @@
     const internalSection = document.getElementById('linkModalInternal');
     const externalSection = document.getElementById('linkModalExternal');
     const footnoteSection = document.getElementById('linkModalFootnote');
+    const pdfSection = document.getElementById('linkModalPdf');
     const youtubeSection = document.getElementById('linkModalYoutube');
     const titleEl = document.getElementById('linkModalTitle');
     const picker = document.getElementById('linkPicker');
     const pickerFilter = document.getElementById('linkPickerFilter');
     const pickerFilterClear = document.getElementById('linkPickerFilterClear');
+    const pdfPicker = document.getElementById('pdfPicker');
+    const pdfFilter = document.getElementById('pdfPickerFilter');
+    const pdfFilterClear = document.getElementById('pdfPickerFilterClear');
+    const pdfUploadInput = document.getElementById('pdfUploadInput');
+    const pdfUploadBtn = document.getElementById('pdfUploadBtn');
+    const pdfPickBtn = document.getElementById('pdfPickBtn');
+    const pdfPickLabel = document.getElementById('pdfPickLabel');
+    const pdfStatus = document.getElementById('pdfPickerStatus');
     const externalText = document.getElementById('externalLinkText');
     const externalUrl = document.getElementById('externalLinkUrl');
     const footnoteText = document.getElementById('footnoteLinkText');
@@ -248,14 +257,21 @@
     let mode = 'internal';
     let selectedPath = null;
     let selectedTitle = null;
+    let selectedPdfToken = null;
+    let selectedPdfTitle = null;
+    let pdfItems = [];
+    let pdfLoaded = false;
+    let pdfLoading = false;
     let editContext = null;
     const FOOTNOTE_STYLE_VALUES = ['decimal', 'roman-upper', 'roman-lower', 'alpha-lower', 'alpha-upper'];
+    const pdfPickLabelDefault = pdfPickLabel ? String(pdfPickLabel.textContent || '') : '';
 
     const setMode = (next) => {
-        mode = (next === 'external' || next === 'youtube' || next === 'footnote') ? next : 'internal';
+        mode = (next === 'external' || next === 'youtube' || next === 'footnote' || next === 'pdf') ? next : 'internal';
         if (internalSection) internalSection.hidden = mode !== 'internal';
         if (externalSection) externalSection.hidden = mode !== 'external';
         if (footnoteSection) footnoteSection.hidden = mode !== 'footnote';
+        if (pdfSection) pdfSection.hidden = mode !== 'pdf';
         if (youtubeSection) youtubeSection.hidden = mode !== 'youtube';
         validate();
         if (mode === 'external') {
@@ -263,6 +279,9 @@
         } else if (mode === 'footnote') {
             syncFootnoteModalState({ autodetectStyle: true });
             footnoteUrl?.focus();
+        } else if (mode === 'pdf') {
+            if (!pdfLoaded && !pdfLoading) loadPdfList();
+            pdfFilter?.focus();
         } else if (mode === 'youtube') {
             youtubeInput?.focus();
         } else {
@@ -296,6 +315,14 @@
         if (pickerFilter) pickerFilter.value = '';
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
         if (typeof applyPickerFilter === 'function') applyPickerFilter();
+        selectedPdfToken = null;
+        selectedPdfTitle = null;
+        pdfPicker?.querySelectorAll('.pdf-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        if (pdfFilter) pdfFilter.value = '';
+        if (pdfFilterClear) pdfFilterClear.style.display = 'none';
+        if (typeof applyPdfFilter === 'function') applyPdfFilter();
+        setPdfStatus('');
+        setPdfPickLabel('');
         if (externalText) externalText.value = '';
         if (externalUrl) externalUrl.value = '';
         if (footnoteText) footnoteText.value = '';
@@ -361,6 +388,15 @@
         if (pickerFilter) pickerFilter.value = '';
         if (pickerFilterClear) pickerFilterClear.style.display = 'none';
         if (typeof applyPickerFilter === 'function') applyPickerFilter();
+        selectedPdfToken = null;
+        selectedPdfTitle = null;
+        pdfPicker?.querySelectorAll('.pdf-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        if (pdfFilter) pdfFilter.value = '';
+        if (pdfFilterClear) pdfFilterClear.style.display = 'none';
+        if (typeof applyPdfFilter === 'function') applyPdfFilter();
+        if (pdfUploadInput instanceof HTMLInputElement) pdfUploadInput.value = '';
+        setPdfStatus('');
+        setPdfPickLabel('');
         if (externalText) externalText.value = '';
         if (externalUrl) externalUrl.value = '';
         if (footnoteText) footnoteText.value = '';
@@ -404,6 +440,21 @@
         editor.focus();
     };
 
+    const insertSourceAtSelection = (text) => {
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? 0;
+        const before = editor.value.slice(0, start);
+        const after = editor.value.slice(end);
+        editor.value = before + text + after;
+        const pos = start + text.length;
+        editor.setSelectionRange(pos, pos);
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        if (typeof window.__mdwSendPreview === 'function') {
+            window.__mdwSendPreview();
+        }
+        editor.focus();
+    };
+
     const insertBlockAtSelection = (block) => {
         if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(block)) {
             return;
@@ -432,6 +483,10 @@
         if (mode === 'youtube') {
             const id = extractYoutubeId(youtubeInput?.value || '');
             insertBtn.disabled = !id;
+            return;
+        }
+        if (mode === 'pdf') {
+            insertBtn.disabled = !selectedPdfToken;
             return;
         }
         insertBtn.disabled = !selectedPath && !(editContext?.type === 'visual-link' && editContext.internal);
@@ -510,6 +565,219 @@
         pickerFilter.value = '';
         applyPickerFilter();
         pickerFilter.focus();
+    });
+
+    const escapeHtml = (s) => String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const setPdfStatus = (msg, kind = 'info') => {
+        if (!(pdfStatus instanceof HTMLElement)) return;
+        pdfStatus.textContent = String(msg || '');
+        pdfStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
+
+    const setPdfPickLabel = (value) => {
+        if (!(pdfPickLabel instanceof HTMLElement)) return;
+        const next = String(value || '').trim();
+        pdfPickLabel.textContent = next || pdfPickLabelDefault;
+    };
+
+    const pdfDisplayName = (item) => {
+        const title = String(item?.title || '').trim();
+        if (title) return title;
+        const file = String(item?.file || item?.token || '').split('/').pop() || '';
+        return file.replace(/\.pdf$/i, '').replace(/_/g, ' ').trim() || 'PDF document';
+    };
+
+    const pdfTokenBasename = (value) => {
+        const raw = String(value || '').replace(/\\/g, '/').trim();
+        const base = raw.split('/').pop() || raw;
+        return base.trim();
+    };
+
+    const renderPdfList = () => {
+        if (!(pdfPicker instanceof HTMLElement)) return;
+        const q = String(pdfFilter?.value || '').trim().toLowerCase();
+        if (pdfFilterClear) pdfFilterClear.style.display = q ? '' : 'none';
+        const filtered = !q ? pdfItems : pdfItems.filter((item) => {
+            const hay = `${item.title || ''} ${item.file || ''} ${item.token || ''} ${item.path || ''}`.toLowerCase();
+            return hay.includes(q);
+        });
+
+        if (!filtered.length) {
+            pdfPicker.innerHTML = `<div class="status-text" style="padding:0.5rem;">${escapeHtml(t('link_modal.no_pdfs', 'No PDFs found.'))}</div>`;
+            return;
+        }
+
+        const rows = filtered.map((item) => {
+            const token = pdfTokenBasename(item.token || item.file || '');
+            const path = String(item.path || '').trim();
+            const file = String(item.file || token.split('/').pop() || '').trim();
+            const title = pdfDisplayName(item);
+            const size = (typeof item.size_kb === 'number') ? `${item.size_kb} KB` : '';
+            return `
+                <li class="note-item">
+                    <button type="button" class="note-link kbd-item pdf-pick-item" data-token="${escapeHtml(token)}" data-title="${escapeHtml(title)}">
+                        <div class="note-title" style="justify-content: space-between;">
+                            <span>${escapeHtml(title)}</span>
+                            <span class="pi pi-externallink" style="font-size:0.8em; opacity:0.6;"></span>
+                        </div>
+                        <div class="nav-item-path">${escapeHtml(path || file)}${size ? ` &bull; ${escapeHtml(size)}` : ''}</div>
+                    </button>
+                </li>
+            `;
+        }).join('');
+        pdfPicker.innerHTML = `
+            <section class="nav-section">
+                <div class="nav-section-title">
+                    <span class="pi pi-document"></span>
+                    <span>${escapeHtml(t('link_modal.pdf_documents', 'PDF documents'))}</span>
+                </div>
+                <ul class="notes-list">${rows}</ul>
+            </section>
+        `;
+        if (selectedPdfToken) {
+            pdfPicker.querySelectorAll('.pdf-pick-item').forEach((el) => {
+                if (el instanceof HTMLElement && el.getAttribute('data-token') === selectedPdfToken) {
+                    el.classList.add('is-selected');
+                }
+            });
+        }
+    };
+
+    const loadPdfList = async () => {
+        if (!(pdfPicker instanceof HTMLElement) || pdfLoading) return;
+        pdfLoading = true;
+        if (!pdfItems.length) {
+            pdfPicker.innerHTML = `<div class="status-text" style="padding:0.5rem;">${escapeHtml(t('link_modal.pdf_loading', 'Loading PDFs...'))}</div>`;
+        }
+        setPdfStatus('');
+        try {
+            if (!mdmApi || typeof mdmApi.get !== 'function') throw new Error('network');
+            let data = null;
+            try {
+                data = await mdmApi.get('pdf_manager.php?action=list');
+            } catch (err) {
+                data = err && typeof err === 'object' ? err.data : null;
+                if (!data || typeof data !== 'object') throw err;
+            }
+            if (!data || data.ok !== true) throw new Error(t('link_modal.pdf_load_failed', 'Failed to load PDFs.'));
+            pdfItems = Array.isArray(data.pdfs) ? data.pdfs : [];
+            pdfLoaded = true;
+            renderPdfList();
+        } catch (err) {
+            if (!pdfItems.length) {
+                pdfPicker.innerHTML = `<div class="status-text" style="padding:0.5rem;">${escapeHtml(t('link_modal.pdf_load_failed', 'Failed to load PDFs.'))}</div>`;
+            }
+            setPdfStatus(err?.message || t('link_modal.pdf_load_failed', 'Failed to load PDFs.'), 'error');
+        } finally {
+            pdfLoading = false;
+        }
+    };
+
+    const applyPdfFilter = () => renderPdfList();
+
+    pdfFilter?.addEventListener('input', applyPdfFilter);
+    pdfFilterClear?.addEventListener('click', () => {
+        if (!(pdfFilter instanceof HTMLInputElement)) return;
+        pdfFilter.value = '';
+        applyPdfFilter();
+        pdfFilter.focus();
+    });
+
+    pdfPicker?.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target.closest('.pdf-pick-item') : null;
+        if (!(target instanceof HTMLElement)) return;
+        pdfPicker.querySelectorAll('.pdf-pick-item.is-selected').forEach(el => el.classList.remove('is-selected'));
+        target.classList.add('is-selected');
+        selectedPdfToken = pdfTokenBasename(target.getAttribute('data-token') || '');
+        selectedPdfTitle = target.getAttribute('data-title') || selectedPdfToken;
+        validate();
+        insertLink();
+    });
+
+    pdfPickBtn?.addEventListener('click', () => {
+        if (pdfUploadInput instanceof HTMLInputElement) pdfUploadInput.click();
+    });
+
+    pdfUploadInput?.addEventListener('change', () => {
+        if (!(pdfUploadInput instanceof HTMLInputElement)) return;
+        const file = pdfUploadInput.files && pdfUploadInput.files[0];
+        setPdfPickLabel(file ? file.name : '');
+    });
+
+    pdfUploadBtn?.addEventListener('click', async () => {
+        if (!(pdfUploadInput instanceof HTMLInputElement)) return;
+        const file = pdfUploadInput.files && pdfUploadInput.files[0];
+        if (!file) {
+            setPdfStatus(t('link_modal.choose_pdf_first', 'Choose a PDF first.'), 'error');
+            return;
+        }
+        const csrf = String(window.MDW_CSRF || '');
+        if (!csrf) {
+            setPdfStatus(t('image_modal.missing_csrf', 'Missing CSRF token. Reload the page.'), 'error');
+            return;
+        }
+        setPdfStatus(t('link_modal.pdf_uploading', 'Uploading...'));
+        if (mdmUi && typeof mdmUi.busy === 'function') {
+            mdmUi.busy(pdfUploadBtn, true, { label: t('link_modal.pdf_uploading', 'Uploading...') });
+        } else {
+            pdfUploadBtn.disabled = true;
+        }
+        try {
+            const fd = new FormData();
+            fd.append('action', 'upload');
+            fd.append('csrf', csrf);
+            fd.append('pdf', file);
+            if (!mdmApi || typeof mdmApi.form !== 'function') throw new Error('network');
+            let data = null;
+            try {
+                data = await mdmApi.form('pdf_manager.php', fd);
+            } catch (err) {
+                data = err && typeof err === 'object' ? err.data : null;
+                if (!data || typeof data !== 'object') throw err;
+            }
+            if (!data || data.ok !== true) {
+                const code = String(data?.error_code || data?.error || '').trim();
+                const dir = String(data?.static_dir || 'static');
+                const messages = {
+                    csrf: t('image_modal.error_csrf', 'Your session expired. Reload and try again.'),
+                    missing_upload: t('link_modal.pdf_missing_upload', 'No PDF file was received. Try again.'),
+                    upload_failed: t('link_modal.pdf_upload_failed', 'Upload failed.'),
+                    invalid_upload: t('link_modal.pdf_invalid_upload', 'The upload did not look like a valid file.'),
+                    static_dir_not_writable: t('link_modal.pdf_not_writable', 'We cannot write to the static folder ({dir}). Check permissions and try again.', { dir }),
+                    type_unsupported: t('link_modal.pdf_type_unsupported', 'Only PDF files are supported.'),
+                    store_failed: t('link_modal.pdf_store_failed', 'We could not store the uploaded PDF.'),
+                };
+                throw new Error(messages[code] || t('link_modal.pdf_upload_failed', 'Upload failed.'));
+            }
+            selectedPdfToken = pdfTokenBasename(data.token || data.file || '');
+            selectedPdfTitle = String(data.title || selectedPdfToken).trim();
+            pdfUploadInput.value = '';
+            setPdfPickLabel('');
+            setPdfStatus(t('link_modal.pdf_uploaded', 'Uploaded.'), 'ok');
+            pdfLoaded = false;
+            await loadPdfList();
+            validate();
+            if (selectedPdfToken) {
+                insertSourceAtSelection(`{{${selectedPdfToken}}}{:class=pdflink}`);
+                close();
+            }
+        } catch (err) {
+            setPdfStatus(err?.message || t('link_modal.pdf_upload_failed', 'Upload failed.'), 'error');
+        } finally {
+            if (mdmUi && typeof mdmUi.busy === 'function') {
+                mdmUi.busy(pdfUploadBtn, false);
+            } else {
+                pdfUploadBtn.disabled = false;
+            }
+        }
     });
 
     const isPdfUrl = (url) => {
@@ -953,6 +1221,13 @@
                 '{: class="ytframe-wrapper"}',
             ].join('\n');
             insertBlockAtSelection(block);
+            close();
+            return;
+        }
+        if (mode === 'pdf') {
+            const token = pdfTokenBasename(selectedPdfToken);
+            if (!token) return;
+            insertSourceAtSelection(`{{${token}}}{:class=pdflink}`);
             close();
             return;
         }

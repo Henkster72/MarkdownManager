@@ -1915,6 +1915,10 @@ window.mermaid = mermaid;
                     <span><?=h(mdw_t('link_modal.mode_footnote','Footnote'))?></span>
                 </label>
                 <label class="radio">
+                    <input type="radio" name="linkMode" value="pdf">
+                    <span><?=h(mdw_t('link_modal.mode_pdf','PDF'))?></span>
+                </label>
+                <label class="radio">
                     <input type="radio" name="linkMode" value="youtube">
                     <span><?=h(mdw_t('link_modal.mode_youtube','YouTube'))?></span>
                 </label>
@@ -2025,6 +2029,26 @@ window.mermaid = mermaid;
                     </div>
                 </div>
                 <div id="footnoteStyleHint" class="status-text"><?=h(mdw_t('link_modal.footnote_style_hint','Style detection runs on the current note.'))?></div>
+            </div>
+            <div id="linkModalPdf" class="link-modal-section" hidden>
+                <div class="link-picker-filter-row">
+                    <input id="pdfPickerFilter" type="text" class="input" placeholder="<?=h(mdw_t('link_modal.search_pdfs','Search PDFs in the configured static folder'))?>">
+                    <button type="button" class="btn btn-ghost icon-button" id="pdfPickerFilterClear" aria-label="<?=h(mdw_t('link_modal.clear_search_aria','Clear search'))?>" style="display:none;">
+                        <span class="pi pi-cross"></span>
+                    </button>
+                </div>
+                <div class="modal-row" style="gap:0.5rem; margin:0.35rem 0 0.55rem;">
+                    <input id="pdfUploadInput" type="file" accept="application/pdf,.pdf" style="display:none;">
+                    <button type="button" class="btn btn-ghost btn-small" id="pdfPickBtn">
+                        <span class="pi pi-upload"></span>
+                        <span id="pdfPickLabel"><?=h(mdw_t('link_modal.choose_pdf','Choose PDF'))?></span>
+                    </button>
+                    <button type="button" class="btn btn-primary btn-small" id="pdfUploadBtn"><?=h(mdw_t('link_modal.upload_pdf','Upload'))?></button>
+                </div>
+                <div class="link-picker" id="pdfPicker">
+                    <div class="status-text" style="padding:0.5rem;"><?=h(mdw_t('link_modal.pdf_loading','Loading PDFs...'))?></div>
+                </div>
+                <div id="pdfPickerStatus" class="status-text" style="margin-top:0.4rem;"></div>
             </div>
 	        <div id="linkModalYoutube" class="link-modal-section" hidden>
 	            <div class="modal-field">

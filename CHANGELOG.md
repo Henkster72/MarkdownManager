@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.96
+
+- Link modal PDFs: added a PDF mode that reads `.pdf` files from the instance-configured `static_path`, shows filenames with underscores as spaces, uploads PDFs to that same static folder while converting spaces to underscores, and inserts `{{document.pdf}}{:class=pdflink}` for custom instance styling.
+
 ## 0.958
 
 - WPM onboarding: added `WPM_ONBOARDING.md` with the standard instance paths, `.env` contract, publisher/minipc timers, ntfy behavior, template feedback loop, conflict handling, and verification checklist. It explicitly keeps operational helpers outside instance `edit/` folders and supports renderer names that differ from instance names.
