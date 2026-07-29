@@ -544,7 +544,11 @@
         let articleMetaImages = null;
         let articleMetaImagesPromise = null;
         let articleMetaBooleanGroup = null;
-        const imageTokenForFile = (file, path) => {
+        const imageTokenForItem = (item) => {
+            const token = String(item?.token || '').trim();
+            if (token) return token;
+            const file = String(item?.file || '').trim();
+            const path = String(item?.path || '').trim();
             let name = String(file || '').trim();
             if (!name) {
                 const parts = String(path || '').replace(/\\/g, '/').split('/');
@@ -571,7 +575,7 @@
             filtered.forEach((it) => {
                 const path = String(it.path || '');
                 const file = String(it.file || '');
-                const token = imageTokenForFile(file, path);
+                const token = imageTokenForItem(it);
                 if (!token) return;
                 const row = document.createElement('button');
                 row.type = 'button';
@@ -3014,7 +3018,9 @@
                 try {
                     return encodeURIComponent(decodeURIComponent(segment));
                 } catch (_error) {
-                    return encodeURIComponent(segment);
+                    return String(segment || '').split(/(%[0-9A-Fa-f]{2})/g)
+                        .map((part) => /^%[0-9A-Fa-f]{2}$/.test(part) ? part.toUpperCase() : encodeURIComponent(part))
+                        .join('');
                 }
             }).join('/');
             return `${imageBase}/${encodedPath}`;

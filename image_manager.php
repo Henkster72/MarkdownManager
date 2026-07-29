@@ -57,6 +57,46 @@ function image_manager_guess_alt($filename) {
     return ucwords(strtolower($name));
 }
 
+function image_manager_is_utf8($value) {
+    return is_string($value) && preg_match('//u', $value) === 1;
+}
+
+function image_manager_utf8_label($filename) {
+    $filename = (string)$filename;
+    if (image_manager_is_utf8($filename)) return $filename;
+
+    if (function_exists('mb_convert_encoding')) {
+        $converted = @mb_convert_encoding($filename, 'UTF-8', 'Windows-1252');
+        if (is_string($converted) && $converted !== '' && image_manager_is_utf8($converted)) {
+            return $converted;
+        }
+        $converted = @mb_convert_encoding($filename, 'UTF-8', 'ISO-8859-1');
+        if (is_string($converted) && $converted !== '' && image_manager_is_utf8($converted)) {
+            return $converted;
+        }
+    }
+
+    if (function_exists('iconv')) {
+        $converted = @iconv('Windows-1252', 'UTF-8//IGNORE', $filename);
+        if (is_string($converted) && $converted !== '' && image_manager_is_utf8($converted)) {
+            return $converted;
+        }
+    }
+
+    return rawurlencode($filename);
+}
+
+function image_manager_url_path($base, $filename) {
+    $base = rtrim(str_replace("\\", '/', (string)$base), '/');
+    $encoded = rawurlencode((string)$filename);
+    return ($base !== '' ? $base . '/' : '') . $encoded;
+}
+
+function image_manager_token($filename) {
+    $filename = (string)$filename;
+    return image_manager_is_utf8($filename) ? $filename : rawurlencode($filename);
+}
+
 function image_manager_unique_name($dir, $base, $ext) {
     $base = (string)$base;
     $ext = ltrim((string)$ext, '.');
@@ -109,10 +149,12 @@ if ($action === 'list') {
                 if (!in_array($ext, $allowedExt, true)) continue;
 
                 $sizeKB = round((filesize($full) ?: 0) / 1024, 1);
+                $label = image_manager_utf8_label($file);
                 $out[] = [
-                    'file' => $file,
-                    'path' => $IMAGES_DIR . '/' . $file,
-                    'alt' => image_manager_guess_alt($file),
+                    'file' => $label,
+                    'token' => image_manager_token($file),
+                    'path' => image_manager_url_path($IMAGES_DIR, $file),
+                    'alt' => image_manager_guess_alt($label),
                     'size_kb' => $sizeKB,
                     'mtime' => @filemtime($full) ?: 0,
                 ];
@@ -250,7 +292,8 @@ if ($canConvertToWebp) {
 image_manager_json([
     'ok' => true,
     'images_dir' => $IMAGES_DIR,
-    'path' => $IMAGES_DIR . '/' . $filename,
+    'path' => image_manager_url_path($IMAGES_DIR, $filename),
     'file' => $filename,
+    'token' => $filename,
     'alt' => image_manager_guess_alt($filename),
 ]);

@@ -636,6 +636,8 @@
     let newMdImages = null;
     let newMdImagesPromise = null;
     const newMdImageToken = (image) => {
+        const token = String(image?.token || '').trim();
+        if (token) return token;
         const file = String(image?.file || '').trim();
         if (file) return file;
         const path = String(image?.path || '').replace(/\\/g, '/');
@@ -765,7 +767,7 @@
                 if (!token) throw new Error('upload');
                 newMdPicture.value = token;
                 newMdPicture.dispatchEvent(new Event('input', { bubbles: true }));
-                newMdImages = [{ file: uploaded.file, path: uploaded.path, alt: uploaded.alt }, ...(Array.isArray(newMdImages) ? newMdImages : [])];
+                newMdImages = [{ file: uploaded.file, token: uploaded.token || uploaded.file, path: uploaded.path, alt: uploaded.alt }, ...(Array.isArray(newMdImages) ? newMdImages : [])];
                 newMdImagesPromise = null;
                 fileInput.value = '';
                 status.textContent = t('image_modal.uploaded', 'Uploaded.');
