@@ -5,6 +5,7 @@
 - Link modal PDFs: added a PDF mode that reads `.pdf` files from the instance-configured `static_path`, shows filenames with underscores as spaces, uploads PDFs to that same static folder while converting spaces to underscores, and inserts `{{document.pdf}}{:class=pdflink}` for custom instance styling.
 - Explorer scrolling: focused/current notes now scroll only within the explorer pane, preventing the large index split view from jumping upward after opening folders or lazy-loading notes.
 - Image picker filenames: legacy non-UTF-8 image filenames are now exposed with safe URL/token values so WPM metadata pickers do not request broken `�` image URLs.
+- Visual saves: raw PopIcon and PopBrand icon spans such as `<span class="pi pi-floppydisk"></span>` and `<span class="pb pb-facebook"></span>` are preserved when WPM visual edits are saved back to Markdown.
 
 ## 0.958
 
