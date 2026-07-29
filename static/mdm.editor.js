@@ -2592,17 +2592,17 @@
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-    const popIconClasses = (node) => {
+    const iconFontClasses = (node) => {
         if (!(node instanceof Element)) return [];
         const classes = Array.from(node.classList || [])
             .map((cls) => String(cls || '').trim())
             .filter((cls) => /^[A-Za-z0-9_:\-\/\[\].%]+$/.test(cls));
-        const hasPiBase = classes.includes('pi');
-        const hasPiIcon = classes.some((cls) => /^pi-[A-Za-z0-9_-]+$/.test(cls));
-        return hasPiBase && hasPiIcon ? classes : [];
+        const hasPopIcon = classes.includes('pi') && classes.some((cls) => /^pi-[A-Za-z0-9_-]+$/.test(cls));
+        const hasPopBrand = classes.includes('pb') && classes.some((cls) => /^pb-[A-Za-z0-9_-]+$/.test(cls));
+        return hasPopIcon || hasPopBrand ? classes : [];
     };
-    const serializePopIcon = (node) => {
-        const classes = popIconClasses(node);
+    const serializeIconFontElement = (node) => {
+        const classes = iconFontClasses(node);
         if (!classes.length) return '';
         const tag = node.tagName.toLowerCase() === 'i' ? 'i' : 'span';
         const attrs = [`class="${escapeInlineHtmlAttr(classes.join(' '))}"`];
@@ -2692,8 +2692,8 @@
         if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '').replace(/\s+/g, ' ');
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
-        if ((tag === 'span' || tag === 'i') && popIconClasses(node).length) {
-            return serializePopIcon(node);
+        if ((tag === 'span' || tag === 'i') && iconFontClasses(node).length) {
+            return serializeIconFontElement(node);
         }
         const childContext = tag === 'a' ? { ...context, inLink: true } : context;
         const text = Array.from(node.childNodes).map((child) => inlineMarkdown(child, childContext)).join('');
