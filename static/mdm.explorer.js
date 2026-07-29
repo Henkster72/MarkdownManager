@@ -1721,6 +1721,21 @@
 
     const overview = document.getElementById('links_md_overview');
     if (!overview) return;
+    const scrollExplorerItemIntoView = (el) => {
+        if (!(el instanceof HTMLElement)) return;
+        const scroller = el.closest('.pane-body');
+        if (!(scroller instanceof HTMLElement)) {
+            el.scrollIntoView({block: 'nearest', inline: 'nearest'});
+            return;
+        }
+        const itemRect = el.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        if (itemRect.top < scrollerRect.top) {
+            scroller.scrollTop -= (scrollerRect.top - itemRect.top);
+        } else if (itemRect.bottom > scrollerRect.bottom) {
+            scroller.scrollTop += (itemRect.bottom - scrollerRect.bottom);
+        }
+    };
 
     const isEditorPage = !!document.getElementById('editor');
     const isIndexSplitLayout = document.body.classList.contains('index-split-layout');
