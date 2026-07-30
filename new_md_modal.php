@@ -89,8 +89,17 @@ if (!function_exists('mdw_render_new_md_modal')) {
         $formAction = trim((string)($opts['form_action'] ?? 'index.php'));
         if ($formAction === '') $formAction = 'index.php';
         $existingFolders = is_array($opts['existing_folders'] ?? null) ? $opts['existing_folders'] : [];
+        $normalizedFolders = [];
+        foreach ($existingFolders as $folder) {
+            if (!is_string($folder)) continue;
+            $folder = trim($folder);
+            if ($folder === '' || $folder === 'root') continue;
+            $normalizedFolders[$folder] = true;
+        }
+        $existingFolders = array_keys($normalizedFolders);
         $defaultFolder = trim((string)($opts['default_folder'] ?? 'root'));
-        if ($defaultFolder === '') $defaultFolder = 'root';
+        if ($defaultFolder === '' || $defaultFolder === '/') $defaultFolder = 'root';
+        if ($defaultFolder !== 'root' && !isset($normalizedFolders[$defaultFolder])) $defaultFolder = 'root';
         $todayPrefix = trim((string)($opts['today_prefix'] ?? date('y-m-d-')));
         $titleValue = (string)($opts['title'] ?? '');
         $slugValue = (string)($opts['slug'] ?? '');
@@ -142,7 +151,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
 
                 <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
                     <select name="new_folder" class="input" style="width: auto; flex: 1 1 12rem; min-width: 10rem;" aria-label="<?= $esc($tr('common.folder', 'Folder')) ?>">
-                        <option value="root" <?= $defaultFolder === 'root' ? 'selected' : '' ?>><?= $esc($tr('common.root', 'Root')) ?></option>
+                        <option value="root" <?= $defaultFolder === 'root' ? 'selected' : '' ?>>/</option>
                         <?php foreach ($existingFolders as $folder): ?>
                             <?php if (!is_string($folder) || $folder === '') continue; ?>
                             <option value="<?= $esc($folder) ?>" <?= $defaultFolder === $folder ? 'selected' : '' ?>><?= $esc($folder) ?></option>

@@ -509,7 +509,7 @@ function list_md_by_subdir_sorted(){
 }
 
 function list_existing_folders_sorted($excludeNames = []) {
-    $exclude = [];
+    $exclude = ['root' => true];
     if (is_array($excludeNames)) {
         foreach ($excludeNames as $n) {
             if (is_string($n) && $n !== '') $exclude[$n] = true;
@@ -528,10 +528,11 @@ function list_existing_folders_sorted($excludeNames = []) {
     $out = [];
     foreach ($dirs as $dir) {
         $out[] = $dir;
-        $subdirs = array_filter(glob($dir . '/*'), function($f){
+        $subdirs = array_filter(glob($dir . '/*'), function($f) use ($exclude){
             if (!is_dir($f)) return false;
             $base = basename($f);
             if ($base === '' || $base[0] === '.') return false;
+            if (isset($exclude[$base])) return false;
             return true;
         });
         sort($subdirs, SORT_NATURAL | SORT_FLAG_CASE);

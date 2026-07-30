@@ -8,6 +8,7 @@
 - Visual saves: raw PopIcon and PopBrand icon spans such as `<span class="pi pi-floppydisk"></span>` and `<span class="pb pb-facebook"></span>` are preserved when WPM visual edits are saved back to Markdown.
 - Inline loading: explorer scroll handling is available to the inline document loader, fixing a `scrollExplorerItemIntoView is not defined` error when users open notes from the WPM explorer.
 - WPM creation copy: the new-file modal title now reads as translated “New page” in hide-Markdown WPM mode instead of “New markdown.”
+- New-page folder picker: the root create target is shown consistently as `/`, and reserved `root` folders are filtered out of discovered folder options to avoid duplicate root entries.
 
 ## 0.958
 
