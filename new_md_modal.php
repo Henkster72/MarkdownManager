@@ -100,6 +100,9 @@ if (!function_exists('mdw_render_new_md_modal')) {
         $publisherMode = !empty($opts['publisher_mode']);
         $metadataValues = is_array($opts['metadata_values'] ?? null) ? $opts['metadata_values'] : [];
         $publisherFields = $publisherMode ? mdw_new_md_publisher_fields($defaultFolder, $metadataValues) : [];
+        $modalTitle = ($publisherMode && $hideMarkdownEditor)
+            ? $tr('index.new_markdown.page_title', 'New page')
+            : $tr('index.new_markdown.title', 'New markdown');
         $open = !empty($opts['open']);
         $errorMessage = trim((string)($opts['error_message'] ?? ''));
         $hiddenFields = is_array($opts['hidden_fields'] ?? null) ? $opts['hidden_fields'] : [];
@@ -124,7 +127,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
 
             <div class="modal-header">
                 <div>
-                    <div id="newMdModalTitle" class="modal-title"><?= $esc($tr('index.new_markdown.title', 'New markdown')) ?></div>
+                    <div id="newMdModalTitle" class="modal-title"><?= $esc($modalTitle) ?></div>
                     <div class="status-text" style="margin-top: 0.25rem;">
                         <?= $esc($tr('index.new_markdown.relative_path', 'Pick a folder, add a title, and a slug is created for the filename.')) ?>
                     </div>

@@ -36,6 +36,7 @@
     },
     "new_markdown": {
       "title": "Nieuwe markdown",
+      "page_title": "Nieuwe pagina",
       "close": "Sluiten",
       "create_edit": "Aanmaken & bewerken",
       "relative_path": "Kies een map, geef een titel en er wordt een slug gemaakt voor de bestandsnaam.",

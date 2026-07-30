@@ -36,6 +36,7 @@
     },
     "new_markdown": {
       "title": "New markdown",
+      "page_title": "New page",
       "close": "Close",
       "create_edit": "Create & edit",
       "relative_path": "Pick a folder, add a title, and a slug is created for the filename.",

@@ -7,6 +7,7 @@
 - Image picker filenames: legacy non-UTF-8 image filenames are now exposed with safe URL/token values so WPM metadata pickers do not request broken `�` image URLs.
 - Visual saves: raw PopIcon and PopBrand icon spans such as `<span class="pi pi-floppydisk"></span>` and `<span class="pb pb-facebook"></span>` are preserved when WPM visual edits are saved back to Markdown.
 - Inline loading: explorer scroll handling is available to the inline document loader, fixing a `scrollExplorerItemIntoView is not defined` error when users open notes from the WPM explorer.
+- WPM creation copy: the new-file modal title now reads as translated “New page” in hide-Markdown WPM mode instead of “New markdown.”
 
 ## 0.958
 
