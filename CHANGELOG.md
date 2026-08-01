@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.961
+
+- Visual editor image insertion: image replacements and insertions now anchor to the current Markdown image block, including adjacent attribute lines, so edits do not drift to an unrelated cursor position.
+- Visual editor cursor mapping: preview clicks, textarea selections, and source edits now preserve the most recent valid Markdown range and reject stale anchors instead of inserting content at an obsolete location.
+- Editor diagnostics: added opt-in cursor/image diagnostics for the browser console, restricted the setting to superusers, and ensured diagnostics remain silent when the setting is off.
+- Heading formatting: added a `Normal` heading option that removes Markdown heading markers and converts visual-editor blocks back to paragraphs.
+- Toolbar feedback: active heading, alignment, bold, italic, underline, blockquote, ordered-list, and unordered-list actions now use the green active state; save and processing actions are highlighted while active.
+- Preview printing: added a superuser-only Print action to the current Markdown preview Actions toolbar, printing the complete rendered preview in a standalone document so it can paginate beyond the visible editor pane.
+- Authentication security: added server-side per-client failed-login tracking with a five-attempt threshold, ten-minute lockout, HTTP 429 responses, `Retry-After`, successful-login reset, and a fail-closed rate-limit store. The client now displays the server cooldown message consistently.
+
 ## 0.96
 
 - Link modal PDFs: added a PDF mode that reads `.pdf` files from the instance-configured `static_path`, shows filenames with underscores as spaces, uploads PDFs to that same static folder while converting spaces to underscores, and inserts `{{document.pdf}}{:class=pdflink}` for custom instance styling.

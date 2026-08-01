@@ -1,4 +1,4 @@
-# MarkdownManager v0.96
+# MarkdownManager v0.961
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.961: visual-editor cursor/image anchoring, opt-in superuser diagnostics, Normal heading formatting, green active toolbar/save states, full-preview printing, and server-side authentication throttling.
 - v0.96: The link modal now has a PDF picker that lists PDFs from the configured instance `static_path`, displays underscore filenames with spaces, uploads PDFs into that same static folder with spaces converted to underscores, and inserts `{{document.pdf}}{:class=pdflink}` tokens for instance-specific PDF styling. Explorer focus now scrolls only inside the note pane, preventing large split-view index pages from jumping upward.
 - v0.958: WPM onboarding is now documented as a reusable project workflow. New-page WPM metadata uses translated boolean checkboxes and omits the non-WPM content field, while an empty visual preview opens the new-page modal in all supported UI languages. The minipc template sync now resolves each renderer from its instance `.env`, so sites whose instance and Jinja names differ are synchronized correctly.
 - v0.957: WPM preview and publication bugfixes now preserve Jinja imports, macro calls, section includes, line breaks, and standalone image blocks through visual editing and export. Published templates exclude editor wrappers and preview markers, Processing explicitly publishes the reviewed Markdown source, and a fail-closed publisher guard blocks malformed preview markup before it can replace a live template. Overview headers retain their caller context and selected page image, including root-level pages. The vBook publisher leaves Tailwind purge/prune and static-asset synchronization to the minipc, while the hourly minipc sync pushes the site-owned `templates/base.html` to the vBook renderer. A pull-only GitHub source deployment can update configured structural code without touching WPM Markdown.
