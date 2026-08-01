@@ -1019,12 +1019,22 @@
     const criticalSectionsList = document.getElementById('criticalSectionsList');
     const criticalSectionsStatus = document.getElementById('criticalSectionsStatus');
     const copyButtonsToggle = document.getElementById('copyButtonsToggle');
+    const editorDebugLoggingToggle = document.getElementById('editorDebugLoggingToggle');
+    const editorDebugLoggingStatus = document.getElementById('editorDebugLoggingStatus');
     const copyIncludeMetaToggle = document.getElementById('copyIncludeMetaToggle');
     const copyHtmlModeSelect = document.getElementById('copyHtmlModeSelect');
     const exportClassPrefixInput = document.getElementById('exportClassPrefixInput');
     const exportClassPrefixSaveBtn = document.getElementById('exportClassPrefixSaveBtn');
     const exportClassPrefixStatus = document.getElementById('exportClassPrefixStatus');
     const copySettingsStatus = document.getElementById('copySettingsStatus');
+
+    const setEditorDebugLoggingStatus = (msg, kind = 'info') => {
+        if (!(editorDebugLoggingStatus instanceof HTMLElement)) return;
+        editorDebugLoggingStatus.textContent = String(msg || '');
+        editorDebugLoggingStatus.style.color = kind === 'error'
+            ? 'var(--danger)'
+            : (kind === 'ok' ? '#16a34a' : 'var(--text-muted)');
+    };
     const tocMenuSelect = document.getElementById('tocMenuSelect');
     const tocExportStyleSelect = document.getElementById('tocExportStyleSelect');
     const tocButtonToggle = document.getElementById('tocButtonToggle');
@@ -1262,6 +1272,10 @@
         const s = getSettings();
         if (!s || typeof s !== 'object') return true;
         return !Object.prototype.hasOwnProperty.call(s, 'copy_buttons_enabled') ? true : !!s.copy_buttons_enabled;
+    };
+    const readEditorDebugLoggingSetting = () => {
+        const s = getSettings();
+        return !!(s && typeof s === 'object' && s.editor_debug_logging);
     };
     const readCopyIncludeMetaSetting = () => {
         const s = getSettings();
@@ -1583,6 +1597,9 @@
         if (copyButtonsToggle instanceof HTMLInputElement) {
             copyButtonsToggle.checked = readCopyButtonsSetting();
         }
+        if (editorDebugLoggingToggle instanceof HTMLInputElement) {
+            editorDebugLoggingToggle.checked = readEditorDebugLoggingSetting();
+        }
         if (copyIncludeMetaToggle instanceof HTMLInputElement) {
             copyIncludeMetaToggle.checked = readCopyIncludeMetaSetting();
         }
@@ -1885,6 +1902,35 @@
                 ? e.message.trim()
                 : t('theme.copy.save_failed', 'Save failed');
             setCopySettingsStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveEditorDebugLoggingSetting = async (nextValue) => {
+        setEditorDebugLoggingStatus(t('theme.debug.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setEditorDebugLoggingStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                if (editorDebugLoggingToggle instanceof HTMLInputElement) editorDebugLoggingToggle.checked = false;
+                return false;
+            }
+            const value = !!nextValue;
+            const result = await saveSettingsToServer({ editor_debug_logging: value });
+            if (!result.ok) throw new Error(result.message || t('theme.debug.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.editor_debug_logging = value;
+            }
+            setEditorDebugLoggingStatus(
+                value ? t('theme.debug.enabled', 'Diagnostics enabled.') : t('theme.debug.disabled', 'Diagnostics disabled.'),
+                'ok'
+            );
+            return true;
+        } catch (e) {
+            console.error('editor debug logging save failed', e);
+            if (editorDebugLoggingToggle instanceof HTMLInputElement) editorDebugLoggingToggle.checked = !nextValue;
+            setEditorDebugLoggingStatus(e?.message || t('theme.debug.save_failed', 'Save failed'), 'error');
             return false;
         }
     };
@@ -2406,6 +2452,10 @@
             if (!(copyButtonsToggle instanceof HTMLInputElement)) return;
             const next = !!copyButtonsToggle.checked;
             await saveCopyButtonsSetting(next);
+        });
+        editorDebugLoggingToggle?.addEventListener('change', async () => {
+            if (!(editorDebugLoggingToggle instanceof HTMLInputElement)) return;
+            await saveEditorDebugLoggingSetting(!!editorDebugLoggingToggle.checked);
         });
 
         copyIncludeMetaToggle?.addEventListener('change', async () => {

@@ -236,6 +236,9 @@ if (is_array($settingsIn)) {
     $editorWrap = array_key_exists('editor_wrap', $settingsIn)
         ? (bool)$settingsIn['editor_wrap']
         : (!array_key_exists('editor_wrap', $curSettings) ? false : (bool)$curSettings['editor_wrap']);
+    $editorDebugLogging = array_key_exists('editor_debug_logging', $settingsIn)
+        ? (bool)$settingsIn['editor_debug_logging']
+        : (!array_key_exists('editor_debug_logging', $curSettings) ? false : (bool)$curSettings['editor_debug_logging']);
     $copyButtonsEnabled = array_key_exists('copy_buttons_enabled', $settingsIn)
         ? (bool)$settingsIn['copy_buttons_enabled']
         : (!array_key_exists('copy_buttons_enabled', $curSettings) ? true : (bool)$curSettings['copy_buttons_enabled']);
@@ -356,6 +359,7 @@ if (is_array($settingsIn)) {
         'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
         'editor_wrap' => (bool)$editorWrap,
+        'editor_debug_logging' => (bool)$editorDebugLogging,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
         'copy_html_mode' => $copyHtmlMode,

@@ -227,6 +227,7 @@ if ($WPM_SITE_BASE === null && $MDW_PUBLISHER_MODE) {
 }
 $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_buttons_enabled']);
 $copyIncludeMeta = !array_key_exists('copy_include_meta', $MDW_SETTINGS) || !empty($MDW_SETTINGS['copy_include_meta']);
+$editorDebugLogging = !empty($MDW_SETTINGS['editor_debug_logging']);
 $copyHtmlMode = isset($MDW_SETTINGS['copy_html_mode']) ? trim((string)$MDW_SETTINGS['copy_html_mode']) : 'dry';
 if (!in_array($copyHtmlMode, ['dry', 'medium', 'wet'], true)) $copyHtmlMode = 'dry';
 $exportClassPrefix = isset($MDW_SETTINGS['export_class_prefix']) ? trim((string)$MDW_SETTINGS['export_class_prefix']) : '';
@@ -2418,7 +2419,18 @@ window.mermaid = mermaid;
 					                    <span class="status-text"><?=h(mdw_t('theme.copy.show_buttons','Show preview copy buttons'))?></span>
 					                </label>
 					            </div>
-					        </div>
+
+				            <div class="modal-field" data-auth-superuser="1">
+				                <div class="modal-label"><?=h(mdw_t('theme.debug.title','Editor diagnostics'))?></div>
+				                <label style="display:flex; align-items:flex-start; gap:0.5rem; margin-top: 0.35rem;">
+				                    <input id="editorDebugLoggingToggle" type="checkbox" <?= $editorDebugLogging ? 'checked' : '' ?> data-auth-superuser-enable="1">
+				                    <span class="status-text"><?=h(mdw_t('theme.debug.enable','Enable visual editor cursor/image diagnostics in the browser console'))?></span>
+				                </label>
+				                <div id="editorDebugLoggingStatus" class="status-text" style="margin-top: 0.35rem;">
+				                    <?=h(mdw_t('theme.debug.hint','Off by default. Enable temporarily when investigating editor behavior.'))?>
+				                </div>
+				            </div>
+			        </div>
 					    </details>
 
 					    <details class="theme-modal-section" style="margin-top: 0.8rem;">

@@ -2929,6 +2929,11 @@
         });
     };
     let visualSelectionRange = null;
+    const editorDebugLoggingEnabled = () => {
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !!(settings && settings.editor_debug_logging);
+    };
     let mdwInsertionAnchor = null;
     let mdwInsertionSeq = 0;
     const setMdwInsertionAnchor = ({ source, offset, end = offset, reason = '' } = {}) => {
@@ -3285,13 +3290,15 @@
             end: replaceStart + replacement.length,
             reason: imageRange ? 'image_replace' : 'image_insert',
         });
-        console.info('[MDW image insert] committed', {
-            anchor,
-            currentSelection: { start: ta.selectionStart, end: ta.selectionEnd },
-            insertion: { start: replaceStart, end: replaceEnd },
-            insertedMarkdown: replacement,
-            replacedText: replaced,
-        });
+        if (editorDebugLoggingEnabled()) {
+            console.info('[MDW image insert] committed', {
+                anchor,
+                currentSelection: { start: ta.selectionStart, end: ta.selectionEnd },
+                insertion: { start: replaceStart, end: replaceEnd },
+                insertedMarkdown: replacement,
+                replacedText: replaced,
+            });
+        }
         return { ok: true, replaced: !!imageRange };
     };
     window.__mdwInsertMarkdownBlockAtSelection = insertVisualMarkdownBlock;
@@ -3470,8 +3477,8 @@
         let scheduled = false;
         let previewHighlights = [];
         const debug = (...args) => {
-            if (!window.MDW_SELECTION_DEBUG) return;
-            console.info('[mdw-selection]', ...args);
+            if (!editorDebugLoggingEnabled()) return;
+            console.debug('[mdw-selection]', ...args);
         };
 
         const clearPreviewHighlights = () => {
@@ -4055,7 +4062,6 @@
             syncing = true;
             highlightPreviewRange(startEl, startIndex, endEl, endIndex);
             syncing = false;
-            debug('editor -> preview', { start, end, startIndex, endIndex, delta: map.delta });
         };
 
         const syncFromPreview = () => {
@@ -4097,26 +4103,22 @@
                 ta.setSelectionRange(editorStart, editorStart);
                 syncing = false;
                 renderSelectionOverlay(ta.value || '', editorStart, editorStart);
-                debug('preview caret -> editor', { srcStart, editorStart });
                 return;
             }
             syncing = true;
             ta.setSelectionRange(editorStart, editorEnd);
             syncing = false;
             renderSelectionOverlay(ta.value || '', editorStart, editorEnd);
-            debug('preview -> editor', { srcStart, srcEnd, startIndex, endIndex, delta: map.delta });
         };
 
         const runSync = () => {
             if (syncing) return;
             const sel = document.getSelection();
             if (document.activeElement === ta) {
-                debug('run sync: editor active');
                 syncFromEditor();
                 return;
             }
             if (sel && sel.rangeCount && prev.contains(sel.anchorNode)) {
-                debug('run sync: preview selection');
                 syncFromPreview();
             }
         };
