@@ -2932,7 +2932,8 @@
     const editorDebugLoggingEnabled = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
-        return !!(settings && settings.editor_debug_logging);
+        const isSuperuser = typeof window.__mdwIsSuperuser === 'function' && window.__mdwIsSuperuser();
+        return !!(isSuperuser && settings && settings.editor_debug_logging);
     };
     let mdwInsertionAnchor = null;
     let mdwInsertionSeq = 0;
