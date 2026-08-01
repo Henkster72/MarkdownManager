@@ -3904,6 +3904,22 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $attrLine = mdw_attr_list_parse_line($line);
         if ($attrLine) {
             mdw_apply_attr_list_to_last_html($html, $attrLine);
+            // Keep a standalone block attribute line in the same source range
+            // as the block it modifies.  The visual editor uses this range as
+            // the explicit insertion/replacement anchor; mapping only the
+            // image line makes a click on its attribute line ambiguous.
+            $lastIndex = count($html) - 1;
+            if ($lastIndex >= 0 && is_string($html[$lastIndex])) {
+                $combinedSrcAttrs = $srcAttrsFor(max(0, $i - 1), $i);
+                if ($combinedSrcAttrs !== '') {
+                    $withoutSrcAttrs = preg_replace(
+                        '/\sdata-mdw-src-(?:start|end)\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i',
+                        '',
+                        $html[$lastIndex]
+                    );
+                    $html[$lastIndex] = mdw_html_insert_attrs($withoutSrcAttrs, $combinedSrcAttrs);
+                }
+            }
             continue;
         }
 

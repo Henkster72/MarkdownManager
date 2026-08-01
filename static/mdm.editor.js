@@ -2921,8 +2921,48 @@
         prev.querySelectorAll('[data-mdw-macro-source]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
+        prev.querySelectorAll('span, i').forEach((node) => {
+            if (node instanceof HTMLElement && iconFontClasses(node).length) {
+                node.setAttribute('contenteditable', 'false');
+                node.setAttribute('data-mdw-icon-font', '1');
+            }
+        });
     };
     let visualSelectionRange = null;
+    let mdwInsertionAnchor = null;
+    let mdwInsertionSeq = 0;
+    const setMdwInsertionAnchor = ({ source, offset, end = offset, reason = '' } = {}) => {
+        const value = String(ta.value || '');
+        const start = Math.max(0, Math.min(Number(offset) || 0, value.length));
+        const finish = Math.max(start, Math.min(Number(end) || start, value.length));
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        mdwInsertionAnchor = {
+            source: source === 'preview' ? 'preview' : 'markdown',
+            offset: start,
+            end: finish,
+            line: value.slice(0, start).split('\n').length,
+            column: start - lineStart,
+            seq: ++mdwInsertionSeq,
+            sourceLength: value.length,
+            reason: String(reason || ''),
+            createdAt: Date.now(),
+        };
+        return mdwInsertionAnchor;
+    };
+    const rememberMarkdownAnchor = (reason) => {
+        if (window.__mdwVisualPreviewInputActive || visualPreviewInputActive) return;
+        setMdwInsertionAnchor({
+            source: 'markdown',
+            offset: ta.selectionStart ?? 0,
+            end: ta.selectionEnd ?? ta.selectionStart ?? 0,
+            reason,
+        });
+    };
+    ['click', 'keyup', 'mouseup', 'select', 'beforeinput', 'input'].forEach((eventName) => {
+        ta.addEventListener(eventName, () => rememberMarkdownAnchor(`markdown_${eventName}`));
+    });
+    window.__mdwGetInsertionAnchor = () => mdwInsertionAnchor ? { ...mdwInsertionAnchor } : null;
+    window.__mdwRememberMarkdownAnchor = (reason = 'markdown_api') => rememberMarkdownAnchor(reason);
     const isRangeInPreview = (range) => {
         if (!range) return false;
         return prev.contains(range.startContainer) && prev.contains(range.endContainer);
@@ -3200,6 +3240,60 @@
     window.__mdwGetVisualSelectionText = getVisualSelectedText;
     window.__mdwGetVisualInsertionRange = getVisualInsertionRange;
     window.__mdwInsertMarkdownAtSelection = insertVisualMarkdown;
+    const imageBlockRangeAt = (value, offset, end) => {
+        const lineStart = value.lastIndexOf('\n', Math.max(0, offset) - 1) + 1;
+        const lineEndFound = value.indexOf('\n', lineStart);
+        const lineEnd = lineEndFound === -1 ? value.length : lineEndFound;
+        const imageLine = value.slice(lineStart, lineEnd);
+        if (!/^\s*!\[[^\]]*\]\([^\n]*\)\s*$/.test(imageLine)) return null;
+        const attrStart = lineEnd < value.length ? lineEnd + 1 : lineEnd;
+        const attrEndFound = value.indexOf('\n', attrStart);
+        const attrEnd = attrEndFound === -1 ? value.length : attrEndFound;
+        const attrLine = value.slice(attrStart, attrEnd);
+        const inImage = offset >= lineStart && offset <= lineEnd;
+        const inAttr = /^\s*\{:\s*[^}]*\}\s*$/.test(attrLine)
+            && ((offset >= attrStart && offset <= attrEnd) || (end >= attrStart && end <= attrEnd));
+        if (!inImage && !inAttr) return null;
+        return {
+            start: lineStart,
+            end: inAttr && attrEnd > lineEnd ? attrEnd : lineEnd,
+            replacementSuffix: inAttr ? `\n${attrLine}` : '',
+        };
+    };
+    window.__mdwInsertImageMarkdown = (markdown) => {
+        const text = String(markdown || '').trim();
+        if (!text) return { ok: false, error: 'empty_image' };
+        const anchor = mdwInsertionAnchor;
+        if (!anchor) return { ok: false, error: 'no_anchor' };
+        const current = String(ta.value || '');
+        if (anchor.source === 'preview' && anchor.sourceLength !== current.length) {
+            return { ok: false, error: 'stale_preview_anchor', anchor: { ...anchor } };
+        }
+        const start = anchor.offset;
+        const end = anchor.end;
+        const imageRange = imageBlockRangeAt(current, start, end);
+        const replaceStart = imageRange ? imageRange.start : start;
+        const replaceEnd = imageRange ? imageRange.end : end;
+        const replacement = imageRange ? `${text}${imageRange.replacementSuffix}` : text;
+        const replaced = current.slice(replaceStart, replaceEnd);
+        ta.setRangeText(replacement, replaceStart, replaceEnd, 'end');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+        setMdwInsertionAnchor({
+            source: 'markdown',
+            offset: replaceStart + replacement.length,
+            end: replaceStart + replacement.length,
+            reason: imageRange ? 'image_replace' : 'image_insert',
+        });
+        console.info('[MDW image insert] committed', {
+            anchor,
+            currentSelection: { start: ta.selectionStart, end: ta.selectionEnd },
+            insertion: { start: replaceStart, end: replaceEnd },
+            insertedMarkdown: replacement,
+            replacedText: replaced,
+        });
+        return { ok: true, replaced: !!imageRange };
+    };
     window.__mdwInsertMarkdownBlockAtSelection = insertVisualMarkdownBlock;
     window.__mdwInsertVisualTable = insertVisualTable;
     window.__mdwToggleVisualBlockquote = toggleVisualBlockquote;
@@ -3246,8 +3340,10 @@
             if (target instanceof HTMLImageElement && prev.contains(target)) {
                 e.preventDefault();
                 selectVisualImage(target);
+                window.__mdwCaptureVisualInsertionAnchor?.('preview_image');
             } else {
                 clearSelectedVisualImage();
+                window.__mdwCaptureVisualInsertionAnchor?.('preview_click');
             }
         });
         document.addEventListener('selectionchange', saveVisualSelection);
@@ -4041,11 +4137,25 @@
         prev.addEventListener('mouseup', schedule);
         prev.addEventListener('keyup', schedule);
 
-        return { reset, syncFromPreview };
+        const capturePreviewAnchor = (reason = 'preview_selection') => {
+            const sel = document.getSelection?.();
+            if (!sel || !sel.rangeCount || !prev.contains(sel.anchorNode)) return null;
+            const range = sel.getRangeAt(0);
+            const startEl = getBlockFromNode(range.startContainer);
+            if (!(startEl instanceof HTMLElement)) return null;
+            syncFromPreview();
+            const start = Number(ta.selectionStart);
+            const end = Number(ta.selectionEnd);
+            if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+            return setMdwInsertionAnchor({ source: 'preview', offset: start, end, reason });
+        };
+
+        return { reset, syncFromPreview, capturePreviewAnchor };
     })();
 
     window.__mdwResetSelectionSync = selectionSync.reset;
     window.__mdwSyncPreviewSelectionToTextarea = selectionSync.syncFromPreview;
+    window.__mdwCaptureVisualInsertionAnchor = selectionSync.capturePreviewAnchor;
 
     window.__mdwHighlightEditorSearchRange = (start, end) => {
         const value = ta.value || '';
@@ -5516,6 +5626,9 @@
         const rememberInsertionPoint = () => {
             if (!isUsingVisualEditor()) return;
             if (typeof window.__mdwSaveVisualSelection === 'function') window.__mdwSaveVisualSelection();
+            if (typeof window.__mdwCaptureVisualInsertionAnchor === 'function') {
+                window.__mdwCaptureVisualInsertionAnchor('toolbar_pointerdown');
+            }
             if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') window.__mdwSyncPreviewSelectionToTextarea();
             const start = ta.selectionStart;
             const end = ta.selectionEnd;

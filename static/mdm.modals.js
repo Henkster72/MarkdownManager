@@ -1433,6 +1433,19 @@
     };
 
     const insertAtSelection = (text) => {
+        if (typeof window.__mdwInsertImageMarkdown === 'function') {
+            const result = window.__mdwInsertImageMarkdown(text);
+            if (result && result.ok) return true;
+            if (result && result.error) {
+                const messages = {
+                    no_anchor: t('image_modal.no_cursor', 'Place the cursor in the Markdown source or a mapped preview block first.'),
+                    stale_preview_anchor: t('image_modal.cursor_changed', 'The preview cursor is no longer valid because the Markdown changed. Place it again and retry.'),
+                    empty_image: t('image_modal.insert_failed', 'Could not insert the image.'),
+                };
+                setStatus(messages[result.error] || t('image_modal.insert_failed', 'Could not insert the image.'), 'error');
+            }
+            return false;
+        }
         if (typeof window.__mdwInsertMarkdownAtSelection === 'function' && window.__mdwInsertMarkdownAtSelection(text)) {
             return;
         }
@@ -1648,7 +1661,8 @@
             const alt = String(altInput?.value || '').trim() || String(data.alt || '') || guessAlt(path);
             const token = imageTokenForFile(uploadedFile, path);
             if (token) {
-                insertAtSelection(`![${alt}](${token})`);
+                const inserted = insertAtSelection(`![${alt}]({{ ${token} }})`);
+                if (!inserted) return;
             }
 
             uploadInput.value = '';
@@ -1677,7 +1691,7 @@
         if (!token) return;
 
         const alt = String(altInput?.value || '').trim() || suggestedAlt || guessAlt(file || path);
-        insertAtSelection(`![${alt}](${token})`);
+        if (!insertAtSelection(`![${alt}]({{ ${token} }})`)) return;
         close();
     });
 })();
