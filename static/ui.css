@@ -1175,6 +1175,16 @@ body.app-body .find-replace-modal {
   color: var(--accent);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
+#paneMarkdown .pane-header-actions .format-btn.is-active,
+#paneMarkdown .pane-header-actions .editor-toolbar-select.is-active,
+#panePreview .pane-header-actions .format-btn.is-active,
+#panePreview .pane-header-actions .editor-toolbar-select.is-active,
+.editor-toolbar .format-btn.is-active,
+.editor-toolbar .editor-toolbar-select.is-active,
+.editor-toolbar .save-action-active {
+  color: #16a34a;
+  box-shadow: inset 0 -2px 0 #16a34a;
+}
 #paneMarkdown .pane-header-actions .btn,
 #panePreview .pane-header-actions .btn {
   flex: 0 0 var(--editor-toolbar-control-height);

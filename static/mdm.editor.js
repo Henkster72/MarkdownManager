@@ -1883,6 +1883,7 @@
     const saveErrorMessage = document.getElementById('saveErrorMessage');
     const saveErrorDetailsWrap = document.getElementById('saveErrorDetailsWrap');
     const saveErrorDetails = document.getElementById('saveErrorDetails');
+    const saveBtn = document.getElementById('saveBtn');
     let saveChipTimer = null;
     let saveWarnTimer = null;
     const warningHoldMs = 10000;
@@ -1905,12 +1906,19 @@
         return api;
     };
     const statusHold = getStatusHold();
+    const setSaveActionActive = (active) => {
+        [saveBtn, submitForProcessingBtn].forEach((control) => {
+            if (control instanceof HTMLElement) control.classList.toggle('save-action-active', !!active);
+        });
+    };
     const showSaveChip = () => {
         if (!saveChip) return;
+        setSaveActionActive(true);
         saveChip.style.display = '';
         if (saveChipTimer) clearTimeout(saveChipTimer);
         saveChipTimer = setTimeout(() => {
             saveChip.style.display = 'none';
+            setSaveActionActive(false);
         }, 1800);
     };
     const showSaveError = (message, details) => {
@@ -2122,6 +2130,7 @@
             }
         }
 
+        setSaveActionActive(true);
         if (status) status.textContent = t('js.save_saving', 'Saving…');
         clearSaveError();
         try {
@@ -2141,6 +2150,7 @@
                 if (status) status.textContent = msg;
                 showSaveError(msg, details);
                 showErrorModal(msg, details);
+                setSaveActionActive(false);
                 clearIgnoreBeforeUnload();
                 return false;
             }
@@ -2186,6 +2196,7 @@
             const detail = err && err.message ? String(err.message) : '';
             showSaveError(t('js.save_failed', 'Save failed.'), detail);
             showErrorModal(t('js.save_failed', 'Save failed.'), detail);
+            setSaveActionActive(false);
             return false;
         } finally {
             clearIgnoreBeforeUnload();
@@ -5762,6 +5773,9 @@
         let bold = false;
         let italic = false;
         let underline = false;
+        let blockquote = false;
+        let orderedList = false;
+        let unorderedList = false;
         const sel = window.getSelection?.();
         if (isUsingVisualEditor() && sel && sel.rangeCount && previewElForToolbar instanceof HTMLElement && previewElForToolbar.contains(sel.anchorNode)) {
             const block = closestEditableBlock(sel.anchorNode);
@@ -5769,6 +5783,9 @@
                 const tag = block.tagName.toLowerCase();
                 if (/^h[2-6]$/.test(tag)) heading = tag.slice(1);
                 align = readAlignFromElement(block);
+                blockquote = !!block.closest('blockquote');
+                orderedList = !!block.closest('ol');
+                unorderedList = !!block.closest('ul');
             }
             bold = visualCommandIsActive('bold', 'strong,b');
             italic = visualCommandIsActive('italic', 'em,i');
@@ -5777,6 +5794,13 @@
             const info = currentMarkdownLineInfo();
             heading = info.heading;
             align = info.align;
+            const lineStart = ta.value.lastIndexOf('\n', (ta.selectionStart ?? 0) - 1) + 1;
+            const lineEndFound = ta.value.indexOf('\n', ta.selectionEnd ?? ta.selectionStart ?? 0);
+            const lineEnd = lineEndFound === -1 ? ta.value.length : lineEndFound;
+            const line = ta.value.slice(lineStart, lineEnd);
+            blockquote = /^\s*>\s?/.test(line);
+            orderedList = /^\s*\d+[.)]\s+/.test(line);
+            unorderedList = /^\s*[-+*]\s+/.test(line);
         }
         if (headingSelect instanceof HTMLSelectElement) headingSelect.value = heading;
         if (alignSelect instanceof HTMLSelectElement) alignSelect.value = align;
@@ -5785,6 +5809,9 @@
         setToolbarControlState(boldBtn, bold);
         setToolbarControlState(italicBtn, italic);
         setToolbarControlState(underlineBtn, underline);
+        setToolbarControlState(blockquoteBtn, blockquote);
+        setToolbarControlState(orderedListBtn, orderedList);
+        setToolbarControlState(unorderedListBtn, unorderedList);
     };
     const scheduleToolbarSync = () => {
         if (toolbarSyncScheduled) return;
