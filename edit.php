@@ -1758,6 +1758,10 @@ window.mermaid = mermaid;
                                     </span>
                                     <span class="btn-label"><?=h(mdw_t('edit.preview.copy_btn','Copy HTML'))?></span>
                                 </button>
+                                <button type="button" class="btn btn-ghost print-preview-btn" title="<?=h(mdw_t('edit.preview.print_title','Print preview'))?>" aria-label="<?=h(mdw_t('edit.preview.print_title','Print preview'))?>" <?= $requested ? '' : 'disabled' ?> data-auth-superuser="1">
+                                    <span class="pi pi-print"></span>
+                                    <span class="btn-label"><?=h(mdw_t('edit.preview.print_btn','Print'))?></span>
+                                </button>
                             </div>
                         </div>
                     </header>

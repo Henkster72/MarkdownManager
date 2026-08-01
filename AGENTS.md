@@ -5,12 +5,17 @@
 This directory is the source repo for the MarkdownManager app.
 
 Source:
-- `/home/henk/Documents/php_websites/markdownmanager/output`
+- `/home/henk/Documents/php_websites/Markdownmanager`
 
 Live mounted targets on `minipc`:
 - `/home/henk/vbook_web/md`
 - `/home/henk/vbook_web/naomi`
 - `/home/henk/vbook_web/ntg`
+
+WPM instance targets:
+- `/home/henk/vbook_web/ntg/edit`
+- `/home/henk/vbook_web/wchnederland/edit`
+- `/home/henk/vbook_web/nlslank/edit`
 
 Public LAN URLs are served from `vBook`, for example:
 - `https://vbook.smelt-sun.ts.net/web/md/`
@@ -32,10 +37,16 @@ Timer/service:
 
 Expected behavior:
 - deploy committed core files from this git repo
-- deploy to all three targets: `md`, `naomi`, and `ntg`
+- deploy MDM core files only to `md` and `naomi`
+- deploy WPM core files only to the `edit` folders of `ntg`, `wchnederland`, and `nlslank`
 - do not delete files from live targets
 - do not copy uncommitted working-tree drift
 - do not overwrite protected settings/secrets
+
+The `/home/henk/vbook_web/` paths are mounted through the Tailscale LAN. Before
+any deployment, verify that the required mounts and target folders are
+available. If they are unavailable, stop and report that Tailscale or the
+mount is down; never fall back to another path or perform a blind sync.
 
 Protected files that must not be overwritten by the tracker:
 - `.env`

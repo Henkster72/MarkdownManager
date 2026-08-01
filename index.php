@@ -2177,6 +2177,10 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                                     </span>
                                     <span class="btn-label"><?=h(mdw_t('index.preview.copy_html_btn','Copy HTML'))?></span>
                                 </button>
+                                <button type="button" class="btn btn-ghost print-preview-btn" title="<?=h(mdw_t('index.preview.print_title','Print preview'))?>" aria-label="<?=h(mdw_t('index.preview.print_title','Print preview'))?>" <?= $indexSplitHasFile ? '' : 'disabled' ?> data-auth-superuser="1">
+                                    <span class="pi pi-print"></span>
+                                    <span class="btn-label"><?=h(mdw_t('index.preview.print_btn','Print'))?></span>
+                                </button>
                             </div>
                         </div>
                     </header>
@@ -2331,7 +2335,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 </script>
 <div class="preview-container">
     <?php if ($mode === 'view' && $requested): ?>
-        <div class="preview-copy-toolbar" data-copy-buttons="1" <?= ($copyButtonsEnabled || ($github_pages_plugin_loaded && $github_pages_env_ready)) ? '' : 'hidden' ?>>
+        <div class="preview-copy-toolbar" data-copy-buttons="1" <?= ($copyButtonsEnabled || ($github_pages_plugin_loaded && $github_pages_env_ready) || $requested) ? '' : 'hidden' ?>>
             <?php if ($github_pages_plugin_loaded && $github_pages_env_ready): ?>
                 <button type="button" id="githubPagesExportBtn" class="btn btn-ghost" title="<?=h(mdw_t('index.preview.github_pages_title','Export this note to GitHub Pages'))?>" data-auth-superuser="1">
                     <span class="pi pi-upload"></span>
@@ -2351,6 +2355,10 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                     <span class="pi pi-checkmark copy-check"></span>
                 </span>
                 <span class="btn-label"><?=h(mdw_t('index.preview.copy_html_btn','Copy HTML'))?></span>
+            </button>
+            <button type="button" class="btn btn-ghost print-preview-btn" title="<?=h(mdw_t('index.preview.print_title','Print preview'))?>" aria-label="<?=h(mdw_t('index.preview.print_title','Print preview'))?>" data-auth-superuser="1">
+                <span class="pi pi-print"></span>
+                <span class="btn-label"><?=h(mdw_t('index.preview.print_btn','Print'))?></span>
             </button>
         </div>
     <?php endif; ?>

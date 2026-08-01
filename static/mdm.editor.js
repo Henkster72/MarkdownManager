@@ -6199,8 +6199,9 @@
     const exportTemplateBtn = document.getElementById('exportTemplateBtn');
     const copyHtmlBtn = document.getElementById('copyHtmlBtn');
     const copyMdBtn = document.getElementById('copyMdBtn');
+    const printPreviewBtns = document.querySelectorAll('.print-preview-btn');
     const preview = document.getElementById('preview');
-    if (!exportBtn && !exportTemplateBtn && !copyHtmlBtn && !copyMdBtn) return;
+    if (!exportBtn && !exportTemplateBtn && !copyHtmlBtn && !copyMdBtn && !printPreviewBtns.length) return;
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
 
     const editor = document.getElementById('editor');
@@ -7035,6 +7036,43 @@ ${bodyHtml}
             }
         });
     }
+
+    printPreviewBtns.forEach((printBtn) => {
+        printBtn.addEventListener('click', () => {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) return;
+            if (!preview) return;
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) return;
+            printWindow.opener = null;
+            const printDocument = printWindow.document;
+            printDocument.open();
+            printDocument.write('<!doctype html><html><head><meta charset="utf-8"><title>Markdown preview</title></head><body></body></html>');
+            printDocument.close();
+            document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+                const copy = printDocument.createElement('link');
+                copy.rel = 'stylesheet';
+                copy.href = link.href;
+                printDocument.head.appendChild(copy);
+            });
+            document.querySelectorAll('style').forEach((style) => {
+                const copy = printDocument.createElement('style');
+                copy.textContent = style.textContent || '';
+                printDocument.head.appendChild(copy);
+            });
+            const printStyle = printDocument.createElement('style');
+            printStyle.textContent = '@page{margin:16mm}html,body{height:auto!important;min-height:0!important}body{margin:0;background:#fff;color:#111}.preview-content{display:block!important;position:static!important;width:auto!important;max-width:none!important;height:auto!important;max-height:none!important;overflow:visible!important;margin:0!important;padding:0!important;border:0!important}.preview-copy-toolbar{display:none!important}img,svg,table,pre,blockquote{break-inside:avoid}img{max-width:100%;height:auto}';
+            printDocument.head.appendChild(printStyle);
+            const article = printDocument.createElement('article');
+            article.className = preview.className;
+            article.innerHTML = preview.innerHTML;
+            printDocument.body.appendChild(article);
+            setTimeout(() => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.addEventListener('afterprint', () => printWindow.close(), { once: true });
+            }, 250);
+        });
+    });
 
     initCodeCopyButtons();
 })();

@@ -1175,6 +1175,29 @@ body.app-body .find-replace-modal {
   color: var(--accent);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
+
+@media print {
+  body.mdw-print-preview * { visibility: hidden !important; }
+  body.mdw-print-preview .preview-content,
+  body.mdw-print-preview .preview-content * { visibility: visible !important; }
+  body.mdw-print-preview .preview-content,
+  body.mdw-print-preview .preview-container,
+  body.mdw-print-preview #panePreview,
+  body.mdw-print-preview #panePreview .editor-pane-inner,
+  body.mdw-print-preview #panePreview .pane-body {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  body.mdw-print-preview .preview-content { max-width: none; margin: 0; padding: 0; border: 0; background: #fff; color: #111; }
+  body.mdw-print-preview #panePreview .pane-header,
+  body.mdw-print-preview .editor-grid > :not(#panePreview),
+  body.mdw-print-preview .preview-copy-toolbar { display: none !important; }
+}
 #paneMarkdown .pane-header-actions .format-btn.is-active,
 #paneMarkdown .pane-header-actions .editor-toolbar-select.is-active,
 #panePreview .pane-header-actions .format-btn.is-active,
