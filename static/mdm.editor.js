@@ -3001,14 +3001,68 @@
         sel.addRange(visualSelectionRange);
         return true;
     };
+    const placeVisualCursorMarker = () => {
+        const sel = window.getSelection?.();
+        if (!sel || sel.rangeCount < 1) return null;
+        const range = sel.getRangeAt(0);
+        if (!isRangeInPreview(range)) return null;
+        const marker = `MDWCURSOR${Date.now()}${Math.random().toString(36).slice(2)}`;
+        const markerNode = document.createTextNode(marker);
+        const insertRange = range.cloneRange();
+        insertRange.collapse(false);
+        try {
+            insertRange.insertNode(markerNode);
+        } catch {
+            return null;
+        }
+        return { marker, markerNode };
+    };
+    const removeVisualCursorMarker = (placed) => {
+        if (!placed || !placed.markerNode) return;
+        try {
+            placed.markerNode.parentNode?.removeChild(placed.markerNode);
+        } catch {}
+    };
     const syncVisualPreviewToTextarea = () => {
-        const next = previewHtmlToMarkdown();
-        if (ta.value === next) return;
+        const placedCursor = placeVisualCursorMarker();
+        let next = previewHtmlToMarkdown();
+        let cursorOffset = null;
+        if (placedCursor) {
+            const markerIndex = next.indexOf(placedCursor.marker);
+            if (markerIndex >= 0) {
+                cursorOffset = markerIndex;
+                next = next.slice(0, markerIndex) + next.slice(markerIndex + placedCursor.marker.length);
+            }
+            removeVisualCursorMarker(placedCursor);
+        }
+        if (ta.value === next) {
+            if (cursorOffset !== null) {
+                const safeOffset = Math.max(0, Math.min(cursorOffset, ta.value.length));
+                ta.setSelectionRange(safeOffset, safeOffset);
+                setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: safeOffset,
+                    end: safeOffset,
+                    reason: 'visual_sync_cursor_unchanged',
+                });
+            }
+            return;
+        }
         cancelScheduledPreview();
         visualPreviewInputActive = true;
         window.__mdwVisualPreviewInputActive = true;
         try {
             ta.value = next;
+            if (cursorOffset !== null) {
+                const safeOffset = Math.max(0, Math.min(cursorOffset, ta.value.length));
+                ta.setSelectionRange(safeOffset, safeOffset);
+                setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: safeOffset,
+                    end: safeOffset,
+                    reason: 'visual_sync_cursor',
+                });
+            }
             ta.dispatchEvent(new Event('input', { bubbles: true }));
         } finally {
             window.__mdwVisualPreviewInputActive = false;
