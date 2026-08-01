@@ -17,6 +17,86 @@ if (!is_array($data)) {
 $action = isset($data['action']) ? (string)$data['action'] : '';
 $auth = mdw_auth_config();
 
+const MDW_AUTH_MAX_FAILURES = 5;
+const MDW_AUTH_FAILURE_WINDOW = 600;
+const MDW_AUTH_LOCKOUT_WINDOW = 600;
+
+function mdw_auth_rate_limit_path(): string {
+    $instance = realpath(__DIR__) ?: __DIR__;
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'mdw_auth_rate_' . hash('sha256', $instance) . '.json';
+}
+
+function mdw_auth_rate_limit_key(): string {
+    $client = trim((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    if ($client === '') $client = 'unknown';
+    return hash('sha256', $client);
+}
+
+/** @return array{allowed: bool, retry_after: int, handle: resource|null, state: array<string, mixed>} */
+function mdw_auth_rate_limit_begin(): array {
+    $handle = @fopen(mdw_auth_rate_limit_path(), 'c+');
+    if (!is_resource($handle) || !@flock($handle, LOCK_EX)) {
+        if (is_resource($handle)) @fclose($handle);
+        // Do not fail open: without state storage, the server cannot enforce the limit.
+        return ['allowed' => false, 'retry_after' => 60, 'handle' => null, 'state' => []];
+    }
+    @chmod(mdw_auth_rate_limit_path(), 0600);
+    rewind($handle);
+    $raw = stream_get_contents($handle);
+    $state = json_decode(is_string($raw) ? $raw : '', true);
+    if (!is_array($state)) $state = [];
+    $now = time();
+    foreach ($state as $key => $entry) {
+        if (!is_array($entry)) {
+            unset($state[$key]);
+            continue;
+        }
+        $expires = max((int)($entry['window_until'] ?? 0), (int)($entry['blocked_until'] ?? 0));
+        if ($expires <= $now) unset($state[$key]);
+    }
+    $key = mdw_auth_rate_limit_key();
+    $entry = isset($state[$key]) && is_array($state[$key]) ? $state[$key] : null;
+    $blockedUntil = (int)($entry['blocked_until'] ?? 0);
+    if ($blockedUntil > $now) {
+        return [
+            'allowed' => false,
+            'retry_after' => max(1, $blockedUntil - $now),
+            'handle' => $handle,
+            'state' => $state,
+        ];
+    }
+    return ['allowed' => true, 'retry_after' => 0, 'handle' => $handle, 'state' => $state];
+}
+
+/** @param resource|null $handle @param array<string, mixed> $state */
+function mdw_auth_rate_limit_end($handle, array $state, bool $success): void {
+    $key = mdw_auth_rate_limit_key();
+    $now = time();
+    if ($success) {
+        unset($state[$key]);
+    } else {
+        $entry = isset($state[$key]) && is_array($state[$key]) ? $state[$key] : [];
+        $windowUntil = (int)($entry['window_until'] ?? 0);
+        $failures = $windowUntil > $now ? (int)($entry['failures'] ?? 0) : 0;
+        $failures++;
+        $state[$key] = [
+            'failures' => $failures,
+            'window_until' => $windowUntil > $now ? $windowUntil : $now + MDW_AUTH_FAILURE_WINDOW,
+            'blocked_until' => $failures >= MDW_AUTH_MAX_FAILURES ? $now + MDW_AUTH_LOCKOUT_WINDOW : 0,
+        ];
+    }
+    if (is_resource($handle)) {
+        rewind($handle);
+        ftruncate($handle, 0);
+        fwrite($handle, json_encode($state, JSON_UNESCAPED_SLASHES));
+        fflush($handle);
+        flock($handle, LOCK_UN);
+        fclose($handle);
+    }
+}
+
 if ($action === 'status') {
     $sharedRole = mdw_shared_auth_current_role();
     $sharedToken = $sharedRole === 'superuser'
@@ -75,6 +155,11 @@ if ($action === 'setup') {
 }
 
 if ($action === 'login') {
+    $rateLimit = mdw_auth_rate_limit_begin();
+    if (!$rateLimit['allowed']) {
+        header('Retry-After: ' . $rateLimit['retry_after']);
+        json(['ok' => false, 'error' => 'rate_limited', 'retry_after' => $rateLimit['retry_after']], 429);
+    }
     $role = isset($data['role']) ? (string)$data['role'] : '';
     $password = isset($data['password']) ? (string)$data['password'] : '';
     $password = trim($password);
@@ -90,6 +175,7 @@ if ($action === 'login') {
         if ($matchSuper) $role = 'superuser';
         else if ($matchUser) $role = 'user';
         else {
+            mdw_auth_rate_limit_end($rateLimit['handle'], $rateLimit['state'], false);
             json(['ok' => false, 'error' => 'invalid_password'], 403);
         }
     } else {
@@ -104,6 +190,7 @@ if ($action === 'login') {
         }
         $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
         if (!mdw_auth_verify_password($password, $stored)) {
+            mdw_auth_rate_limit_end($rateLimit['handle'], $rateLimit['state'], false);
             json(['ok' => false, 'error' => 'invalid_password'], 403);
         }
         $matches[$role] = true;
@@ -136,6 +223,7 @@ if ($action === 'login') {
     }
 
     $stored = $role === 'superuser' ? $auth['superuser_hash'] : $auth['user_hash'];
+    mdw_auth_rate_limit_end($rateLimit['handle'], $rateLimit['state'], true);
     mdw_shared_auth_login($role);
 
     json([

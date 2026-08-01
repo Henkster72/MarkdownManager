@@ -251,7 +251,9 @@
         const data = await mdmApi.json('auth.php', payload || {});
         if (!data || data.ok !== true) {
             const err = (data && data.error) ? String(data.error) : 'auth_failed';
-            throw new Error(err);
+            const error = new Error(err);
+            if (data && Number.isFinite(Number(data.retry_after))) error.retryAfter = Number(data.retry_after);
+            throw error;
         }
         return data;
     };
@@ -354,13 +356,16 @@
                 updateAuthButton();
                 return;
             }
-            const friendly = msg === 'invalid_password'
-                ? t('auth.wrong_password', 'Wrong password.')
-                : (msg === 'missing_password'
-                    ? t('auth.missing_password', 'Enter a password.')
-                    : (msg === 'auth_failed'
-                        ? t('auth.failed', 'Auth failed.')
-                        : msg));
+            const retryAfter = Math.max(0, Number(e?.retryAfter) || 0);
+            const friendly = msg === 'rate_limited'
+                ? t('auth.locked', 'Too many attempts. Try again in {time}.', { time: formatMs(retryAfter * 1000) })
+                : (msg === 'invalid_password'
+                    ? t('auth.wrong_password', 'Wrong password.')
+                    : (msg === 'missing_password'
+                        ? t('auth.missing_password', 'Enter a password.')
+                        : (msg === 'auth_failed'
+                            ? t('auth.failed', 'Auth failed.')
+                            : msg)));
             setStatus(friendly, 'error');
             if (msg === 'invalid_password') {
                 let count = 0;
