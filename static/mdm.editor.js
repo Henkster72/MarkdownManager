@@ -4803,6 +4803,40 @@
         setSelection(shiftPos(selStart), shiftPos(selEnd));
     };
 
+    const clearHeadingLevel = () => {
+        const value = ta.value;
+        const selStart = ta.selectionStart ?? 0;
+        const selEnd = ta.selectionEnd ?? selStart;
+        const blockStart = value.lastIndexOf('\n', selStart - 1) + 1;
+        let blockEnd = value.indexOf('\n', selEnd);
+        if (blockEnd === -1) blockEnd = value.length;
+        const block = value.slice(blockStart, blockEnd);
+        const lines = block.split('\n');
+        let offset = 0;
+        const deltas = [];
+        const newLines = lines.map((line) => {
+            const absStart = blockStart + offset;
+            offset += line.length + 1;
+            const m = line.match(/^(\s*)#{1,6}\s?(.*)$/);
+            if (!m) {
+                deltas.push({ absStart, delta: 0 });
+                return line;
+            }
+            const out = (m[1] || '') + (m[2] || '');
+            deltas.push({ absStart, delta: out.length - line.length });
+            return out;
+        });
+        replaceRange(blockStart, blockEnd, newLines.join('\n'));
+        const shiftPos = (pos) => {
+            let out = pos;
+            for (const d of deltas) {
+                if (pos > d.absStart) out += d.delta;
+            }
+            return out;
+        };
+        setSelection(shiftPos(selStart), shiftPos(selEnd));
+    };
+
     const toggleLinePrefix = (kind) => {
         const value = ta.value;
         const selStart = ta.selectionStart ?? 0;
@@ -5771,11 +5805,11 @@
         if (!(headingSelect instanceof HTMLSelectElement)) return;
         const value = String(headingSelect.value || '').trim();
         if (!value) return;
-        const level = value;
+        const isNormal = value === 'normal';
         if (isUsingVisualEditor()) {
-            window.__mdwRunVisualCommand?.('formatBlock', `h${level}`);
+            window.__mdwRunVisualCommand?.('formatBlock', isNormal ? 'p' : `h${value}`);
         } else {
-            runFormatAction(() => setHeadingLevel(level));
+            runFormatAction(() => isNormal ? clearHeadingLevel() : setHeadingLevel(value));
             ta.focus();
         }
         setTimeout(scheduleToolbarSync, 0);

@@ -1629,6 +1629,7 @@ window.mermaid = mermaid;
                                     <option value="4" class="md-h4 heading-select-option">H4</option>
                                     <option value="5" class="md-h5 heading-select-option">H5</option>
                                     <option value="6" class="md-h6 heading-select-option">H6</option>
+                                    <option value="normal" class="heading-select-option"><?=h(mdw_t('edit.toolbar.normal','Normal'))?></option>
                                 </select>
                                 <select id="customFormat" class="input editor-toolbar-select editor-css-select" aria-label="<?=h(mdw_t('edit.toolbar.custom_format','Custom format'))?>" hidden>
                                     <option value="" selected><?=h(mdw_t('edit.toolbar.custom_format','Custom format'))?></option>
