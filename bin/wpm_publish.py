@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -137,6 +138,55 @@ def load_state(path: Path) -> dict[str, object]:
 def managed_template_source(path: Path) -> str:
     match = MANAGED_TEMPLATE_RE.search(path.read_text(encoding="utf-8", errors="replace"))
     return match.group(1).strip() if match else ""
+
+
+def managed_default_layout(site_dir: Path, source: Path) -> str:
+    """Return a site's opt-in layout for exported WPM templates.
+
+    A source-level ``extends`` metadata value remains authoritative. The
+    layout is only applied when the site config explicitly provides a
+    ``markdown.default_layout`` whose template exposes ``markdown_body``.
+    """
+    source_text = source.read_text(encoding="utf-8", errors="replace")
+    explicit = re.search(
+        r"^\{\s*extends\s*:\s*([^}]+?)\s*\}$",
+        source_text,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    if explicit:
+        layout = explicit.group(1).strip().strip("\"'")
+    else:
+        config_path = site_dir / "site_config.json"
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return ""
+        layout = str((config.get("markdown") or {}).get("default_layout") or "").strip()
+    if not layout or layout == "base.html" or not re.fullmatch(r"[A-Za-z0-9_./-]+", layout):
+        return ""
+    layout_path = site_dir / "templates" / layout
+    try:
+        layout_source = layout_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    return layout if "{% block markdown_body" in layout_source else ""
+
+
+def adapt_managed_layout(template: str, site_dir: Path, source: Path) -> str:
+    layout = managed_default_layout(site_dir, source)
+    if not layout:
+        return template
+    source_text = source.read_text(encoding="utf-8", errors="replace")
+    if not re.search(r"^\{\s*extends\s*:", source_text, re.IGNORECASE | re.MULTILINE):
+        template = re.sub(
+            r"\{%\s*extends\s+[\"']base\.html[\"']\s*%\}",
+            "{% extends " + json.dumps(layout) + " %}",
+            template,
+            count=1,
+        )
+    template = template.replace("{% block content %}", "{% block markdown_body %}", 1)
+    template = template.replace("{% endblock content %}", "{% endblock markdown_body %}", 1)
+    return template
 
 
 def jinja_value(value: str) -> str | None:
@@ -282,10 +332,10 @@ def sync_shadow(staging: Path, shadow: Path, known: dict[str, str]) -> tuple[dic
     return remote_files, active_files, conflicts
 
 
-def export_template(editor_url: str, rel: str, source: Path, target: Path) -> None:
+def export_template(editor_url: str, rel: str, source: Path, target: Path, site_dir: Path) -> None:
     url = f"{editor_url}?file={urllib.parse.quote(rel, safe='/')}&preview=1&template=jinja"
     result = run(["curl", "--fail", "--silent", "--show-error", "-F", f"content=<{source}", url], capture=True)
-    template = result.stdout
+    template = adapt_managed_layout(result.stdout, site_dir, source)
     if not re.match(r"\s*(?:\{#[\s\S]*?#\}\s*)*\{%\s*extends\b", template):
         raise RuntimeError(f"AW-SSG export returned no Jinja template for {rel}")
     ensure_publishable_template(template, rel)
@@ -336,6 +386,25 @@ def upload_outputs(site_env: dict[str, str], site_dir: Path, rel: str) -> None:
         run(command)
     finally:
         Path(files_from).unlink(missing_ok=True)
+
+
+def purge_remote_cache(site_env: dict[str, str]) -> None:
+    command = site_env.get(
+        "SSH_CACHE_PURGE_COMMAND",
+        site_env.get("CACHE_PURGE_COMMAND", "cache-purge"),
+    ).strip()
+    if command.lower() in {"0", "false", "no", "off", "none", "disabled"}:
+        return
+    host = site_env.get("SSH_ADDRESS", "")
+    user = site_env.get("SSH_USER", "")
+    remote_dir = site_env.get("SSH_DIR", "")
+    if not all((host, user, remote_dir)):
+        raise RuntimeError("SSH_ADDRESS, SSH_USER and SSH_DIR are required for cache purge")
+    remote_command = f"cd {shlex.quote(remote_dir)} && {command or 'cache-purge'}"
+    run(ssh_prefix(site_env) + [
+        "ssh", "-F", "/dev/null", "-o", "StrictHostKeyChecking=accept-new",
+        f"{user}@{host}", remote_command,
+    ])
 
 
 def set_published(path: Path) -> None:
@@ -401,9 +470,10 @@ def _publish_main() -> int:
         # Before that point, reconciliation still imports hand-written template
         # changes into Markdown. Once Processing is selected, Markdown is the
         # source of truth and replaces the page template.
-        export_template(editor_url, rel, source, template)
+        export_template(editor_url, rel, source, template, site_dir)
         render_site(site_dir)
         upload_outputs(site_env, site_dir, rel)
+        purge_remote_cache(site_env)
         processed.append(rel)
 
     if processed:
