@@ -23,7 +23,9 @@ if (!function_exists('mdw_render_new_md_modal')) {
         $friendly = [
             'page_title' => 'Pagina titel',
             'slug' => 'Slug',
-            'page_subtitle' => 'Pagina ondertitel',
+            'page_subtitle' => function_exists('mdw_t')
+                ? mdw_t('newMdMeta_page_subtitle', 'Page subtitle')
+                : 'Page subtitle',
             'page_picture' => 'Kop plaatje',
             'author' => 'Auteur',
             'post_date' => 'Datum',
@@ -86,8 +88,8 @@ if (!function_exists('mdw_render_new_md_modal')) {
         };
 
         $csrf = (string)($opts['csrf'] ?? '');
-        $formAction = trim((string)($opts['form_action'] ?? 'index.php'));
-        if ($formAction === '') $formAction = 'index.php';
+        $formAction = trim((string)($opts['form_action'] ?? './'));
+        if ($formAction === '') $formAction = './';
         $existingFolders = is_array($opts['existing_folders'] ?? null) ? $opts['existing_folders'] : [];
         $normalizedFolders = [];
         foreach ($existingFolders as $folder) {
@@ -185,9 +187,12 @@ if (!function_exists('mdw_render_new_md_modal')) {
 
                 <?php foreach ($publisherFields as $field): ?>
                     <?php if (!empty($field['boolean'])) continue; ?>
+                    <?php $fieldPlaceholder = $field['key'] === 'page_subtitle'
+                        ? (function_exists('mdw_t') ? mdw_t('newMdMeta_page_subtitle', 'Page subtitle') : 'Page subtitle')
+                        : ''; ?>
                     <div class="modal-field article-meta-field">
                         <label class="modal-label" for="newMdMeta_<?= $esc($field['key']) ?>"><?= $esc($field['label']) ?></label>
-                        <input id="newMdMeta_<?= $esc($field['key']) ?>" class="input" type="text" name="new_meta[<?= $esc($field['key']) ?>]" value="<?= $esc($field['value']) ?>" data-new-md-meta-key="<?= $esc($field['key']) ?>">
+                        <input id="newMdMeta_<?= $esc($field['key']) ?>" class="input" type="text" name="new_meta[<?= $esc($field['key']) ?>]" value="<?= $esc($field['value']) ?>"<?= $fieldPlaceholder !== '' ? ' placeholder="' . $esc($fieldPlaceholder) . '"' : '' ?> data-new-md-meta-key="<?= $esc($field['key']) ?>">
                     </div>
                 <?php endforeach; ?>
 

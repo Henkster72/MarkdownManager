@@ -2253,6 +2253,28 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   text-align: center;
 }
 
+@media (min-width: 961px) {
+  .editor-toolbar-left .editor-align-select.input,
+  .editor-toolbar-left .editor-heading-select.input {
+    flex: 0 0 auto;
+    padding-inline: 0.35rem 1.35rem;
+  }
+
+  .editor-toolbar-left .editor-align-select.input {
+    flex: 0 0 3.5rem;
+    width: 3.5rem !important;
+    min-width: 3.5rem !important;
+    max-width: 3.5rem !important;
+  }
+
+  .editor-toolbar-left .editor-heading-select.input {
+    flex: 0 0 4.5rem;
+    width: 4.5rem !important;
+    min-width: 4.5rem !important;
+    max-width: 4.5rem !important;
+  }
+}
+
 .editor-heading-select option.heading-select-option {
   font-weight: 600;
 }

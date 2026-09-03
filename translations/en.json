@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "English", "native": "English" },
+  "newMdMeta_page_subtitle": "Page subtitle",
   "common": {
     "back": "Back",
     "close": "Close",
@@ -454,6 +455,10 @@
     "uploading": "Uploading…",
     "upload_failed": "Upload failed.",
     "uploaded": "Uploaded.",
+    "drop_here": "Drop image here",
+    "no_cursor": "The image will be inserted at the start of the text.",
+    "cursor_changed": "The cursor position changed; the image will be inserted at the start of the text.",
+    "insert_failed": "The image could not be inserted.",
     "error_csrf": "Your session expired. Reload and try again.",
     "error_missing_upload": "No image file was received. Try again.",
     "error_invalid_upload": "The upload did not look like a valid file.",

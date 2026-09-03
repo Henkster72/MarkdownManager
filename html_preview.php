@@ -3648,7 +3648,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
                     $pictureInserted = true;
                 }
                 if ($title !== '') $html[] = '<h1 class="blogheader">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>';
-                if ($subtitle !== '') $html[] = '<h3>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h3>';
+                if ($subtitle !== '') $html[] = '<h2>' . htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8') . '</h2>';
                 if ($postDate !== '') {
                     $html[] = '<span class="datum">' . htmlspecialchars(mdw_format_post_date_value($postDate, $settings['post_date_format'] ?? 'mdy_short'), ENT_QUOTES, 'UTF-8') . '</span>';
                 }

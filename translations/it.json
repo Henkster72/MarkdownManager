@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "Italian", "native": "Italiano" },
+  "newMdMeta_page_subtitle": "Sottotitolo della pagina",
   "common": {
     "back": "Indietro",
     "close": "Chiudi",
@@ -440,6 +441,10 @@
     "uploading": "Caricamento…",
     "upload_failed": "Caricamento non riuscito.",
     "uploaded": "Caricato.",
+    "drop_here": "Rilascia qui l’immagine",
+    "no_cursor": "L’immagine verrà inserita all’inizio del testo.",
+    "cursor_changed": "La posizione del cursore è cambiata; l’immagine verrà inserita all’inizio del testo.",
+    "insert_failed": "Non è stato possibile inserire l’immagine.",
     "error_csrf": "La tua sessione è scaduta. Ricarica e riprova.",
     "error_missing_upload": "Non è stato ricevuto alcun file immagine. Riprova.",
     "error_invalid_upload": "Il caricamento non sembrava un file valido.",

@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "German", "native": "Deutsch" },
+  "newMdMeta_page_subtitle": "Seitenuntertitel",
   "common": {
     "back": "Zurück",
     "close": "Schließen",
@@ -432,6 +433,10 @@
     "uploading": "Hochladen…",
     "upload_failed": "Upload fehlgeschlagen.",
     "uploaded": "Hochgeladen.",
+    "drop_here": "Bild hier ablegen",
+    "no_cursor": "Das Bild wird am Anfang des Textes eingefügt.",
+    "cursor_changed": "Die Cursorposition hat sich geändert; das Bild wird am Anfang des Textes eingefügt.",
+    "insert_failed": "Das Bild konnte nicht eingefügt werden.",
     "error_csrf": "Ihre Sitzung ist abgelaufen. Bitte neu laden und erneut versuchen.",
     "error_missing_upload": "Es wurde keine Bilddatei empfangen. Bitte erneut versuchen.",
     "error_invalid_upload": "Der Upload sah nicht wie eine gültige Datei aus.",

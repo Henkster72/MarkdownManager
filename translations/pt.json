@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "Portuguese", "native": "Português" },
+  "newMdMeta_page_subtitle": "Subtítulo da página",
   "common": {
     "back": "Voltar",
     "close": "Fechar",
@@ -432,6 +433,10 @@
     "uploading": "A enviar…",
     "upload_failed": "Falha no envio.",
     "uploaded": "Enviado.",
+    "drop_here": "Largue a imagem aqui",
+    "no_cursor": "A imagem será inserida no início do texto.",
+    "cursor_changed": "A posição do cursor mudou; a imagem será inserida no início do texto.",
+    "insert_failed": "Não foi possível inserir a imagem.",
     "error_csrf": "A sua sessão expirou. Recarregue e tente novamente.",
     "error_missing_upload": "Nenhum ficheiro de imagem foi recebido. Tente novamente.",
     "error_invalid_upload": "O upload não parece ser um ficheiro válido.",

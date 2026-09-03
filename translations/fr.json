@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "French", "native": "Français" },
+  "newMdMeta_page_subtitle": "Sous-titre de la page",
   "common": {
     "back": "Retour",
     "close": "Fermer",
@@ -432,6 +433,10 @@
     "uploading": "Téléversement…",
     "upload_failed": "Échec du téléversement.",
     "uploaded": "Téléversé.",
+    "drop_here": "Déposer l’image ici",
+    "no_cursor": "L’image sera insérée au début du texte.",
+    "cursor_changed": "La position du curseur a changé ; l’image sera insérée au début du texte.",
+    "insert_failed": "Impossible d’insérer l’image.",
     "error_csrf": "Votre session a expiré. Rechargez et réessayez.",
     "error_missing_upload": "Aucun fichier image n’a été reçu. Réessayez.",
     "error_invalid_upload": "Le téléversement ne semble pas être un fichier valide.",

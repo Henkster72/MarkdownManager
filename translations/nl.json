@@ -1,5 +1,6 @@
 {
   "_meta": { "label": "Dutch", "native": "Nederlands" },
+  "newMdMeta_page_subtitle": "Pagina ondertitel",
   "common": {
     "back": "Terug",
     "close": "Sluiten",
@@ -445,6 +446,10 @@
     "uploading": "Uploaden…",
     "upload_failed": "Upload mislukt.",
     "uploaded": "Geupload.",
+    "drop_here": "Afbeelding hier plaatsen",
+    "no_cursor": "De afbeelding wordt aan het begin van de tekst ingevoegd.",
+    "cursor_changed": "De cursorpositie is gewijzigd; de afbeelding wordt aan het begin van de tekst ingevoegd.",
+    "insert_failed": "De afbeelding kon niet worden ingevoegd.",
     "error_csrf": "Je sessie is verlopen. Herlaad en probeer opnieuw.",
     "error_missing_upload": "Er is geen afbeeldingsbestand ontvangen. Probeer opnieuw.",
     "error_invalid_upload": "De upload lijkt geen geldig bestand.",

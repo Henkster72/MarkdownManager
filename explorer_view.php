@@ -859,7 +859,7 @@ function explorer_view_render_tree($opts) {
                     <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?></span>
                 </a>
                 <?php if ($csrf_token): ?>
-                <form method="post" action="index.php" id="explorerDeleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>">
+                <form method="post" action="./" id="explorerDeleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="file" id="explorerDeleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
                     <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
@@ -875,7 +875,7 @@ function explorer_view_render_tree($opts) {
                     <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.rename','Rename'))?></span>
                 </button>
                 <?php if ($csrf_token): ?>
-                <form method="post" action="index.php" id="deleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>" data-auth-superuser="1">
+                <form method="post" action="./" id="deleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>" data-auth-superuser="1">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="file" id="deleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
                     <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.97
+
+- WPM page creation: fixed directory-form POST handling so new pages are actually created and opened immediately in the editor from both `index.php` and `edit.php`.
+- New-page metadata: new notes start as `Concept`, use the active-language subtitle label/placeholder, avoid duplicating the page title or filled subtitle in Markdown, and render metadata subtitles consistently as H2.
+- Shared settings: `index.php` and `edit.php` now use the same settings modal, including the superuser `internal_link_prefix` setting.
+- Visual editor images: image insertion anchors safely to the Markdown body, while preview drag-and-drop moves Markdown image blocks with a visible drop marker and undo-safe source updates instead of converting them to links.
+- Hide Markdown and toolbar layout: preview-copy controls are restricted for regular users when Markdown is hidden, and alignment/heading selects have fixed rem widths so their values remain visible beside the carets.
+- Translations: added synchronized subtitle and image drag-feedback strings for German, English, Spanish, French, Italian, Dutch, and Portuguese.
+
 ## 0.961
 
 - Visual editor image insertion: image replacements and insertions now anchor to the current Markdown image block, including adjacent attribute lines, so edits do not drift to an unrelated cursor position.

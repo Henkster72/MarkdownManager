@@ -2750,6 +2750,7 @@
         if (node.nodeType === Node.TEXT_NODE) return escapeMd(node.nodeValue);
         if (!(node instanceof Element)) return '';
         if (node.hasAttribute('data-mdw-auto-section')) return '';
+        if (node.hasAttribute('data-mdw-image-drop-marker')) return '';
         if (node.hasAttribute('data-mdw-feedback-slot') || node.hasAttribute('data-mdw-feedbackpopup')) return '';
         const pendingSection = node.getAttribute('data-mdw-pending-section');
         if (pendingSection) return pendingSection;
@@ -2914,7 +2915,7 @@
         return restoreJinjaImports(next.trimEnd()) + '\n';
     };
     const markPreviewGeneratedContent = () => {
-        prev.querySelectorAll('.md-meta, [data-mdw-generated], [data-mdw-feedback-slot], [data-mdw-feedbackpopup]').forEach((node) => {
+        prev.querySelectorAll('.md-meta, [data-mdw-generated], [data-mdw-feedback-slot], [data-mdw-feedbackpopup], [data-mdw-image-drop-marker]').forEach((node) => {
             if (node instanceof HTMLElement) node.setAttribute('contenteditable', 'false');
         });
         prev.querySelectorAll('.md-toc-layout').forEach((node) => {
@@ -3195,6 +3196,90 @@
         syncVisualPreviewToTextarea();
         return true;
     };
+    let draggedVisualImage = null;
+    let draggedVisualBlock = null;
+    let draggedVisualSourceRange = null;
+    let visualDropMarker = null;
+    let draggedVisualDropTarget = null;
+    let draggedVisualDropBefore = false;
+    const clearVisualDrag = () => {
+        visualDropMarker?.remove();
+        draggedVisualImage = null;
+        draggedVisualBlock = null;
+        draggedVisualSourceRange = null;
+        visualDropMarker = null;
+        draggedVisualDropTarget = null;
+        draggedVisualDropBefore = false;
+    };
+    const visualSourceBlock = (node) => {
+        const el = node instanceof Element ? node : node?.parentElement;
+        if (!(el instanceof Element) || !prev.contains(el)) return null;
+        const block = el.closest('[data-mdw-src-start]');
+        return block instanceof HTMLElement && prev.contains(block) ? block : null;
+    };
+    const moveDraggedVisualImage = (event) => {
+        if (!(draggedVisualImage instanceof HTMLImageElement)
+            || !(draggedVisualBlock instanceof HTMLElement)
+            || !draggedVisualSourceRange
+            || !prev.contains(draggedVisualBlock)) {
+            clearVisualDrag();
+            return false;
+        }
+        const targetBlock = draggedVisualDropTarget || visualSourceBlock(event.target);
+        if (!(targetBlock instanceof HTMLElement)
+            || targetBlock === draggedVisualBlock
+            || draggedVisualBlock.contains(targetBlock)) {
+            clearVisualDrag();
+            return false;
+        }
+        const targetStartRaw = Number(targetBlock.dataset.mdwSrcStart);
+        const targetEndRaw = Number(targetBlock.dataset.mdwSrcEnd);
+        const toEditorOffset = window.__mdwPreviewSourceOffsetToEditor;
+        if (typeof toEditorOffset !== 'function'
+            || !Number.isFinite(targetStartRaw)
+            || !Number.isFinite(targetEndRaw)) {
+            clearVisualDrag();
+            return false;
+        }
+        const targetStart = toEditorOffset(targetStartRaw);
+        const targetEnd = toEditorOffset(targetEndRaw);
+        const source = String(ta.value || '');
+        if (!Number.isFinite(targetStart) || !Number.isFinite(targetEnd)
+            || draggedVisualSourceRange.start < 0
+            || draggedVisualSourceRange.end > source.length
+            || targetStart < 0 || targetEnd > source.length) {
+            clearVisualDrag();
+            return false;
+        }
+        const rect = targetBlock.getBoundingClientRect();
+        const insertBefore = draggedVisualDropTarget
+            ? draggedVisualDropBefore
+            : event.clientY < (rect.top + (rect.height / 2));
+        const lineStart = source.lastIndexOf('\n', draggedVisualSourceRange.start - 1) + 1;
+        const lineEndFound = source.indexOf('\n', draggedVisualSourceRange.end);
+        const lineEnd = lineEndFound === -1 ? source.length : lineEndFound;
+        const moveStart = lineStart > 0 ? lineStart - 1 : lineStart;
+        const moveEnd = lineEnd < source.length ? lineEnd + 1 : lineEnd;
+        const blockText = source.slice(lineStart, lineEnd).trim();
+        if (!blockText || (targetStart >= moveStart && targetStart <= moveEnd)) {
+            clearVisualDrag();
+            return false;
+        }
+        let insertion = insertBefore ? targetStart : targetEnd;
+        if (moveStart < insertion) insertion -= moveEnd - moveStart;
+        const withoutBlock = source.slice(0, moveStart) + source.slice(moveEnd);
+        const moved = insertBefore
+            ? `${blockText}\n\n`
+            : `\n\n${blockText}`;
+        const next = withoutBlock.slice(0, insertion) + moved + withoutBlock.slice(insertion);
+        ta.value = next;
+        const caret = insertion + moved.length;
+        ta.setSelectionRange(caret, caret);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        prev.focus();
+        clearVisualDrag();
+        return true;
+    };
     const buildBasicTableHtml = (rows = 2, cols = 2) => {
         const safeRows = Math.max(1, Math.min(12, Number(rows) || 2));
         const safeCols = Math.max(1, Math.min(8, Number(cols) || 2));
@@ -3331,20 +3416,57 @@
             replacementSuffix: inAttr ? `\n${attrLine}` : '',
         };
     };
+    const previewBodyInsertionOffset = (value) => {
+        const fn = window.__mdwExtractMetaAndBody;
+        if (typeof fn !== 'function') return 0;
+        const raw = String(value || '');
+        const body = String(fn(raw)?.body ?? '');
+        const bodyStart = Math.max(0, raw.length - body.length);
+        const leadingBlankLength = (body.match(/^\n+/u) || [''])[0].length;
+        return Math.min(raw.length, bodyStart + leadingBlankLength);
+    };
     window.__mdwInsertImageMarkdown = (markdown) => {
         const text = String(markdown || '').trim();
         if (!text) return { ok: false, error: 'empty_image' };
-        const anchor = mdwInsertionAnchor;
-        if (!anchor) return { ok: false, error: 'no_anchor' };
+        let anchor = mdwInsertionAnchor;
         const current = String(ta.value || '');
+        if (!anchor && isVisualEditorMode()) {
+            const fallback = previewBodyInsertionOffset(current);
+            anchor = {
+                source: 'preview',
+                offset: fallback,
+                end: fallback,
+                sourceLength: current.length,
+                reason: 'image_insert_safe_fallback',
+            };
+        }
+        if (!anchor) return { ok: false, error: 'no_anchor' };
         if (anchor.source === 'preview' && anchor.sourceLength !== current.length) {
-            return { ok: false, error: 'stale_preview_anchor', anchor: { ...anchor } };
+            const fallback = previewBodyInsertionOffset(current);
+            anchor = {
+                source: 'preview',
+                offset: fallback,
+                end: fallback,
+                sourceLength: current.length,
+                reason: 'image_insert_stale_fallback',
+            };
         }
         const start = anchor.offset;
         const end = anchor.end;
-        const imageRange = imageBlockRangeAt(current, start, end);
-        const replaceStart = imageRange ? imageRange.start : start;
-        const replaceEnd = imageRange ? imageRange.end : end;
+        let imageRange = imageBlockRangeAt(current, start, end);
+        let replaceStart = imageRange ? imageRange.start : start;
+        let replaceEnd = imageRange ? imageRange.end : end;
+        if (anchor.source === 'preview') {
+            // A preview cursor must never insert into the hidden metadata block.
+            // If the visual mapping is unavailable, the body start is the only
+            // safe fallback; inserting at source offset 0 corrupts WPM metadata.
+            const bodyStart = previewBodyInsertionOffset(current);
+            if (replaceStart < bodyStart) {
+                imageRange = null;
+                replaceStart = bodyStart;
+                replaceEnd = bodyStart;
+            }
+        }
         const replacement = imageRange ? `${text}${imageRange.replacementSuffix}` : text;
         const replaced = current.slice(replaceStart, replaceEnd);
         ta.setRangeText(replacement, replaceStart, replaceEnd, 'end');
@@ -3380,6 +3502,97 @@
         prev.setAttribute('role', 'textbox');
         prev.setAttribute('aria-multiline', 'true');
         markPreviewGeneratedContent();
+        const updateVisualDropMarker = (event) => {
+            if (!(draggedVisualBlock instanceof HTMLElement)) return;
+            let targetBlock = visualSourceBlock(event.target);
+            if (!(targetBlock instanceof HTMLElement) && event.target === visualDropMarker) {
+                targetBlock = draggedVisualDropTarget;
+            }
+            if (!(targetBlock instanceof HTMLElement) || targetBlock === draggedVisualBlock) {
+                visualDropMarker?.remove();
+                visualDropMarker = null;
+                draggedVisualDropTarget = null;
+                return;
+            }
+            const rect = targetBlock.getBoundingClientRect();
+            const before = event.clientY < (rect.top + (rect.height / 2));
+            if (visualDropMarker
+                && draggedVisualDropTarget === targetBlock
+                && draggedVisualDropBefore === before) return;
+            visualDropMarker?.remove();
+            visualDropMarker = document.createElement('div');
+            visualDropMarker.className = 'mdw-image-drop-marker';
+            visualDropMarker.dataset.mdwImageDropMarker = '1';
+            visualDropMarker.textContent = t('image_modal.drop_here', 'Drop image here');
+            visualDropMarker.setAttribute('contenteditable', 'false');
+            visualDropMarker.setAttribute('aria-hidden', 'true');
+            visualDropMarker.style.cssText = [
+                'display:block',
+                'border:2px dashed var(--accent, #2563eb)',
+                'border-radius:0.35rem',
+                'padding:0.35rem 0.6rem',
+                'margin:0.5rem 0',
+                'color:var(--accent, #2563eb)',
+                'font-size:0.85rem',
+                'font-weight:600',
+                'text-align:center',
+                'pointer-events:none',
+            ].join(';');
+            const parent = targetBlock.parentNode;
+            if (!(parent instanceof Node)) return;
+            parent.insertBefore(visualDropMarker, before ? targetBlock : targetBlock.nextSibling);
+            draggedVisualDropTarget = targetBlock;
+            draggedVisualDropBefore = before;
+        };
+        prev.addEventListener('dragstart', (e) => {
+            const target = e.target instanceof Element ? e.target.closest('img') : null;
+            const block = target instanceof HTMLImageElement ? visualSourceBlock(target) : null;
+            if (!(target instanceof HTMLImageElement)) return;
+            if (!(block instanceof HTMLElement)) {
+                e.preventDefault();
+                return;
+            }
+            const sourceStart = Number(block.dataset.mdwSrcStart);
+            const sourceEnd = Number(block.dataset.mdwSrcEnd);
+            const toEditorOffset = window.__mdwPreviewSourceOffsetToEditor;
+            if (typeof toEditorOffset !== 'function'
+                || !Number.isFinite(sourceStart)
+                || !Number.isFinite(sourceEnd)) {
+                e.preventDefault();
+                return;
+            }
+            const editorStart = toEditorOffset(sourceStart);
+            const editorEnd = toEditorOffset(sourceEnd);
+            if (!Number.isFinite(editorStart) || !Number.isFinite(editorEnd) || editorEnd <= editorStart) {
+                e.preventDefault();
+                return;
+            }
+            draggedVisualImage = target;
+            draggedVisualBlock = block;
+            draggedVisualSourceRange = {
+                start: editorStart,
+                end: editorEnd,
+            };
+            selectVisualImage(target);
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('application/x-mdw-image', 'move');
+                e.dataTransfer.setData('text/plain', '');
+            }
+        });
+        prev.addEventListener('dragover', (e) => {
+            if (!(draggedVisualBlock instanceof HTMLElement)) return;
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+            updateVisualDropMarker(e);
+        });
+        prev.addEventListener('drop', (e) => {
+            if (!(draggedVisualBlock instanceof HTMLElement)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            moveDraggedVisualImage(e);
+        });
+        prev.addEventListener('dragend', clearVisualDrag);
         prev.addEventListener('keyup', saveVisualSelection);
         prev.addEventListener('mouseup', saveVisualSelection);
         prev.addEventListener('focus', saveVisualSelection);
@@ -3429,12 +3642,19 @@
             if (!mod) return;
             if (e.key === 'z' || e.key === 'Z') {
                 e.preventDefault();
-                runVisualCommand(e.shiftKey ? 'redo' : 'undo');
+                if (e.shiftKey && typeof window.__mdwRedo === 'function') {
+                    window.__mdwRedo();
+                } else if (!e.shiftKey && typeof window.__mdwUndo === 'function') {
+                    window.__mdwUndo();
+                } else {
+                    runVisualCommand(e.shiftKey ? 'redo' : 'undo');
+                }
                 return;
             }
             if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
                 e.preventDefault();
-                runVisualCommand('redo');
+                if (typeof window.__mdwRedo === 'function') window.__mdwRedo();
+                else runVisualCommand('redo');
                 return;
             }
             if (!e.shiftKey && (e.key === 'b' || e.key === 'B')) {
@@ -4130,29 +4350,29 @@
             syncing = false;
         };
 
-        const syncFromPreview = () => {
+        const syncFromPreview = (rangeOverride = null) => {
             const map = getOffsetMap();
             const sel = document.getSelection();
-            if (!sel || !sel.rangeCount) {
+            if (!rangeOverride && (!sel || !sel.rangeCount)) {
                 debug('skip preview sync: no selection');
-                return;
+                return false;
             }
-            const range = sel.getRangeAt(0);
+            const range = rangeOverride || sel.getRangeAt(0);
             if (!range) {
                 debug('skip preview sync: no range');
-                return;
+                return false;
             }
             const startEl = getBlockFromNode(range.startContainer);
             const endEl = getBlockFromNode(range.endContainer);
             if (!(startEl instanceof HTMLElement) || !(endEl instanceof HTMLElement)) {
                 debug('skip preview sync: no source block for range');
-                return;
+                return false;
             }
             const startInfo = getMapForElement(startEl);
             const endInfo = getMapForElement(endEl);
             if (!startInfo || !endInfo) {
                 debug('skip preview sync: missing mapping', { hasStart: !!startInfo, hasEnd: !!endInfo });
-                return;
+                return false;
             }
             const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
             const endIndex = getDisplayIndex(endEl, range.endContainer, range.endOffset);
@@ -4162,19 +4382,20 @@
             const editorEnd = previewToEditorOffset(srcEnd, map);
             if (editorStart === null || editorEnd === null) {
                 debug('skip preview sync: selection in hidden metadata block');
-                return;
+                return false;
             }
             if (srcStart === srcEnd) {
                 syncing = true;
                 ta.setSelectionRange(editorStart, editorStart);
                 syncing = false;
                 renderSelectionOverlay(ta.value || '', editorStart, editorStart);
-                return;
+                return true;
             }
             syncing = true;
             ta.setSelectionRange(editorStart, editorEnd);
             syncing = false;
             renderSelectionOverlay(ta.value || '', editorStart, editorEnd);
+            return true;
         };
 
         const runSync = () => {
@@ -4207,23 +4428,47 @@
 
         const capturePreviewAnchor = (reason = 'preview_selection') => {
             const sel = document.getSelection?.();
-            if (!sel || !sel.rangeCount || !prev.contains(sel.anchorNode)) return null;
-            const range = sel.getRangeAt(0);
+            const activeRange = sel && sel.rangeCount && prev.contains(sel.anchorNode)
+                ? sel.getRangeAt(0)
+                : null;
+            const range = activeRange || visualSelectionRange;
+            if (!range || !isRangeInPreview(range)) {
+                mdwInsertionAnchor = null;
+                return null;
+            }
             const startEl = getBlockFromNode(range.startContainer);
-            if (!(startEl instanceof HTMLElement)) return null;
-            syncFromPreview();
+            if (!(startEl instanceof HTMLElement) || !syncFromPreview(range)) {
+                mdwInsertionAnchor = null;
+                return null;
+            }
             const start = Number(ta.selectionStart);
             const end = Number(ta.selectionEnd);
-            if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-            return setMdwInsertionAnchor({ source: 'preview', offset: start, end, reason });
+            if (!Number.isFinite(start) || !Number.isFinite(end)) {
+                mdwInsertionAnchor = null;
+                return null;
+            }
+            const bodyStart = previewBodyInsertionOffset(ta.value);
+            return setMdwInsertionAnchor({
+                source: 'preview',
+                offset: Math.max(start, bodyStart),
+                end: Math.max(end, bodyStart),
+                reason,
+            });
         };
 
-        return { reset, syncFromPreview, capturePreviewAnchor };
+        const previewSourceOffsetToEditor = (offset) => {
+            const value = Number(offset);
+            if (!Number.isFinite(value)) return null;
+            return previewToEditorOffset(value, getOffsetMap());
+        };
+
+        return { reset, syncFromPreview, capturePreviewAnchor, previewSourceOffsetToEditor };
     })();
 
     window.__mdwResetSelectionSync = selectionSync.reset;
     window.__mdwSyncPreviewSelectionToTextarea = selectionSync.syncFromPreview;
     window.__mdwCaptureVisualInsertionAnchor = selectionSync.capturePreviewAnchor;
+    window.__mdwPreviewSourceOffsetToEditor = selectionSync.previewSourceOffsetToEditor;
 
     window.__mdwHighlightEditorSearchRange = (start, end) => {
         const value = ta.value || '';
@@ -4429,6 +4674,23 @@
         }
     };
 
+    const undo = () => {
+        if (undoStack.length <= 1) return false;
+        const current = undoStack.pop();
+        if (current) redoStack.push(current);
+        applySnapshot(undoStack[undoStack.length - 1]);
+        return true;
+    };
+    const redo = () => {
+        const next = redoStack.pop();
+        if (!next) return false;
+        pushUndoSnapshot(next, { merge: false });
+        applySnapshot(next);
+        return true;
+    };
+    window.__mdwUndo = undo;
+    window.__mdwRedo = redo;
+
     // Seed initial state so shortcuts + programmatic edits are undoable.
     pushUndoSnapshot(snapshot(), { merge: false });
 
@@ -4456,29 +4718,15 @@
 
         if (e.key === 'z' || e.key === 'Z') {
             e.preventDefault();
-            if (e.shiftKey) {
-                const next = redoStack.pop();
-                if (!next) return;
-                pushUndoSnapshot(next, { merge: false });
-                applySnapshot(next);
-                return;
-            }
-
-            if (undoStack.length <= 1) return;
-            const current = undoStack.pop();
-            if (current) redoStack.push(current);
-            const prev = undoStack[undoStack.length - 1];
-            applySnapshot(prev);
+            if (e.shiftKey) redo();
+            else undo();
             return;
         }
 
         // Also support Ctrl+Y as redo (common on Windows/Linux).
         if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
             e.preventDefault();
-            const next = redoStack.pop();
-            if (!next) return;
-            pushUndoSnapshot(next, { merge: false });
-            applySnapshot(next);
+            redo();
         }
     });
 
@@ -5731,7 +5979,13 @@
             if (typeof window.__mdwCaptureVisualInsertionAnchor === 'function') {
                 window.__mdwCaptureVisualInsertionAnchor('toolbar_pointerdown');
             }
-            if (typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') window.__mdwSyncPreviewSelectionToTextarea();
+            // The image picker commits directly to the Markdown source using
+            // the captured preview anchor. Converting/syncing its selection a
+            // second time can replace a valid visual anchor with a stale one.
+            if (el.id !== 'addImageBtn'
+                && typeof window.__mdwSyncPreviewSelectionToTextarea === 'function') {
+                window.__mdwSyncPreviewSelectionToTextarea();
+            }
             const start = ta.selectionStart;
             const end = ta.selectionEnd;
             if (el === customFormat && Number.isInteger(start) && Number.isInteger(end)) {

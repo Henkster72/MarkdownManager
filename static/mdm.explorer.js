@@ -1558,13 +1558,6 @@
             focusRelative(-1);
             return;
         }
-        if (e.key === 'Delete') {
-            const file = getFileForActive();
-            if (!file) return;
-            e.preventDefault();
-            deleteFile(file);
-            return;
-        }
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
             const file = getFileForActive();
             if (!file) return;
@@ -1625,25 +1618,6 @@
         const activeEl = document.activeElement;
         const inExplorerTree = activeEl instanceof HTMLElement && !!activeEl.closest?.('#contentList');
         if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && inExplorerTree) {
-            return;
-        }
-
-        if (e.key === 'Delete' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            if (typeof window.__mdwCanDelete === 'function' && !window.__mdwCanDelete()) return;
-            const form = document.querySelector(`form.deleteForm[data-file="${CSS.escape(file)}"]`)
-                || document.querySelector('form.deleteForm');
-            if (!(form instanceof HTMLFormElement)) return;
-            e.preventDefault();
-            if (typeof form.requestSubmit === 'function') {
-                form.requestSubmit();
-                return;
-            }
-            const btn = form.querySelector('button[type="submit"], input[type="submit"]');
-            if (btn instanceof HTMLElement) {
-                btn.click();
-                return;
-            }
-            form.submit();
             return;
         }
 
