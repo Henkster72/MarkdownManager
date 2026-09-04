@@ -316,7 +316,8 @@
 
     const refreshAuthStatus = async () => {
         try {
-            const data = await authRequest({ action: 'status' });
+            const { role: storedRole, token: storedToken } = getStoredAuth();
+            const data = await authRequest({ action: 'status', role: storedRole, token: storedToken });
             meta.has_user = !!data.has_user;
             meta.has_superuser = !!data.has_superuser;
             if (data.shared_enabled === true) {

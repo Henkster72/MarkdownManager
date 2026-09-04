@@ -99,6 +99,11 @@ function mdw_auth_rate_limit_end($handle, array $state, bool $success): void {
 
 if ($action === 'status') {
     $sharedRole = mdw_shared_auth_current_role();
+    if ($sharedRole === '') {
+        $clientRole = isset($data['role']) ? (string)$data['role'] : '';
+        $clientToken = isset($data['token']) ? (string)$data['token'] : '';
+        $sharedRole = mdw_shared_auth_role_from_token($clientRole, $clientToken);
+    }
     $sharedToken = $sharedRole === 'superuser'
         ? $auth['superuser_hash']
         : ($sharedRole === 'user' ? $auth['user_hash'] : '');

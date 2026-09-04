@@ -2,6 +2,7 @@
 
 ## 0.97
 
+- Shared authentication: avoid destructive session-ID rotation races and validate the existing client token during status refresh, preventing NTG logins from being cleared immediately after successful authentication.
 - YouTube preview parity: shared editor CSS and visual-editor serialization now render YouTube iframe blocks consistently across instances, including legacy saved blocks with HTML break separators.
 - WPM page creation: fixed directory-form POST handling so new pages are actually created and opened immediately in the editor from both `index.php` and `edit.php`.
 - New-page metadata: new notes start as `Concept`, use the active-language subtitle label/placeholder, avoid duplicating the page title or filled subtitle in Markdown, and render metadata subtitles consistently as H2.

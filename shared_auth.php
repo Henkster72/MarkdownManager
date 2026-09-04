@@ -39,13 +39,24 @@ function mdw_shared_auth_login(string $role): bool
         return false;
     }
 
-    session_regenerate_id(true);
+    // Keep the old session file during the privilege transition. Proxies and
+    // concurrent browser requests can otherwise reopen the deleted session
+    // and make a successful login appear to disappear immediately.
+    session_regenerate_id(false);
     $_SESSION['mdw_shared_auth'] = [
         'instance' => mdw_shared_auth_instance(),
         'role' => $role,
         'expires_at' => time() + 8 * 60 * 60,
     ];
     return true;
+}
+
+function mdw_shared_auth_role_from_token(string $role, string $token): string
+{
+    if (!in_array($role, ['user', 'superuser'], true)) {
+        return '';
+    }
+    return mdw_auth_verify_token($role, $token) ? $role : '';
 }
 
 function mdw_shared_auth_login_with_password(string $password): string
