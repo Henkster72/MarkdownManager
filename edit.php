@@ -1493,6 +1493,7 @@ window.mermaid = mermaid;
 			                                'dirMap' => $dirMap,
 			                                'secretMap' => $secretMap,
 			                                'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+                                                'hide_markdown_editor' => $hideMarkdownEditor,
 			                                'folder_filter' => $folder_filter,
 			                                'current_file' => $requested,
 			                                'csrf_token' => $CSRF_TOKEN,
@@ -1738,11 +1739,11 @@ window.mermaid = mermaid;
                         </div>
                     </header>
                     <div class="pane-body preview-body">
-                        <div id="preview" class="preview-content<?= trim($current_html) === '' ? ' preview-create-target' : '' ?>"<?= trim($current_html) === '' ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('edit.empty_preview_hint', 'Choose a file or add a new file with')) . '"' : '' ?>>
+                        <div id="preview" class="preview-content<?= trim($current_html) === '' ? ' preview-create-target' : '' ?>"<?= trim($current_html) === '' ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('edit.empty_preview_hint', 'Choose a page or create a new page with')) . '"' : '' ?>>
                             <?php if (trim($current_html) === ''): ?>
                                 <span class="preview-empty-prompt">
-                                    <span><?=h(mdw_t('edit.empty_preview_hint','Choose a file or add a new file with'))?></span>
-                                    <span class="preview-empty-action" aria-hidden="true">+ <span class="pi pi-documentlabel"></span></span>
+                                    <span><?=h(mdw_t('edit.empty_preview_hint','Choose a page or create a new page with'))?></span>
+                                    <span class="preview-empty-action" aria-hidden="true"><span class="pi pi-documentlabel"></span>+</span>
                                 </span>
                             <?php else: ?>
                                 <?=$current_html?>

@@ -468,6 +468,7 @@ function explorer_view_render_tree($opts) {
     $dirMap = $opts['dirMap'] ?? [];
     $secretMap = $opts['secretMap'] ?? [];
     $publisher_mode = !empty($opts['publisher_mode']);
+    $hide_markdown_editor = !empty($opts['hide_markdown_editor']);
     $folder_filter = $opts['folder_filter'] ?? null;
     $folder_filter = is_string($folder_filter) ? trim($folder_filter) : null;
     if ($folder_filter === '' || $folder_filter === 'root') $folder_filter = null;
@@ -489,6 +490,11 @@ function explorer_view_render_tree($opts) {
     $current_folder_path = $current_file_path !== '' ? explorer_view_folder_from_path($current_file_path) : 'root';
     if (!is_string($current_folder_path) || $current_folder_path === '') $current_folder_path = 'root';
     $has_current_file = ($current_file_path !== '');
+
+    $new_md_toggle_key = $hide_markdown_editor
+        ? 'index.new_markdown.page_toggle_title'
+        : 'index.new_markdown.toggle_title';
+    $new_md_toggle_fallback = $hide_markdown_editor ? 'Create a new page' : 'Create a new Markdown file';
 
     $folderLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
     $fileLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
@@ -848,7 +854,7 @@ function explorer_view_render_tree($opts) {
 
             <?php if ($page === 'index' || $page === 'edit'): ?>
             <div class="nav-file-actions nav-file-actions-right nav-toolbar-actions">
-                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>"><span class="pi pi-documentlabel"></span>+</button>
+                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t($new_md_toggle_key, $new_md_toggle_fallback))?>" aria-label="<?=explorer_view_escape(explorer_view_t($new_md_toggle_key, $new_md_toggle_fallback))?>"><span class="pi pi-documentlabel"></span>+</button>
                 <?php if ($csrf_token && $server_superuser): ?>
                 <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
                     <span class="pi pi-folder"></span>

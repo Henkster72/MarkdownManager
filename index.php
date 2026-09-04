@@ -2147,6 +2147,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                             'dirMap' => $dirMap,
                             'secretMap' => $secretMap,
                             'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+                            'hide_markdown_editor' => $hideMarkdownEditor,
                             'folder_filter' => $folder_filter,
                             'current_file' => $indexSplitHasFile ? $requested : null,
                             'csrf_token' => $CSRF_TOKEN,
@@ -2219,7 +2220,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                         </div>
                     </header>
                     <div class="pane-body preview-body">
-                        <article id="preview" class="preview-content<?= $indexSplitCanCreateFromPreview ? ' preview-create-target' : '' ?>"<?= $indexSplitCanCreateFromPreview ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('index.new_markdown.title', 'New markdown')) . '"' : '' ?>>
+                        <article id="preview" class="preview-content<?= $indexSplitCanCreateFromPreview ? ' preview-create-target' : '' ?>"<?= $indexSplitCanCreateFromPreview ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t($hideMarkdownEditor ? 'index.new_markdown.page_title' : 'index.new_markdown.title', $hideMarkdownEditor ? 'New page' : 'New markdown')) . '"' : '' ?>>
                         <?php if ($indexSplitHasFile): ?>
                             <?=$article_html?>
                         <?php else: ?>
@@ -2304,6 +2305,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 		    'dirMap' => $dirMap,
 		    'secretMap' => $secretMap,
 		    'publisher_mode' => !empty($MDW_PUBLISHER_MODE),
+            'hide_markdown_editor' => $hideMarkdownEditor,
 		    'folder_filter' => $folder_filter,
 		    'csrf_token' => $CSRF_TOKEN,
 		    'show_actions' => true,

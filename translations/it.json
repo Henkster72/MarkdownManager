@@ -49,7 +49,8 @@
       "date_prefix_title": "Aggiunge un prefisso yy-mm-dd- al nome file.",
       "filename_placeholder": "mio-titolo",
       "content_placeholder": "# Titolo\n\nInizia a scrivere...",
-      "toggle_title": "Crea un nuovo file Markdown"
+      "toggle_title": "Crea un nuovo file Markdown",
+      "page_toggle_title": "Crea una nuova pagina"
     },
     "new_folder_title": "Crea una nuova cartella"
   },
@@ -113,7 +114,7 @@
       "collapse_overview": "Comprimi panoramica",
       "expand_overview": "Espandi panoramica"
     },
-    "empty_preview_hint": "Scegli un file o aggiungine uno nuovo con"
+    "empty_preview_hint": "Scegli una pagina o creane una nuova con"
   },
   "theme": {
     "settings_title": "Impostazioni",

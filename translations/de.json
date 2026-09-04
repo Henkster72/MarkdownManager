@@ -49,7 +49,8 @@
       "date_prefix_title": "Fügt dem Dateinamen ein yy-mm-dd- Präfix hinzu.",
       "filename_placeholder": "mein-titel",
       "content_placeholder": "# Titel\n\nSchreiben Sie los...",
-      "toggle_title": "Neue Markdown-Datei erstellen"
+      "toggle_title": "Neue Markdown-Datei erstellen",
+      "page_toggle_title": "Neue Seite erstellen"
     },
     "new_folder_title": "Neuen Ordner erstellen"
   },
@@ -113,7 +114,7 @@
       "collapse_overview": "Übersicht einklappen",
       "expand_overview": "Übersicht ausklappen"
     },
-    "empty_preview_hint": "Wählen Sie eine Datei aus oder fügen Sie eine neue Datei hinzu mit"
+    "empty_preview_hint": "Wählen Sie eine Seite aus oder erstellen Sie eine neue Seite mit"
   },
   "theme": {
     "settings_title": "Einstellungen",

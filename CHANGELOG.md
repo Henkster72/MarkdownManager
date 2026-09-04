@@ -12,6 +12,7 @@
 - WPM server-side pending-delete filtering: ordinary users no longer receive `ToDelete` rows in the initial PHP/JSON response, preventing a visible first-load flash; superuser sessions retain them.
 - Explorer toolbar: removed duplicate index edit/delete actions from the top file-action bar; document actions remain on each item, and the new-document button now places `+` after its document icon.
 - Explorer permissions: `newFolderBtn` is now rendered by PHP only for an authenticated superuser, eliminating the brief regular-user flash.
+- Hide-Markdown labels: the new-page toggle and empty preview prompt now use translated page wording in every supported language, with the `+` after the document icon.
 - Hide Markdown and toolbar layout: preview-copy controls are restricted for regular users when Markdown is hidden, and alignment/heading selects have fixed rem widths so their values remain visible beside the carets.
 - Translations: added synchronized subtitle and image drag-feedback strings for German, English, Spanish, French, Italian, Dutch, and Portuguese.
 

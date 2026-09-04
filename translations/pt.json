@@ -49,7 +49,8 @@
       "date_prefix_title": "Adiciona um prefixo yy-mm-dd- ao nome do ficheiro.",
       "filename_placeholder": "meu-titulo",
       "content_placeholder": "# Título\n\nComece a escrever...",
-      "toggle_title": "Criar um novo ficheiro Markdown"
+      "toggle_title": "Criar um novo ficheiro Markdown",
+      "page_toggle_title": "Criar uma nova página"
     },
     "new_folder_title": "Criar uma nova pasta"
   },
@@ -113,7 +114,7 @@
       "collapse_overview": "Recolher visão geral",
       "expand_overview": "Expandir visão geral"
     },
-    "empty_preview_hint": "Escolha um ficheiro ou adicione um novo com"
+    "empty_preview_hint": "Escolha uma página ou crie uma nova com"
   },
   "theme": {
     "settings_title": "Definições",

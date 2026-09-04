@@ -49,7 +49,8 @@
       "date_prefix_title": "Voegt een yy-mm-dd- prefix toe aan de bestandsnaam.",
       "filename_placeholder": "mijn-titel",
       "content_placeholder": "# Titel\n\nBegin met schrijven...",
-      "toggle_title": "Nieuwe Markdown aanmaken"
+      "toggle_title": "Nieuwe Markdown aanmaken",
+      "page_toggle_title": "Nieuwe pagina maken"
     },
     "new_folder_title": "Nieuwe map maken"
   },
@@ -114,7 +115,7 @@
       "collapse_overview": "Overzicht inklappen",
       "expand_overview": "Overzicht uitklappen"
     },
-    "empty_preview_hint": "Kies een bestand of voeg een nieuw bestand toe met"
+    "empty_preview_hint": "Kies een pagina of maak een nieuwe pagina met"
   },
   "article_meta": {
     "title": "Artikelmetadata",
