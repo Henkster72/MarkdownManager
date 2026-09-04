@@ -56,6 +56,22 @@ if (!str_contains($html, 'data-mdw-macro="special.bigheader"') || !str_contains(
     exit(1);
 }
 
+$youtubeHtml = md_to_html(implode("\n", [
+    '<iframe src="https://www.youtube.com/embed/uFFWU7zTbQI" frameborder="0"></iframe>',
+    '{: class="lazyload ytframe"}',
+    '{: class="ytframe-wrapper"}',
+]), 'test.md');
+if (!preg_match('/<div class="ytframe-wrapper"[^>]*><iframe class="lazyload ytframe" src="https:\/\/www\.youtube\.com\/embed\/uFFWU7zTbQI"/', $youtubeHtml)) {
+    fwrite(STDERR, "YouTube iframe blocks must render as a wrapped preview iframe\n");
+    exit(1);
+}
+
+$legacyYoutubeHtml = md_to_html('<iframe src="https://www.youtube.com/embed/uFFWU7zTbQI" frameborder="0"></iframe><br>{: class="lazyload ytframe"}<br>{: class="ytframe-wrapper"}', 'test.md');
+if (!preg_match('/<div class="ytframe-wrapper"[^>]*><iframe class="lazyload ytframe" src="https:\/\/www\.youtube\.com\/embed\/uFFWU7zTbQI"/', $legacyYoutubeHtml)) {
+    fwrite(STDERR, "Legacy YouTube blocks with HTML breaks must be normalized\n");
+    exit(1);
+}
+
 $blogDateHtml = md_to_html(implode("\n", [
     '{blog: True}',
     '{post_date: 2023-10-28}',

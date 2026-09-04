@@ -3521,6 +3521,21 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $tocLayout = ($tocMenu === 'left' || $tocMenu === 'right') ? $tocMenu : '';
 
     $text = str_replace(["\r\n","\r"], "\n", $body);
+    $normalizedYoutubeText = preg_replace_callback(
+        '~(<iframe\b[^>]*>\s*</iframe>)\s*(?:<br\s*/?>\s*)+({:\s*[^}]*})\s*(?:<br\s*/?>\s*)+({:\s*[^}]*})~i',
+        static function ($match) {
+            $attributes = strtolower((string)($match[2] ?? '') . ' ' . (string)($match[3] ?? ''));
+            if (strpos($attributes, 'ytframe-wrapper') === false || strpos($attributes, 'ytframe') === false) {
+                return $match[0];
+            }
+            return $match[1] . "\n" . $match[2] . "\n" . $match[3];
+        },
+        $text
+    );
+    if (is_string($normalizedYoutubeText) && $normalizedYoutubeText !== $text) {
+        $text = $normalizedYoutubeText;
+        $lineMap = null;
+    }
     $sectionIncludesExpanded = false;
     $text = mdw_preview_expand_section_includes($text, $mdPath, $meta, $sectionIncludesExpanded);
     if ($expandAutoSections) {

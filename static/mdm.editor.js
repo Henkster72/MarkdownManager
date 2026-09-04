@@ -2779,6 +2779,22 @@
                 .join('\n\n');
         }
         const tag = node.tagName.toLowerCase();
+        if (node.matches('.ytframe-wrapper, .video-wrapper')) {
+            const iframe = node.querySelector('iframe');
+            const src = String(iframe?.getAttribute('src') || '').trim();
+            if (/^https?:\/\/(?:www\.)?youtube\.com\/embed\//i.test(src)) {
+                const safeClasses = (value, fallback) => {
+                    const classes = String(value || '').split(/\s+/)
+                        .map((name) => name.trim())
+                        .filter((name) => /^[A-Za-z0-9_:\-/\[\].%]+$/.test(name));
+                    return classes.join(' ') || fallback;
+                };
+                const iframeClasses = safeClasses(iframe?.getAttribute('class'), 'lazyload ytframe');
+                const wrapperClasses = safeClasses(node.getAttribute('class'), 'ytframe-wrapper');
+                const source = src.replace(/[\r\n"]/g, '');
+                return `<iframe src="${source}" frameborder="0"></iframe>\n{: class="${iframeClasses}"}\n{: class="${wrapperClasses}"}`;
+            }
+        }
         const alignClassFor = (el) => {
             if (!(el instanceof HTMLElement)) return '';
             if (el.classList.contains('right') || el.classList.contains('align-right')) return 'right';
@@ -3323,6 +3339,10 @@
         if (!isVisualEditorMode()) return false;
         if (isMarkdownTable(text)) {
             return insertVisualTable();
+        }
+        const youtubeMatch = text.match(/<iframe\b[^>]*\bsrc="([^"]+)"[^>]*><\/iframe>/i);
+        if (youtubeMatch && /^https?:\/\/(?:www\.)?youtube\.com\/embed\//i.test(youtubeMatch[1])) {
+            return insertVisualHtml(`<div class="ytframe-wrapper"><iframe class="lazyload ytframe" src="${escapeHtml(youtubeMatch[1])}" frameborder="0" allowfullscreen></iframe></div>`);
         }
         const imageMatch = text.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
         if (imageMatch) {
