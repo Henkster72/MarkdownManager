@@ -484,6 +484,7 @@ function explorer_view_render_tree($opts) {
     $lazy_cache_ttl_ms = isset($opts['lazy_cache_ttl_ms']) ? (int)$opts['lazy_cache_ttl_ms'] : 300000;
     if ($lazy_cache_ttl_ms < 0) $lazy_cache_ttl_ms = 0;
     $show_pending_deletes = !array_key_exists('show_pending_deletes', $opts) || !empty($opts['show_pending_deletes']);
+    $server_superuser = !empty($opts['server_superuser']);
     $current_file_path = is_string($current_file) ? trim($current_file) : '';
     $current_folder_path = $current_file_path !== '' ? explorer_view_folder_from_path($current_file_path) : 'root';
     if (!is_string($current_folder_path) || $current_folder_path === '') $current_folder_path = 'root';
@@ -848,7 +849,7 @@ function explorer_view_render_tree($opts) {
             <?php if ($page === 'index' || $page === 'edit'): ?>
             <div class="nav-file-actions nav-file-actions-right nav-toolbar-actions">
                 <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>"><span class="pi pi-documentlabel"></span>+</button>
-                <?php if ($csrf_token): ?>
+                <?php if ($csrf_token && $server_superuser): ?>
                 <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
                     <span class="pi pi-folder"></span>
                     <span>+</span>
