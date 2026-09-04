@@ -2177,11 +2177,30 @@
         && typeof window.__mdwIsSuperuser === 'function'
         && window.__mdwIsSuperuser();
     const isUserHiddenRow = (row) => row instanceof HTMLElement && row.dataset.userHidden === 'true';
+    const isPendingDeleteRow = (row) => row instanceof HTMLElement && isPendingDeleteState(row.dataset.publishState || '');
+    const isHiddenForUsersRow = (row) => isUserHiddenRow(row) || isPendingDeleteRow(row);
+    const syncUserVisibilityButton = (row, button) => {
+        if (!(row instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) return;
+        const pendingDelete = isPendingDeleteRow(row);
+        const hidden = isHiddenForUsersRow(row);
+        button.classList.toggle('is-hidden', hidden);
+        button.disabled = pendingDelete;
+        button.title = pendingDelete
+            ? t('explorer.visibility.pending_delete_hidden', 'Hidden pending deletion')
+            : (hidden
+                ? t('explorer.visibility.show_to_users', 'Show to users')
+                : t('explorer.visibility.hide_from_users', 'Hide from users'));
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    };
     const makeUserVisibilityControl = (row) => {
         if (!(row instanceof HTMLElement) || !canManageUserVisibility()) return;
-        if (row.querySelector('.user-visibility-toggle')) return;
+        const existing = row.querySelector('.user-visibility-toggle');
+        if (existing instanceof HTMLButtonElement) {
+            syncUserVisibilityButton(row, existing);
+            return;
+        }
 
-        const hidden = isUserHiddenRow(row);
         let actions = row.querySelector(':scope > .note-actions');
         if (!(actions instanceof HTMLElement)) {
             actions = document.createElement('div');
@@ -2191,19 +2210,15 @@
         }
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = `btn btn-ghost icon-button user-visibility-toggle${hidden ? ' is-hidden' : ''}`;
+        button.className = 'btn btn-ghost icon-button user-visibility-toggle';
         button.dataset.userVisibilityToggle = '1';
-        button.title = hidden
-            ? t('explorer.visibility.show_to_users', 'Show to users')
-            : t('explorer.visibility.hide_from_users', 'Hide from users');
-        button.setAttribute('aria-label', button.title);
-        button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         const icon = document.createElement('span');
         icon.className = 'pi pi-eye';
         icon.setAttribute('aria-hidden', 'true');
         button.appendChild(icon);
         actions.appendChild(button);
         row.classList.add('has-user-visibility');
+        syncUserVisibilityButton(row, button);
     };
     const syncUserVisibilityControls = () => {
         const canManage = canManageUserVisibility();

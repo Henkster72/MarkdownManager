@@ -57,6 +57,7 @@
     "visibility": {
       "hide_from_users": "Verbergen voor gebruikers",
       "show_to_users": "Tonen aan gebruikers",
+      "pending_delete_hidden": "Verborgen in afwachting van verwijdering",
       "update_failed": "Bestandszichtbaarheid kon niet worden bijgewerkt."
     }
   },

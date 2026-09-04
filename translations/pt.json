@@ -57,6 +57,7 @@
     "visibility": {
       "hide_from_users": "Ocultar dos utilizadores",
       "show_to_users": "Mostrar aos utilizadores",
+      "pending_delete_hidden": "Oculto enquanto aguarda eliminação",
       "update_failed": "Não foi possível atualizar a visibilidade do ficheiro."
     }
   },

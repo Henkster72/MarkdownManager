@@ -57,6 +57,7 @@
     "visibility": {
       "hide_from_users": "Hide from users",
       "show_to_users": "Show to users",
+      "pending_delete_hidden": "Hidden pending deletion",
       "update_failed": "Could not update file visibility."
     }
   },

@@ -8,6 +8,7 @@
 - Visual editor images: image insertion anchors safely to the Markdown body, while preview drag-and-drop moves Markdown image blocks with a visible drop marker and undo-safe source updates instead of converting them to links.
 - WPM delete/recreate: files marked `ToDelete` are treated as pending deletions, so creating the same filename again cancels that pending deletion instead of incorrectly reporting that the file already exists.
 - WPM deletion visibility: regular users no longer see pending deletions, which are shown as `Concept`; only a superuser can permanently remove the file.
+- WPM pending-delete visibility: superusers now see the user-visibility eye crossed out for `ToDelete` files, and the control is disabled because the hidden state is enforced by the pending deletion.
 - WPM publisher deletion: confirmed superuser deletions now remove the managed template and generated page output from the site on the next publisher run, with conflict checks and status reporting.
 - Hide Markdown and toolbar layout: preview-copy controls are restricted for regular users when Markdown is hidden, and alignment/heading selects have fixed rem widths so their values remain visible beside the carets.
 - Translations: added synchronized subtitle and image drag-feedback strings for German, English, Spanish, French, Italian, Dutch, and Portuguese.

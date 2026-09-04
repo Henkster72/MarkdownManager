@@ -57,6 +57,7 @@
     "visibility": {
       "hide_from_users": "Vor Benutzern verbergen",
       "show_to_users": "Benutzern anzeigen",
+      "pending_delete_hidden": "Während der Löschung verborgen",
       "update_failed": "Die Dateisichtbarkeit konnte nicht aktualisiert werden."
     }
   },
