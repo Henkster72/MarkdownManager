@@ -1,21 +1,19 @@
 # Changelog
 
+## 0.971
+
+- WPM pending-delete lifecycle: recreating a file cancels its pending deletion; regular users no longer receive `ToDelete` rows, while superusers see them as hidden `Concept` items with permanent deletion restricted to superusers.
+- Explorer permissions and actions: duplicate toolbar actions were removed, the new-folder control is rendered by PHP only for superusers, and the document `+` placement was corrected.
+- Hide-Markdown labels: translated page wording now covers new-page controls, empty previews, empty folders, and the folder-focused explorer state in every supported language.
+- YouTube previews: shared responsive iframe styling, visual-editor serialization, and legacy `<br>` compatibility now keep YouTube blocks consistent across instances.
+- Shared authentication: race-safe session rotation and client-token recovery prevent successful NTG logins from being cleared immediately.
+
 ## 0.97
 
-- Shared authentication: avoid destructive session-ID rotation races and validate the existing client token during status refresh, preventing NTG logins from being cleared immediately after successful authentication.
-- YouTube preview parity: shared editor CSS and visual-editor serialization now render YouTube iframe blocks consistently across instances, including legacy saved blocks with HTML break separators.
 - WPM page creation: fixed directory-form POST handling so new pages are actually created and opened immediately in the editor from both `index.php` and `edit.php`.
 - New-page metadata: new notes start as `Concept`, use the active-language subtitle label/placeholder, avoid duplicating the page title or filled subtitle in Markdown, and render metadata subtitles consistently as H2.
 - Shared settings: `index.php` and `edit.php` now use the same settings modal, including the superuser `internal_link_prefix` setting.
 - Visual editor images: image insertion anchors safely to the Markdown body, while preview drag-and-drop moves Markdown image blocks with a visible drop marker and undo-safe source updates instead of converting them to links.
-- WPM delete/recreate: files marked `ToDelete` are treated as pending deletions, so creating the same filename again cancels that pending deletion instead of incorrectly reporting that the file already exists.
-- WPM deletion visibility: regular users no longer see pending deletions, which are shown as `Concept`; only a superuser can permanently remove the file.
-- WPM pending-delete visibility: superusers now see the user-visibility eye crossed out for `ToDelete` files, and the control is disabled because the hidden state is enforced by the pending deletion.
-- WPM server-side pending-delete filtering: ordinary users no longer receive `ToDelete` rows in the initial PHP/JSON response, preventing a visible first-load flash; superuser sessions retain them.
-- Explorer toolbar: removed duplicate index edit/delete actions from the top file-action bar; document actions remain on each item, and the new-document button now places `+` after its document icon.
-- Explorer permissions: `newFolderBtn` is now rendered by PHP only for an authenticated superuser, eliminating the brief regular-user flash.
-- Hide-Markdown labels: the new-page toggle and empty preview prompt now use translated page wording in every supported language, with the `+` after the document icon.
-- Empty WPM folders: hidden-Markdown mode now shows translated “no pages yet” text instead of “no notes yet”.
 - Hide Markdown and toolbar layout: preview-copy controls are restricted for regular users when Markdown is hidden, and alignment/heading selects have fixed rem widths so their values remain visible beside the carets.
 - Translations: added synchronized subtitle and image drag-feedback strings for German, English, Spanish, French, Italian, Dutch, and Portuguese.
 
