@@ -115,6 +115,7 @@ if ($github_pages_plugin_loaded) {
 function h($s){ return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
 require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/shared_auth.php';
 require_once __DIR__ . '/themes_lib.php';
 
 $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
@@ -190,6 +191,10 @@ $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
     'has_superuser' => !empty($MDW_AUTH['superuser_hash']),
 ];
+$MDW_SERVER_AUTH_ROLE = function_exists('mdw_shared_auth_current_role')
+    ? mdw_shared_auth_current_role()
+    : '';
+$MDW_SHOW_PENDING_DELETES = !$MDW_PUBLISHER_MODE || $MDW_SERVER_AUTH_ROLE === 'superuser';
 $APP_TITLE_OVERRIDE = trim((string)($MDW_SETTINGS['app_title'] ?? ''));
 $APP_NAME = $APP_TITLE_OVERRIDE !== '' ? $APP_TITLE_OVERRIDE : 'Markdown Manager';
 $META_CFG_CLIENT = $META_CFG;
@@ -534,12 +539,12 @@ function mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode
     ];
 }
 
-function mdw_explorer_collect_notes_payload($rootList, $dirMap, $secretMap, $publisherMode) {
+function mdw_explorer_collect_notes_payload($rootList, $dirMap, $secretMap, $publisherMode, $showPendingDeletes = true) {
     $notes = [];
     if (is_array($rootList)) {
         foreach ($rootList as $entry) {
             $row = mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode);
-            if (is_array($row)) $notes[] = $row;
+            if (is_array($row) && ($showPendingDeletes || !explorer_view_is_pending_delete_state($row['publish_state'] ?? ''))) $notes[] = $row;
         }
     }
     if (is_array($dirMap)) {
@@ -547,7 +552,7 @@ function mdw_explorer_collect_notes_payload($rootList, $dirMap, $secretMap, $pub
             if (!is_array($list)) continue;
             foreach ($list as $entry) {
                 $row = mdw_explorer_note_payload_from_entry($entry, $secretMap, $publisherMode);
-                if (is_array($row)) $notes[] = $row;
+                if (is_array($row) && ($showPendingDeletes || !explorer_view_is_pending_delete_state($row['publish_state'] ?? ''))) $notes[] = $row;
             }
         }
     }
@@ -643,7 +648,7 @@ function mdw_search_collect_md_entries() {
 }
 
 function mdw_search_markdown($query, $limit = 50) {
-    global $MDW_PUBLISHER_MODE;
+    global $MDW_PUBLISHER_MODE, $MDW_SHOW_PENDING_DELETES;
     $terms = mdw_search_terms($query);
     if (empty($terms)) return [];
     $limit = max(1, min(100, (int)$limit));
@@ -664,8 +669,9 @@ function mdw_search_markdown($query, $limit = 50) {
         $info = explorer_view_extract_md_title_and_meta_from_file(
             $full,
             $basename,
-            $publisherMode ? ['page_title'] : []
+            $publisherMode ? ['page_title', 'publishstate'] : []
         );
+        if ($publisherMode && !$MDW_SHOW_PENDING_DELETES && explorer_view_is_pending_delete_state($info['meta']['publishstate'] ?? '')) continue;
         $metaTitle = $publisherMode ? trim((string)($info['meta']['page_title'] ?? '')) : '';
         $title = $metaTitle !== '' ? $metaTitle : (string)($info['title'] ?? $basename);
         $raw = @file_get_contents($full);
@@ -988,7 +994,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['json']) && $_GET['json
         $rootListForJson,
         $dirMapForJson,
         $secretMapForJson,
-        $publisherModeForJson
+        $publisherModeForJson,
+        $MDW_SHOW_PENDING_DELETES
     );
     header('Cache-Control: private, max-age=120');
     header('Vary: Accept-Encoding');
@@ -1728,20 +1735,23 @@ if ($requested) {
             $p = $e['path'];
             if (!is_string($p) || $p === '') continue;
             if (is_secret_file($p) && !is_secret_authenticated()) continue;
-            $paths[] = $p;
             $userHidden = false;
+            $publishStateForNav = '';
             if ($MDW_PUBLISHER_MODE) {
                 $info = explorer_view_extract_md_title_and_meta_from_file(
                     __DIR__ . '/' . $p,
                     (string)($e['basename'] ?? basename($p)),
-                    ['user_hidden']
+                    ['user_hidden', 'publishstate']
                 );
                 $userHidden = mdw_hidden_meta_is_truthy($info['meta']['user_hidden'] ?? '');
+                $publishStateForNav = mdw_publisher_normalize_publishstate($info['meta']['publishstate'] ?? '');
+                if (!$MDW_SHOW_PENDING_DELETES && explorer_view_is_pending_delete_state($publishStateForNav)) continue;
             }
+            $paths[] = $p;
             $view_nav_items[] = [
                 'path' => $p,
                 'user_hidden' => $userHidden,
-                'publish_state' => mdw_publisher_normalize_publishstate($info['meta']['publishstate'] ?? ''),
+                'publish_state' => $publishStateForNav,
             ];
         }
 
@@ -2141,6 +2151,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
                             'current_file' => $indexSplitHasFile ? $requested : null,
                             'csrf_token' => $CSRF_TOKEN,
                             'show_actions' => true,
+                            'show_pending_deletes' => $MDW_SHOW_PENDING_DELETES,
                             'show_filter_row' => true,
                             'show_filter_reset' => true,
                             'sticky_controls' => true,
@@ -2295,6 +2306,7 @@ window.MDW_CURRENT_MD = <?= mdw_json_for_script($raw) ?>;
 		    'folder_filter' => $folder_filter,
 		    'csrf_token' => $CSRF_TOKEN,
 		    'show_actions' => true,
+            'show_pending_deletes' => $MDW_SHOW_PENDING_DELETES,
             'lazy_notes' => $explorerUseLazyNotes,
             'lazy_endpoint' => $explorerLazyEndpoint,
             'lazy_cache_ttl_ms' => 300000,

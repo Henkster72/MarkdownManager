@@ -199,6 +199,7 @@ function mdw_perm_diag($fullPath) {
 }
 
 require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/shared_auth.php';
 require_once __DIR__ . '/themes_lib.php';
 
 $STATIC_DIR = sanitize_folder_name(env_str('STATIC_DIR', 'static') ?? '') ?? 'static';
@@ -264,6 +265,10 @@ $MDW_AUTH_META = [
     'has_user' => !empty($MDW_AUTH['user_hash']),
     'has_superuser' => !empty($MDW_AUTH['superuser_hash']),
 ];
+$MDW_SERVER_AUTH_ROLE = function_exists('mdw_shared_auth_current_role')
+    ? mdw_shared_auth_current_role()
+    : '';
+$MDW_SHOW_PENDING_DELETES = !$MDW_PUBLISHER_MODE || $MDW_SERVER_AUTH_ROLE === 'superuser';
 $APP_TITLE_OVERRIDE = trim((string)($MDW_SETTINGS['app_title'] ?? ''));
 $APP_NAME = $APP_TITLE_OVERRIDE !== '' ? $APP_TITLE_OVERRIDE : 'Markdown Manager';
 $META_CFG_CLIENT = $META_CFG;
@@ -1492,6 +1497,7 @@ window.mermaid = mermaid;
 			                                'current_file' => $requested,
 			                                'csrf_token' => $CSRF_TOKEN,
 			                                'show_actions' => false,
+                                                'show_pending_deletes' => $MDW_SHOW_PENDING_DELETES,
 			                                'plugins_enabled' => false,
                                             'show_filter_row' => true,
                                             'show_filter_reset' => false,

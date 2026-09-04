@@ -289,6 +289,7 @@
         if (typeof window.__mdwMaybeShowWpmSetup === 'function') {
             window.__mdwMaybeShowWpmSetup();
         }
+        window.location.reload();
     };
 
     const setup = async () => {

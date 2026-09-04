@@ -16,6 +16,11 @@ function explorer_view_t($key, $fallback = '') {
     return is_string($fallback) ? $fallback : '';
 }
 
+function explorer_view_is_pending_delete_state($state) {
+    $state = strtolower(trim((string)$state));
+    return in_array($state, ['to delete', 'todelete', 'to-delete'], true);
+}
+
 function explorer_view_url_encode_path($path) {
     if (function_exists('url_encode_path')) return url_encode_path($path);
     $path = str_replace("\\", "/", (string)$path);
@@ -478,6 +483,7 @@ function explorer_view_render_tree($opts) {
     $lazy_endpoint = isset($opts['lazy_endpoint']) ? trim((string)$opts['lazy_endpoint']) : '';
     $lazy_cache_ttl_ms = isset($opts['lazy_cache_ttl_ms']) ? (int)$opts['lazy_cache_ttl_ms'] : 300000;
     if ($lazy_cache_ttl_ms < 0) $lazy_cache_ttl_ms = 0;
+    $show_pending_deletes = !array_key_exists('show_pending_deletes', $opts) || !empty($opts['show_pending_deletes']);
     $current_file_path = is_string($current_file) ? trim($current_file) : '';
     $current_folder_path = $current_file_path !== '' ? explorer_view_folder_from_path($current_file_path) : 'root';
     if (!is_string($current_folder_path) || $current_folder_path === '') $current_folder_path = 'root';
@@ -591,7 +597,7 @@ function explorer_view_render_tree($opts) {
     }
     $current_folder = $current_file ? explorer_view_folder_from_path($current_file) : null;
 
-    $renderNotes = function($list, $folderPath, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token, $lazy_notes) {
+    $renderNotes = function($list, $folderPath, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token, $lazy_notes, $show_pending_deletes) {
         $folderPath = trim((string)$folderPath);
         if ($folderPath === '') $folderPath = 'root';
     ?>
@@ -621,6 +627,7 @@ function explorer_view_render_tree($opts) {
                     : ($rawState !== '' ? $rawState : 'Concept');
                 if ($publishState === '') $publishState = 'Concept';
                 $publishStateLabel = $publishState;
+                if (!$show_pending_deletes && explorer_view_is_pending_delete_state($publishState)) continue;
             }
             $rawDate = trim((string)($info['meta']['post_date'] ?? ''));
             if ($publisher_mode) {
