@@ -1513,9 +1513,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
             } else {
                 $full = mdw_safe_full_path($sanNew, false);
                 $existingFull = mdw_safe_full_path($sanNew, true);
+                $recreatePendingDelete = !empty($MDW_PUBLISHER_MODE)
+                    && $existingFull
+                    && is_file($existingFull)
+                    && mdw_publisher_should_hide_md_entry($sanNew);
                 if (!$full) {
                     $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
-                } else if ($existingFull && is_file($existingFull)) {
+                } else if ($existingFull && is_file($existingFull) && !$recreatePendingDelete) {
                     $_SESSION['flash_error'] = mdw_t('flash.file_exists_prefix', 'File already exists:') . ' ' . $sanNew;
                 } else if (!$existingFull && file_exists($full)) {
                     $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
