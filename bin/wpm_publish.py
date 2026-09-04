@@ -280,12 +280,7 @@ def managed_template_state(site_dir: Path, active_files: dict[str, Path]) -> dic
     return state
 
 
-def write_status(
-    shadow_dir: Path,
-    active_files: dict[str, Path],
-    processed: list[str],
-    deleted: list[str] | None = None,
-) -> None:
+def write_status(shadow_dir: Path, active_files: dict[str, Path], processed: list[str]) -> None:
     latest_rel = ""
     latest_mtime = 0.0
     for rel, path in active_files.items():
@@ -300,7 +295,6 @@ def write_status(
         "last_markdown_change_at": datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat() if latest_mtime else "",
         "last_markdown_change": latest_rel,
         "published": processed,
-        "deleted": deleted or [],
     }
     status_path = shadow_dir.parent / ".wpm-status.json"
     temp_path = status_path.with_suffix(".json.tmp")
@@ -373,68 +367,6 @@ def output_paths(rel: str) -> list[str]:
         "sitemap.xml",
         "robots.txt",
     ]
-
-
-def remove_deleted_markdown(
-    shadow_dir: Path,
-    site_dir: Path,
-    remote_files: dict[str, Path],
-    known_files: dict[str, str],
-    template_state: dict[str, object],
-) -> list[str]:
-    """Remove confirmed vBook deletions from the shadow and managed templates."""
-    deleted: list[str] = []
-    for rel, previous_hash in sorted(known_files.items()):
-        if rel in remote_files:
-            continue
-        relative = Path(rel)
-        if relative.is_absolute() or ".." in relative.parts:
-            raise RuntimeError(f"invalid tracked Markdown path: {rel}")
-
-        shadow_path = shadow_dir / relative
-        if shadow_path.is_file() and digest(shadow_path) != str(previous_hash):
-            raise RuntimeError(f"WPM delete conflict: {rel}")
-
-        template_path = site_dir / "templates" / relative.with_suffix(".html")
-        template_info = template_state.get(rel, {})
-        expected_template_hash = (
-            str(template_info.get("template", ""))
-            if isinstance(template_info, dict)
-            else ""
-        )
-        if template_path.is_file():
-            if expected_template_hash and digest(template_path) != expected_template_hash:
-                raise RuntimeError(f"WPM template delete conflict: {rel}")
-            if managed_template_source(template_path) != rel:
-                raise RuntimeError(f"WPM template delete conflict: {rel}")
-            template_path.unlink()
-        if shadow_path.is_file():
-            shadow_path.unlink()
-        deleted.append(rel)
-    return deleted
-
-
-def remove_remote_page(site_env: dict[str, str], rel: str) -> None:
-    """Remove the generated page for a deleted Markdown source."""
-    host = site_env.get("SSH_ADDRESS", "")
-    user = site_env.get("SSH_USER", "")
-    remote_root = site_env.get("SSH_DIR", "").rstrip("/")
-    if not all((host, user, remote_root)):
-        raise RuntimeError("SSH_ADDRESS, SSH_USER and SSH_DIR are required")
-    page_path = remote_root + "/" + output_paths(rel)[0]
-    remote_target = f"{user}@{host}"
-    command = "rm -f -- " + shlex.quote(page_path)
-    run(ssh_prefix(site_env) + [
-        "ssh", "-F", "/dev/null", "-o", "StrictHostKeyChecking=accept-new",
-        remote_target, command,
-    ])
-
-
-def remove_local_page(site_dir: Path, rel: str) -> None:
-    output_dir = site_dir / "output"
-    page_path = output_dir / output_paths(rel)[0]
-    if page_path.is_file():
-        page_path.unlink()
 
 
 def upload_outputs(site_env: dict[str, str], site_dir: Path, rel: str) -> None:
@@ -525,16 +457,6 @@ def _publish_main() -> int:
     if conflicts:
         raise RuntimeError("WPM sync conflict: " + ", ".join(conflicts))
 
-    deleted = remove_deleted_markdown(shadow_dir, site_dir, remote_files, known, template_state)
-    for rel in deleted:
-        remove_local_page(site_dir, rel)
-    if deleted:
-        render_site(site_dir)
-        for rel in deleted:
-            remove_remote_page(site_env, rel)
-            upload_outputs(site_env, site_dir, rel)
-        purge_remote_cache(site_env)
-
     imported = reconcile_templates(site_dir, active_files, template_state)
     for rel in imported:
         push_markdown(editor_env, active_files[rel], rel)
@@ -566,25 +488,19 @@ def _publish_main() -> int:
         "files": next_state,
         "templates": managed_template_state(site_dir, active_files),
     }, indent=2) + "\n", encoding="utf-8")
-    write_status(shadow_dir, active_files, processed, deleted)
-    if processed or deleted:
+    write_status(shadow_dir, active_files, processed)
+    if processed:
         site = instance_name(args.instance_env)
         notify_ntfy(
             instance_env,
             site,
             f'WPM {site}: render geslaagd',
             'Site: ' + site + '\n' +
-            'Gepubliceerd: ' + (', '.join(processed) if processed else 'geen') + '\n' +
-            'Verwijderd: ' + (', '.join(deleted) if deleted else 'geen') + '\n' +
-            'Resultaat: site bijgewerkt.',
+            'Bestanden: ' + ', '.join(processed) + '\n' +
+            'Resultaat: gerenderd, live gezet en op Published gezet.',
             'white_check_mark,computer',
         )
-    result_parts = []
-    if processed:
-        result_parts.append("published=" + ",".join(processed))
-    if deleted:
-        result_parts.append("deleted=" + ",".join(deleted))
-    print("WPM publish: " + (" ".join(result_parts) if result_parts else "no Processing files"))
+    print("WPM publish: " + (", ".join(processed) if processed else "no Processing files"))
     return 0
 
 
