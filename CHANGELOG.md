@@ -10,6 +10,7 @@
 - WPM deletion visibility: regular users no longer see pending deletions, which are shown as `Concept`; only a superuser can permanently remove the file.
 - WPM pending-delete visibility: superusers now see the user-visibility eye crossed out for `ToDelete` files, and the control is disabled because the hidden state is enforced by the pending deletion.
 - WPM server-side pending-delete filtering: ordinary users no longer receive `ToDelete` rows in the initial PHP/JSON response, preventing a visible first-load flash; superuser sessions retain them.
+- Explorer toolbar: removed duplicate index edit/delete actions from the top file-action bar; document actions remain on each item, and the new-document button now places `+` after its document icon.
 - Hide Markdown and toolbar layout: preview-copy controls are restricted for regular users when Markdown is hidden, and alignment/heading selects have fixed rem widths so their values remain visible beside the carets.
 - Translations: added synchronized subtitle and image drag-feedback strings for German, English, Spanish, French, Italian, Dutch, and Portuguese.
 

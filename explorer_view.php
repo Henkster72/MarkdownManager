@@ -487,10 +487,6 @@ function explorer_view_render_tree($opts) {
     $current_file_path = is_string($current_file) ? trim($current_file) : '';
     $current_folder_path = $current_file_path !== '' ? explorer_view_folder_from_path($current_file_path) : 'root';
     if (!is_string($current_folder_path) || $current_folder_path === '') $current_folder_path = 'root';
-    $current_edit_href = 'edit.php';
-    if ($current_file_path !== '') {
-        $current_edit_href = 'edit.php?file=' . rawurlencode($current_file_path) . '&folder=' . rawurlencode($current_folder_path);
-    }
     $has_current_file = ($current_file_path !== '');
 
     $folderLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
@@ -851,7 +847,7 @@ function explorer_view_render_tree($opts) {
 
             <?php if ($page === 'index' || $page === 'edit'): ?>
             <div class="nav-file-actions nav-file-actions-right nav-toolbar-actions">
-                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>">+<span class="pi pi-documentlabel"></span></button>
+                <button id="newMdToggle" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_markdown.toggle_title','Create a new Markdown file'))?>"><span class="pi pi-documentlabel"></span>+</button>
                 <?php if ($csrf_token): ?>
                 <button id="newFolderBtn" type="button" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('index.new_folder_title','Create a new folder'))?>" data-auth-superuser="1">
                     <span class="pi pi-folder"></span>
@@ -859,23 +855,7 @@ function explorer_view_render_tree($opts) {
                 </button>
                 <?php endif; ?>
 
-                <?php if ($page === 'index'): ?>
-                <a id="explorerEditBtn" href="<?=explorer_view_escape($current_edit_href)?>" class="btn btn-ghost btn-small<?= $has_current_file ? '' : ' is-disabled' ?>" title="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?>" data-base-href="edit.php" <?= $has_current_file ? '' : 'aria-disabled="true" tabindex="-1"' ?>>
-                    <span class="pi pi-edit"></span>
-                    <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.edit','Edit'))?></span>
-                </a>
-                <?php if ($csrf_token): ?>
-                <form method="post" action="./" id="explorerDeleteForm" class="deleteForm" data-file="<?=explorer_view_escape($current_file_path)?>">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="file" id="explorerDeleteFileInput" value="<?=explorer_view_escape($current_file_path)?>">
-                    <input type="hidden" name="csrf" value="<?=explorer_view_escape($csrf_token)?>">
-                <button type="submit" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?>" <?= $has_current_file ? '' : 'disabled' ?>>
-                        <span class="pi pi-bin"></span>
-                        <span class="btn-label"><?=explorer_view_escape(explorer_view_t('common.delete','Delete'))?></span>
-                    </button>
-                </form>
-                <?php endif; ?>
-                <?php else: ?>
+                <?php if ($page !== 'index'): ?>
                 <button type="button" id="renameFileBtn" class="btn btn-ghost btn-small" title="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>" aria-label="<?=explorer_view_escape(explorer_view_t('common.rename','Rename'))?>" data-auth-superuser="1" <?= $has_current_file ? '' : 'disabled' ?>>
                     <span class="pi pi-edit"></span>
                     <span class="btn-label"><?=explorer_view_escape(explorer_view_t('edit.toolbar.rename','Rename'))?></span>

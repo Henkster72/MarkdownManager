@@ -1997,8 +1997,7 @@ body.folder-icons-caret .note-group-title .folder-toggle .folder-icon {
   min-width: 6.5rem;
 }
 
-#previewEditBtn.is-disabled,
-#explorerEditBtn.is-disabled {
+#previewEditBtn.is-disabled {
   opacity: 0.5;
   pointer-events: none;
 }

@@ -1749,21 +1749,12 @@
     const focusParam = params.get('focus');
     const allowFocusWithFile = document.body.classList.contains('index-split-layout');
     const previewEditBtn = document.getElementById('previewEditBtn');
-    const explorerEditBtn = document.getElementById('explorerEditBtn');
-    const explorerDeleteForm = document.getElementById('explorerDeleteForm');
-    const explorerDeleteFileInput = document.getElementById('explorerDeleteFileInput');
     const previewEditBaseHref = (() => {
         if (!(previewEditBtn instanceof HTMLAnchorElement)) return 'edit.php';
         const raw = String(previewEditBtn.dataset.baseHref || previewEditBtn.getAttribute('href') || 'edit.php').trim();
         return raw || 'edit.php';
     })();
-    const explorerEditBaseHref = (() => {
-        if (!(explorerEditBtn instanceof HTMLAnchorElement)) return 'edit.php';
-        const raw = String(explorerEditBtn.dataset.baseHref || explorerEditBtn.getAttribute('href') || 'edit.php').trim();
-        return raw || 'edit.php';
-    })();
     const previewEditBasePath = String(previewEditBaseHref.split('?')[0] || 'edit.php').trim() || 'edit.php';
-    const explorerEditBasePath = String(explorerEditBaseHref.split('?')[0] || 'edit.php').trim() || 'edit.php';
     const previewEditFolderFromFile = (filePath) => {
         const file = String(filePath || '').trim();
         if (!file) return 'root';
@@ -1775,12 +1766,6 @@
         if (!file) return previewEditBaseHref;
         const folder = previewEditFolderFromFile(file);
         return `${previewEditBasePath}?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder || 'root')}`;
-    };
-    const explorerEditHrefForFile = (filePath) => {
-        const file = String(filePath || '').trim();
-        if (!file) return explorerEditBaseHref;
-        const folder = previewEditFolderFromFile(file);
-        return `${explorerEditBasePath}?file=${encodeURIComponent(file)}&folder=${encodeURIComponent(folder || 'root')}`;
     };
     const setPreviewEditTarget = (filePath) => {
         if (!(previewEditBtn instanceof HTMLAnchorElement)) return;
@@ -1796,32 +1781,6 @@
         previewEditBtn.classList.remove('is-disabled');
         previewEditBtn.removeAttribute('aria-disabled');
         previewEditBtn.removeAttribute('tabindex');
-    };
-    const setExplorerTopActionTarget = (filePath) => {
-        const file = String(filePath || '').trim();
-        if (explorerEditBtn instanceof HTMLAnchorElement) {
-            if (!file) {
-                explorerEditBtn.href = explorerEditBaseHref;
-                explorerEditBtn.classList.add('is-disabled');
-                explorerEditBtn.setAttribute('aria-disabled', 'true');
-                explorerEditBtn.setAttribute('tabindex', '-1');
-            } else {
-                explorerEditBtn.href = explorerEditHrefForFile(file);
-                explorerEditBtn.classList.remove('is-disabled');
-                explorerEditBtn.removeAttribute('aria-disabled');
-                explorerEditBtn.removeAttribute('tabindex');
-            }
-        }
-        if (explorerDeleteForm instanceof HTMLFormElement) {
-            explorerDeleteForm.dataset.file = file;
-            if (explorerDeleteFileInput instanceof HTMLInputElement) {
-                explorerDeleteFileInput.value = file;
-            }
-            const deleteBtn = explorerDeleteForm.querySelector('button[type="submit"]');
-            if (deleteBtn instanceof HTMLButtonElement) {
-                deleteBtn.disabled = !file;
-            }
-        }
     };
     const getFocusedOverviewFile = () => {
         const active = document.activeElement;
@@ -1848,7 +1807,6 @@
         const focused = getFocusedOverviewFile();
         const file = String(focused || fallbackFile || window.CURRENT_FILE || '').trim();
         setPreviewEditTarget(file);
-        setExplorerTopActionTarget(file);
     };
 
     if (canInlineLoad) {
@@ -1869,15 +1827,10 @@
         navSortPlaceholder.dataset.navSortPlaceholder = '1';
         navSortRow.parentNode.insertBefore(navSortPlaceholder, navSortRow);
     }
-    if (previewEditBtn instanceof HTMLAnchorElement || explorerEditBtn instanceof HTMLAnchorElement || explorerDeleteForm instanceof HTMLFormElement) {
+    if (previewEditBtn instanceof HTMLAnchorElement) {
         const syncSoon = () => requestAnimationFrame(() => syncPreviewEditTarget());
         previewEditBtn?.addEventListener('click', (e) => {
             if (previewEditBtn.classList.contains('is-disabled') || previewEditBtn.getAttribute('aria-disabled') === 'true') {
-                e.preventDefault();
-            }
-        });
-        explorerEditBtn?.addEventListener('click', (e) => {
-            if (explorerEditBtn.classList.contains('is-disabled') || explorerEditBtn.getAttribute('aria-disabled') === 'true') {
                 e.preventDefault();
             }
         });
