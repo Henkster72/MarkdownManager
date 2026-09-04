@@ -602,7 +602,7 @@ function explorer_view_render_tree($opts) {
     }
     $current_folder = $current_file ? explorer_view_folder_from_path($current_file) : null;
 
-    $renderNotes = function($list, $folderPath, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token, $lazy_notes, $show_pending_deletes) {
+    $renderNotes = function($list, $folderPath, $showEmpty = true) use ($publisher_mode, $secretMap, $current_file, $mdHref, $show_actions, $csrf_token, $lazy_notes, $show_pending_deletes, $empty_list_key, $empty_list_fallback) {
         $folderPath = trim((string)$folderPath);
         if ($folderPath === '') $folderPath = 'root';
     ?>
