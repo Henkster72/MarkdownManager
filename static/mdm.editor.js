@@ -1959,8 +1959,7 @@
     const isProcessingLikeState = (raw) => {
         const s = String(raw || '').trim().toLowerCase();
         return s === 'processing'
-            || s === 'to publish' || s === 'topublish' || s === 'to-publish'
-            || s === 'to delete' || s === 'todelete' || s === 'to-delete';
+            || s === 'to publish' || s === 'topublish' || s === 'to-publish';
     };
     const normalizePublishState = (raw) => {
         const s = String(raw || '').trim().toLowerCase();

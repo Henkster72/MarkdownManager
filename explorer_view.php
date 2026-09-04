@@ -648,7 +648,6 @@ function explorer_view_render_tree($opts) {
                 } else if (
                     $s === 'processing'
                     || $s === 'to publish' || $s === 'topublish' || $s === 'to-publish'
-                    || $s === 'to delete' || $s === 'todelete' || $s === 'to-delete'
                 ) {
                     $publishClass = 'publish-processing';
                     $publishIcon = 'pi-certificate';

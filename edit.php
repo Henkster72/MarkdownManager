@@ -388,47 +388,12 @@ function mdw_entry_publisher_sort_date_key($entry) {
     return (string)$dateKey;
 }
 
-function mdw_publisher_should_hide_md_entry($path) {
-    global $MDW_PUBLISHER_MODE;
-    if (empty($MDW_PUBLISHER_MODE)) return false;
-    if (!is_string($path) || $path === '') return false;
-    $full = mdw_safe_full_path($path, true);
-    if (!$full || !is_file($full) || !is_readable($full)) return false;
-
-    $h = @fopen($full, 'rb');
-    if (!$h) return false;
-    $state = '';
-    $maxLines = 120;
-    while ($maxLines-- > 0 && ($line = fgets($h)) !== false) {
-        $line = rtrim($line, "\r\n");
-        $k = null;
-        $v = null;
-        if (function_exists('mdw_hidden_meta_match') && mdw_hidden_meta_match($line, $k, $v)) {
-            if (strtolower(trim((string)$k)) === 'publishstate') {
-                $state = (string)$v;
-                break;
-            }
-            continue;
-        }
-        if (preg_match('/^\s*(?:_+publishstate\s*:\s*(.*?)\s*_*\s*|\{+\s*publishstate\s*:\s*(.*?)\s*\}+\s*)$/iu', $line, $m)) {
-            $state = (string)(($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? ''));
-            break;
-        }
-    }
-    fclose($h);
-    if ($state === '') return false;
-    $normalized = function_exists('mdw_publisher_normalize_publishstate')
-        ? mdw_publisher_normalize_publishstate($state)
-        : trim($state);
-    return $normalized === 'ToDelete';
-}
-
 /* ROOT FILES */
 function list_md_root_sorted(){
     $mds = glob("*.md");
     $out=[];
     foreach($mds as $path){
-        if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
+        if (explorer_view_should_hide_editor_document($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -490,7 +455,7 @@ function list_md_by_subdir_sorted(){
             $tmp = [];
             if ($mds) {
                 foreach ($mds as $path) {
-                    if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
+                    if (explorer_view_should_hide_editor_document($path)) continue;
                     $base = basename($path);
                     [$yy,$mm,$dd] = parse_ymd_from_filename($base);
                     $tmp[] = [
@@ -1195,7 +1160,7 @@ if (!empty($MDW_PUBLISHER_MODE)) {
     $current_publish_state = mdw_publisher_normalize_publishstate($meta['publishstate'] ?? '');
     if ($current_publish_state === '') $current_publish_state = 'Concept';
 }
-$current_publish_state_ui = ($current_publish_state === 'ToDelete') ? 'Processing' : $current_publish_state;
+$current_publish_state_ui = ($current_publish_state === 'ToDelete') ? 'Concept' : $current_publish_state;
 $current_publish_state_lower = strtolower($current_publish_state_ui);
 
 $rename_slug_value = '';

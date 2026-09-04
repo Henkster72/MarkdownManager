@@ -330,7 +330,7 @@ function mdw_entry_publisher_sort_date_key($entry) {
     return (string)$dateKey;
 }
 
-function mdw_publisher_should_hide_md_entry($path) {
+function mdw_publisher_is_pending_delete($path) {
     global $MDW_PUBLISHER_MODE;
     if (empty($MDW_PUBLISHER_MODE)) return false;
     if (!is_string($path) || $path === '') return false;
@@ -374,7 +374,7 @@ function list_md_in_dir_sorted($dirRel) {
     $mds = glob($pattern);
     $out = [];
     foreach ($mds as $path) {
-        if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
+        if (explorer_view_should_hide_editor_document($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -394,7 +394,7 @@ function list_md_root_sorted(){
     $mds = glob("*.md");
     $out=[];
     foreach($mds as $path){
-        if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
+        if (explorer_view_should_hide_editor_document($path)) continue;
         $base = basename($path);
         [$yy,$mm,$dd] = parse_ymd_from_filename($base);
         $out[] = [
@@ -456,7 +456,7 @@ function list_md_by_subdir_sorted(){
             $tmp = [];
             if ($mds) {
                 foreach ($mds as $path) {
-                    if (mdw_publisher_should_hide_md_entry($path) || explorer_view_should_hide_editor_document($path)) continue;
+                    if (explorer_view_should_hide_editor_document($path)) continue;
                     $base = basename($path);
                     [$yy,$mm,$dd] = parse_ymd_from_filename($base);
                     $tmp[] = [
@@ -1099,7 +1099,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
             if (!$full || !is_file($full)) {
                 $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
             } else {
-                if (!empty($MDW_PUBLISHER_MODE)) {
+                if (!empty($MDW_PUBLISHER_MODE) && !$authIsSuperuser) {
                     $raw = @file_get_contents($full);
                     if (!is_string($raw)) {
                         $err = error_get_last();
@@ -1516,7 +1516,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && array_key_exists('search', $_GET)) {
                 $recreatePendingDelete = !empty($MDW_PUBLISHER_MODE)
                     && $existingFull
                     && is_file($existingFull)
-                    && mdw_publisher_should_hide_md_entry($sanNew);
+                    && mdw_publisher_is_pending_delete($sanNew);
                 if (!$full) {
                     $_SESSION['flash_error'] = mdw_t('flash.invalid_file_path', 'Invalid file path.');
                 } else if ($existingFull && is_file($existingFull) && !$recreatePendingDelete) {
@@ -1738,7 +1738,11 @@ if ($requested) {
                 );
                 $userHidden = mdw_hidden_meta_is_truthy($info['meta']['user_hidden'] ?? '');
             }
-            $view_nav_items[] = ['path' => $p, 'user_hidden' => $userHidden];
+            $view_nav_items[] = [
+                'path' => $p,
+                'user_hidden' => $userHidden,
+                'publish_state' => mdw_publisher_normalize_publishstate($info['meta']['publishstate'] ?? ''),
+            ];
         }
 
         $idx = array_search($requested, $paths, true);

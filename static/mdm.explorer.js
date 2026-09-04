@@ -1596,6 +1596,10 @@
         return query ? `edit.php?${query}` : 'edit.php';
     };
     const nav = (window.MDW_VIEW_NAV && typeof window.MDW_VIEW_NAV === 'object') ? window.MDW_VIEW_NAV : null;
+    const isPendingDelete = (stateRaw) => {
+        const state = String(stateRaw || '').trim().toLowerCase();
+        return state === 'to delete' || state === 'todelete' || state === 'to-delete';
+    };
     const viewNavTarget = (direction) => {
         if (!Array.isArray(nav?.items)) {
             return direction === 'previous' ? (nav?.prev || null) : (nav?.next || null);
@@ -1603,7 +1607,7 @@
         const isSuperuser = typeof window.__mdwIsSuperuser === 'function' && window.__mdwIsSuperuser();
         const accessible = nav.items.filter((item) => item
             && typeof item.path === 'string'
-            && (isSuperuser || !item.user_hidden));
+            && (isSuperuser || (!item.user_hidden && !isPendingDelete(item.publish_state))));
         const currentIndex = accessible.findIndex((item) => item.path === file);
         if (currentIndex < 0) return null;
         const target = direction === 'previous'
@@ -2263,6 +2267,10 @@
     const lazyNotesMode = lazyRequested && lazyListsByFolder.size > 0;
 
     const normalizeSort = (value) => String(value || '').trim().toLowerCase();
+    const isPendingDeleteState = (stateRaw) => {
+        const state = normalizeSort(stateRaw || '');
+        return state === 'to delete' || state === 'todelete' || state === 'to-delete';
+    };
     const isPublisherMode = () => {
         const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
         const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
@@ -2270,11 +2278,11 @@
     };
     const stateRank = (stateRaw) => {
         const state = normalizeSort(stateRaw || '');
+        if (isPendingDeleteState(state)) return 0;
         if (state === 'concept') return 0;
         if (
             state === 'processing'
             || state === 'to publish' || state === 'topublish' || state === 'to-publish'
-            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
         ) return 1;
         if (state === 'published') return 2;
         return 3;
@@ -2372,7 +2380,6 @@
         if (
             state === 'processing'
             || state === 'to publish' || state === 'topublish' || state === 'to-publish'
-            || state === 'to delete' || state === 'todelete' || state === 'to-delete'
         ) {
             return { cls: 'publish-processing', icon: 'pi-certificate', label: t('edit.publish_state.processing', 'Processing') };
         }
@@ -2674,7 +2681,10 @@
             const listEl = lazyListsByFolder.get(folder);
             if (!(listEl instanceof HTMLElement)) continue;
             const source = lazyNotesByFolder.get(folder) || [];
-            const accessible = source.filter((note) => !isPublisherMode() || !note.user_hidden || canManageUserVisibility());
+            const accessible = source.filter((note) =>
+                (!isPublisherMode() || !note.user_hidden || canManageUserVisibility())
+                && (!isPublisherMode() || isSuperuser() || !isPendingDeleteState(note.publish_state))
+            );
             totalVisible += accessible.length;
 
             if (filtering) {
@@ -2774,7 +2784,9 @@
         const visibleBySection = new Map();
 
         for (const { el, text, section } of docEntries) {
-            const match = (!isPublisherMode() || !isUserHiddenRow(el) || canManageUserVisibility()) && (!filtering || text.includes(q));
+            const match = (!isPublisherMode() || isSuperuser() || !isPendingDeleteState(el.dataset.publishState))
+                && (!isPublisherMode() || !isUserHiddenRow(el) || canManageUserVisibility())
+                && (!filtering || text.includes(q));
             const nextDisplay = match ? '' : 'none';
             if (el.style.display !== nextDisplay) el.style.display = nextDisplay;
             if (!match) continue;

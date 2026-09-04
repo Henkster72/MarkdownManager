@@ -518,7 +518,7 @@
     "csrf_invalid": "Sessione non valida (CSRF). Ricarica la pagina.",
     "invalid_file_path": "Percorso file non valido.",
     "secret_locked": "La nota segreta è bloccata. Sblocca prima dal visualizzatore.",
-    "delete_marked_processing_prefix": "Contrassegnato per l'eliminazione (In elaborazione):",
+    "delete_marked_processing_prefix": "Contrassegnato per l'eliminazione:",
     "deleted_prefix": "Eliminato:",
     "delete_failed": "Impossibile eliminare il file.",
     "no_write_permissions": "nessun permesso di scrittura",
