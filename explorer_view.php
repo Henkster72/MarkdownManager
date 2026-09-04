@@ -495,6 +495,8 @@ function explorer_view_render_tree($opts) {
         ? 'index.new_markdown.page_toggle_title'
         : 'index.new_markdown.toggle_title';
     $new_md_toggle_fallback = $hide_markdown_editor ? 'Create a new page' : 'Create a new Markdown file';
+    $empty_list_key = $hide_markdown_editor ? 'nav.no_pages_yet' : 'nav.no_notes_yet';
+    $empty_list_fallback = $hide_markdown_editor ? 'No pages yet.' : 'No notes yet.';
 
     $folderLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
     $fileLinkBase = ($page === 'edit') ? 'edit.php' : 'index.php';
@@ -724,7 +726,7 @@ function explorer_view_render_tree($opts) {
             <li class="nav-empty nav-lazy-placeholder" hidden><?=explorer_view_escape(explorer_view_t('common.loading','Loading…'))?></li>
         <?php endif; ?>
         <?php if (empty($list) && $showEmpty): ?>
-            <li class="nav-empty"><?=explorer_view_escape(explorer_view_t('nav.no_notes_yet','No notes yet.'))?></li>
+            <li class="nav-empty"><?=explorer_view_escape(explorer_view_t($empty_list_key, $empty_list_fallback))?></li>
         <?php endif; ?>
         </ul>
     <?php
