@@ -23,7 +23,10 @@ PUBLISHSTATE_RE = re.compile(r"^\{\s*publishstate\s*:\s*.*?\s*\}$", re.IGNORECAS
 MANAGED_TEMPLATE_RE = re.compile(r"\{#\s*mdw-managed:\s*source=([^\s#]+)\s*#\}")
 EXTENDS_RE = re.compile(r"\{%\s*extends\s+([\"'])(.*?)\1\s*%\}")
 SET_RE = re.compile(r"^\s*\{%\s*set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*%\}\s*$", re.MULTILINE)
-CONTENT_BLOCK_RE = re.compile(r"\{%\s*block\s+content\s*%\}(.*?)\{%\s*endblock(?:\s+content)?\s*%\}", re.DOTALL)
+CONTENT_BLOCK_RE = re.compile(
+    r"\{%\s*block\s+(content|markdown_body)\s*%\}(.*?)\{%\s*endblock(?:\s+\1)?\s*%\}",
+    re.DOTALL,
+)
 PREVIEW_EXPORT_MARKERS = (
     "data-mdw-",
     "mdw-preview-",
@@ -219,7 +222,7 @@ def template_to_markdown(template: Path, rel: str) -> str:
     preferred = ["extends", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author", "blog"]
     lines = [f"{{{key}: {metadata.pop(key)}}}" for key in preferred if metadata.get(key, "") != ""]
     lines.extend(f"{{{key}: {value}}}" for key, value in sorted(metadata.items()) if value != "")
-    body = body_match.group(1).strip()
+    body = body_match.group(2).strip()
     if not body:
         raise RuntimeError(f"managed template has an empty content block: {template}")
     return "\n".join(lines) + "\n\n" + body + "\n"

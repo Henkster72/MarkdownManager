@@ -54,4 +54,17 @@ with tempfile.TemporaryDirectory() as temp_dir:
     assert explicit_layout.startswith('{% extends "layouts/markdown_page.html" %}')
     assert "{% block markdown_body %}Text{% endblock markdown_body %}" in explicit_layout
 
+    managed_template = site_dir / "templates" / "article.html"
+    managed_template.write_text(
+        '{# mdw-managed: source=article.md #}\n'
+        '{% extends "layouts/markdown_page.html" %}\n'
+        '{% set page_title = "Article" %}\n'
+        '{% block markdown_body %}<p>Updated</p>{% endblock markdown_body %}\n',
+        encoding="utf-8",
+    )
+    imported = publisher.template_to_markdown(managed_template, "article.md")
+    assert "{extends: layouts/markdown_page.html}" in imported
+    assert "{page_title: Article}" in imported
+    assert "<p>Updated</p>" in imported
+
 print("WPM managed layout regression checks passed")
