@@ -651,15 +651,31 @@
             tools.style.gap = '0.5rem';
             tools.style.marginTop = '0.45rem';
             tools.style.alignItems = 'center';
+            tools.style.flexWrap = 'wrap';
 
             const toggle = document.createElement('button');
             toggle.type = 'button';
             toggle.className = 'btn btn-ghost btn-small';
             toggle.textContent = t('image_modal.title', 'Insert image');
 
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*,.svg';
+            fileInput.hidden = true;
+
+            const chooseFile = document.createElement('button');
+            chooseFile.type = 'button';
+            chooseFile.className = 'btn btn-ghost btn-small';
+            chooseFile.textContent = t('image_modal.choose_file', 'Choose file');
+
+            const upload = document.createElement('button');
+            upload.type = 'button';
+            upload.className = 'btn btn-primary btn-small';
+            upload.textContent = t('image_modal.upload', 'Upload');
+
             const status = document.createElement('span');
             status.className = 'status-text';
-            tools.append(toggle, status);
+            tools.append(toggle, fileInput, chooseFile, upload, status);
 
             const panel = document.createElement('div');
             panel.hidden = true;
@@ -682,6 +698,49 @@
             wrap.append(tools, panel);
 
             filter.addEventListener('input', () => renderArticleMetaImages(list, filter, input));
+            chooseFile.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', () => {
+                const file = fileInput.files?.[0];
+                status.textContent = file ? file.name : '';
+            });
+            upload.addEventListener('click', async () => {
+                const file = fileInput.files?.[0];
+                if (!file) {
+                    status.textContent = t('image_modal.choose_first', 'Choose an image first.');
+                    chooseFile.focus();
+                    return;
+                }
+                const csrf = String(window.MDW_CSRF || '').trim();
+                if (!csrf || !mdmApi || typeof mdmApi.form !== 'function') {
+                    status.textContent = !csrf
+                        ? t('image_modal.missing_csrf', 'Missing CSRF token. Reload the page.')
+                        : t('image_modal.upload_failed', 'Upload failed.');
+                    return;
+                }
+                upload.disabled = true;
+                status.textContent = t('image_modal.uploading', 'Uploading…');
+                try {
+                    const formData = new FormData();
+                    formData.append('action', 'upload');
+                    formData.append('csrf', csrf);
+                    formData.append('image', file);
+                    const uploaded = await mdmApi.form('image_manager.php', formData);
+                    if (!uploaded || uploaded.ok !== true) throw new Error('upload');
+                    const token = imageTokenForItem(uploaded);
+                    if (!token) throw new Error('upload');
+                    articleMetaImages = [uploaded, ...(Array.isArray(articleMetaImages) ? articleMetaImages : [])];
+                    input.value = token;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    fileInput.value = '';
+                    status.textContent = t('image_modal.uploaded', 'Uploaded.');
+                    if (!panel.hidden) renderArticleMetaImages(list, filter, input);
+                    input.focus();
+                } catch (error) {
+                    status.textContent = t('image_modal.upload_failed', 'Upload failed.');
+                } finally {
+                    upload.disabled = false;
+                }
+            });
             toggle.addEventListener('click', async () => {
                 panel.hidden = !panel.hidden;
                 if (panel.hidden) return;
