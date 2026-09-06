@@ -371,6 +371,76 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
 
     window.__mdwIsEscapeKey = isEscapeKey;
     window.__mdwBindModal = bindModal;
+
+    const modalCloseApis = {
+        linkModal: '__mdwCloseLinkModal',
+        imageModal: '__mdwCloseImageModal',
+        replaceModal: '__mdwCloseReplaceModal',
+        newMdModal: '__mdwCloseNewMdModal',
+        themeModal: '__mdwCloseThemeModal',
+        wpmUserModal: '__mdwCloseWpmUserModal',
+        authModal: '__mdwCloseAuthModal',
+        errorModal: '__mdwCloseErrorModal',
+    };
+    const modalOverlayFor = (modal) => {
+        const id = String(modal?.id || '');
+        if (!id) return null;
+        return document.getElementById(id.replace(/Modal$/, 'Overlay'));
+    };
+    const isVisibleModal = (modal) => {
+        if (!(modal instanceof HTMLElement) || modal.hidden) return false;
+        const overlay = modalOverlayFor(modal);
+        if (overlay instanceof HTMLElement && overlay.hidden) return false;
+        const style = window.getComputedStyle(modal);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const visibleModal = () => {
+        const dialogs = Array.from(document.querySelectorAll('.modal[role="dialog"]'))
+            .filter(isVisibleModal);
+        return dialogs.reduce((top, modal) => {
+            if (!top) return modal;
+            const topZ = Number.parseInt(window.getComputedStyle(top).zIndex, 10) || 0;
+            const modalZ = Number.parseInt(window.getComputedStyle(modal).zIndex, 10) || 0;
+            return modalZ >= topZ ? modal : top;
+        }, null);
+    };
+    const dismissModal = (modal) => {
+        if (!(modal instanceof HTMLElement)) return false;
+        const controller = modal.__mdwModalController;
+        if (controller && typeof controller.close === 'function') {
+            return controller.close({ source: 'escape' });
+        }
+
+        const apiName = modalCloseApis[String(modal.id || '')];
+        if (apiName && typeof window[apiName] === 'function') {
+            return window[apiName]({ source: 'escape' }) !== false;
+        }
+
+        const closeButton = Array.from(modal.querySelectorAll('button')).find((button) => {
+            const id = String(button.id || '').toLowerCase();
+            return button.dataset.modalClose === '1'
+                || id.endsWith('close')
+                || id.endsWith('cancel')
+                || button.classList.contains('modal-close');
+        });
+        if (closeButton instanceof HTMLButtonElement) {
+            closeButton.click();
+            return true;
+        }
+
+        modal.hidden = true;
+        const overlay = modalOverlayFor(modal);
+        if (overlay instanceof HTMLElement) overlay.hidden = true;
+        document.documentElement.classList.remove('modal-open');
+        return true;
+    };
+    document.addEventListener('keydown', (e) => {
+        if (e.defaultPrevented || !isEscapeKey(e)) return;
+        const modal = visibleModal();
+        if (!modal || !dismissModal(modal)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    });
 })();
 
 (function(){
