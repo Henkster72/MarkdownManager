@@ -408,7 +408,7 @@ window.__mdwSetLangCookie = mdwSetLangCookie;
         if (!(modal instanceof HTMLElement)) return false;
         const controller = modal.__mdwModalController;
         if (controller && typeof controller.close === 'function') {
-            return controller.close({ source: 'escape' });
+            return controller.close({ source: 'escape', force: true });
         }
 
         const apiName = modalCloseApis[String(modal.id || '')];
