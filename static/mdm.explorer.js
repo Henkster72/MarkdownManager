@@ -704,7 +704,7 @@
         togglePicker.textContent = t('image_modal.title', 'Insert image');
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'image/*';
+        fileInput.accept = 'image/*,.svg';
         fileInput.hidden = true;
         const chooseFile = document.createElement('button');
         chooseFile.type = 'button';

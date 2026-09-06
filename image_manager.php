@@ -134,7 +134,7 @@ $CSRF_TOKEN = (string)$_SESSION['csrf_token'];
 $action = isset($_REQUEST['action']) ? (string)$_REQUEST['action'] : 'list';
 
 if ($action === 'list') {
-    $allowedExt = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'];
+    $allowedExt = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg'];
     $out = [];
 
     if (is_dir($imagesFsDir)) {
@@ -214,6 +214,7 @@ $validMimes = [
     'image/gif'  => 'gif',
     'image/webp' => 'webp',
     'image/avif' => 'avif',
+    'image/svg+xml' => 'svg',
 ];
 
 $mime = null;

@@ -2062,7 +2062,7 @@ window.mermaid = mermaid;
 
 		        <div class="modal-row" style="gap: 0.6rem;">
 		            <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
-		                <input id="imageUploadInput" type="file" accept="image/*" style="display:none;">
+		                <input id="imageUploadInput" type="file" accept="image/*,.svg" style="display:none;">
 		                <button type="button" class="btn btn-ghost btn-small" id="imagePickBtn"><?=h(mdw_t('image_modal.choose_file','Choose file'))?></button>
 		                <span class="status-text" id="imagePickLabel"><?=h(mdw_t('image_modal.no_file','No file chosen'))?></span>
 		                <button type="button" class="btn btn-primary btn-small" id="imageUploadBtn"><?=h(mdw_t('image_modal.upload','Upload'))?></button>
