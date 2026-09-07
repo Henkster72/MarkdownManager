@@ -3579,6 +3579,17 @@
         prev.setAttribute('contenteditable', 'true');
         prev.setAttribute('role', 'textbox');
         prev.setAttribute('aria-multiline', 'true');
+        const focusVisualEditorAtEnd = () => {
+            if (!isVisualEditorMode()) return;
+            prev.focus({ preventScroll: true });
+            const selection = window.getSelection?.();
+            if (!selection) return;
+            const range = document.createRange();
+            range.selectNodeContents(prev);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
         prev.addEventListener('pointerdown', () => {
             if (isVisualEditorMode() && document.activeElement !== prev) {
                 try { prev.focus({ preventScroll: true }); } catch { prev.focus(); }
@@ -3763,6 +3774,7 @@
             saveVisualSelection();
             syncVisualPreviewToTextarea();
         });
+        requestAnimationFrame(focusVisualEditorAtEnd);
     };
     enableVisualPreviewEditing();
 
