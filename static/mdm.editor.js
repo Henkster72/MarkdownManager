@@ -2619,6 +2619,9 @@
                 markPreviewGeneratedContent();
             }
             if (isVisualEditorMode()) {
+                ensureVisualEditorPlaceholder();
+            }
+            if (isVisualEditorMode()) {
                 requestAnimationFrame(() => focusVisualEditorAtEnd());
             }
             if (typeof window.__mdwResetSelectionSync === 'function') {
@@ -3068,6 +3071,20 @@
                 node.setAttribute('data-mdw-icon-font', '1');
             }
         });
+    };
+    const ensureVisualEditorPlaceholder = () => {
+        if (!isVisualEditorMode() || !(prev instanceof HTMLElement)) return;
+        const hasEditableBody = Array.from(prev.children).some((node) => {
+            if (!(node instanceof HTMLElement)) return false;
+            if (node.matches('.md-meta, [data-mdw-generated]')) return false;
+            return node.getAttribute('contenteditable') !== 'false';
+        });
+        if (hasEditableBody) return;
+        if (prev.querySelector('[data-mdw-editor-placeholder="1"]')) return;
+        const placeholder = document.createElement('p');
+        placeholder.dataset.mdwEditorPlaceholder = '1';
+        placeholder.innerHTML = '<br>';
+        prev.appendChild(placeholder);
     };
     let visualSelectionRange = null;
     const editorDebugLoggingEnabled = () => {
@@ -3818,6 +3835,7 @@
             saveVisualSelection();
             syncVisualPreviewToTextarea();
         });
+        ensureVisualEditorPlaceholder();
         requestAnimationFrame(focusVisualEditorAtEnd);
     };
     enableVisualPreviewEditing();
