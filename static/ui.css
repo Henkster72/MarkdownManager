@@ -953,6 +953,10 @@ body.app-body .find-replace-modal {
 .edit-page.hide-markdown-editor #preview[contenteditable="true"] {
   min-height: 100%;
   outline: none;
+  cursor: text;
+  caret-color: var(--text-main);
+  user-select: text;
+  -webkit-user-select: text;
 }
 .edit-page.hide-markdown-editor #preview[contenteditable="true"]:focus,
 .edit-page.hide-markdown-editor #preview .md-toc-body[contenteditable="true"]:focus,

@@ -3579,6 +3579,11 @@
         prev.setAttribute('contenteditable', 'true');
         prev.setAttribute('role', 'textbox');
         prev.setAttribute('aria-multiline', 'true');
+        prev.addEventListener('pointerdown', () => {
+            if (isVisualEditorMode() && document.activeElement !== prev) {
+                try { prev.focus({ preventScroll: true }); } catch { prev.focus(); }
+            }
+        }, { capture: true });
         markPreviewGeneratedContent();
         const updateVisualDropMarker = (event) => {
             if (!(draggedVisualBlock instanceof HTMLElement)) return;
