@@ -2618,6 +2618,9 @@
             if (typeof markPreviewGeneratedContent === 'function' && isVisualEditorMode()) {
                 markPreviewGeneratedContent();
             }
+            if (isVisualEditorMode()) {
+                requestAnimationFrame(() => focusVisualEditorAtEnd());
+            }
             if (typeof window.__mdwResetSelectionSync === 'function') {
                 window.__mdwResetSelectionSync(previewContent);
             }
@@ -2655,6 +2658,58 @@
 
     const isVisualEditorMode = () => document.body?.classList.contains('hide-markdown-editor')
         && !document.body.classList.contains('mdw-show-markdown-source');
+    const focusVisualEditorAtEnd = () => {
+        if (!isVisualEditorMode() || !(prev instanceof HTMLElement)) return false;
+        try {
+            prev.focus({ preventScroll: true });
+        } catch {
+            prev.focus();
+        }
+        const selection = window.getSelection?.();
+        if (!selection) return false;
+        const range = document.createRange();
+        range.selectNodeContents(prev);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    };
+    window.__mdwForceVisualCaretAtEnd = focusVisualEditorAtEnd;
+    window.__mdwDebugVisualEditor = () => {
+        const selection = window.getSelection?.();
+        const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+        const rect = prev instanceof HTMLElement ? prev.getBoundingClientRect() : null;
+        const styles = prev instanceof HTMLElement ? getComputedStyle(prev) : null;
+        const state = {
+            visualMode: isVisualEditorMode(),
+            bodyClass: document.body?.className || '',
+            previewExists: prev instanceof HTMLElement,
+            contentEditable: prev instanceof HTMLElement ? prev.getAttribute('contenteditable') : null,
+            isContentEditable: prev instanceof HTMLElement ? prev.isContentEditable : false,
+            activeElement: document.activeElement?.id || document.activeElement?.className || document.activeElement?.tagName || null,
+            selection: selection ? {
+                rangeCount: selection.rangeCount,
+                collapsed: selection.isCollapsed,
+                insidePreview: !!(range && prev instanceof HTMLElement && prev.contains(range.commonAncestorContainer)),
+                anchorNode: selection.anchorNode?.nodeName || null,
+                focusNode: selection.focusNode?.nodeName || null,
+            } : null,
+            previewTextLength: prev instanceof HTMLElement ? prev.textContent.length : 0,
+            previewHtml: prev instanceof HTMLElement ? prev.innerHTML.slice(0, 500) : '',
+            computed: styles ? {
+                caretColor: styles.caretColor,
+                cursor: styles.cursor,
+                userSelect: styles.userSelect,
+                pointerEvents: styles.pointerEvents,
+                display: styles.display,
+                visibility: styles.visibility,
+            } : null,
+            rect: rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null,
+            editorDebugLogging: editorDebugLoggingEnabled(),
+        };
+        console.info('[MDW visual editor]', state);
+        return state;
+    };
     const escapeMd = (value) => String(value || '').replace(/\u00a0/g, ' ').trim();
     const escapeInlineHtmlAttr = (value) => String(value || '')
         .replace(/&/g, '&amp;')
@@ -3579,17 +3634,6 @@
         prev.setAttribute('contenteditable', 'true');
         prev.setAttribute('role', 'textbox');
         prev.setAttribute('aria-multiline', 'true');
-        const focusVisualEditorAtEnd = () => {
-            if (!isVisualEditorMode()) return;
-            prev.focus({ preventScroll: true });
-            const selection = window.getSelection?.();
-            if (!selection) return;
-            const range = document.createRange();
-            range.selectNodeContents(prev);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        };
         prev.addEventListener('pointerdown', () => {
             if (isVisualEditorMode() && document.activeElement !== prev) {
                 try { prev.focus({ preventScroll: true }); } catch { prev.focus(); }
