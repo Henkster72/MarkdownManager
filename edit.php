@@ -1739,12 +1739,16 @@ window.mermaid = mermaid;
                         </div>
                     </header>
                     <div class="pane-body preview-body">
-                        <div id="preview" class="preview-content<?= trim($current_html) === '' ? ' preview-create-target' : '' ?>"<?= trim($current_html) === '' ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('edit.empty_preview_hint', 'Choose a page or create a new page with')) . '"' : '' ?>>
-                            <?php if (trim($current_html) === ''): ?>
+                        <?php $preview_is_empty = trim($current_html) === ''; ?>
+                        <?php $preview_is_new_page = $preview_is_empty && empty($requested); ?>
+                        <div id="preview" class="preview-content<?= $preview_is_new_page ? ' preview-create-target' : '' ?>"<?= $preview_is_new_page ? ' data-new-md-empty-preview="1" role="button" tabindex="0" aria-label="' . h(mdw_t('edit.empty_preview_hint', 'Choose a page or create a new page with')) . '"' : '' ?>>
+                            <?php if ($preview_is_new_page): ?>
                                 <span class="preview-empty-prompt">
                                     <span><?=h(mdw_t('edit.empty_preview_hint','Choose a page or create a new page with'))?></span>
                                     <span class="preview-empty-action" aria-hidden="true"><span class="pi pi-documentlabel"></span>+</span>
                                 </span>
+                            <?php elseif ($preview_is_empty): ?>
+                                <p><br></p>
                             <?php else: ?>
                                 <?=$current_html?>
                             <?php endif; ?>
