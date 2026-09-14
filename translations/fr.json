@@ -116,6 +116,22 @@
     },
     "empty_preview_hint": "Choisissez une page ou créez-en une nouvelle avec"
   },
+  "article_meta": {
+    "title": "Métadonnées de l’article",
+    "hint": "Modifier les informations principales de l’article.",
+    "empty": "Aucun champ de métadonnées modifiable n’est visible dans Markdown.",
+    "apply": "Appliquer",
+    "field_page_title": "Titre de la page",
+    "field_slug": "Slug",
+    "field_page_subtitle": "Sous-titre de la page",
+    "field_page_picture": "Image de la page",
+    "field_author": "Auteur",
+    "field_post_date": "Date de publication",
+    "field_disclaim": "Avertissement",
+    "field_published_date": "Date de publication",
+    "field_creationdate": "Date de création",
+    "field_changedate": "Date de modification"
+  },
   "theme": {
     "settings_title": "Paramètres",
     "title": "Paramètres",

@@ -21,19 +21,21 @@ if (!function_exists('mdw_render_new_md_modal')) {
     function mdw_new_md_field_label($key, array $cfg = []) {
         $key = strtolower(trim((string)$key));
         $friendly = [
-            'page_title' => 'Pagina titel',
-            'slug' => 'Slug',
-            'page_subtitle' => function_exists('mdw_t')
-                ? mdw_t('newMdMeta_page_subtitle', 'Page subtitle')
-                : 'Page subtitle',
-            'page_picture' => 'Kop plaatje',
-            'author' => 'Auteur',
-            'post_date' => 'Datum',
-            'published_date' => 'Publicatiedatum',
-            'creationdate' => 'Aanmaakdatum',
-            'changedate' => 'Wijzigingsdatum',
+            'page_title' => ['article_meta.field_page_title', 'Page title'],
+            'slug' => ['article_meta.field_slug', 'Slug'],
+            'page_subtitle' => ['article_meta.field_page_subtitle', 'Page subtitle'],
+            'page_picture' => ['article_meta.field_page_picture', 'Page picture'],
+            'author' => ['article_meta.field_author', 'Author'],
+            'post_date' => ['article_meta.field_post_date', 'Post date'],
+            'published_date' => ['article_meta.field_published_date', 'Published date'],
+            'creationdate' => ['article_meta.field_creationdate', 'Creation date'],
+            'changedate' => ['article_meta.field_changedate', 'Changed date'],
         ];
-        if (isset($friendly[$key])) return $friendly[$key];
+        if (isset($friendly[$key])) {
+            return function_exists('mdw_t')
+                ? mdw_t($friendly[$key][0], $friendly[$key][1])
+                : $friendly[$key][1];
+        }
         $raw = trim((string)($cfg['label'] ?? ''));
         return $raw !== '' ? $raw : str_replace('_', ' ', $key);
     }

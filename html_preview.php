@@ -1328,7 +1328,7 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
     $linkClass = $p['link_class'];
     $text = preg_replace_callback(
         "/\\[([^\\]]+)\\]\\((?<url>(?:[^()]+|\\((?&url)\\))*)\\)(?:\\s*\\{:\\s*class\\s*=\\s*(?:\"([^\"]+)\"|&quot;([^&]+)&quot;|&#039;([^']+)&#039;)\\s*\\})?/i",
-        function($m) use ($mdPath, $linkClass){
+        function($m) use ($mdPath, $linkClass, $context){
             $label = $m[1];
             $urlRaw = html_entity_decode($m[2], ENT_QUOTES, 'UTF-8');
             $urlResolved = resolve_rel_href_from_md_link($urlRaw, $mdPath);
@@ -1342,7 +1342,14 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
             $rawClass = preg_replace('/[^A-Za-z0-9_:\\-\\/\\[\\].%\\s]+/', '', (string)$rawClass);
             $rawClass = trim(preg_replace('/\\s+/', ' ', $rawClass));
 
-            $classAttr = md_join_classes($linkClass, $rawClass);
+            // WPM site CSS uses externlink for external anchors. Add it only
+            // to the preview output; the Markdown remains unchanged.
+            $externalPreviewClass = '';
+            if (!empty($context['external_link_class']) && is_external_url($urlResolved)
+                && !preg_match('/(?:^|\s)externlink(?:\s|$)/', $rawClass)) {
+                $externalPreviewClass = (string)$context['external_link_class'];
+            }
+            $classAttr = md_join_classes($linkClass, $externalPreviewClass, $rawClass);
             $classAttr = $classAttr !== '' ? ' class="'.$classAttr.'"' : '';
             $externalAttr = preg_match('~^https?://~i', $urlRaw)
                 ? ' target="_blank" rel="noopener noreferrer"'

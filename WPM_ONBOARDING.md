@@ -51,11 +51,11 @@ Enable `wpm-minipc-sync@<instance>.timer` on the minipc. It runs hourly and:
 
 - pulls Markdown from vBook;
 - reconciles managed generated templates back to the local Jinja source;
-- pushes the site-owned `templates/base.html` to the vBook renderer.
+- copies newer files from the complete site-owned `templates/` tree to the vBook renderer with `rsync --update`; it never deletes remote templates and excludes transient `temp_*.html` files.
 
 The helper reads `WPM_SITE_DIR` from `/home/henk/vbook_web/<instance>/edit/.env` and derives the local Jinja directory from its basename. Do not assume `<instance>_site` when the site uses a different name or casing.
 
-Review `.wpm-minipc-sync/state.json` and the service journal after the first run. Template conflicts must stop for manual resolution; never overwrite local source blindly.
+The destination is `WPM_SITE_DIR/templates/` on vBook; for WCH this is `/home/henk/jinja_websites/wch_NL_site/templates/`. This source-template copy is independent of Git and does not render or upload live output. Review `.wpm-minipc-sync/state.json` and the service journal after the first run. Managed-template conflicts must stop for manual resolution; never overwrite local source blindly.
 
 ## Verification
 

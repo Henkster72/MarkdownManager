@@ -463,18 +463,18 @@
             || /^(true|false)$/i.test(String(cfg?.default_value ?? '').trim());
         const fieldLabel = (key, cfg) => {
             const friendly = {
-                page_title: 'Pagina titel',
-                slug: 'Slug',
-                page_subtitle: 'Pagina ondertitel',
-                page_picture: 'Kop plaatje',
-                author: 'Auteur',
-                post_date: 'Datum',
-                disclaim: 'Disclaimer',
-                published_date: 'Publicatiedatum',
-                creationdate: 'Aanmaakdatum',
-                changedate: 'Wijzigingsdatum',
+                page_title: ['article_meta.field_page_title', 'Page title'],
+                slug: ['article_meta.field_slug', 'Slug'],
+                page_subtitle: ['article_meta.field_page_subtitle', 'Page subtitle'],
+                page_picture: ['article_meta.field_page_picture', 'Page picture'],
+                author: ['article_meta.field_author', 'Author'],
+                post_date: ['article_meta.field_post_date', 'Post date'],
+                disclaim: ['article_meta.field_disclaim', 'Disclaimer'],
+                published_date: ['article_meta.field_published_date', 'Published date'],
+                creationdate: ['article_meta.field_creationdate', 'Creation date'],
+                changedate: ['article_meta.field_changedate', 'Changed date'],
             };
-            if (friendly[key]) return friendly[key];
+            if (friendly[key]) return t(friendly[key][0], friendly[key][1]);
             const raw = cfg && typeof cfg.label === 'string' ? cfg.label.trim() : '';
             return raw || key.replace(/_/g, ' ');
         };
@@ -520,7 +520,8 @@
         };
         const formatDateForArticleMeta = (date) => {
             try {
-                return new Intl.DateTimeFormat('nl-NL', {
+                const lang = String(window.MDW_LANG || 'en').trim() || 'en';
+                return new Intl.DateTimeFormat(lang, {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',

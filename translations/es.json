@@ -116,6 +116,22 @@
     },
     "empty_preview_hint": "Elige una página o crea una nueva página con"
   },
+  "article_meta": {
+    "title": "Metadatos del artículo",
+    "hint": "Edita los datos principales del artículo.",
+    "empty": "No hay campos de metadatos editables visibles en Markdown.",
+    "apply": "Aplicar",
+    "field_page_title": "Título de la página",
+    "field_slug": "Slug",
+    "field_page_subtitle": "Subtítulo de la página",
+    "field_page_picture": "Imagen de la página",
+    "field_author": "Autor",
+    "field_post_date": "Fecha de publicación",
+    "field_disclaim": "Aviso legal",
+    "field_published_date": "Fecha de publicación",
+    "field_creationdate": "Fecha de creación",
+    "field_changedate": "Fecha de modificación"
+  },
   "theme": {
     "settings_title": "Configuración",
     "title": "Configuración",

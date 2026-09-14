@@ -1,0 +1,89 @@
+.preview-content {
+  --theme-bg: #FFF3E0;
+  --theme-primary: #FFAB01;
+  --theme-secondary: #FFD977;
+  --theme-surface: #FFF9F1;
+  --theme-border: rgba(71, 71, 71, 0.18);
+  background: var(--theme-bg);
+  color: #474747;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.preview-content h1,
+.preview-content h2,
+.preview-content h3,
+.preview-content h4,
+.preview-content h5,
+.preview-content h6 {
+  color: #474747;
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1.04;
+}
+
+.preview-content a {
+  color: #474747;
+  text-decoration-color: var(--theme-primary);
+  text-underline-offset: 0.3em;
+}
+
+.preview-content a:hover,
+.preview-content a:focus-visible {
+  text-decoration-thickness: 2px;
+}
+
+.preview-content blockquote {
+  border-left-color: var(--theme-primary);
+  border-left-width: 2px;
+  border-radius: 0 24px 24px 0;
+  background: var(--theme-surface);
+  color: #474747;
+  box-shadow: 0 8px 20px rgba(71, 71, 71, 0.1);
+}
+
+.preview-content code,
+.preview-content .md-code-inline,
+.preview-content pre {
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  background: var(--theme-surface);
+  color: #474747;
+}
+
+.preview-content pre {
+  box-shadow: 0 8px 20px rgba(71, 71, 71, 0.1);
+}
+
+.preview-content hr {
+  border-color: var(--theme-secondary);
+}
+
+.preview-content .externlink,
+.preview-content .pdflink,
+.preview-content .link {
+  color: #474747;
+  text-decoration-color: var(--theme-primary);
+}
+
+.editor-textarea {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.editor-lines {
+  color: #FFAB01;
+}
+
+.editor-textarea {
+  caret-color: #FFAB01;
+}
+
+.editor-textarea::selection {
+  background-color: color-mix(in srgb, #FFAB01 28%, transparent);
+}
+
+.editor-textarea,
+.editor-lines {
+  font-size: 16px;
+}

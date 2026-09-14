@@ -121,7 +121,17 @@
     "title": "Article metadata",
     "hint": "Edit the main article details.",
     "empty": "No editable metadata fields are visible in Markdown.",
-    "apply": "Apply"
+    "apply": "Apply",
+    "field_page_title": "Page title",
+    "field_slug": "Slug",
+    "field_page_subtitle": "Page subtitle",
+    "field_page_picture": "Page picture",
+    "field_author": "Author",
+    "field_post_date": "Post date",
+    "field_disclaim": "Disclaimer",
+    "field_published_date": "Published date",
+    "field_creationdate": "Creation date",
+    "field_changedate": "Changed date"
   },
   "theme": {
     "settings_title": "Settings",

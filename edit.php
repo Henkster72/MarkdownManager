@@ -734,7 +734,7 @@ if (isset($_GET['preview']) && $_GET['preview'] === '1') {
         exit;
     }
 
-    html(md_to_html($content, $requested));
+    html(md_to_html($content, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']));
 }
 
 /* LOAD DATA FOR JSON REQUEST */
@@ -1143,12 +1143,12 @@ if ($requested) {
 	    $raw             = $posted_content_for_render;
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
-	    $current_html    = md_to_html($raw, $requested);
+	    $current_html    = md_to_html($raw, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']);
 	} else if ($full && is_file($full)) {
 	    $raw             = file_get_contents($full);
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
-	    $current_html    = md_to_html($raw, $requested);
+	    $current_html    = md_to_html($raw, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']);
 	} else {
 	    $save_error = 'Bestand niet gevonden.';
 	}

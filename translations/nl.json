@@ -121,7 +121,17 @@
     "title": "Artikelmetadata",
     "hint": "Bewerk de belangrijkste artikelgegevens.",
     "empty": "Er zijn geen bewerkbare metadatavelden zichtbaar in Markdown.",
-    "apply": "Toepassen"
+    "apply": "Toepassen",
+    "field_page_title": "Paginatitel",
+    "field_slug": "Slug",
+    "field_page_subtitle": "Paginaondertitel",
+    "field_page_picture": "Pagina-afbeelding",
+    "field_author": "Auteur",
+    "field_post_date": "Postdatum",
+    "field_disclaim": "Disclaimer",
+    "field_published_date": "Publicatiedatum",
+    "field_creationdate": "Aanmaakdatum",
+    "field_changedate": "Wijzigingsdatum"
   },
   "theme": {
     "settings_title": "Instellingen",

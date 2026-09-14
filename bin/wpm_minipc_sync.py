@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 
-SITE_TEMPLATE_FILES = ("base.html",)
+TEMPLATE_EXCLUDES = ("temp_*.html", "__pycache__/", ".DS_Store")
 
 
 def digest(path: Path) -> str:
@@ -90,20 +90,35 @@ def copy_template(source: str, destination: str) -> None:
     run(["scp", "-q", "-p", "-o", "StrictHostKeyChecking=accept-new", source, destination])
 
 
-def sync_site_templates(remote: str, remote_site: str, site_dir: Path) -> int:
-    pushed = 0
-    for rel in SITE_TEMPLATE_FILES:
-        local_template = site_dir / "templates" / rel
-        if not local_template.is_file():
-            continue
-        remote_template = f"{remote_site.rstrip('/')}/templates/{rel}"
-        run([
-            "ssh", "-o", "StrictHostKeyChecking=accept-new", remote,
-            "mkdir", "-p", str(Path(remote_template).parent),
-        ])
-        copy_template(str(local_template), f"{remote}:{remote_template}")
-        pushed += 1
-    return pushed
+def sync_newer_site_templates(remote: str, remote_site: str, site_dir: Path) -> int:
+    """Copy newer site-owned template sources to the matching vBook renderer.
+
+    Managed WPM templates are reconciled separately before this runs.  This
+    deliberately has no delete option: it only fills missing remote templates
+    or replaces a remote template when the local source has a newer mtime.
+    """
+    local_templates = site_dir / "templates"
+    if not local_templates.is_dir():
+        return 0
+
+    remote_templates = f"{remote_site.rstrip('/')}/templates"
+    run([
+        "ssh", "-o", "StrictHostKeyChecking=accept-new", remote,
+        "mkdir", "-p", remote_templates,
+    ])
+    command = [
+        "rsync", "-az", "--update", "--itemize-changes",
+        "-e", "ssh -o StrictHostKeyChecking=accept-new",
+    ]
+    command.extend(f"--exclude={pattern}" for pattern in TEMPLATE_EXCLUDES)
+    command.extend([
+        f"{local_templates}/",
+        f"{remote}:{remote_templates}/",
+    ])
+    result = subprocess.run(command, text=True, capture_output=True)
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout or "template sync failed").strip())
+    return sum(len(line) > 1 and line[1] == "f" for line in result.stdout.splitlines())
 
 
 def template_path(rel: str) -> str:
@@ -200,12 +215,12 @@ def main() -> int:
     pull_markdown(args.remote, args.remote_edit, args.local_edit.resolve())
     remote_state = pull_remote_state(args.remote, args.remote_site)
     pulled, pushed, deleted = sync_templates(args.remote, args.remote_site, site_dir, remote_state, local_state)
-    site_templates_pushed = sync_site_templates(args.remote, args.remote_site, site_dir)
+    newer_site_templates_pushed = sync_newer_site_templates(args.remote, args.remote_site, site_dir)
     state_path.write_text(json.dumps(local_state, indent=2) + "\n", encoding="utf-8")
     print(
         "WPM minipc sync: "
         f"markdown=pulled templates_pulled={pulled} templates_pushed={pushed} "
-        f"templates_deleted={deleted} site_templates_pushed={site_templates_pushed}"
+        f"templates_deleted={deleted} newer_site_templates_pushed={newer_site_templates_pushed}"
     )
     return 0
 

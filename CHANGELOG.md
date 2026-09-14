@@ -1,12 +1,20 @@
 # Changelog
 
+## 0.972
+
+- WPM preview links: external links now receive the instance `externlink` class automatically in server-rendered previews and when links are edited through the visual link modal, while Markdown source remains unchanged.
+- WPM template synchronization: the minipc helper now copies newer files from the complete site-owned `templates/` tree with `rsync --update`, without deleting remote templates or transient files; onboarding documentation now describes the destination and safety boundary.
+- WPM onboarding and themes: added the Bold Yellow theme and supporting metadata, and improved the template-to-Markdown onboarding workflow for managed pages, published states, inline Jinja assignments, duplicate metadata headers, and testimonial audio sources.
+- Localization: replaced hard-coded Dutch Article Metadata and New Page labels with translation keys in English, Dutch, German, Spanish, French, Italian, and Portuguese. Article dates now use the active interface locale instead of always using Dutch formatting.
+- Regression coverage: added WPM external-link preview regression coverage and synchronized the corrected runtime files and translations across all WPM instances.
+
 ## 0.971
 
 - WPM pending-delete lifecycle: recreating a file cancels its pending deletion; regular users no longer receive `ToDelete` rows, while superusers see them as hidden `Concept` items with permanent deletion restricted to superusers.
 - Explorer permissions and actions: duplicate toolbar actions were removed, the new-folder control is rendered by PHP only for superusers, and the document `+` placement was corrected.
 - Hide-Markdown labels: translated page wording now covers new-page controls, empty previews, empty folders, and the folder-focused explorer state in every supported language.
 - YouTube previews: shared responsive iframe styling, visual-editor serialization, and legacy `<br>` compatibility now keep YouTube blocks consistent across instances.
-- Shared authentication: race-safe session rotation and client-token recovery prevent successful NTG logins from being cleared immediately.
+- Shared authentication: race-safe session rotation and client-token recovery prevent successful logins from being cleared immediately.
 
 ## 0.97
 
