@@ -1,3 +1,5 @@
 .env
 legacy_themes/
 dist/
+HANDOFF_*.md
+WPM_ONBOARDING.md

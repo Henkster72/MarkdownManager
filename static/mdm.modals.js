@@ -1198,7 +1198,7 @@
                 link.textContent = text;
                 if (editContext.className) link.setAttribute('class', editContext.className);
                 else link.removeAttribute('class');
-                if (isPublisherMode()) link.classList.add('externlink');
+                link.classList.add('externlink');
                 if (editContext.target) link.setAttribute('target', editContext.target);
                 if (editContext.rel) link.setAttribute('rel', editContext.rel);
                 if (typeof window.__mdwSyncVisualPreviewToTextarea === 'function') {
@@ -1434,6 +1434,9 @@
     };
 
     const insertAtSelection = (text) => {
+        if (typeof window.__mdwEnsureInsertionAnchor === 'function') {
+            window.__mdwEnsureInsertionAnchor();
+        }
         if (typeof window.__mdwInsertImageMarkdown === 'function') {
             const result = window.__mdwInsertImageMarkdown(text);
             if (result && result.ok) return true;

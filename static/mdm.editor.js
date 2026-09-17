@@ -66,6 +66,7 @@
 
     const publisherOrder = [
         'extends',
+        'content_type',
         'page_title',
         'page_subtitle',
         'post_date',
@@ -2997,6 +2998,25 @@
             return '```\n' + code.replace(/\n+$/g, '') + '\n```';
         }
         if (tag === 'ul' || tag === 'ol') {
+            if (tag === 'ol' && node.classList.contains('mdw-faq-list')) {
+                const entries = Array.from(node.children)
+                    .filter((child) => child instanceof HTMLElement && child.tagName.toLowerCase() === 'li')
+                    .map((item) => {
+                        const heading = item.querySelector(':scope > details > summary > h3');
+                        const detail = item.querySelector(':scope > details > .mdw-faq-answer');
+                        if (!(heading instanceof HTMLElement) || !(detail instanceof HTMLElement)) return '';
+                        const answer = Array.from(detail.childNodes)
+                            .map((child) => child instanceof Element ? blockMarkdown(child, depth) : inlineMarkdown(child))
+                            .map((value) => String(value || '').trim())
+                            .filter(Boolean)
+                            .join('\n\n');
+                        return `### ${inlineMarkdown(heading)}\n\n${answer}`.trim();
+                    })
+                    .filter(Boolean);
+                return entries.length
+                    ? entries.join('\n\n')
+                    : '';
+            }
             let index = 1;
             return Array.from(node.children)
                 .filter((child) => child instanceof HTMLElement && child.tagName.toLowerCase() === 'li')
@@ -3579,45 +3599,17 @@
     window.__mdwInsertImageMarkdown = (markdown) => {
         const text = String(markdown || '').trim();
         if (!text) return { ok: false, error: 'empty_image' };
-        let anchor = mdwInsertionAnchor;
+        const anchor = mdwInsertionAnchor;
         const current = String(ta.value || '');
-        if (!anchor && isVisualEditorMode()) {
-            const fallback = previewBodyInsertionOffset(current);
-            anchor = {
-                source: 'preview',
-                offset: fallback,
-                end: fallback,
-                sourceLength: current.length,
-                reason: 'image_insert_safe_fallback',
-            };
-        }
         if (!anchor) return { ok: false, error: 'no_anchor' };
         if (anchor.source === 'preview' && anchor.sourceLength !== current.length) {
-            const fallback = previewBodyInsertionOffset(current);
-            anchor = {
-                source: 'preview',
-                offset: fallback,
-                end: fallback,
-                sourceLength: current.length,
-                reason: 'image_insert_stale_fallback',
-            };
+            return { ok: false, error: 'stale_preview_anchor', anchor: { ...anchor } };
         }
         const start = anchor.offset;
         const end = anchor.end;
         let imageRange = imageBlockRangeAt(current, start, end);
         let replaceStart = imageRange ? imageRange.start : start;
         let replaceEnd = imageRange ? imageRange.end : end;
-        if (anchor.source === 'preview') {
-            // A preview cursor must never insert into the hidden metadata block.
-            // If the visual mapping is unavailable, the body start is the only
-            // safe fallback; inserting at source offset 0 corrupts WPM metadata.
-            const bodyStart = previewBodyInsertionOffset(current);
-            if (replaceStart < bodyStart) {
-                imageRange = null;
-                replaceStart = bodyStart;
-                replaceEnd = bodyStart;
-            }
-        }
         const replacement = imageRange ? `${text}${imageRange.replacementSuffix}` : text;
         const replaced = current.slice(replaceStart, replaceEnd);
         ta.setRangeText(replacement, replaceStart, replaceEnd, 'end');
@@ -3750,7 +3742,15 @@
         });
         prev.addEventListener('dragend', clearVisualDrag);
         prev.addEventListener('keyup', saveVisualSelection);
-        prev.addEventListener('mouseup', saveVisualSelection);
+        const capturePreviewMouseSelection = () => {
+            saveVisualSelection();
+            window.__mdwCaptureVisualInsertionAnchor?.('preview_mouseup');
+        };
+        prev.addEventListener('mouseup', capturePreviewMouseSelection);
+        // Let the browser finish its native contenteditable caret update before
+        // mapping the preview position. This matters when the next action is a
+        // toolbar click, which otherwise moves focus first.
+        prev.addEventListener('mouseup', () => window.setTimeout(capturePreviewMouseSelection, 0));
         prev.addEventListener('focus', saveVisualSelection);
         prev.addEventListener('blur', saveVisualSelection);
         prev.addEventListener('click', (e) => {
@@ -4546,12 +4546,24 @@
                 syncing = true;
                 ta.setSelectionRange(editorStart, editorStart);
                 syncing = false;
+                setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: editorStart,
+                    end: editorStart,
+                    reason: 'preview_selection_sync',
+                });
                 renderSelectionOverlay(ta.value || '', editorStart, editorStart);
                 return true;
             }
             syncing = true;
             ta.setSelectionRange(editorStart, editorEnd);
             syncing = false;
+            setMdwInsertionAnchor({
+                source: 'markdown',
+                offset: editorStart,
+                end: editorEnd,
+                reason: 'preview_selection_sync',
+            });
             renderSelectionOverlay(ta.value || '', editorStart, editorEnd);
             return true;
         };
@@ -4594,22 +4606,56 @@
                 mdwInsertionAnchor = null;
                 return null;
             }
+            if (reason === 'preview_image' && selectedVisualImage instanceof HTMLImageElement) {
+                const imageBlock = visualSourceBlock(selectedVisualImage);
+                const sourceStart = Number(imageBlock?.dataset?.mdwSrcStart);
+                const sourceEnd = Number(imageBlock?.dataset?.mdwSrcEnd);
+                const mappedStart = Number.isFinite(sourceStart) ? previewToEditorOffset(sourceStart, getOffsetMap()) : null;
+                const mappedEnd = Number.isFinite(sourceEnd) ? previewToEditorOffset(sourceEnd, getOffsetMap()) : null;
+                if (Number.isFinite(mappedStart) && Number.isFinite(mappedEnd)) {
+                    return setMdwInsertionAnchor({
+                        source: 'markdown',
+                        offset: mappedStart,
+                        end: mappedEnd,
+                        reason,
+                    });
+                }
+            }
             const startEl = getBlockFromNode(range.startContainer);
-            if (!(startEl instanceof HTMLElement) || !syncFromPreview(range)) {
+            const endEl = getBlockFromNode(range.endContainer);
+            const startInfo = startEl instanceof HTMLElement ? getMapForElement(startEl) : null;
+            const endInfo = endEl instanceof HTMLElement ? getMapForElement(endEl) : null;
+            if (!(startEl instanceof HTMLElement)
+                || !(endEl instanceof HTMLElement)
+                || !startInfo
+                || !endInfo) {
                 mdwInsertionAnchor = null;
                 return null;
             }
-            const start = Number(ta.selectionStart);
-            const end = Number(ta.selectionEnd);
+            const map = getOffsetMap();
+            const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
+            const endIndex = getDisplayIndex(endEl, range.endContainer, range.endOffset);
+            const srcStart = displayIndexToSource(startInfo, startIndex, false);
+            const srcEnd = displayIndexToSource(endInfo, Math.max(endIndex - 1, startIndex), true);
+            const start = previewToEditorOffset(srcStart, map);
+            const end = previewToEditorOffset(srcEnd, map);
             if (!Number.isFinite(start) || !Number.isFinite(end)) {
                 mdwInsertionAnchor = null;
                 return null;
             }
             const bodyStart = previewBodyInsertionOffset(ta.value);
+            if (start < bodyStart || end < bodyStart) {
+                mdwInsertionAnchor = null;
+                return null;
+            }
+            syncing = true;
+            ta.setSelectionRange(start, end);
+            syncing = false;
+            renderSelectionOverlay(ta.value || '', start, end);
             return setMdwInsertionAnchor({
-                source: 'preview',
-                offset: Math.max(start, bodyStart),
-                end: Math.max(end, bodyStart),
+                source: 'markdown',
+                offset: start,
+                end,
                 reason,
             });
         };
@@ -4626,6 +4672,27 @@
     window.__mdwResetSelectionSync = selectionSync.reset;
     window.__mdwSyncPreviewSelectionToTextarea = selectionSync.syncFromPreview;
     window.__mdwCaptureVisualInsertionAnchor = selectionSync.capturePreviewAnchor;
+    window.__mdwEnsureInsertionAnchor = () => {
+        if (mdwInsertionAnchor) return mdwInsertionAnchor;
+        if (isVisualEditorMode()) {
+            window.__mdwSaveVisualSelection?.();
+            window.__mdwCaptureVisualInsertionAnchor?.('image_modal_recovery');
+        }
+        if (mdwInsertionAnchor) return mdwInsertionAnchor;
+        const start = Number(ta.selectionStart);
+        const end = Number(ta.selectionEnd);
+        const bodyStart = previewBodyInsertionOffset(String(ta.value || ''));
+        if (Number.isInteger(start) && Number.isInteger(end)
+            && start >= bodyStart && end >= bodyStart) {
+            return setMdwInsertionAnchor({
+                source: 'markdown',
+                offset: start,
+                end,
+                reason: 'image_modal_markdown_recovery',
+            });
+        }
+        return null;
+    };
     window.__mdwPreviewSourceOffsetToEditor = selectionSync.previewSourceOffsetToEditor;
 
     window.__mdwHighlightEditorSearchRange = (start, end) => {

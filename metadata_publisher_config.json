@@ -45,6 +45,13 @@
             "obligatory": false,
             "default_value": ""
         },
+        "content_type": {
+            "label": "Content type",
+            "markdown_visible": false,
+            "html_visible": false,
+            "obligatory": false,
+            "default_value": ""
+        },
         "page_title": {
             "label": "Page title",
             "markdown_visible": true,

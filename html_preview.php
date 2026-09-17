@@ -1350,14 +1350,18 @@ function inline_md($text, $mdPath = null, $profile = 'edit', $context = []) {
                 $externalPreviewClass = (string)$context['external_link_class'];
             }
             $classAttr = md_join_classes($linkClass, $externalPreviewClass, $rawClass);
+            $hasExternalClass = preg_match('/(?:^|\s)externlink(?:\s|$)/', $classAttr) === 1;
             $classAttr = $classAttr !== '' ? ' class="'.$classAttr.'"' : '';
             $externalAttr = preg_match('~^https?://~i', $urlRaw)
                 ? ' target="_blank" rel="noopener noreferrer"'
                 : '';
+            $externalIcon = $hasExternalClass
+                ? '<span class="pi pi-externallink" aria-hidden="true"></span>'
+                : '';
 
             return '<a'.$classAttr.' href="'.
                    $urlEsc.
-                   '"'.$externalAttr.'>'.$label.'</a>';
+                   '"'.$externalAttr.'>'.$label.$externalIcon.'</a>';
         },
         $text
     );
@@ -1826,6 +1830,15 @@ function mdw_html_insert_attrs($html, $attrs) {
 function mdw_html_strip_source_map_attrs($html) {
     if (!is_string($html) || $html === '') return (string)$html;
     return (string)preg_replace('/\\sdata-mdw-src-(?:start|end)\\s*=\\s*(?:"[^"]*"|\\\'[^\\\']*\\\'|[^\\s>]+)/i', '', $html);
+}
+
+function mdw_html_strip_preview_external_link_icons($html) {
+    if (!is_string($html) || $html === '') return (string)$html;
+    return (string)preg_replace(
+        "~\\s*<span\\b(?=[^>]*\\bclass\\s*=\\s*[\"'][^\"']*\\bpi-externallink\\b[^\"']*[\"'])(?=[^>]*\\baria-hidden\\s*=\\s*[\"']true[\"'])[^>]*>\\s*</span>~i",
+        '',
+        $html
+    );
 }
 
 function mdw_normalize_export_class_prefix($prefix) {
@@ -2303,6 +2316,7 @@ function mdw_metadata_default_publisher_config() {
             'publishstate' => ['label' => 'Publish state', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
 
             'extends' => ['label' => 'Extends', 'markdown_visible' => true, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
+            'content_type' => ['label' => 'Content type', 'markdown_visible' => false, 'html_visible' => false, 'obligatory' => false, 'default_value' => ''],
             'page_title' => ['label' => 'Page title', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
             'page_subtitle' => ['label' => 'Page subtitle', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
             'post_date' => ['label' => 'Post date', 'markdown_visible' => true, 'html_visible' => true, 'obligatory' => false, 'default_value' => ''],
@@ -2627,10 +2641,10 @@ function mdw_format_post_date_value($raw, $format, $lang = null) {
 function mdw_jinja_quote_string($value, $quoteMode = 'double') {
     $value = str_replace(["\r\n", "\r"], "\n", (string)$value);
     if ($quoteMode === 'single') {
-        $value = str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
+        $value = str_replace(['\\', "'", "\n"], ['\\\\', "\\'", '\\n'], $value);
         return "'" . $value . "'";
     }
-    $value = str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
+    $value = str_replace(['\\', '"', "\n"], ['\\\\', '\\"', '\\n'], $value);
     return '"' . $value . '"';
 }
 
@@ -2867,6 +2881,9 @@ function mdw_jinja_prepare_body_html($bodyHtml, $meta = []) {
     $meta = is_array($meta) ? $meta : [];
 
     $bodyHtml = mdw_html_strip_source_map_attrs($bodyHtml);
+    // The editor preview uses a real PopIcon span. Published Jinja themes
+    // own the external-link icon, commonly through .externlink::after.
+    $bodyHtml = mdw_html_strip_preview_external_link_icons($bodyHtml);
     $bodyHtml = mdw_jinja_strip_inline_style_attrs($bodyHtml);
 
     $pageTitleNorm = mdw_jinja_normalize_text_value($meta['page_title'] ?? '');
@@ -2946,6 +2963,18 @@ function mdw_jinja_prepare_body_html($bodyHtml, $meta = []) {
     return $bodyHtml !== '' ? $bodyHtml : '<div class="preview-content"></div>';
 }
 
+function mdw_export_faq_items_from_html($html) {
+    $items = [];
+    preg_match_all('~<h3\\b[^>]*>(.*?)</h3>(.*?)(?=<h3\\b|$)~is', (string)$html, $matches, PREG_SET_ORDER);
+    foreach ($matches as $match) {
+        $question = trim((string)($match[1] ?? ''));
+        $answer = trim((string)($match[2] ?? ''));
+        if ($question === '') continue;
+        $items[] = ['question_html' => $question, 'answer_html' => $answer];
+    }
+    return $items;
+}
+
 function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $opts = is_array($opts) ? $opts : [];
     $settings = (isset($opts['settings']) && is_array($opts['settings'])) ? $opts['settings'] : mdw_metadata_settings();
@@ -2986,6 +3015,9 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
             'source_map' => false,
             'render_metadata' => false,
             'expand_auto_sections' => false,
+            // Content-type DOM is an editor preview concern. Managed layouts
+            // receive the ordinary rendered Markdown body and own site markup.
+            'render_content_type' => false,
         ]);
         $rendered = mdw_html_strip_source_map_attrs($rendered);
         // preview-content belongs to the editor surface only. Published Jinja
@@ -2996,6 +3028,8 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $bodyHtml = mdw_jinja_prepare_body_html($bodyHtml, $effectiveMeta);
     $bodyHtml = mdw_export_normalize_toc_template_html($bodyHtml, $settings['toc_export_style'] ?? 'list');
     $bodyHtml = mdw_rewrite_md_class_prefix_in_html($bodyHtml, $exportClassPrefix, true);
+    $contentTypeValue = strtolower(trim((string)($effectiveMeta['content_type'] ?? '')));
+    $faqItems = $contentTypeValue === 'faq' ? mdw_export_faq_items_from_html($bodyHtml) : [];
 
     $lines = [];
     if ($mdPath !== null && $mdPath !== '') {
@@ -3033,9 +3067,23 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     if ($activePageValue !== '') {
         $lines[] = '{% set active_page = ' . mdw_jinja_value_literal($activePageValue, 'single') . ' %}';
     }
+    if ($contentTypeValue !== '') {
+        $lines[] = '{% set content_type = ' . mdw_jinja_value_literal($contentTypeValue, 'single') . ' %}';
+    }
+    if ($contentTypeValue === 'faq') {
+        $faqLiteral = '[';
+        foreach ($faqItems as $index => $item) {
+            if ($index > 0) $faqLiteral .= ', ';
+            $faqLiteral .= '{"question_html": ' . mdw_jinja_quote_string($item['question_html'], 'double')
+                . ', "answer_html": ' . mdw_jinja_quote_string($item['answer_html'], 'double') . '}';
+        }
+        $faqLiteral .= ']';
+        $lines[] = '{% set faq_items = ' . $faqLiteral . ' %}';
+    }
 
     $skipKeys = [
         'extends' => true,
+        'content_type' => true,
         'page_title' => true,
         'post_date' => true,
         'page_picture' => true,
@@ -3061,9 +3109,13 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
         $lines[] = $directive;
     }
 
-    $lines[] = '{% block content %}';
-    $lines[] = $bodyHtml;
-    $lines[] = '{% endblock content %}';
+    if ($contentTypeValue === 'faq') {
+        $lines[] = '{% block markdown_body %}{{ super() }}{% endblock markdown_body %}';
+    } else {
+        $lines[] = '{% block content %}';
+        $lines[] = $bodyHtml;
+        $lines[] = '{% endblock content %}';
+    }
     return implode("\n", $lines) . "\n";
 }
 
@@ -3222,6 +3274,30 @@ function mdw_attr_list_extract_classes($line) {
         if ($val !== '') $classes[] = $val;
     }
     return $classes;
+}
+
+function mdw_render_faq_content_type($output, $meta) {
+    if (strtolower(trim((string)($meta['content_type'] ?? ''))) !== 'faq') return $output;
+
+    preg_match_all('~(?P<heading><h3\b[^>]*>.*?</h3>)(?P<body>.*?)(?=<h3\b|$)~is', $output, $matches, PREG_OFFSET_CAPTURE);
+    if (empty($matches['heading'])) {
+        return '<div class="mdw-content-type-error" role="alert">FAQ content requires at least one level-3 heading.</div>';
+    }
+
+    $firstOffset = (int)$matches['heading'][0][1];
+    $prefix = rtrim(substr($output, 0, $firstOffset));
+    $items = [];
+    $count = count($matches['heading']);
+    for ($index = 0; $index < $count; $index++) {
+        $heading = (string)$matches['heading'][$index][0];
+        $body = trim((string)$matches['body'][$index][0]);
+        $open = $index === 0 ? ' open' : '';
+        $number = str_pad((string)($index + 1), 2, '0', STR_PAD_LEFT);
+        $items[] = '<li><details'.$open.'><summary><span>'.$number.'</span>'.$heading.'</summary><div class="mdw-faq-answer">'.$body.'</div></details></li>';
+    }
+
+    $faqHtml = '<ol class="mdw-faq-list">' . "\n" . implode("\n", $items) . "\n</ol>";
+    return $prefix === '' ? $faqHtml : $prefix . "\n\n" . $faqHtml;
 }
 
 function mdw_auth_password_algo() {
@@ -3468,7 +3544,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         if ($k !== '' && !in_array($k, $order, true)) $order[] = $k;
     }
     // Stable publisher order.
-    $publisherOrder = ['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'];
+    $publisherOrder = ['extends','content_type','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'];
     foreach ($publisherOrder as $k) {
         if (!isset($pubFields[$k])) continue;
         if (!$publisherMode && !array_key_exists($k, $meta)) continue;
@@ -3502,6 +3578,12 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     $p = md_render_profile($profile);
 
     $context = is_array($context) ? $context : [];
+    // External-link decoration is part of the shared editor preview contract.
+    // Keep it out of the public/view renderer, but do not make preview behavior
+    // depend on a publisher-mode caller supplying an implementation detail.
+    if ($profile === 'edit' && !array_key_exists('external_link_class', $context)) {
+        $context['external_link_class'] = 'externlink';
+    }
     $sourceMapEnabled = !array_key_exists('source_map', $context) || !empty($context['source_map']);
     $renderMetadata = !array_key_exists('render_metadata', $context) || !empty($context['render_metadata']);
     $expandAutoSections = !array_key_exists('expand_auto_sections', $context) || !empty($context['expand_auto_sections']);
@@ -3628,7 +3710,7 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
         $metaShown = [];
         $order = [];
         foreach (array_keys($baseFields) as $k) $order[] = $k;
-        foreach (['extends','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'] as $k) {
+        foreach (['extends','content_type','page_title','page_subtitle','post_date','page_picture','active_page','cta','blurmenu','sociallinks','blog','author','creationdate','changedate','published_date','publishstate'] as $k) {
             if (!isset($pubFields[$k])) continue;
             $order[] = $k;
         }
@@ -4317,6 +4399,9 @@ function md_to_html($text, $mdPath = null, $profile = 'edit', $context = null) {
     }
 
     $output = implode("\n",$html);
+    if (($context['render_content_type'] ?? true) !== false) {
+        $output = mdw_render_faq_content_type($output, $meta);
+    }
     $feedbackPopupValue = strtolower(trim((string)($meta['feedbackpopup'] ?? '')));
     if (in_array($feedbackPopupValue, ['1', 'true', 'yes', 'on'], true)) {
         $feedbackWidget = '<aside class="mdw-preview-feedback-widget" data-mdw-feedbackpopup="true"><span class="pi pi-info"></span><span>FeedbackCompany</span></aside>';

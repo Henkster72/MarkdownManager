@@ -129,7 +129,7 @@ function mdw_static_asset($file) {
     $url = rtrim($base, "/\\") . '/' . $file;
     $path = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $STATIC_DIR) . '/' . $file;
     $mtime = is_file($path) ? @filemtime($path) : false;
-    return $mtime ? ($url . '?v=' . rawurlencode((string)$mtime)) : $url;
+    return $mtime ? ($url . '?ts=' . rawurlencode((string)$mtime)) : $url;
 }
 function mdw_json_for_script($value) {
     return json_encode(

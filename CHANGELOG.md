@@ -2,6 +2,8 @@
 
 ## 0.972
 
+- Visual-editor image insertion: preview caret capture now survives toolbar focus changes, inserts only at the exact mapped Markdown position, and never falls back into metadata or the document body start.
+- Static asset cache keys: PHP now names timestamp-based cache keys `ts` instead of the ambiguous `v`; remote deployments continue to use `cache-purge`.
 - WPM preview links: external links now receive the instance `externlink` class automatically in server-rendered previews and when links are edited through the visual link modal, while Markdown source remains unchanged.
 - WPM template synchronization: the minipc helper now copies newer files from the complete site-owned `templates/` tree with `rsync --update`, without deleting remote templates or transient files; onboarding documentation now describes the destination and safety boundary.
 - WPM onboarding and themes: added the Bold Yellow theme and supporting metadata, and improved the template-to-Markdown onboarding workflow for managed pages, published states, inline Jinja assignments, duplicate metadata headers, and testimonial audio sources.

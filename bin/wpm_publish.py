@@ -219,7 +219,7 @@ def template_to_markdown(template: Path, rel: str) -> str:
             metadata[key] = value
     metadata["publishstate"] = "Concept"
 
-    preferred = ["extends", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author", "blog"]
+    preferred = ["extends", "content_type", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author", "blog"]
     lines = [f"{{{key}: {metadata.pop(key)}}}" for key in preferred if metadata.get(key, "") != ""]
     lines.extend(f"{{{key}: {value}}}" for key, value in sorted(metadata.items()) if value != "")
     body = body_match.group(2).strip()

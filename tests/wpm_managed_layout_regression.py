@@ -58,12 +58,14 @@ with tempfile.TemporaryDirectory() as temp_dir:
     managed_template.write_text(
         '{# mdw-managed: source=article.md #}\n'
         '{% extends "layouts/markdown_page.html" %}\n'
+        '{% set content_type = "faq" %}\n'
         '{% set page_title = "Article" %}\n'
         '{% block markdown_body %}<p>Updated</p>{% endblock markdown_body %}\n',
         encoding="utf-8",
     )
     imported = publisher.template_to_markdown(managed_template, "article.md")
     assert "{extends: layouts/markdown_page.html}" in imported
+    assert "{content_type: faq}" in imported
     assert "{page_title: Article}" in imported
     assert "<p>Updated</p>" in imported
 

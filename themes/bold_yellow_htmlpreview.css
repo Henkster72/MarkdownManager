@@ -18,14 +18,191 @@
 .preview-content h5,
 .preview-content h6 {
   color: #474747;
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-family: inherit;
+  font-weight: 400;
   line-height: 1.04;
+  margin: 0;
+}
+
+.preview-content h1 {
+  max-width: 10ch;
+  margin-bottom: 1.5rem;
+  font-size: clamp(3.6rem, 8vw, 7rem);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.preview-content h2 {
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  letter-spacing: -0.03em;
+}
+
+/* Markdown H2 headings are ordinary article section headings. The very large
+ * Flowing Numbers display scale belongs only to named overview components. */
+.preview-content h2.md-h2 {
+  margin: 2rem 0 1rem;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+/* Metadata is emitted before the Markdown body for overview/FAQ pages.
+ * Keep it separate from the site's large article-heading scale. */
+.preview-content > h1:first-child {
+  max-width: none;
+  margin: 1.5rem auto 1rem;
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.preview-content > h1:first-child + h2,
+.preview-content > h1:first-child + .md-img + h2 {
+  max-width: 42rem;
+  margin: 0 auto 1.5rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+/* The editor emits this shell for managed blog metadata. Match the
+ * Flowing Numbers base.html blog article rather than the generic Markdown
+ * heading scale. */
+.preview-content .mdw-preview-blog-header {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 48rem);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.preview-content .mdw-preview-blog-header .page-main-image {
+  order: -1;
+  display: block;
+  width: 100%;
+  max-width: 48rem;
+  height: auto;
+  margin: 0 auto 5rem;
+  border-radius: 1rem;
+}
+
+.preview-content .mdw-preview-blog-header h1.blogheader {
+  max-width: none;
+  margin: 0 0 2rem;
+  font-size: 2rem;
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+}
+
+.preview-content .mdw-preview-blog-header h2 {
+  max-width: 42rem;
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+.preview-content .mdw-preview-blog-header .datum {
+  margin: 0 0 2rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.preview-content .mdw-preview-blog-header + .blog-article {
+  width: min(100%, 48rem);
+  margin: 0 auto;
+  padding: 0 1.25rem 5rem;
+}
+
+.preview-content .mdw-preview-blog-header + .blog-article p {
+  max-width: 42rem;
+}
+
+.preview-content .mdw-faq-list {
+  max-width: 56rem;
+  margin: 0;
+  list-style: none !important;
+}
+
+.preview-content .mdw-faq-list summary {
+  grid-template-columns: 4rem 1fr;
+  gap: 1rem;
+  min-height: 6rem;
+  list-style: none;
+}
+
+.preview-content .mdw-faq-list > li,
+.preview-content .mdw-faq-list > li::marker {
+  list-style: none !important;
+  content: "";
+}
+
+.preview-content .mdw-faq-list summary::marker {
+  content: "";
+  font-size: 0;
+}
+
+.preview-content .mdw-faq-list summary::after {
+  justify-self: end;
+  font-size: 1.5rem;
+}
+
+.preview-content .mdw-faq-list summary > span {
+  font-size: 2rem;
+  color: var(--theme-primary);
+}
+
+.preview-content .mdw-faq-list summary h3 {
+  font-size: clamp(1.4rem, 2.4vw, 2.2rem);
+}
+
+.preview-content .mdw-faq-answer {
+  padding: 0 3rem 2rem 5rem;
+}
+
+.preview-content .mdw-faq-answer p {
+  font-size: 0.9rem;
+}
+
+.preview-content h3 {
+  font-size: clamp(1.4rem, 2.1vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+.preview-content h4 {
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+}
+
+.preview-content h5 {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.preview-content h6 {
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
+.preview-content p {
+  margin: 0;
+}
+
+.preview-content p + p {
+  margin-top: 1em;
+}
+
+.preview-content em {
+  font-family: Georgia, serif;
+  font-weight: 400;
 }
 
 .preview-content a {
-  color: #474747;
-  text-decoration-color: var(--theme-primary);
+  color: inherit;
   text-underline-offset: 0.3em;
 }
 
@@ -34,13 +211,43 @@
   text-decoration-thickness: 2px;
 }
 
+.preview-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .preview-content blockquote {
+  margin: 0 0 2rem;
   border-left-color: var(--theme-primary);
   border-left-width: 2px;
-  border-radius: 0 24px 24px 0;
-  background: var(--theme-surface);
+  border-radius: 0;
+  background: transparent;
   color: #474747;
-  box-shadow: 0 8px 20px rgba(71, 71, 71, 0.1);
+  box-shadow: none;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.preview-content .eyebrow,
+.preview-content .path-marker {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.preview-content .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding-block: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.preview-content .text-link span {
+  font-size: 1.4em;
 }
 
 .preview-content code,

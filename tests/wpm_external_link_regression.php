@@ -22,7 +22,7 @@ $html = md_to_html(implode("\n", [
     '[Bare domain](example.com/path)',
     '[Internal](other-page)',
     '[Already marked](https://example.org) {: class="externlink"}',
-]), 'test.md', 'edit', ['external_link_class' => 'externlink']);
+]), 'test.md', 'edit');
 
 $assert = static function (bool $condition, string $message): void {
     if (!$condition) {
@@ -35,5 +35,13 @@ $assert((bool)preg_match('/<a class="md-link externlink" href="https:\/\/example
 $assert((bool)preg_match('/<a class="md-link externlink" href="https:\/\/example\.com\/path"/', $html), 'Bare domains must receive externlink in WPM preview');
 $assert((bool)preg_match('/<a class="md-link" href="other-page"/', $html), 'Internal links must not receive externlink');
 $assert(substr_count($html, 'class="md-link externlink"') === 3, 'Explicit externlink must not be duplicated');
+$assert(substr_count($html, 'class="pi pi-externallink"') === 3, 'External links must contain the PopIcon external-link element');
+
+$exportHtml = mdw_jinja_prepare_body_html($html, []);
+$assert(strpos($exportHtml, 'class="pi pi-externallink"') === false, 'Jinja export must not carry editor-only external-link icon spans');
+$assert(substr_count($exportHtml, 'externlink') === 3, 'Jinja export must retain external-link classes for the published theme');
+
+$viewHtml = md_to_html('[External](https://example.com)', 'test.md', 'view');
+$assert(strpos($viewHtml, 'externlink') === false, 'Public/view rendering must not inherit editor-only externlink decoration');
 
 echo "WPM external link regression checks passed\n";

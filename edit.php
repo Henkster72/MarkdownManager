@@ -213,7 +213,7 @@ function mdw_static_asset($file) {
     $url = rtrim($base, "/\\") . '/' . $file;
     $path = mdw_asset_filesystem_path('static_path', 'STATIC_PATH', $STATIC_DIR) . '/' . $file;
     $mtime = is_file($path) ? @filemtime($path) : false;
-    return $mtime ? ($url . '?v=' . rawurlencode((string)$mtime)) : $url;
+    return $mtime ? ($url . '?ts=' . rawurlencode((string)$mtime)) : $url;
 }
 $themesList = list_available_themes($THEMES_DIR);
 $META_CFG = mdw_metadata_load_config();
@@ -734,7 +734,7 @@ if (isset($_GET['preview']) && $_GET['preview'] === '1') {
         exit;
     }
 
-    html(md_to_html($content, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']));
+    html(md_to_html($content, $requested, 'edit'));
 }
 
 /* LOAD DATA FOR JSON REQUEST */
@@ -1143,12 +1143,12 @@ if ($requested) {
 	    $raw             = $posted_content_for_render;
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
-	    $current_html    = md_to_html($raw, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']);
+	    $current_html    = md_to_html($raw, $requested, 'edit');
 	} else if ($full && is_file($full)) {
 	    $raw             = file_get_contents($full);
 	    $current_content = (string)$raw;
 	    $current_title   = mdw_editor_title_from_raw($raw, !empty($MDW_PUBLISHER_MODE), $requested);
-	    $current_html    = md_to_html($raw, $requested, 'edit', ['external_link_class' => !empty($MDW_PUBLISHER_MODE) ? 'externlink' : '']);
+	    $current_html    = md_to_html($raw, $requested, 'edit');
 	} else {
 	    $save_error = 'Bestand niet gevonden.';
 	}
