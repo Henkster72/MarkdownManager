@@ -2822,6 +2822,10 @@
         if (!(node instanceof Element)) return '';
         const tag = node.tagName.toLowerCase();
         if ((tag === 'span' || tag === 'i') && iconFontClasses(node).length) {
+            if (node.classList.contains('pi-externallink')
+                && node.getAttribute('aria-hidden') === 'true') {
+                return '';
+            }
             return serializeIconFontElement(node);
         }
         const childContext = tag === 'a' ? { ...context, inLink: true } : context;
