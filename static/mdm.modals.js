@@ -1199,6 +1199,10 @@
                 if (editContext.className) link.setAttribute('class', editContext.className);
                 else link.removeAttribute('class');
                 link.classList.add('externlink');
+                const icon = document.createElement('span');
+                icon.className = 'pi pi-externallink';
+                icon.setAttribute('aria-hidden', 'true');
+                link.appendChild(icon);
                 if (editContext.target) link.setAttribute('target', editContext.target);
                 if (editContext.rel) link.setAttribute('rel', editContext.rel);
                 if (typeof window.__mdwSyncVisualPreviewToTextarea === 'function') {
