@@ -86,7 +86,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.958 extends the translated WPM workflow to empty-preview prompts and boolean metadata controls. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and normal-user workflow guides in [English](docs/GEBRUIKERSHANDLEIDING_EN.md) and [Dutch](docs/GEBRUIKERSHANDLEIDING_NL.md). Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.958 extends the translated WPM workflow to empty-preview prompts and boolean metadata controls. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and normal-user workflow guides in [English](docs/USER_GUIDE_EN.md) and [Dutch](docs/GEBRUIKERSHANDLEIDING_NL.md). Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
 
 ## Security warning (read this)
 
