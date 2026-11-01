@@ -66,6 +66,30 @@
         const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
         return !!(auth && auth.role === 'superuser' && auth.token);
     };
+    const canDragFiles = () => {
+        const meta = (window.MDW_AUTH_META && typeof window.MDW_AUTH_META === 'object')
+            ? window.MDW_AUTH_META
+            : { has_user: false, has_superuser: false };
+        const hasAuth = !!(meta.has_user || meta.has_superuser);
+        if (!hasAuth) return true;
+        const auth = (typeof window.__mdwAuthState === 'function') ? window.__mdwAuthState() : null;
+        if (!auth || !auth.role) return false;
+        if (auth.role === 'superuser') return true;
+        if (auth.role !== 'user') return false;
+        const cfg = (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') ? window.MDW_META_CONFIG : null;
+        const settings = cfg && cfg._settings && typeof cfg._settings === 'object' ? cfg._settings : null;
+        return !settings || !Object.prototype.hasOwnProperty.call(settings, 'allow_user_drag') || !!settings.allow_user_drag;
+    };
+    const syncFileDragState = () => {
+        const allowDrag = canDragFiles();
+        document.querySelectorAll('.note-item[data-kind="md"] .note-link').forEach((link) => {
+            if (!(link instanceof HTMLAnchorElement)) return;
+            link.draggable = allowDrag;
+        });
+    };
+    window.__mdwCanDragFiles = canDragFiles;
+    window.__mdwApplyFileDragPermissions = syncFileDragState;
+    syncFileDragState();
 
     const ensureInput = (form, name, value) => {
         let input = form.querySelector(`input[name="${name}"]`);
@@ -406,6 +430,10 @@
         const link = e.target instanceof Element ? e.target.closest('.note-link') : null;
         const row = link?.closest('.note-item[data-kind="md"]');
         if (!(row instanceof HTMLElement)) return;
+        if (!canDragFiles()) {
+            e.preventDefault();
+            return;
+        }
         const file = getFilePathFromRow(row);
         if (!file) return;
         const canMove = canManageFolders();
@@ -2406,7 +2434,9 @@
         const link = document.createElement('a');
         link.href = lazyBuildHref(note);
         link.className = `note-link note-link-main kbd-item${isCurrent ? ' active' : ''}`;
-        link.draggable = true;
+        link.draggable = typeof window.__mdwCanDragFiles === 'function'
+            ? window.__mdwCanDragFiles()
+            : true;
 
         const leading = document.createElement('span');
         leading.className = 'note-leading';
@@ -2526,6 +2556,7 @@
             lazyRenderState.set(listEl, { signature, token: null });
             refreshDocEntries();
             if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+            if (typeof window.__mdwApplyFileDragPermissions === 'function') window.__mdwApplyFileDragPermissions();
             syncUserVisibilityControls();
             return;
         }
@@ -2546,6 +2577,7 @@
             }
             refreshDocEntries();
             if (typeof window.__mdwApplyDeletePermissions === 'function') window.__mdwApplyDeletePermissions();
+            if (typeof window.__mdwApplyFileDragPermissions === 'function') window.__mdwApplyFileDragPermissions();
             syncUserVisibilityControls();
         };
         push();

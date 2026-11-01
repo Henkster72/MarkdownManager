@@ -242,6 +242,7 @@
       "title": "Permessi",
       "allow_user_publish": "Consenti agli utenti di pubblicare",
       "allow_user_delete": "Consenti agli utenti di eliminare note",
+      "allow_user_drag": "Consenti agli utenti di trascinare le note",
       "hint": "Salvato per tutti gli utenti.",
       "saving": "Salvando…",
       "saved": "Salvato",

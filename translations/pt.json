@@ -233,6 +233,7 @@
       "title": "Permissões",
       "allow_user_publish": "Permitir que os utilizadores publiquem",
       "allow_user_delete": "Permitir que os utilizadores eliminem notas",
+      "allow_user_drag": "Permitir que os utilizadores arrastem notas",
       "hint": "Guardado para todos os utilizadores.",
       "saving": "A guardar…",
       "saved": "Guardado",

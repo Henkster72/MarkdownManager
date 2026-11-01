@@ -246,6 +246,7 @@
       "title": "Permissions",
       "allow_user_publish": "Allow users to publish",
       "allow_user_delete": "Allow users to delete notes",
+      "allow_user_drag": "Allow users to drag notes",
       "hint": "Saved for all users.",
       "saving": "Saving…",
       "saved": "Saved",

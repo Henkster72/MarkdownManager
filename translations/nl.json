@@ -237,6 +237,7 @@
       "title": "Rechten",
       "allow_user_publish": "Gebruikers mogen publiceren",
       "allow_user_delete": "Gebruikers mogen notities verwijderen",
+      "allow_user_drag": "Gebruikers mogen notities slepen",
       "hint": "Opgeslagen voor alle gebruikers.",
       "saving": "Opslaan…",
       "saved": "Opgeslagen",

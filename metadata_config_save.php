@@ -233,6 +233,9 @@ if (is_array($settingsIn)) {
     $allowUserDelete = array_key_exists('allow_user_delete', $settingsIn)
         ? (bool)$settingsIn['allow_user_delete']
         : (!array_key_exists('allow_user_delete', $curSettings) ? true : (bool)$curSettings['allow_user_delete']);
+    $allowUserDrag = array_key_exists('allow_user_drag', $settingsIn)
+        ? (bool)$settingsIn['allow_user_drag']
+        : (!array_key_exists('allow_user_drag', $curSettings) ? true : (bool)$curSettings['allow_user_drag']);
     $editorWrap = array_key_exists('editor_wrap', $settingsIn)
         ? (bool)$settingsIn['editor_wrap']
         : (!array_key_exists('editor_wrap', $curSettings) ? false : (bool)$curSettings['editor_wrap']);
@@ -358,6 +361,7 @@ if (is_array($settingsIn)) {
         'publisher_require_h2' => (bool)$requireH2,
         'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'allow_user_drag' => (bool)$allowUserDrag,
         'editor_wrap' => (bool)$editorWrap,
         'editor_debug_logging' => (bool)$editorDebugLogging,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,

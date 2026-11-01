@@ -2048,6 +2048,7 @@ function mdw_metadata_default_config() {
             'publisher_require_h2' => true,
             'allow_user_publish' => false,
             'allow_user_delete' => true,
+            'allow_user_drag' => true,
             'editor_wrap' => false,
             'copy_buttons_enabled' => true,
             'copy_include_meta' => true,
@@ -2189,6 +2190,7 @@ function mdw_metadata_normalize_config($cfg) {
     $publisherRequireH2 = !array_key_exists('publisher_require_h2', $inSettings) ? true : (bool)$inSettings['publisher_require_h2'];
     $allowUserPublish = !array_key_exists('allow_user_publish', $inSettings) ? false : (bool)$inSettings['allow_user_publish'];
     $allowUserDelete = !array_key_exists('allow_user_delete', $inSettings) ? true : (bool)$inSettings['allow_user_delete'];
+    $allowUserDrag = !array_key_exists('allow_user_drag', $inSettings) ? true : (bool)$inSettings['allow_user_drag'];
     $editorWrap = !array_key_exists('editor_wrap', $inSettings) ? false : (bool)$inSettings['editor_wrap'];
     $copyButtonsEnabled = !array_key_exists('copy_buttons_enabled', $inSettings) ? true : (bool)$inSettings['copy_buttons_enabled'];
     $copyIncludeMeta = !array_key_exists('copy_include_meta', $inSettings) ? true : (bool)$inSettings['copy_include_meta'];
@@ -2241,6 +2243,7 @@ function mdw_metadata_normalize_config($cfg) {
         'publisher_require_h2' => (bool)$publisherRequireH2,
         'allow_user_publish' => (bool)$allowUserPublish,
         'allow_user_delete' => (bool)$allowUserDelete,
+        'allow_user_drag' => (bool)$allowUserDrag,
         'editor_wrap' => (bool)$editorWrap,
         'copy_buttons_enabled' => (bool)$copyButtonsEnabled,
         'copy_include_meta' => (bool)$copyIncludeMeta,
@@ -2521,6 +2524,7 @@ function mdw_metadata_settings() {
         'publisher_require_h2' => !array_key_exists('publisher_require_h2', $s) ? true : (bool)$s['publisher_require_h2'],
         'allow_user_publish' => !array_key_exists('allow_user_publish', $s) ? false : (bool)$s['allow_user_publish'],
         'allow_user_delete' => !array_key_exists('allow_user_delete', $s) ? true : (bool)$s['allow_user_delete'],
+        'allow_user_drag' => !array_key_exists('allow_user_drag', $s) ? true : (bool)$s['allow_user_drag'],
         'editor_wrap' => !array_key_exists('editor_wrap', $s) ? false : (bool)$s['editor_wrap'],
         'copy_buttons_enabled' => !array_key_exists('copy_buttons_enabled', $s) ? true : (bool)$s['copy_buttons_enabled'],
         'copy_include_meta' => !array_key_exists('copy_include_meta', $s) ? true : (bool)$s['copy_include_meta'],

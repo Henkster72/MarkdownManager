@@ -84,6 +84,9 @@
         if (typeof window.__mdwSyncFolderDragState === 'function') {
             window.__mdwSyncFolderDragState();
         }
+        if (typeof window.__mdwApplyFileDragPermissions === 'function') {
+            window.__mdwApplyFileDragPermissions();
+        }
         document.dispatchEvent(new CustomEvent('mdw-auth-change', { detail: { superuser: allow } }));
     };
 

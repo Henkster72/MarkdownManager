@@ -1012,6 +1012,7 @@
     const offlineDelaySelect = document.getElementById('offlineDelaySelect');
     const allowUserPublishToggle = document.getElementById('allowUserPublishToggle');
     const allowUserDeleteToggle = document.getElementById('allowUserDeleteToggle');
+    const allowUserDragToggle = document.getElementById('allowUserDragToggle');
     const allowUserDeleteStatus = document.getElementById('allowUserDeleteStatus');
     const customFormatCustomCssToggle = document.getElementById('customFormatCustomCssToggle');
     const customFormatSectionsToggle = document.getElementById('customFormatSectionsToggle');
@@ -1267,6 +1268,11 @@
         const s = getSettings();
         if (!s || typeof s !== 'object') return true;
         return !Object.prototype.hasOwnProperty.call(s, 'allow_user_delete') ? true : !!s.allow_user_delete;
+    };
+    const readAllowUserDragSetting = () => {
+        const s = getSettings();
+        if (!s || typeof s !== 'object') return true;
+        return !Object.prototype.hasOwnProperty.call(s, 'allow_user_drag') ? true : !!s.allow_user_drag;
     };
     const readCopyButtonsSetting = () => {
         const s = getSettings();
@@ -1594,6 +1600,9 @@
         if (allowUserDeleteToggle instanceof HTMLInputElement) {
             allowUserDeleteToggle.checked = readAllowUserDeleteSetting();
         }
+        if (allowUserDragToggle instanceof HTMLInputElement) {
+            allowUserDragToggle.checked = readAllowUserDragSetting();
+        }
         if (copyButtonsToggle instanceof HTMLInputElement) {
             copyButtonsToggle.checked = readCopyButtonsSetting();
         }
@@ -1841,6 +1850,35 @@
             return true;
         } catch (e) {
             console.error('allow user delete save failed', e);
+            const msg = (e && typeof e.message === 'string' && e.message.trim())
+                ? e.message.trim()
+                : t('theme.permissions.save_failed', 'Save failed');
+            setAllowUserDeleteStatus(msg, 'error');
+            return false;
+        }
+    };
+
+    const saveAllowUserDragSetting = async (nextValue) => {
+        setAllowUserDeleteStatus(t('theme.permissions.saving', 'Saving…'), 'info');
+        try {
+            if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
+                setAllowUserDeleteStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
+                if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();
+                return false;
+            }
+            const result = await saveSettingsToServer({ allow_user_drag: nextValue });
+            if (!result.ok) throw new Error(result.message || t('theme.permissions.save_failed', 'Save failed'));
+            if (window.MDW_META_CONFIG && typeof window.MDW_META_CONFIG === 'object') {
+                window.MDW_META_CONFIG._settings = window.MDW_META_CONFIG._settings || {};
+                window.MDW_META_CONFIG._settings.allow_user_drag = nextValue;
+            }
+            if (typeof window.__mdwApplyFileDragPermissions === 'function') {
+                window.__mdwApplyFileDragPermissions();
+            }
+            setAllowUserDeleteStatus(t('theme.permissions.saved', 'Saved'), 'ok');
+            return true;
+        } catch (e) {
+            console.error('allow user drag save failed', e);
             const msg = (e && typeof e.message === 'string' && e.message.trim())
                 ? e.message.trim()
                 : t('theme.permissions.save_failed', 'Save failed');
@@ -2436,6 +2474,11 @@
             if (!(allowUserDeleteToggle instanceof HTMLInputElement)) return;
             const next = !!allowUserDeleteToggle.checked;
             await saveAllowUserDeleteSetting(next);
+        });
+        allowUserDragToggle?.addEventListener('change', async () => {
+            if (!(allowUserDragToggle instanceof HTMLInputElement)) return;
+            const next = !!allowUserDragToggle.checked;
+            await saveAllowUserDragSetting(next);
         });
 
         const onCustomFormatChange = async () => {
@@ -3056,6 +3099,13 @@
                 const next = !!allowUserDeleteToggle.checked;
                 if (next !== readAllowUserDeleteSetting()) {
                     const ok = await saveAllowUserDeleteSetting(next);
+                    if (!ok) return false;
+                }
+            }
+            if (allowUserDragToggle instanceof HTMLInputElement) {
+                const next = !!allowUserDragToggle.checked;
+                if (next !== readAllowUserDragSetting()) {
+                    const ok = await saveAllowUserDragSetting(next);
                     if (!ok) return false;
                 }
             }

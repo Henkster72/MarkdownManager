@@ -193,6 +193,10 @@
 				                    <input id="allowUserDeleteToggle" type="checkbox" <?= !array_key_exists('allow_user_delete', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_delete']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
 				                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_delete','Allow users to delete notes'))?></span>
 				                </label>
+	                <label style="display:flex; align-items:center; gap:0.5rem; margin-top: 0.35rem;">
+	                    <input id="allowUserDragToggle" type="checkbox" <?= !array_key_exists('allow_user_drag', $MDW_SETTINGS) || !empty($MDW_SETTINGS['allow_user_drag']) ? 'checked' : '' ?> data-auth-superuser-enable="1">
+	                    <span class="status-text"><?=h(mdw_t('theme.permissions.allow_user_drag','Allow users to drag notes'))?></span>
+	                </label>
 				                <div id="allowUserDeleteStatus" class="status-text" style="margin-top: 0.35rem;">
 				                    <?=h(mdw_t('theme.permissions.hint','Saved for all users.'))?>
 				                </div>

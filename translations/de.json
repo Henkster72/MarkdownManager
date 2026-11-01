@@ -233,6 +233,7 @@
       "title": "Berechtigungen",
       "allow_user_publish": "Benutzern erlauben, zu veröffentlichen",
       "allow_user_delete": "Benutzern erlauben, Notizen zu löschen",
+      "allow_user_drag": "Benutzern erlauben, Notizen zu ziehen",
       "hint": "Für alle Benutzer gespeichert.",
       "saving": "Speichern…",
       "saved": "Gespeichert",
