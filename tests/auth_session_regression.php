@@ -36,6 +36,11 @@ if (mdw_shared_auth_role_from_token('superuser', $superHash) !== 'superuser') {
     @unlink($configPath);
     exit(1);
 }
+if (!mdw_auth_verify_token('superuser', 'stale-browser-token')) {
+    fwrite(STDERR, "A valid shared superuser session must authorize stale client tokens\n");
+    @unlink($configPath);
+    exit(1);
+}
 if (mdw_shared_auth_role_from_token('superuser', $userHash) !== '' || mdw_shared_auth_role_from_token('user', 'invalid') !== '') {
     fwrite(STDERR, "Client token fallback must reject invalid role/token combinations\n");
     @unlink($configPath);

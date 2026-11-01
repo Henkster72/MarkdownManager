@@ -56,7 +56,7 @@ function mdw_shared_auth_role_from_token(string $role, string $token): string
     if (!in_array($role, ['user', 'superuser'], true)) {
         return '';
     }
-    return mdw_auth_verify_token($role, $token) ? $role : '';
+    return mdw_auth_verify_token($role, $token, false) ? $role : '';
 }
 
 function mdw_shared_auth_login_with_password(string $password): string

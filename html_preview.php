@@ -3363,7 +3363,10 @@ function mdw_auth_has_role($role) {
     return false;
 }
 
-function mdw_auth_verify_token($role, $token) {
+function mdw_auth_verify_token($role, $token, $allowSharedSession = true) {
+    if ($allowSharedSession && function_exists('mdw_shared_auth_current_role') && mdw_shared_auth_current_role() === $role) {
+        return true;
+    }
     $token = (string)$token;
     if ($token === '') return false;
     $auth = mdw_auth_config();
