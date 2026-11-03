@@ -1391,6 +1391,8 @@
     const imageErrorMessage = (code, data) => {
         const dir = String((data && data.images_dir) || 'images');
         switch (code) {
+            case 'auth_required':
+                return t('auth.login_required', 'Please log in to view images.');
             case 'csrf':
                 return t('image_modal.error_csrf', 'Your session expired. Reload and try again.');
             case 'missing_upload':

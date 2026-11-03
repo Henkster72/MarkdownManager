@@ -2,6 +2,7 @@
 
 require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/shared_auth.php';
 
 function image_manager_sanitize_dir_name($name, $fallback) {
     $name = is_string($name) ? trim($name) : '';
@@ -43,6 +44,16 @@ function image_manager_error($code, $status = 400, $extra = []) {
         }
     }
     image_manager_json($payload, $status);
+}
+
+$imageAuthRole = trim((string)($_SERVER['HTTP_X_MDW_AUTH_ROLE'] ?? $_REQUEST['auth_role'] ?? ''));
+$imageAuthToken = (string)($_SERVER['HTTP_X_MDW_AUTH_TOKEN'] ?? $_REQUEST['auth_token'] ?? '');
+$imageAuthenticated = mdw_shared_auth_current_role() !== '';
+if (!$imageAuthenticated && in_array($imageAuthRole, ['user', 'superuser'], true)) {
+    $imageAuthenticated = mdw_auth_verify_token($imageAuthRole, $imageAuthToken, false);
+}
+if (!$imageAuthenticated) {
+    image_manager_error('auth_required', 403);
 }
 
 function image_manager_guess_alt($filename) {

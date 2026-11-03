@@ -18,8 +18,28 @@
         return String(res.statusText || 'Request failed');
     };
 
+    const authHeaders = (url) => {
+        try {
+            const target = new URL(url, window.location.href);
+            if (target.origin !== window.location.origin || typeof window.__mdwStorageGet !== 'function') {
+                return {};
+            }
+            const role = String(window.__mdwStorageGet('mdw_auth_role') || '').trim();
+            const token = String(window.__mdwStorageGet('mdw_auth_token') || '').trim();
+            if (!role || !token) return {};
+            return {
+                'X-MDW-Auth-Role': role,
+                'X-MDW-Auth-Token': token,
+            };
+        } catch {
+            return {};
+        }
+    };
+
     const request = async (url, options) => {
-        const res = await fetch(url, options || {});
+        const requestOptions = Object.assign({}, options || {});
+        requestOptions.headers = Object.assign(authHeaders(url), requestOptions.headers || {});
+        const res = await fetch(url, requestOptions);
         const data = await parseResponse(res);
         if (!res.ok || (data && typeof data === 'object' && data.ok === false)) {
             const err = new Error(extractError(res, data));
