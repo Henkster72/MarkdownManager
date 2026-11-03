@@ -1503,8 +1503,9 @@
             if (!data || data.ok !== true) throw Object.assign(new Error('delete_failed'), { data });
             items = items.filter((item) => String(item?.token || '') !== token && String(item?.file || '') !== file);
             saveCache();
-            render();
-            setStatus(t('image_modal.deleted', 'Image deleted.'), 'ok');
+            if (await loadList()) {
+                setStatus(t('image_modal.deleted', 'Image deleted.'), 'ok');
+            }
         } catch (error) {
             const data = error && typeof error === 'object' ? error.data : null;
             const code = normalizeImageErrorCode(data) || (error?.message === 'delete_failed' ? 'delete_failed' : '');
@@ -1587,6 +1588,7 @@
             canDeleteImages = data.can_delete === true;
             saveCache();
             render();
+            return true;
         } catch (err) {
             if (items.length) {
                 setStatus(err?.message || t('image_modal.load_failed', 'Failed to load images.'), 'error');
@@ -1595,6 +1597,7 @@
             items = [];
             listEl.innerHTML = `<div class="status-text" style="padding:0.5rem;">${t('image_modal.load_failed', 'Failed to load images.')}</div>`;
             setStatus(err?.message || t('image_modal.load_failed', 'Failed to load images.'), 'error');
+            return false;
         }
     };
 

@@ -742,9 +742,18 @@
                         if (!api || typeof api.deleteImage !== 'function') throw new Error('network');
                         const deleted = await api.deleteImage(token, newMdForm?.querySelector?.('input[name="csrf"]')?.value || '');
                         if (!deleted || deleted.ok !== true) throw new Error(String(deleted?.error || 'delete_failed'));
-                        newMdImages = newMdImages.filter((item) => String(item?.token || '') !== token && String(item?.file || '') !== file);
-                        renderNewMdImages(list, filter);
-                        if (newMdImageStatus instanceof HTMLElement) newMdImageStatus.textContent = t('image_modal.deleted', 'Image deleted.');
+                        const previousImages = newMdImages;
+                        newMdImages = null;
+                        newMdImagesPromise = null;
+                        try {
+                            await loadNewMdImages();
+                            renderNewMdImages(list, filter);
+                            if (newMdImageStatus instanceof HTMLElement) newMdImageStatus.textContent = t('image_modal.deleted', 'Image deleted.');
+                        } catch (refreshError) {
+                            newMdImages = previousImages;
+                            renderNewMdImages(list, filter);
+                            throw refreshError;
+                        }
                     } catch (error) {
                         const code = String(error?.data?.error || error?.message || 'delete_failed');
                         if (newMdImageStatus instanceof HTMLElement) {
@@ -760,6 +769,25 @@
             }
             list.appendChild(row);
         });
+    };
+    const loadNewMdImages = async () => {
+        if (Array.isArray(newMdImages)) return newMdImages;
+        if (newMdImagesPromise) return newMdImagesPromise;
+        newMdImagesPromise = (async () => {
+            const api = window.MDM?.api;
+            if (!api || typeof api.get !== 'function') throw new Error('network');
+            const data = await api.get('image_manager.php?action=list');
+            if (!data || data.ok !== true) throw new Error('network');
+            newMdImages = Array.isArray(data.images) ? data.images : [];
+            newMdCanDeleteImages = data.can_delete === true;
+            return newMdImages;
+        })();
+        try {
+            return await newMdImagesPromise;
+        } catch (error) {
+            newMdImagesPromise = null;
+            throw error;
+        }
     };
     const attachNewMdPicturePicker = () => {
         if (!(newMdPictureWrap instanceof HTMLElement) || !(newMdPicture instanceof HTMLInputElement)) return;
@@ -855,17 +883,7 @@
             if (picker.hidden) return;
             status.textContent = t('image_modal.loading', 'Loading…');
             try {
-                if (!Array.isArray(newMdImages)) {
-                    if (!newMdImagesPromise) {
-                        const api = window.MDM?.api;
-                        if (!api || typeof api.get !== 'function') throw new Error('network');
-                        newMdImagesPromise = api.get('image_manager.php?action=list');
-                    }
-                    const data = await newMdImagesPromise;
-                    if (!data || data.ok !== true) throw new Error('network');
-                    newMdImages = Array.isArray(data.images) ? data.images : [];
-                    newMdCanDeleteImages = data.can_delete === true;
-                }
+                await loadNewMdImages();
                 status.textContent = '';
                 renderNewMdImages(list, filter);
                 filter.focus();

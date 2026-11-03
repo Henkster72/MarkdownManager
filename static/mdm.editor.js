@@ -650,9 +650,18 @@
                             if (!mdmApi || typeof mdmApi.deleteImage !== 'function') throw new Error('network');
                             const deleted = await mdmApi.deleteImage(token, window.MDW_CSRF || '');
                             if (!deleted || deleted.ok !== true) throw new Error(String(deleted?.error || 'delete_failed'));
-                            articleMetaImages = articleMetaImages.filter((image) => String(image?.token || '') !== token && String(image?.file || '') !== file);
-                            renderArticleMetaImages(list, filter, input);
-                            status.textContent = t('image_modal.deleted', 'Image deleted.');
+                            const previousImages = articleMetaImages;
+                            articleMetaImages = null;
+                            articleMetaImagesPromise = null;
+                            try {
+                                await loadArticleMetaImages(status);
+                                renderArticleMetaImages(list, filter, input);
+                                status.textContent = t('image_modal.deleted', 'Image deleted.');
+                            } catch (refreshError) {
+                                articleMetaImages = previousImages;
+                                renderArticleMetaImages(list, filter, input);
+                                throw refreshError;
+                            }
                         } catch (error) {
                             const code = String(error?.data?.error || error?.message || 'delete_failed');
                             status.textContent = code === 'delete_missing'
