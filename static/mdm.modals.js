@@ -1282,8 +1282,7 @@
             }
             return;
         }
-        const selection = getEditorSelectionText();
-        const text = selection || selectedTitle || selectedPath;
+        const text = String(selectedTitle || '').trim() || selectedPath;
         let href = buildInternalHref(window.CURRENT_FILE || '', selectedPath);
         if (editContext?.type === 'visual-link' && editContext.internalPath === selectedPath) {
             href = editContext.href;
