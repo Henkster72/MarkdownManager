@@ -16,10 +16,6 @@ function mdw_shared_auth_instance(): string
 
 function mdw_shared_auth_current_role(): string
 {
-    if (!mdw_shared_auth_enabled()) {
-        return '';
-    }
-
     $auth = $_SESSION['mdw_shared_auth'] ?? null;
     if (!is_array($auth) || ($auth['instance'] ?? '') !== mdw_shared_auth_instance()) {
         return '';
@@ -35,7 +31,7 @@ function mdw_shared_auth_current_role(): string
 
 function mdw_shared_auth_login(string $role): bool
 {
-    if (!mdw_shared_auth_enabled() || !in_array($role, ['user', 'superuser'], true)) {
+    if (!in_array($role, ['user', 'superuser'], true)) {
         return false;
     }
 
@@ -80,7 +76,5 @@ function mdw_shared_auth_login_with_password(string $password): string
 
 function mdw_shared_auth_logout(): void
 {
-    if (mdw_shared_auth_enabled()) {
-        unset($_SESSION['mdw_shared_auth']);
-    }
+    unset($_SESSION['mdw_shared_auth']);
 }

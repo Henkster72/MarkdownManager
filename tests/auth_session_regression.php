@@ -47,5 +47,19 @@ if (mdw_shared_auth_role_from_token('superuser', $userHash) !== '' || mdw_shared
     exit(1);
 }
 
+putenv('MDW_SHARED_AUTH=0');
+unset($_SESSION['mdw_shared_auth']);
+if (!mdw_shared_auth_login('superuser') || mdw_shared_auth_current_role() !== 'superuser') {
+    fwrite(STDERR, "Local auth login must establish a server session when shared auth is disabled\n");
+    @unlink($configPath);
+    exit(1);
+}
+mdw_shared_auth_logout();
+if (mdw_shared_auth_current_role() !== '') {
+    fwrite(STDERR, "Local auth logout must clear the server session\n");
+    @unlink($configPath);
+    exit(1);
+}
+
 @unlink($configPath);
 echo "Authentication session regression checks passed\n";
