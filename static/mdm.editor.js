@@ -545,6 +545,7 @@
         };
         let articleMetaImages = null;
         let articleMetaImagesPromise = null;
+        let articleMetaCanDeleteImages = false;
         let articleMetaBooleanGroup = null;
         const imageTokenForItem = (item) => {
             const token = String(item?.token || '').trim();
@@ -579,13 +580,19 @@
                 const file = String(it.file || '');
                 const token = imageTokenForItem(it);
                 if (!token) return;
-                const row = document.createElement('button');
-                row.type = 'button';
-                row.className = 'btn btn-ghost';
-                row.style.width = '100%';
-                row.style.justifyContent = 'flex-start';
-                row.style.gap = '0.55rem';
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '0.35rem';
                 row.style.marginTop = '0.35rem';
+
+                const pick = document.createElement('button');
+                pick.type = 'button';
+                pick.className = 'btn btn-ghost';
+                pick.style.flex = '1 1 auto';
+                pick.style.minWidth = '0';
+                pick.style.justifyContent = 'flex-start';
+                pick.style.gap = '0.55rem';
 
                 const img = document.createElement('img');
                 img.src = path;
@@ -620,12 +627,43 @@
                 meta.textContent = path;
                 text.append(name, meta);
 
-                row.append(img, text);
-                row.addEventListener('click', () => {
+                pick.append(img, text);
+                pick.addEventListener('click', () => {
                     input.value = token;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.focus();
                 });
+                row.appendChild(pick);
+                if (articleMetaCanDeleteImages) {
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'btn btn-ghost icon-button';
+                    remove.title = t('image_modal.delete_image', 'Delete image permanently');
+                    remove.setAttribute('aria-label', remove.title);
+                    remove.innerHTML = '<span class="pi pi-bin"></span>';
+                    remove.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (!window.confirm(t('image_modal.confirm_delete', 'Permanently delete "{file}"? This cannot be undone.', { file }))) return;
+                        remove.disabled = true;
+                        try {
+                            if (!mdmApi || typeof mdmApi.deleteImage !== 'function') throw new Error('network');
+                            const deleted = await mdmApi.deleteImage(token, window.MDW_CSRF || '');
+                            if (!deleted || deleted.ok !== true) throw new Error(String(deleted?.error || 'delete_failed'));
+                            articleMetaImages = articleMetaImages.filter((image) => String(image?.token || '') !== token && String(image?.file || '') !== file);
+                            renderArticleMetaImages(list, filter, input);
+                            status.textContent = t('image_modal.deleted', 'Image deleted.');
+                        } catch (error) {
+                            const code = String(error?.data?.error || error?.message || 'delete_failed');
+                            status.textContent = code === 'delete_missing'
+                                ? t('image_modal.delete_missing', 'That image no longer exists.')
+                                : t('image_modal.delete_failed', 'Could not delete image.');
+                        } finally {
+                            remove.disabled = false;
+                        }
+                    });
+                    row.appendChild(remove);
+                }
                 listEl.appendChild(row);
             });
         };
@@ -638,6 +676,7 @@
                 const data = await mdmApi.get('image_manager.php?action=list');
                 if (!data || data.ok !== true) throw new Error(t('image_modal.load_failed', 'Failed to load images.'));
                 articleMetaImages = Array.isArray(data.images) ? data.images : [];
+                articleMetaCanDeleteImages = data.can_delete === true;
                 return articleMetaImages;
             })();
             try {

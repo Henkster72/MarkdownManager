@@ -464,7 +464,12 @@
     "error_type_unsupported": "Dieser Bildtyp wird nicht unterstützt.",
     "error_process_failed": "Das Bild konnte nicht verarbeitet werden.",
     "error_save_failed": "Das verarbeitete Bild konnte nicht gespeichert werden.",
-    "error_store_failed": "Das hochgeladene Bild konnte nicht gespeichert werden."
+    "error_store_failed": "Das hochgeladene Bild konnte nicht gespeichert werden.",
+    "delete_image": "Bild dauerhaft löschen",
+    "confirm_delete": "Bild \"{file}\" dauerhaft löschen? Dies kann nicht rückgängig gemacht werden.",
+    "deleted": "Bild gelöscht.",
+    "delete_missing": "Dieses Bild ist nicht mehr vorhanden.",
+    "delete_failed": "Bild konnte nicht gelöscht werden."
   },
   "rename_modal": {
     "title": "Datei umbenennen",

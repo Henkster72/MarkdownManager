@@ -480,7 +480,12 @@
     "error_type_unsupported": "That image type is not supported.",
     "error_process_failed": "We could not process that image.",
     "error_save_failed": "We could not save the processed image.",
-    "error_store_failed": "We could not store the uploaded image."
+    "error_store_failed": "We could not store the uploaded image.",
+    "delete_image": "Delete image permanently",
+    "confirm_delete": "Permanently delete \"{file}\"? This cannot be undone.",
+    "deleted": "Image deleted.",
+    "delete_missing": "That image no longer exists.",
+    "delete_failed": "Could not delete image."
   },
   "rename_modal": {
     "title": "Rename file",

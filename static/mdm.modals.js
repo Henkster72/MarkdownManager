@@ -1349,6 +1349,7 @@
     const t = (k, f, vars) => (typeof window.MDW_T === 'function' ? window.MDW_T(k, f, vars) : (typeof f === 'string' ? f : ''));
     const apiUrl = 'image_manager.php';
     let items = [];
+    let canDeleteImages = false;
     const CACHE_KEY = 'mdw_image_cache_v1';
     const CACHE_TTL_MS = 10 * 60 * 1000;
     const pickLabelDefault = pickLabel ? String(pickLabel.textContent || '') : '';
@@ -1393,6 +1394,12 @@
         switch (code) {
             case 'auth_required':
                 return t('auth.login_required', 'Please log in to view images.');
+            case 'superuser_required':
+                return t('auth.superuser_required', 'Superuser login required.');
+            case 'delete_missing':
+                return t('image_modal.delete_missing', 'That image no longer exists.');
+            case 'delete_failed':
+                return t('image_modal.delete_failed', 'Could not delete image.');
             case 'csrf':
                 return t('image_modal.error_csrf', 'Your session expired. Reload and try again.');
             case 'missing_upload':
@@ -1485,6 +1492,28 @@
         return s.replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
+    const deleteImageItem = async (token, file, button) => {
+        if (!canDeleteImages || !token) return;
+        const label = file || token;
+        if (!window.confirm(t('image_modal.confirm_delete', 'Permanently delete "{file}"? This cannot be undone.', { file: label }))) return;
+        if (button instanceof HTMLButtonElement) button.disabled = true;
+        try {
+            if (!mdmApi || typeof mdmApi.deleteImage !== 'function') throw new Error('network');
+            const data = await mdmApi.deleteImage(token, csrfInput?.value || window.MDW_CSRF || '');
+            if (!data || data.ok !== true) throw Object.assign(new Error('delete_failed'), { data });
+            items = items.filter((item) => String(item?.token || '') !== token && String(item?.file || '') !== file);
+            saveCache();
+            render();
+            setStatus(t('image_modal.deleted', 'Image deleted.'), 'ok');
+        } catch (error) {
+            const data = error && typeof error === 'object' ? error.data : null;
+            const code = normalizeImageErrorCode(data) || (error?.message === 'delete_failed' ? 'delete_failed' : '');
+            setStatus(imageErrorMessage(code, data) || t('image_modal.delete_failed', 'Could not delete image.'), 'error');
+        } finally {
+            if (button instanceof HTMLButtonElement) button.disabled = false;
+        }
+    };
+
     const render = () => {
         const q = String(filterEl.value || '').trim().toLowerCase();
         if (filterClear) filterClear.style.display = q ? '' : 'none';
@@ -1505,6 +1534,7 @@
             const path = String(it.path || '');
             const file = String(it.file || '');
             const alt = String(it.alt || '');
+            const token = String(it.token || '').trim() || imageTokenForFile(file, path);
             const size = (typeof it.size_kb === 'number') ? `${it.size_kb} KB` : '';
             const esc = (s) => String(s)
                 .replace(/&/g, '&amp;')
@@ -1514,15 +1544,18 @@
                 .replace(/'/g, '&#39;');
 
             return `
-                <button type="button" class="btn btn-ghost" data-path="${esc(path)}" data-file="${esc(file)}" data-alt="${esc(alt)}"
-                    style="width:100%; justify-content:flex-start; gap:0.6rem; padding:0.45rem 0.6rem; margin:0.35rem 0;">
-                    <img src="${esc(path)}" alt="" loading="lazy" decoding="async"
-                        style="width:44px; height:44px; object-fit:cover; border-radius:0.5rem; border:1px solid var(--border-soft); background: var(--surface-code);">
-                    <span style="display:flex; flex-direction:column; align-items:flex-start; min-width:0;">
-                        <span style="font-size:0.8rem; font-weight:600; max-width: 36ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(alt || file || path)}</span>
-                        <span class="status-text" style="max-width: 42ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(path)}${size ? ` • ${esc(size)}` : ''}</span>
-                    </span>
-                </button>
+                <div style="display:flex; align-items:center; gap:0.35rem; margin:0.35rem 0;">
+                    <button type="button" class="btn btn-ghost" data-path="${esc(path)}" data-file="${esc(file)}" data-token="${esc(token)}" data-alt="${esc(alt)}"
+                        style="flex:1 1 auto; min-width:0; justify-content:flex-start; gap:0.6rem; padding:0.45rem 0.6rem;">
+                        <img src="${esc(path)}" alt="" loading="lazy" decoding="async"
+                            style="width:44px; height:44px; object-fit:cover; border-radius:0.5rem; border:1px solid var(--border-soft); background: var(--surface-code);">
+                        <span style="display:flex; flex-direction:column; align-items:flex-start; min-width:0;">
+                            <span style="font-size:0.8rem; font-weight:600; max-width: 36ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(alt || file || path)}</span>
+                            <span class="status-text" style="max-width: 42ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(path)}${size ? ` • ${esc(size)}` : ''}</span>
+                        </span>
+                    </button>
+                    ${canDeleteImages ? `<button type="button" class="btn btn-ghost icon-button" data-delete-token="${esc(token)}" data-delete-file="${esc(file)}" title="${esc(t('image_modal.delete_image', 'Delete image permanently'))}" aria-label="${esc(t('image_modal.delete_image', 'Delete image permanently'))}"><span class="pi pi-bin"></span></button>` : ''}
+                </div>
             `;
         }).join('');
 
@@ -1551,6 +1584,7 @@
                 throw new Error(friendly || t('image_modal.load_failed', 'Failed to load images.'));
             }
             items = Array.isArray(data.images) ? data.images : [];
+            canDeleteImages = data.can_delete === true;
             saveCache();
             render();
         } catch (err) {
@@ -1692,12 +1726,19 @@
     });
 
     listEl.addEventListener('click', (e) => {
+        const deleteTarget = e.target instanceof Element ? e.target.closest('button[data-delete-token]') : null;
+        if (deleteTarget instanceof HTMLButtonElement) {
+            e.preventDefault();
+            e.stopPropagation();
+            void deleteImageItem(deleteTarget.getAttribute('data-delete-token') || '', deleteTarget.getAttribute('data-delete-file') || '', deleteTarget);
+            return;
+        }
         const target = e.target instanceof Element ? e.target.closest('button[data-path]') : null;
         if (!(target instanceof HTMLElement)) return;
         const path = target.getAttribute('data-path') || '';
         const file = target.getAttribute('data-file') || '';
         const suggestedAlt = target.getAttribute('data-alt') || '';
-        const token = imageTokenForFile(file, path);
+        const token = target.getAttribute('data-token') || imageTokenForFile(file, path);
         if (!token) return;
 
         const alt = String(altInput?.value || '').trim() || suggestedAlt || guessAlt(file || path);

@@ -472,7 +472,12 @@
     "error_type_unsupported": "Ese tipo de imagen no es compatible.",
     "error_process_failed": "No pudimos procesar esa imagen.",
     "error_save_failed": "No pudimos guardar la imagen procesada.",
-    "error_store_failed": "No pudimos almacenar la imagen subida."
+    "error_store_failed": "No pudimos almacenar la imagen subida.",
+    "delete_image": "Eliminar imagen permanentemente",
+    "confirm_delete": "¿Eliminar permanentemente \"{file}\"? Esta acción no se puede deshacer.",
+    "deleted": "Imagen eliminada.",
+    "delete_missing": "La imagen ya no existe.",
+    "delete_failed": "No se pudo eliminar la imagen."
   },
   "rename_modal": {
     "title": "Renombrar archivo",

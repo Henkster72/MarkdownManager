@@ -471,7 +471,12 @@
     "error_type_unsupported": "Dit afbeeldingstype wordt niet ondersteund.",
     "error_process_failed": "We konden die afbeelding niet verwerken.",
     "error_save_failed": "We konden de verwerkte afbeelding niet opslaan.",
-    "error_store_failed": "We konden de geüploade afbeelding niet bewaren."
+    "error_store_failed": "We konden de geüploade afbeelding niet bewaren.",
+    "delete_image": "Afbeelding permanent verwijderen",
+    "confirm_delete": "Afbeelding \"{file}\" permanent verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "deleted": "Afbeelding verwijderd.",
+    "delete_missing": "Die afbeelding bestaat niet meer.",
+    "delete_failed": "Kon afbeelding niet verwijderen."
   },
   "rename_modal": {
     "title": "Bestand hernoemen",

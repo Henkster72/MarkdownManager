@@ -48,11 +48,13 @@ function image_manager_error($code, $status = 400, $extra = []) {
 
 $imageAuthRole = trim((string)($_SERVER['HTTP_X_MDW_AUTH_ROLE'] ?? $_REQUEST['auth_role'] ?? ''));
 $imageAuthToken = (string)($_SERVER['HTTP_X_MDW_AUTH_TOKEN'] ?? $_REQUEST['auth_token'] ?? '');
-$imageAuthenticated = mdw_shared_auth_current_role() !== '';
-if (!$imageAuthenticated && in_array($imageAuthRole, ['user', 'superuser'], true)) {
-    $imageAuthenticated = mdw_auth_verify_token($imageAuthRole, $imageAuthToken, false);
+$imageServerRole = mdw_shared_auth_current_role();
+if (in_array($imageAuthRole, ['user', 'superuser'], true)
+    && mdw_auth_verify_token($imageAuthRole, $imageAuthToken, false)
+    && ($imageServerRole === '' || $imageAuthRole === 'superuser')) {
+    $imageServerRole = $imageAuthRole;
 }
-if (!$imageAuthenticated) {
+if ($imageServerRole === '') {
     image_manager_error('auth_required', 403);
 }
 
@@ -184,7 +186,41 @@ if ($action === 'list') {
     image_manager_json([
         'ok' => true,
         'images_dir' => $IMAGES_DIR,
+        'can_delete' => $imageServerRole === 'superuser',
         'images' => $out,
+    ]);
+}
+
+if ($action === 'delete') {
+    if ($imageServerRole !== 'superuser') {
+        image_manager_error('superuser_required', 403);
+    }
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        image_manager_error('post_required', 405);
+    }
+
+    $csrf = isset($_POST['csrf']) ? (string)$_POST['csrf'] : '';
+    if (!hash_equals($CSRF_TOKEN, $csrf)) {
+        image_manager_error('csrf', 403);
+    }
+
+    $rawToken = isset($_POST['token']) ? (string)$_POST['token'] : (string)($_POST['file'] ?? '');
+    $filename = rawurldecode($rawToken);
+    if ($filename === '' || str_contains($filename, '/') || str_contains($filename, '\\') || $filename === '.' || $filename === '..') {
+        image_manager_error('invalid_file', 400);
+    }
+    $targetPath = $imagesFsDir . '/' . $filename;
+    if (!is_file($targetPath)) {
+        image_manager_error('delete_missing', 404);
+    }
+    if (!@unlink($targetPath)) {
+        image_manager_error('delete_failed', 500);
+    }
+
+    image_manager_json([
+        'ok' => true,
+        'file' => image_manager_utf8_label($filename),
+        'token' => image_manager_token($filename),
     ]);
 }
 

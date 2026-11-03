@@ -663,6 +663,8 @@
     const newMdPictureWrap = newMdPicture?.closest?.('.modal-field') || null;
     let newMdImages = null;
     let newMdImagesPromise = null;
+    let newMdCanDeleteImages = false;
+    let newMdImageStatus = null;
     const newMdImageToken = (image) => {
         const token = String(image?.token || '').trim();
         if (token) return token;
@@ -690,13 +692,18 @@
         filtered.forEach((image) => {
             const token = newMdImageToken(image);
             if (!token) return;
-            const row = document.createElement('button');
-            row.type = 'button';
-            row.className = 'btn btn-ghost';
-            row.style.width = '100%';
-            row.style.justifyContent = 'flex-start';
-            row.style.gap = '0.55rem';
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '0.35rem';
             row.style.marginTop = '0.35rem';
+            const pick = document.createElement('button');
+            pick.type = 'button';
+            pick.className = 'btn btn-ghost';
+            pick.style.flex = '1 1 auto';
+            pick.style.minWidth = '0';
+            pick.style.justifyContent = 'flex-start';
+            pick.style.gap = '0.55rem';
             const thumbnail = document.createElement('img');
             thumbnail.src = String(image.path || '');
             thumbnail.alt = '';
@@ -710,12 +717,47 @@
             label.style.textOverflow = 'ellipsis';
             label.style.whiteSpace = 'nowrap';
             label.textContent = String(image.alt || token);
-            row.append(thumbnail, label);
-            row.addEventListener('click', () => {
+            pick.append(thumbnail, label);
+            pick.addEventListener('click', () => {
                 newMdPicture.value = token;
                 newMdPicture.dispatchEvent(new Event('input', { bubbles: true }));
                 newMdPicture.focus();
             });
+            row.appendChild(pick);
+            if (newMdCanDeleteImages) {
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-ghost icon-button';
+                remove.title = t('image_modal.delete_image', 'Delete image permanently');
+                remove.setAttribute('aria-label', remove.title);
+                remove.innerHTML = '<span class="pi pi-bin"></span>';
+                remove.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const file = String(image.file || token);
+                    if (!window.confirm(t('image_modal.confirm_delete', 'Permanently delete "{file}"? This cannot be undone.', { file }))) return;
+                    remove.disabled = true;
+                    try {
+                        const api = window.MDM?.api;
+                        if (!api || typeof api.deleteImage !== 'function') throw new Error('network');
+                        const deleted = await api.deleteImage(token, newMdForm?.querySelector?.('input[name="csrf"]')?.value || '');
+                        if (!deleted || deleted.ok !== true) throw new Error(String(deleted?.error || 'delete_failed'));
+                        newMdImages = newMdImages.filter((item) => String(item?.token || '') !== token && String(item?.file || '') !== file);
+                        renderNewMdImages(list, filter);
+                        if (newMdImageStatus instanceof HTMLElement) newMdImageStatus.textContent = t('image_modal.deleted', 'Image deleted.');
+                    } catch (error) {
+                        const code = String(error?.data?.error || error?.message || 'delete_failed');
+                        if (newMdImageStatus instanceof HTMLElement) {
+                            newMdImageStatus.textContent = code === 'delete_missing'
+                                ? t('image_modal.delete_missing', 'That image no longer exists.')
+                                : t('image_modal.delete_failed', 'Could not delete image.');
+                        }
+                    } finally {
+                        remove.disabled = false;
+                    }
+                });
+                row.appendChild(remove);
+            }
             list.appendChild(row);
         });
     };
@@ -744,6 +786,7 @@
         upload.textContent = t('image_modal.upload', 'Upload');
         const status = document.createElement('span');
         status.className = 'status-text';
+        newMdImageStatus = status;
         tools.append(togglePicker, fileInput, chooseFile, upload, status);
         const picker = document.createElement('div');
         picker.hidden = true;
@@ -821,6 +864,7 @@
                     const data = await newMdImagesPromise;
                     if (!data || data.ok !== true) throw new Error('network');
                     newMdImages = Array.isArray(data.images) ? data.images : [];
+                    newMdCanDeleteImages = data.can_delete === true;
                 }
                 status.textContent = '';
                 renderNewMdImages(list, filter);

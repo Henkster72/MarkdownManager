@@ -464,7 +464,12 @@
     "error_type_unsupported": "Este tipo de imagem não é suportado.",
     "error_process_failed": "Não foi possível processar essa imagem.",
     "error_save_failed": "Não foi possível guardar a imagem processada.",
-    "error_store_failed": "Não foi possível guardar a imagem enviada."
+    "error_store_failed": "Não foi possível guardar a imagem enviada.",
+    "delete_image": "Eliminar imagem permanentemente",
+    "confirm_delete": "Eliminar permanentemente \"{file}\"? Esta ação não pode ser anulada.",
+    "deleted": "Imagem eliminada.",
+    "delete_missing": "Essa imagem já não existe.",
+    "delete_failed": "Não foi possível eliminar a imagem."
   },
   "rename_modal": {
     "title": "Renomear ficheiro",

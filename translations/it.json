@@ -472,7 +472,12 @@
     "error_type_unsupported": "Questo tipo di immagine non è supportato.",
     "error_process_failed": "Non abbiamo potuto elaborare questa immagine.",
     "error_save_failed": "Non abbiamo potuto salvare l'immagine elaborata.",
-    "error_store_failed": "Non abbiamo potuto archiviare l'immagine caricata."
+    "error_store_failed": "Non abbiamo potuto archiviare l'immagine caricata.",
+    "delete_image": "Elimina definitivamente l’immagine",
+    "confirm_delete": "Eliminare definitivamente \"{file}\"? L’operazione non può essere annullata.",
+    "deleted": "Immagine eliminata.",
+    "delete_missing": "L’immagine non esiste più.",
+    "delete_failed": "Impossibile eliminare l’immagine."
   },
   "rename_modal": {
     "title": "Rinomina file",

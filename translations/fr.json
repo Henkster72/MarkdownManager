@@ -464,7 +464,12 @@
     "error_type_unsupported": "Ce type d'image n'est pas pris en charge.",
     "error_process_failed": "Impossible de traiter cette image.",
     "error_save_failed": "Impossible d'enregistrer l'image traitée.",
-    "error_store_failed": "Impossible de stocker l'image téléversée."
+    "error_store_failed": "Impossible de stocker l'image téléversée.",
+    "delete_image": "Supprimer définitivement l’image",
+    "confirm_delete": "Supprimer définitivement \"{file}\" ? Cette action est irréversible.",
+    "deleted": "Image supprimée.",
+    "delete_missing": "Cette image n’existe plus.",
+    "delete_failed": "Impossible de supprimer l’image."
   },
   "rename_modal": {
     "title": "Renommer le fichier",

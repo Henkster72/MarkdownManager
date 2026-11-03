@@ -64,5 +64,13 @@
         return request(url, options);
     };
 
-    MDM.api = MDM.api || { request, json, get, form };
+    const deleteImage = (token, csrf) => {
+        const formData = new FormData();
+        formData.append('action', 'delete');
+        formData.append('csrf', String(csrf || ''));
+        formData.append('token', String(token || ''));
+        return form('image_manager.php', formData);
+    };
+
+    MDM.api = MDM.api || { request, json, get, form, deleteImage };
 })();
