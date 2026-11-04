@@ -538,6 +538,11 @@ body.app-body .find-replace-modal {
   margin-bottom: 0.75rem;
 }
 
+#imageList {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .radio {
   display: inline-flex;
   gap: 0.45rem;
