@@ -3187,7 +3187,7 @@
         return mdwInsertionAnchor;
     };
     const rememberMarkdownAnchor = (reason) => {
-        if (window.__mdwVisualPreviewInputActive || visualPreviewInputActive) return;
+        if (isVisualEditorMode() || window.__mdwVisualPreviewInputActive || visualPreviewInputActive) return;
         setMdwInsertionAnchor({
             source: 'markdown',
             offset: ta.selectionStart ?? 0,
@@ -4649,14 +4649,23 @@
         prev.addEventListener('keyup', schedule);
 
         const capturePreviewAnchor = (reason = 'preview_selection') => {
+            const previousAnchor = mdwInsertionAnchor;
+            const preservePreviousAnchor = () => {
+                const previousReason = String(previousAnchor?.reason || '');
+                if (previousAnchor && (/^preview_/.test(previousReason) || previousReason === 'toolbar_pointerdown')) {
+                    mdwInsertionAnchor = previousAnchor;
+                    return previousAnchor;
+                }
+                mdwInsertionAnchor = null;
+                return null;
+            };
             const sel = document.getSelection?.();
             const activeRange = sel && sel.rangeCount && prev.contains(sel.anchorNode)
                 ? sel.getRangeAt(0)
                 : null;
             const range = activeRange || visualSelectionRange;
             if (!range || !isRangeInPreview(range)) {
-                mdwInsertionAnchor = null;
-                return null;
+                return preservePreviousAnchor();
             }
             if (reason === 'preview_image' && selectedVisualImage instanceof HTMLImageElement) {
                 const imageBlock = visualSourceBlock(selectedVisualImage);
@@ -4681,8 +4690,13 @@
                 || !(endEl instanceof HTMLElement)
                 || !startInfo
                 || !endInfo) {
-                mdwInsertionAnchor = null;
-                return null;
+                const bodyStart = previewBodyInsertionOffset(ta.value);
+                return setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: bodyStart,
+                    end: bodyStart,
+                    reason: `${reason}_body_start`,
+                });
             }
             const map = getOffsetMap();
             const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
@@ -4692,13 +4706,22 @@
             const start = previewToEditorOffset(srcStart, map);
             const end = previewToEditorOffset(srcEnd, map);
             if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                mdwInsertionAnchor = null;
-                return null;
+                const bodyStart = previewBodyInsertionOffset(ta.value);
+                return setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: bodyStart,
+                    end: bodyStart,
+                    reason: `${reason}_body_start`,
+                });
             }
             const bodyStart = previewBodyInsertionOffset(ta.value);
             if (start < bodyStart || end < bodyStart) {
-                mdwInsertionAnchor = null;
-                return null;
+                return setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: bodyStart,
+                    end: bodyStart,
+                    reason: `${reason}_body_start`,
+                });
             }
             syncing = true;
             ta.setSelectionRange(start, end);
