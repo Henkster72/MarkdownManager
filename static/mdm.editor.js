@@ -4587,7 +4587,9 @@
             const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
             const endIndex = getDisplayIndex(endEl, range.endContainer, range.endOffset);
             const srcStart = displayIndexToSource(startInfo, startIndex, false);
-            const srcEnd = displayIndexToSource(endInfo, Math.max(endIndex - 1, startIndex), true);
+            const srcEnd = range.collapsed
+                ? srcStart
+                : displayIndexToSource(endInfo, Math.max(endIndex - 1, startIndex), true);
             const editorStart = previewToEditorOffset(srcStart, map);
             const editorEnd = previewToEditorOffset(srcEnd, map);
             if (editorStart === null || editorEnd === null) {
