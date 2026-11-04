@@ -4649,23 +4649,14 @@
         prev.addEventListener('keyup', schedule);
 
         const capturePreviewAnchor = (reason = 'preview_selection') => {
-            const previousAnchor = mdwInsertionAnchor;
-            const preservePreviousAnchor = () => {
-                const previousReason = String(previousAnchor?.reason || '');
-                if (previousAnchor && (/^preview_/.test(previousReason) || previousReason === 'toolbar_pointerdown')) {
-                    mdwInsertionAnchor = previousAnchor;
-                    return previousAnchor;
-                }
-                mdwInsertionAnchor = null;
-                return null;
-            };
             const sel = document.getSelection?.();
             const activeRange = sel && sel.rangeCount && prev.contains(sel.anchorNode)
                 ? sel.getRangeAt(0)
                 : null;
             const range = activeRange || visualSelectionRange;
             if (!range || !isRangeInPreview(range)) {
-                return preservePreviousAnchor();
+                mdwInsertionAnchor = null;
+                return null;
             }
             if (reason === 'preview_image' && selectedVisualImage instanceof HTMLImageElement) {
                 const imageBlock = visualSourceBlock(selectedVisualImage);
@@ -4690,13 +4681,8 @@
                 || !(endEl instanceof HTMLElement)
                 || !startInfo
                 || !endInfo) {
-                const bodyStart = previewBodyInsertionOffset(ta.value);
-                return setMdwInsertionAnchor({
-                    source: 'markdown',
-                    offset: bodyStart,
-                    end: bodyStart,
-                    reason: `${reason}_body_start`,
-                });
+                mdwInsertionAnchor = null;
+                return null;
             }
             const map = getOffsetMap();
             const startIndex = getDisplayIndex(startEl, range.startContainer, range.startOffset);
@@ -4706,22 +4692,13 @@
             const start = previewToEditorOffset(srcStart, map);
             const end = previewToEditorOffset(srcEnd, map);
             if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                const bodyStart = previewBodyInsertionOffset(ta.value);
-                return setMdwInsertionAnchor({
-                    source: 'markdown',
-                    offset: bodyStart,
-                    end: bodyStart,
-                    reason: `${reason}_body_start`,
-                });
+                mdwInsertionAnchor = null;
+                return null;
             }
             const bodyStart = previewBodyInsertionOffset(ta.value);
             if (start < bodyStart || end < bodyStart) {
-                return setMdwInsertionAnchor({
-                    source: 'markdown',
-                    offset: bodyStart,
-                    end: bodyStart,
-                    reason: `${reason}_body_start`,
-                });
+                mdwInsertionAnchor = null;
+                return null;
             }
             syncing = true;
             ta.setSelectionRange(start, end);
