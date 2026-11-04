@@ -4459,6 +4459,8 @@
             range.setEnd(endPos.node, endPos.offset);
             sel.removeAllRanges();
             sel.addRange(range);
+            visualSelectionRange = range.cloneRange();
+            return range;
         };
 
         const highlightTextRange = (el, startIndex, endIndex) => {
@@ -4532,7 +4534,31 @@
             const start = ta.selectionStart ?? 0;
             const end = ta.selectionEnd ?? 0;
             if (start === end) {
-                debug('skip editor sync: empty selection', { start, end });
+                const previewOffset = editorToPreviewOffset(start, map);
+                if (previewOffset === null) {
+                    debug('skip editor sync: caret in metadata', { start });
+                    return;
+                }
+                const caretEl = findBlockForOffset(previewOffset);
+                const caretInfo = caretEl instanceof HTMLElement ? getMapForElement(caretEl) : null;
+                if (!(caretEl instanceof HTMLElement) || !caretInfo) {
+                    debug('skip editor sync: no preview block for caret', { start, previewOffset });
+                    return;
+                }
+                const caretIndex = sourceOffsetToDisplay(caretInfo, previewOffset);
+                syncing = true;
+                const previewRange = selectPreviewRange(caretEl, caretIndex, caretEl, caretIndex);
+                syncing = false;
+                if (!previewRange) {
+                    debug('skip editor sync: could not place preview caret', { start, previewOffset, caretIndex });
+                    return;
+                }
+                setMdwInsertionAnchor({
+                    source: 'markdown',
+                    offset: start,
+                    end: end,
+                    reason: 'markdown_caret_sync',
+                });
                 return;
             }
             const previewStart = editorToPreviewOffset(start, map);
