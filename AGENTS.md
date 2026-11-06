@@ -38,10 +38,15 @@ Timer/service:
 Expected behavior:
 - deploy committed core files from this git repo
 - deploy MDM core files only to `md` and `naomi`
-- deploy WPM core files only to the `edit` folders of `ntg`, `wchnederland`, and `nlslank`
+- deploy WPM core files only to the `edit` folders of `ntg`, `nlslank`, `wchnederland`, and `flowingnumbers_site`
+- sync committed `bin/wpm_publish.py` privately to `/srv/vbook_web/bin/wpm_publish.py`
 - do not delete files from live targets
 - do not copy uncommitted working-tree drift
 - do not overwrite protected settings/secrets
+
+`bin/wpm_publish.py` is an operational vBook tool. It must never be copied into
+an instance web root or an instance `edit` folder. The private copy is used by
+WPM services on vBook and is separate from the public editor deployment.
 
 The `/home/henk/vbook_web/` paths are mounted through the Tailscale LAN. Before
 any deployment, verify that the required mounts and target folders are

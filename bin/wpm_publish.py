@@ -419,12 +419,68 @@ def set_published(path: Path) -> None:
     path.write_text(updated, encoding="utf-8")
 
 
-def push_markdown(editor_env: dict[str, str], source: Path, rel: str) -> None:
+def remote_edit_file(editor_env: dict[str, str], rel: str) -> tuple[str, str]:
+    remote_file = remote_spec(
+        editor_env,
+        f"{editor_env.get('WPM_SYNC_REMOTE_EDIT_DIR', 'edit').strip('/')}/{rel}",
+    )
+    host, path = remote_file.split(":", 1)
+    return host, path
+
+
+def remote_markdown_digest(editor_env: dict[str, str], rel: str) -> str:
+    host, path = remote_edit_file(editor_env, rel)
+    result = run(
+        ssh_prefix(editor_env) + [
+            "ssh", "-o", "StrictHostKeyChecking=accept-new", host,
+            f"sha256sum -- {shlex.quote(path)}",
+        ],
+        capture=True,
+    )
+    return result.stdout.split()[0]
+
+
+def push_markdown(
+    editor_env: dict[str, str],
+    source: Path,
+    rel: str,
+    *,
+    expected_remote_digest: str | None = None,
+) -> None:
     remote_file = remote_spec(editor_env, f"{editor_env.get('WPM_SYNC_REMOTE_EDIT_DIR', 'edit').strip('/')}/{rel}")
     remote_parent = remote_file.rsplit("/", 1)[0]
     command = ssh_prefix(editor_env) + ["ssh", "-o", "StrictHostKeyChecking=accept-new", remote_file.split(":", 1)[0], f"mkdir -p {remote_parent.split(':', 1)[1]}"]
     run(command)
-    run(ssh_prefix(editor_env) + ["scp", "-O", str(source), remote_file])
+    if expected_remote_digest is None:
+        run(ssh_prefix(editor_env) + ["scp", "-O", str(source), remote_file])
+        return
+
+    host, remote_path = remote_edit_file(editor_env, rel)
+    remote_tmp = f"{remote_path}.wpm-publish-{os.getpid()}.tmp"
+    remote_tmp_spec = f"{host}:{remote_tmp}"
+    run(ssh_prefix(editor_env) + ["scp", "-O", str(source), remote_tmp_spec])
+    expected = shlex.quote(expected_remote_digest)
+    verify_and_move = (
+        "set -eu; "
+        f"current=$(sha256sum -- {shlex.quote(remote_path)} | awk '{{print $1}}'); "
+        f"if [ \"$current\" != {expected} ]; then "
+        f"rm -f -- {shlex.quote(remote_tmp)}; exit 73; fi; "
+        f"mv -f -- {shlex.quote(remote_tmp)} {shlex.quote(remote_path)}"
+    )
+    try:
+        run(ssh_prefix(editor_env) + [
+            "ssh", "-o", "StrictHostKeyChecking=accept-new", host, verify_and_move,
+        ])
+    except Exception:
+        subprocess.run(
+            ssh_prefix(editor_env) + [
+                "ssh", "-o", "StrictHostKeyChecking=accept-new", host,
+                f"rm -f -- {shlex.quote(remote_tmp)}",
+            ],
+            text=True,
+            capture_output=True,
+        )
+        raise
 
 
 def _publish_main() -> int:
@@ -469,6 +525,9 @@ def _publish_main() -> int:
         if publish_state(source) != "processing":
             continue
         CURRENT_PUBLISH_FILE = rel
+        source_revision = digest(source)
+        if remote_markdown_digest(editor_env, rel) != source_revision:
+            raise RuntimeError(f"WPM source changed during publish: {rel}")
         template = site_dir / "templates" / Path(rel).with_suffix(".html")
         # Processing is the explicit approval to publish the Markdown revision.
         # Before that point, reconciliation still imports hand-written template
@@ -476,6 +535,8 @@ def _publish_main() -> int:
         # source of truth and replaces the page template.
         export_template(editor_url, rel, source, template, site_dir)
         render_site(site_dir)
+        if remote_markdown_digest(editor_env, rel) != source_revision:
+            raise RuntimeError(f"WPM source changed during publish: {rel}")
         upload_outputs(site_env, site_dir, rel)
         purge_remote_cache(site_env)
         processed.append(rel)
@@ -483,8 +544,21 @@ def _publish_main() -> int:
     if processed:
         for rel in processed:
             source = active_files[rel]
+            source_revision = digest(source)
+            if remote_markdown_digest(editor_env, rel) != source_revision:
+                raise RuntimeError(f"WPM source changed during publish: {rel}")
+            original_source = source.read_text(encoding="utf-8")
             set_published(source)
-            push_markdown(editor_env, source, rel)
+            try:
+                push_markdown(
+                    editor_env,
+                    source,
+                    rel,
+                    expected_remote_digest=source_revision,
+                )
+            except Exception:
+                source.write_text(original_source, encoding="utf-8")
+                raise
 
     next_state = {rel: digest(path) for rel, path in active_files.items()}
     state_path.write_text(json.dumps({
