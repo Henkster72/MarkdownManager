@@ -48,6 +48,30 @@ Expected behavior:
 an instance web root or an instance `edit` folder. The private copy is used by
 WPM services on vBook and is separate from the public editor deployment.
 
+## WPM Publisher Architecture
+
+`bin/wpm_publish.py` is only for WPM-mode instances that publish Markdown
+articles or blogs to live site output. It is not part of the normal Markdown
+Manager mode used by `md` or `naomi`.
+
+There must be one canonical, format-agnostic publisher implementation:
+- source: `bin/wpm_publish.py`
+- private vBook runtime copy: `/srv/vbook_web/bin/wpm_publish.py`
+
+All WPM instances must use the same publisher implementation. Do not create
+per-site forks or add site-specific article/blog formatting to the Python
+publisher.
+
+Conditional article and blog formatting belongs in the site renderer and
+templates, especially `base.html` and its template inheritance. The Python
+publisher should orchestrate Markdown state, conflict checks, rendering,
+transport, and publication safety; it must not contain format-specific HTML
+or site-layout rules.
+
+When a requested feature appears to require conditional formatting in
+`wpm_publish.py`, stop and move that behavior into the appropriate
+`base.html`/template layer instead.
+
 The `/home/henk/vbook_web/` paths are mounted through the Tailscale LAN. Before
 any deployment, verify that the required mounts and target folders are
 available. If they are unavailable, stop and report that Tailscale or the
