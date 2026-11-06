@@ -534,13 +534,95 @@
                 return `${dd}-${mm}-${yyyy}`;
             }
         };
+        const formatDateForStorage = (date) => {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+        const articleMetaDateKinds = Object.freeze({
+            date: 'date',
+            post_date: 'date',
+            published_date: 'date',
+            creationdate: 'datetime',
+            changedate: 'datetime',
+        });
+        const articleMetaMonthNumbers = Object.freeze({
+            jan: 1, january: 1, januari: 1,
+            feb: 2, february: 2, februari: 2,
+            mar: 3, march: 3, maart: 3, mrt: 3,
+            apr: 4, april: 4,
+            may: 5, mei: 5,
+            jun: 6, june: 6, juni: 6,
+            jul: 7, july: 7, juli: 7,
+            aug: 8, august: 8, augustus: 8,
+            sep: 9, september: 9,
+            oct: 10, october: 10, oktober: 10, okt: 10,
+            nov: 11, november: 11,
+            dec: 12, december: 12,
+        });
+        const articleMetaDateKind = (key, cfg = {}) => {
+            const normalizedKey = String(key || '').trim().toLowerCase();
+            const declared = String(cfg?.date_type || cfg?.value_type || '').trim().toLowerCase();
+            if (declared === 'date' || declared === 'datetime') return declared;
+            if (articleMetaDateKinds[normalizedKey]) return articleMetaDateKinds[normalizedKey];
+            return /(?:^|_)date$/.test(normalizedKey) ? 'date' : '';
+        };
+        const articleMetaDateParts = (raw) => {
+            const value = String(raw || '').trim().replace(/\s+/g, ' ');
+            if (!value) return null;
+            let match = value.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+            if (match) return [Number(match[1]), Number(match[2]), Number(match[3])];
+            match = value.match(/^(\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+            if (match) {
+                const shortYear = Number(match[1]);
+                return [shortYear < 70 ? 2000 + shortYear : 1900 + shortYear, Number(match[2]), Number(match[3])];
+            }
+            match = value.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+            if (match) return [Number(match[3]), Number(match[2]), Number(match[1])];
+            match = value.match(/^(\d{1,2})\s+([\p{L}.]+)\s+(\d{4})/iu);
+            if (match) {
+                const month = articleMetaMonthNumbers[String(match[2]).toLowerCase().replace(/\.$/, '')];
+                if (month) return [Number(match[3]), month, Number(match[1])];
+            }
+            match = value.match(/^([\p{L}.]+)\s+(\d{1,2}),?\s+(\d{4})/iu);
+            if (match) {
+                const month = articleMetaMonthNumbers[String(match[1]).toLowerCase().replace(/\.$/, '')];
+                if (month) return [Number(match[3]), month, Number(match[2])];
+            }
+            return null;
+        };
+        const articleMetaValidDate = (year, month, day) => {
+            if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+            const date = new Date(Date.UTC(year, month - 1, day));
+            return date.getUTCFullYear() === year
+                && date.getUTCMonth() === month - 1
+                && date.getUTCDate() === day;
+        };
+        const normalizeArticleMetaDate = (raw, kind) => {
+            const value = String(raw || '').trim();
+            if (!value) return '';
+            const parts = articleMetaDateParts(value);
+            if (!parts || !articleMetaValidDate(parts[0], parts[1], parts[2])) return null;
+            const date = `${String(parts[0]).padStart(4, '0')}-${String(parts[1]).padStart(2, '0')}-${String(parts[2]).padStart(2, '0')}`;
+            if (kind === 'date') return date;
+            const time = value.match(/(?:T|\s+)(\d{1,2}):(\d{2})(?::\d{2})?/);
+            if (!time || Number(time[1]) > 23 || Number(time[2]) > 59) return null;
+            return `${date} ${String(time[1]).padStart(2, '0')}:${time[2]}`;
+        };
+        const articleMetaDatePlaceholder = (kind) => kind === 'datetime'
+            ? t('article_meta.datetime_format', 'YYYY-MM-DD HH:MM')
+            : t('article_meta.date_format', 'YYYY-MM-DD');
+        const articleMetaDateError = (kind) => kind === 'datetime'
+            ? t('article_meta.invalid_datetime', `Use ${articleMetaDatePlaceholder(kind)}.`)
+            : t('article_meta.invalid_date', `Use ${articleMetaDatePlaceholder(kind)}.`);
         const articleMetaValue = (key, meta, cfg) => {
             const current = String(meta[key] ?? metaStore[key] ?? '').trim();
             if (current) return current;
             const fallback = String(cfg?.default_value ?? '').trim();
             if (fallback) return fallback;
             if (key === 'author') return publisherDefaultAuthor();
-            if (key === 'post_date') return formatDateForArticleMeta(new Date());
+            if (key === 'post_date') return formatDateForStorage(new Date());
             return '';
         };
         let articleMetaImages = null;
@@ -815,11 +897,15 @@
             label.textContent = labelText;
 
             const rawValue = String(value ?? '').trim();
-            const isBoolean = isArticleMetaBoolean(metaKey || key, getFieldConfig(metaKey || key), rawValue);
+            const fieldConfig = getFieldConfig(metaKey || key);
+            const dateKind = articleMetaDateKind(metaKey || key, fieldConfig);
+            const normalizedValue = dateKind ? normalizeArticleMetaDate(rawValue, dateKind) : null;
+            const isBoolean = isArticleMetaBoolean(metaKey || key, fieldConfig, rawValue);
             const input = document.createElement('input');
             input.id = `articleMeta_${key}`;
             input.name = metaKey || key;
             if (metaKey) input.dataset.metaKey = metaKey;
+            if (dateKind) input.dataset.metaDateKind = dateKind;
             if (isBoolean) {
                 input.type = 'checkbox';
                 input.checked = rawValue.toLowerCase() === 'true';
@@ -828,7 +914,30 @@
             } else {
                 input.className = 'input';
                 input.type = 'text';
-                input.value = rawValue;
+                input.value = normalizedValue === null ? rawValue : normalizedValue;
+                if (dateKind) {
+                    const placeholder = articleMetaDatePlaceholder(dateKind);
+                    input.placeholder = placeholder;
+                    input.title = placeholder;
+                    input.inputMode = 'numeric';
+                    input.maxLength = dateKind === 'datetime' ? 16 : 10;
+                    input.pattern = dateKind === 'datetime'
+                        ? '\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}'
+                        : '\\d{4}-\\d{2}-\\d{2}';
+                    if (normalizedValue === null && rawValue !== '') {
+                        input.setCustomValidity(articleMetaDateError(dateKind));
+                    }
+                    input.addEventListener('input', () => input.setCustomValidity(''));
+                    input.addEventListener('blur', () => {
+                        const normalized = normalizeArticleMetaDate(input.value, dateKind);
+                        if (normalized !== null) {
+                            input.value = normalized;
+                            input.setCustomValidity('');
+                        } else if (String(input.value || '').trim() !== '') {
+                            input.setCustomValidity(articleMetaDateError(dateKind));
+                        }
+                    });
+                }
             }
             if (readonly) {
                 input.readOnly = true;
@@ -904,13 +1013,26 @@
         const applyValues = () => {
             const { meta, body } = extractMetaAndBody(editor.value);
             const nextMeta = { ...metaStore, ...meta };
+            let invalidDateInput = null;
             fieldsEl.querySelectorAll('input[data-meta-key]').forEach((input) => {
                 if (!(input instanceof HTMLInputElement)) return;
                 const key = String(input.dataset.metaKey || '').trim().toLowerCase();
                 if (!key) return;
-                const value = input.dataset.metaBoolean === '1'
+                let value = input.dataset.metaBoolean === '1'
                     ? (input.checked ? 'True' : 'False')
                     : String(input.value || '').trim();
+                const dateKind = String(input.dataset.metaDateKind || '').trim();
+                if (dateKind && value !== '') {
+                    const normalized = normalizeArticleMetaDate(value, dateKind);
+                    if (normalized === null) {
+                        input.setCustomValidity(articleMetaDateError(dateKind));
+                        if (!invalidDateInput) invalidDateInput = input;
+                        return;
+                    }
+                    value = normalized;
+                    input.value = normalized;
+                    input.setCustomValidity('');
+                }
                 if (value === '') {
                     delete nextMeta[key];
                     explicitMetaDeletions.add(key);
@@ -919,6 +1041,11 @@
                     explicitMetaDeletions.delete(key);
                 }
             });
+            if (invalidDateInput instanceof HTMLInputElement) {
+                invalidDateInput.focus();
+                invalidDateInput.reportValidity();
+                return false;
+            }
             metaStore = nextMeta;
             const includeKeys = visibleFields();
             const block = buildMetaBlock(metaStore, includeKeys);
@@ -929,6 +1056,7 @@
             editor.dispatchEvent(new Event('input', { bubbles: true }));
             updateAppTitleFromEditor();
             closeModal();
+            return true;
         };
 
         btn.addEventListener('click', openModal);
@@ -2015,6 +2143,7 @@
         return api;
     };
     const statusHold = getStatusHold();
+    let saveInFlight = false;
     const setSaveActionActive = (active) => {
         [saveBtn, submitForProcessingBtn].forEach((control) => {
             if (control instanceof HTMLElement) control.classList.toggle('save-action-active', !!active);
@@ -2219,6 +2348,7 @@
     const ajaxSave = async () => {
         if (!(editorForm instanceof HTMLFormElement)) return;
         if (!(ta instanceof HTMLTextAreaElement)) return;
+        if (saveInFlight) return false;
         ensureEditorFormAuthFields();
         const action = editorForm.getAttribute('action') || window.location.pathname + window.location.search;
         const fd = new FormData(editorForm);
@@ -2239,6 +2369,7 @@
         }
 
         setSaveActionActive(true);
+        saveInFlight = true;
         if (status) status.textContent = t('js.save_saving', 'Saving…');
         clearSaveError();
         try {
@@ -2281,6 +2412,12 @@
             if (data && typeof data === 'object' && data.publish_state) {
                 applyPublishStateUi(data.publish_state);
             }
+            if (data && typeof data.source_revision === 'string') {
+                const revisionInput = document.getElementById('sourceRevision');
+                if (revisionInput instanceof HTMLInputElement) {
+                    revisionInput.value = data.source_revision;
+                }
+            }
             if (publishStateOverride instanceof HTMLInputElement) {
                 publishStateOverride.value = '0';
             }
@@ -2307,6 +2444,7 @@
             setSaveActionActive(false);
             return false;
         } finally {
+            saveInFlight = false;
             clearIgnoreBeforeUnload();
         }
     };

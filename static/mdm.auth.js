@@ -343,6 +343,8 @@
         } catch {}
     };
 
+    window.__mdwRefreshAuthStatus = refreshAuthStatus;
+
     const onSubmit = async () => {
         try {
             const needsSetup = !meta.has_user && !meta.has_superuser;

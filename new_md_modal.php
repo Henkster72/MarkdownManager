@@ -66,9 +66,7 @@ if (!function_exists('mdw_render_new_md_modal')) {
             $value = trim((string)($values[$key] ?? ''));
             if ($value === '') $value = trim((string)($cfg['default_value'] ?? ''));
             if ($value === '' && $key === 'author') $value = trim((string)($settings['publisher_default_author'] ?? ''));
-            if ($key === 'post_date' && $value === '' && function_exists('mdw_format_post_date_value')) {
-                $value = mdw_format_post_date_value(date('Y-m-d'), $settings['post_date_format'] ?? 'mdy_short');
-            }
+            if ($key === 'post_date' && $value === '') $value = date('Y-m-d');
             if ($key === 'active_page' && $value === '' && $defaultFolder !== 'root') $value = $defaultFolder;
             $out[] = [
                 'key' => $key,

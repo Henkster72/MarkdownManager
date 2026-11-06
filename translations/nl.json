@@ -131,7 +131,11 @@
     "field_disclaim": "Disclaimer",
     "field_published_date": "Publicatiedatum",
     "field_creationdate": "Aanmaakdatum",
-    "field_changedate": "Wijzigingsdatum"
+    "field_changedate": "Wijzigingsdatum",
+    "date_format": "JJJJ-MM-DD",
+    "datetime_format": "JJJJ-MM-DD HH:MM",
+    "invalid_date": "Gebruik JJJJ-MM-DD.",
+    "invalid_datetime": "Gebruik JJJJ-MM-DD HH:MM."
   },
   "theme": {
     "settings_title": "Instellingen",

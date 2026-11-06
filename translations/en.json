@@ -131,7 +131,11 @@
     "field_disclaim": "Disclaimer",
     "field_published_date": "Published date",
     "field_creationdate": "Creation date",
-    "field_changedate": "Changed date"
+    "field_changedate": "Changed date",
+    "date_format": "YYYY-MM-DD",
+    "datetime_format": "YYYY-MM-DD HH:MM",
+    "invalid_date": "Use YYYY-MM-DD.",
+    "invalid_datetime": "Use YYYY-MM-DD HH:MM."
   },
   "theme": {
     "settings_title": "Settings",

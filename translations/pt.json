@@ -130,7 +130,11 @@
     "field_disclaim": "Aviso",
     "field_published_date": "Data de publicação",
     "field_creationdate": "Data de criação",
-    "field_changedate": "Data de alteração"
+    "field_changedate": "Data de alteração",
+    "date_format": "AAAA-MM-DD",
+    "datetime_format": "AAAA-MM-DD HH:MM",
+    "invalid_date": "Use AAAA-MM-DD.",
+    "invalid_datetime": "Use AAAA-MM-DD HH:MM."
   },
   "theme": {
     "settings_title": "Definições",

@@ -130,7 +130,11 @@
     "field_disclaim": "Haftungsausschluss",
     "field_published_date": "Veröffentlichungsdatum",
     "field_creationdate": "Erstellungsdatum",
-    "field_changedate": "Änderungsdatum"
+    "field_changedate": "Änderungsdatum",
+    "date_format": "JJJJ-MM-TT",
+    "datetime_format": "JJJJ-MM-TT HH:MM",
+    "invalid_date": "Verwenden Sie JJJJ-MM-TT.",
+    "invalid_datetime": "Verwenden Sie JJJJ-MM-TT HH:MM."
   },
   "theme": {
     "settings_title": "Einstellungen",

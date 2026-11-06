@@ -2981,6 +2981,9 @@
 
         const saveMetadataSettings = async () => {
             try {
+                if (typeof window.__mdwRefreshAuthStatus === 'function') {
+                    await window.__mdwRefreshAuthStatus();
+                }
                 if (typeof window.__mdwIsSuperuser === 'function' && !window.__mdwIsSuperuser()) {
                     setMetaStatus(t('auth.superuser_required', 'Superuser login required.'), 'error');
                     if (typeof window.__mdwShowAuthModal === 'function') window.__mdwShowAuthModal();

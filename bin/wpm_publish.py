@@ -23,6 +23,7 @@ PUBLISHSTATE_RE = re.compile(r"^\{\s*publishstate\s*:\s*.*?\s*\}$", re.IGNORECAS
 MANAGED_TEMPLATE_RE = re.compile(r"\{#\s*mdw-managed:\s*source=([^\s#]+)\s*#\}")
 EXTENDS_RE = re.compile(r"\{%\s*extends\s+([\"'])(.*?)\1\s*%\}")
 SET_RE = re.compile(r"^\s*\{%\s*set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*%\}\s*$", re.MULTILINE)
+MARKDOWN_META_RE = re.compile(r"^\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*\}$")
 CONTENT_BLOCK_RE = re.compile(
     r"\{%\s*block\s+(content|markdown_body)\s*%\}(.*?)\{%\s*endblock(?:\s+\1)?\s*%\}",
     re.DOTALL,
@@ -34,6 +35,22 @@ PREVIEW_EXPORT_MARKERS = (
 )
 
 CURRENT_PUBLISH_FILE = ''
+
+
+def canonical_date_value(raw: str) -> str:
+    value = str(raw or '').strip()
+    if not value:
+        return value
+    for pattern in (
+        '%Y-%m-%d', '%Y/%m/%d',
+        '%b %d, %Y', '%B %d, %Y', '%b %d %Y', '%B %d %Y',
+        '%d %b %Y', '%d %B %Y',
+    ):
+        try:
+            return datetime.strptime(value, pattern).strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    return value
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -203,13 +220,29 @@ def jinja_value(value: str) -> str | None:
     return str(parsed)
 
 
-def template_to_markdown(template: Path, rel: str) -> str:
+def markdown_metadata(path: Path) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            break
+        match = MARKDOWN_META_RE.match(line.strip())
+        if match:
+            metadata[match.group(1).lower()] = match.group(2).strip()
+    return metadata
+
+
+def template_to_markdown(
+    template: Path,
+    rel: str,
+    publishstate: str = "Concept",
+    existing_metadata: dict[str, str] | None = None,
+) -> str:
     source = template.read_text(encoding="utf-8")
     body_match = CONTENT_BLOCK_RE.search(source)
     if not body_match:
         raise RuntimeError(f"managed template has no content block: {template}")
 
-    metadata: dict[str, str] = {}
+    metadata: dict[str, str] = dict(existing_metadata or {})
     extends_match = EXTENDS_RE.search(source)
     if extends_match:
         metadata["extends"] = extends_match.group(2).strip()
@@ -217,9 +250,12 @@ def template_to_markdown(template: Path, rel: str) -> str:
         key, value = match.group(1).lower(), jinja_value(match.group(2))
         if value is not None:
             metadata[key] = value
-    metadata["publishstate"] = "Concept"
+    for date_key in ('date', 'post_date', 'published_date'):
+        if date_key in metadata:
+            metadata[date_key] = canonical_date_value(metadata[date_key])
+    metadata["publishstate"] = publishstate or "Concept"
 
-    preferred = ["extends", "content_type", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author", "blog"]
+    preferred = ["extends", "content_type", "page_title", "page_subtitle", "post_date", "page_picture", "active_page", "author"]
     lines = [f"{{{key}: {metadata.pop(key)}}}" for key in preferred if metadata.get(key, "") != ""]
     lines.extend(f"{{{key}: {value}}}" for key, value in sorted(metadata.items()) if value != "")
     body = body_match.group(2).strip()
@@ -236,7 +272,12 @@ def ensure_publishable_template(template: str, rel: str) -> None:
         )
 
 
-def reconcile_templates(site_dir: Path, active_files: dict[str, Path], template_state: dict[str, object]) -> list[str]:
+def reconcile_templates(
+    site_dir: Path,
+    active_files: dict[str, Path],
+    template_state: dict[str, object],
+    editor_url: str = "",
+) -> list[str]:
     templates_root = site_dir / "templates"
     if not templates_root.is_dir():
         return []
@@ -256,17 +297,39 @@ def reconcile_templates(site_dir: Path, active_files: dict[str, Path], template_
         md_changed = digest(active_files[rel]) != old_md
         template_changed = digest(template) != old_template
         if md_changed and template_changed:
-            # A WPM Processing state is an explicit approval to publish the
-            # Markdown revision, so it takes precedence over a stale template.
-            if publish_state(active_files[rel]) == "processing":
-                continue
+            # Both sides changed since the last known-good pair.  Do not use
+            # publishstate as an implicit conflict resolver: that used to
+            # allow an older Markdown copy to win over a newer template.
             conflicts.append(rel)
             continue
         if template_changed:
-            active_files[rel].write_text(template_to_markdown(template, rel), encoding="utf-8")
-            imported.append(rel)
+            if active_files[rel].stat().st_mtime >= template.stat().st_mtime:
+                if not editor_url:
+                    raise RuntimeError(f"WPM Markdown is newer but no editor URL is configured: {rel}")
+                export_template(editor_url, rel, active_files[rel], template, site_dir)
+            else:
+                active_files[rel].write_text(
+                    template_to_markdown(
+                        template,
+                        rel,
+                        publishstate=publish_state(active_files[rel]),
+                        existing_metadata=markdown_metadata(active_files[rel]),
+                    ),
+                    encoding="utf-8",
+                )
+                imported.append(rel)
+        elif md_changed and publish_state(active_files[rel]) != "processing":
+            # Markdown is newer and not yet approved for live publication.
+            # Refresh only this managed template; the normal Processing path
+            # will export it once more when publication is explicitly approved.
+            if not editor_url:
+                raise RuntimeError(f"WPM Markdown changed but no editor URL is configured: {rel}")
+            export_template(editor_url, rel, active_files[rel], template, site_dir)
     if conflicts:
-        raise RuntimeError("WPM template conflict: " + ", ".join(sorted(conflicts)))
+        raise RuntimeError(
+            "WPM template/Markdown conflict; both changed since the last baseline, "
+            "nothing overwritten: " + ", ".join(sorted(conflicts))
+        )
     return imported
 
 
@@ -516,9 +579,15 @@ def _publish_main() -> int:
     if conflicts:
         raise RuntimeError("WPM sync conflict: " + ", ".join(conflicts))
 
-    imported = reconcile_templates(site_dir, active_files, template_state)
+    source_revisions = {rel: digest(path) for rel, path in active_files.items()}
+    imported = reconcile_templates(site_dir, active_files, template_state, editor_url)
     for rel in imported:
-        push_markdown(editor_env, active_files[rel], rel)
+        push_markdown(
+            editor_env,
+            active_files[rel],
+            rel,
+            expected_remote_digest=source_revisions.get(rel),
+        )
 
     processed: list[str] = []
     for rel, source in active_files.items():

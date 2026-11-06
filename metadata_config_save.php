@@ -2,6 +2,7 @@
 
 require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/html_preview.php';
+require_once __DIR__ . '/shared_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json(['ok' => false, 'error' => 'method_not_allowed'], 405);

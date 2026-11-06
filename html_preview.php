@@ -2587,9 +2587,71 @@ function mdw_parse_date_parts($raw) {
         $year = $yy < 70 ? (2000 + $yy) : (1900 + $yy);
         return [$year, (int)$m[2], (int)$m[3]];
     }
+    if (preg_match('/^(\\d{1,2})\s+([\p{L}.]+)\s+(\\d{4})/u', $raw, $m)) {
+        $month = mdw_date_month_number($m[2]);
+        if ($month !== null) return [(int)$m[3], $month, (int)$m[1]];
+    }
+    if (preg_match('/^([\p{L}.]+)\s+(\\d{1,2}),?\s+(\\d{4})/u', $raw, $m)) {
+        $month = mdw_date_month_number($m[1]);
+        if ($month !== null) return [(int)$m[3], $month, (int)$m[2]];
+    }
     $ts = strtotime($raw);
     if ($ts === false) return null;
     return [(int)date('Y', $ts), (int)date('n', $ts), (int)date('j', $ts)];
+}
+
+// Date-only metadata is stored canonically; localized month names belong to presentation.
+function mdw_normalize_date_iso($raw) {
+    $parts = mdw_parse_date_parts($raw);
+    if (!$parts) return null;
+    [$year, $month, $day] = $parts;
+    if (!checkdate((int)$month, (int)$day, (int)$year)) return null;
+    return sprintf('%04d-%02d-%02d', $year, $month, $day);
+}
+
+function mdw_normalize_datetime_iso($raw) {
+    $value = trim((string)$raw);
+    if ($value === '') return null;
+    if (!preg_match('/(?:T|\s+)(\d{1,2}):(\d{2})(?::\d{2})?/', $value, $m)) return null;
+    $hour = (int)$m[1];
+    $minute = (int)$m[2];
+    if ($hour > 23 || $minute > 59) return null;
+    $date = mdw_normalize_date_iso($value);
+    if ($date === null) return null;
+    return sprintf('%s %02d:%02d', $date, $hour, $minute);
+}
+
+function mdw_normalize_metadata_dates(&$meta) {
+    if (!is_array($meta)) return;
+    foreach (['date', 'post_date', 'published_date'] as $key) {
+        if (!isset($meta[$key]) || trim((string)$meta[$key]) === '') continue;
+        $normalized = mdw_normalize_date_iso($meta[$key]);
+        if ($normalized !== null) $meta[$key] = $normalized;
+    }
+    foreach (['creationdate', 'changedate'] as $key) {
+        if (!isset($meta[$key]) || trim((string)$meta[$key]) === '') continue;
+        $normalized = mdw_normalize_datetime_iso($meta[$key]);
+        if ($normalized !== null) $meta[$key] = $normalized;
+    }
+}
+
+function mdw_date_month_number($raw) {
+    $month = rtrim(strtolower(trim((string)$raw)), '.');
+    $months = [
+        'january' => 1, 'jan' => 1, 'januari' => 1,
+        'february' => 2, 'feb' => 2, 'februari' => 2,
+        'march' => 3, 'mar' => 3, 'maart' => 3, 'mrt' => 3,
+        'april' => 4, 'apr' => 4,
+        'may' => 5, 'mei' => 5,
+        'june' => 6, 'jun' => 6, 'juni' => 6,
+        'july' => 7, 'jul' => 7, 'juli' => 7,
+        'august' => 8, 'aug' => 8, 'augustus' => 8,
+        'september' => 9, 'sep' => 9,
+        'october' => 10, 'oct' => 10, 'oktober' => 10, 'okt' => 10,
+        'november' => 11, 'nov' => 11,
+        'december' => 12, 'dec' => 12,
+    ];
+    return $months[$month] ?? null;
 }
 
 function mdw_post_date_months($lang) {
@@ -2985,11 +3047,9 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
     $mdPath = isset($opts['md_path']) ? (string)$opts['md_path'] : null;
     $mappedPrefix = mdw_normalize_jinja_meta_prefix($settings['jinja_meta_prefix'] ?? 'page_');
     $exportClassPrefix = mdw_normalize_export_class_prefix($settings['export_class_prefix'] ?? '');
-    $postDateFormat = isset($settings['post_date_format']) ? trim((string)$settings['post_date_format']) : 'mdy_short';
-    if (!in_array($postDateFormat, ['mdy_short', 'dmy_long'], true)) $postDateFormat = 'mdy_short';
-
     $meta = [];
     $bodyMarkdown = mdw_hidden_meta_extract_and_remove_all((string)$rawMarkdown, $meta);
+    mdw_normalize_metadata_dates($meta);
     $jinjaImports = [];
     $jinjaDirectives = [];
     $renderMarkdown = mdw_export_protect_jinja_directives($bodyMarkdown, $jinjaImports, $jinjaDirectives);
@@ -3054,8 +3114,10 @@ function mdw_export_markdown_jinja_template($rawMarkdown, $opts = []) {
 
     $postDateValue = trim((string)($effectiveMeta['post_date'] ?? ''));
     if ($postDateValue !== '') {
-        $formattedPostDate = mdw_format_post_date_value($postDateValue, $postDateFormat);
-        $lines[] = '{% set post_date = ' . mdw_jinja_value_literal($formattedPostDate, 'double') . ' %}';
+        $canonicalPostDate = mdw_normalize_date_iso($postDateValue) ?? $postDateValue;
+        // Store the canonical ISO value in Markdown, but let the Rust renderer
+        // apply the site's configured display format at render time.
+        $lines[] = '{% set post_date = ' . mdw_jinja_value_literal($canonicalPostDate, 'double') . ' | dateformat %}';
     }
 
     $pictureValue = trim((string)($effectiveMeta['page_picture'] ?? ''));
@@ -3473,7 +3535,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
     $body = mdw_hidden_meta_extract_and_remove_all($raw, $meta);
 
     $now = date('Y-m-d H:i');
-    $today = date('y-m-d');
+    $today = date('Y-m-d');
 
     $settings = (isset($opts['settings']) && is_array($opts['settings'])) ? $opts['settings'] : mdw_metadata_settings();
     $publisherMode = !empty($settings['publisher_mode']);
@@ -3504,6 +3566,8 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
         }
     }
 
+    mdw_normalize_metadata_dates($meta);
+
     if (!$preserveOnly && (!isset($meta['date']) || trim((string)$meta['date']) === '')) {
         $fileDate = null;
         if (is_string($mdPath) && $mdPath !== '') {
@@ -3512,7 +3576,7 @@ function mdw_hidden_meta_ensure_block($raw, $mdPath = null, $opts = []) {
                 $fileDate = $m[1];
             }
         }
-        $meta['date'] = $fileDate ?: $today;
+        $meta['date'] = mdw_normalize_date_iso($fileDate) ?: $today;
     }
 
     if ($publisherMode && !$preserveOnly) {

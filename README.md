@@ -1,4 +1,4 @@
-# MarkdownManager v0.961
+# MarkdownManager v0.98
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.98: canonical WPM date storage and site-configured Jinja date formatting, localized date input masks, stale-save conflict protection, safer metadata deletion/preservation, shared-auth refreshes, and conflict-aware publisher/template reconciliation with regression coverage.
 - v0.961: visual-editor cursor/image anchoring, opt-in superuser diagnostics, Normal heading formatting, green active toolbar/save states, full-preview printing, and server-side authentication throttling.
 - v0.96: The link modal now has a PDF picker that lists PDFs from the configured instance `static_path`, displays underscore filenames with spaces, uploads PDFs into that same static folder with spaces converted to underscores, and inserts `{{document.pdf}}{:class=pdflink}` tokens for instance-specific PDF styling. Explorer focus now scrolls only inside the note pane, preventing large split-view index pages from jumping upward.
 - v0.958: WPM onboarding is now documented as a reusable project workflow. New-page WPM metadata uses translated boolean checkboxes and omits the non-WPM content field, while an empty visual preview opens the new-page modal in all supported UI languages. The minipc template sync now resolves each renderer from its instance `.env`, so sites whose instance and Jinja names differ are synchronized correctly.
@@ -86,7 +87,7 @@ Enable Website Publication Mode (WPM) in Settings to unlock publish states, meta
 
 ## Languages
 
-The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.958 extends the translated WPM workflow to empty-preview prompts and boolean metadata controls. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and normal-user workflow guides in [English](docs/USER_GUIDE_EN.md) and [Dutch](docs/GEBRUIKERSHANDLEIDING_NL.md). Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
+The UI can be switched between English, Dutch, German, French, Portuguese, Spanish, and Italian when the matching translation files are present. Version 0.98 adds localized canonical date masks and validation to the WPM metadata workflow. Version 0.958 extends the translated WPM workflow to empty-preview prompts and boolean metadata controls. Version 0.957 keeps the visual-editor and WPM workflow compatible with these language choices while hardening the preview-to-template path. Version 0.956 added clearer visual-editor formatting feedback and normal-user workflow guides in [English](docs/USER_GUIDE_EN.md) and [Dutch](docs/GEBRUIKERSHANDLEIDING_NL.md). Version 0.952 added localized find/replace actions, match feedback, and replacement confirmations.
 
 ## Security warning (read this)
 

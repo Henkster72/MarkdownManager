@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.98 — 2026-11-06
+
+- WPM save conflicts: added a canonical SHA-256 source revision to the editor form and save response. Publisher-mode saves now reject stale or missing revisions with HTTP 409 and a clear reload message instead of silently overwriting a newer Markdown file; successful saves refresh the revision used by the next request, and concurrent browser saves are serialized client-side.
+- WPM metadata preservation: visual/editor saves now respect explicit metadata deletions before restoring existing hidden values, preventing deleted metadata from reappearing during a save.
+- Canonical date storage: `date`, `post_date`, and `published_date` are normalized to `YYYY-MM-DD`, while `creationdate` and `changedate` are normalized to `YYYY-MM-DD HH:MM` without inventing or changing the stored time.
+- Date parsing: English and Dutch month names, abbreviated month names, common numeric forms, and existing ISO values are accepted during normalization; invalid dates are left available for validation rather than silently rewritten.
+- Date presentation: stored Markdown remains canonical ISO, while the editor preview continues to use the configured readable `post_date_format`. Jinja/WPM template exports now emit `post_date` as `"YYYY-MM-DD" | dateformat`, allowing each site renderer to apply its own display format without exporting localized literals.
+- New WPM pages: default `post_date` values are now created canonically as `YYYY-MM-DD` instead of using the configured presentation format as storage.
+- Article metadata input masks: date-only and datetime metadata fields, including additional superuser-selected date fields, now show localized format hints, constrain input length/patterns, normalize recognized values on blur/apply, and block invalid values before applying changes. Dutch uses `JJJJ-MM-DD` and `JJJJ-MM-DD HH:MM`; all seven supported UI languages have matching labels and validation messages.
+- WPM authentication: metadata settings refresh the shared authentication state before checking superuser access, and server-side metadata configuration saves now use the shared authentication boundary consistently.
+- WPM publisher reconciliation: newer Markdown is no longer implicitly overridden by an older template based on publish state. Managed template reconciliation now distinguishes Markdown/template conflicts, preserves existing metadata and publish state when importing template changes, sends newer Markdown back through the configured editor export path, and verifies the remote Markdown revision before pushing an imported file.
+- Regression coverage: added PHP, Python, and JavaScript tests for canonical date normalization, timestamp preservation, Jinja `dateformat` export, localized date masks, preview presentation formatting, and exports without `post_date`.
+
 ## 0.972
 
 - Visual-editor image insertion: preview caret capture now survives toolbar focus changes, inserts only at the exact mapped Markdown position, and never falls back into metadata or the document body start.

@@ -657,6 +657,7 @@ $explorerLazyEndpoint = 'index.php?json=explorer_tree';
 
 $save_error = null;
 $save_error_details = null;
+$save_conflict = false;
 $save_warning = [];
 $saved_flag = isset($_GET['saved']) ? true : false;
 $use_posted_content = false;
@@ -908,6 +909,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $existingRaw = (string)@file_get_contents($full);
                     mdw_hidden_meta_extract_and_remove_all($existingRaw, $existingMeta);
                 }
+                $postedSourceRevision = trim((string)($_POST['source_revision'] ?? ''));
+                $existingSourceRevision = hash(
+                    'sha256',
+                    str_replace(["\r\n", "\r"], "\n", $existingRaw)
+                );
+                if (!empty($MDW_PUBLISHER_MODE)
+                    && ($postedSourceRevision === ''
+                        || !hash_equals($existingSourceRevision, $postedSourceRevision))) {
+                    $save_conflict = true;
+                    $save_error = mdw_t(
+                        'flash.save_conflict',
+                        'This file changed elsewhere. Reload it before saving.'
+                    );
+                }
                 // Visual preview conversion deliberately omits hidden metadata.
                 // Keep existing keys that were absent from the submitted source;
                 // an explicitly submitted empty key may still be cleared.
@@ -1002,6 +1017,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                 if ($save_error === null) {
                     $save_ok_payload = ['ok' => true, 'publish_state' => $finalPublishState];
+                    $save_ok_payload['source_revision'] = hash(
+                        'sha256',
+                        str_replace(["\r\n", "\r"], "\n", $content)
+                    );
                     if (!empty($save_warning)) {
                         $save_ok_payload['warnings'] = array_values($save_warning);
                     }
@@ -1023,10 +1042,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         if ($mdVis) continue;
                         $hasExisting = array_key_exists($kk, $existingMeta);
                         $hasSubmitted = array_key_exists($kk, $submittedMeta);
-                        if ($hasExisting) {
-                            $metaOverrides[$kk] = (string)$existingMeta[$kk];
-                        } else if ($hasSubmitted) {
+                        if (isset($metadataDeletedKeys[$kk])) {
                             $metaOverrides[$kk] = '';
+                        } else if ($hasSubmitted) {
+                            $metaOverrides[$kk] = (string)$submittedMeta[$kk];
+                        } else if ($hasExisting) {
+                            $metaOverrides[$kk] = (string)$existingMeta[$kk];
                         }
                     }
 
@@ -1123,7 +1144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             'ok' => false,
             'error' => (string)($save_error ?: 'Save failed.'),
             'details' => $save_error_details,
-        ], 400);
+            'error_code' => $save_conflict ? 'stale_revision' : 'save_failed',
+        ], $save_conflict ? 409 : 400);
     }
 }
 /* LOAD REQUESTED FILE CONTENT */
@@ -1167,6 +1189,20 @@ if (!empty($MDW_PUBLISHER_MODE)) {
 }
 $current_publish_state_ui = ($current_publish_state === 'ToDelete') ? 'Concept' : $current_publish_state;
 $current_publish_state_lower = strtolower($current_publish_state_ui);
+
+$source_revision = '';
+if ($requested) {
+    $revision_full = mdw_safe_full_path($requested, true);
+    if ($revision_full && is_file($revision_full)) {
+        $revision_raw = @file_get_contents($revision_full);
+        if (is_string($revision_raw)) {
+            $source_revision = hash(
+                'sha256',
+                str_replace(["\r\n", "\r"], "\n", $revision_raw)
+            );
+        }
+    }
+}
 
 $rename_slug_value = '';
 $rename_prefix_value = '';
@@ -1554,6 +1590,7 @@ window.mermaid = mermaid;
                     <form method="post" class="editor-form" id="editor-form" autocomplete="off">
                         <input type="hidden" name="file" value="<?=h($requested)?>">
                         <input type="hidden" name="action" value="save">
+                        <input type="hidden" name="source_revision" id="sourceRevision" value="<?=h($source_revision)?>">
                         <?php if (!empty($MDW_PUBLISHER_MODE)): ?>
                             <input type="hidden" name="publish_state_override" id="publishStateOverride" value="0">
                         <?php endif; ?>
