@@ -914,9 +914,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     'sha256',
                     str_replace(["\r\n", "\r"], "\n", $existingRaw)
                 );
+                $metadataOnlyRevisionMismatch = false;
+                if ($postedSourceRevision !== ''
+                    && in_array($publishAction, ['submit_for_processing', 'publish'], true)
+                    && !hash_equals($existingSourceRevision, $postedSourceRevision)) {
+                    // A successful WPM save may add/update hidden metadata such as
+                    // changedate after the browser's submitted source was built.
+                    // Processing is safe when the visible/source body is unchanged;
+                    // a concurrent body edit must still remain a conflict.
+                    $existingBodyForRevision = mdw_hidden_meta_extract_and_remove_all($existingRaw);
+                    $metadataOnlyRevisionMismatch = str_replace(["\r\n", "\r"], "\n", $submittedBody)
+                        === str_replace(["\r\n", "\r"], "\n", $existingBodyForRevision);
+                }
                 if (!empty($MDW_PUBLISHER_MODE)
                     && ($postedSourceRevision === ''
-                        || !hash_equals($existingSourceRevision, $postedSourceRevision))) {
+                        || (!hash_equals($existingSourceRevision, $postedSourceRevision)
+                            && !$metadataOnlyRevisionMismatch))) {
                     $save_conflict = true;
                     $save_error = mdw_t(
                         'flash.save_conflict',
@@ -1017,10 +1030,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                 if ($save_error === null) {
                     $save_ok_payload = ['ok' => true, 'publish_state' => $finalPublishState];
-                    $save_ok_payload['source_revision'] = hash(
-                        'sha256',
-                        str_replace(["\r\n", "\r"], "\n", $content)
-                    );
                     if (!empty($save_warning)) {
                         $save_ok_payload['warnings'] = array_values($save_warning);
                     }
@@ -1077,6 +1086,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $opts['settings'] = $settingsOverride;
                     }
                         $content = mdw_hidden_meta_ensure_block($content, $san, $opts);
+                        // Hash the exact content that will be written, including
+                        // server-managed metadata such as changedate.
+                        $save_ok_payload['source_revision'] = hash(
+                            'sha256',
+                            str_replace(["\r\n", "\r"], "\n", $content)
+                        );
 
                         $parentDir = dirname($full);
                         $dirWritable = is_dir($parentDir) && is_writable($parentDir);
