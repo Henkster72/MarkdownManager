@@ -544,6 +544,7 @@
   },
   "flash": {
     "csrf_invalid": "Ongeldige sessie (CSRF). Herlaad de pagina.",
+    "save_conflict": "Dit bestand is intussen elders gewijzigd. Herlaad het voordat je opslaat.",
     "invalid_file_path": "Ongeldig bestandspad.",
     "secret_locked": "Geheime notitie is vergrendeld. Ontgrendel eerst via de viewer.",
     "delete_marked_processing_prefix": "Gemarkeerd voor verwijdering:",

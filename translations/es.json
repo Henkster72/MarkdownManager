@@ -545,6 +545,7 @@
   },
   "flash": {
     "csrf_invalid": "Sesión no válida (CSRF). Recarga la página.",
+    "save_conflict": "Este archivo ha cambiado en otro lugar. Vuelve a cargarlo antes de guardarlo.",
     "invalid_file_path": "Ruta de archivo no válida.",
     "secret_locked": "La nota secreta está bloqueada. Desbloquéala primero desde el visor.",
     "delete_marked_processing_prefix": "Marcado para eliminar:",

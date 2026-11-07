@@ -553,6 +553,7 @@
   },
   "flash": {
     "csrf_invalid": "Invalid session (CSRF). Reload the page.",
+    "save_conflict": "This file changed elsewhere. Reload it before saving.",
     "invalid_file_path": "Invalid file path.",
     "secret_locked": "Secret note is locked. Unlock first via the viewer.",
     "delete_marked_processing_prefix": "Marked for deletion:",

@@ -537,6 +537,7 @@
   },
   "flash": {
     "csrf_invalid": "Session invalide (CSRF). Rechargez la page.",
+    "save_conflict": "Ce fichier a été modifié ailleurs. Rechargez-le avant de l’enregistrer.",
     "invalid_file_path": "Chemin de fichier invalide.",
     "secret_locked": "La note secrète est verrouillée. Déverrouillez d'abord via la visionneuse.",
     "delete_marked_processing_prefix": "Marqué pour suppression :",

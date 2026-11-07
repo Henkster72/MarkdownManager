@@ -537,6 +537,7 @@
   },
   "flash": {
     "csrf_invalid": "Ungültige Sitzung (CSRF). Seite neu laden.",
+    "save_conflict": "Diese Datei wurde inzwischen an anderer Stelle geändert. Laden Sie sie vor dem Speichern neu.",
     "invalid_file_path": "Ungültiger Dateipfad.",
     "secret_locked": "Geheime Notiz ist gesperrt. Zuerst über den Viewer entsperren.",
     "delete_marked_processing_prefix": "Zur Löschung vorgemerkt:",
