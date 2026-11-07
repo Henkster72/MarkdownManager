@@ -914,6 +914,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     'sha256',
                     str_replace(["\r\n", "\r"], "\n", $existingRaw)
                 );
+                // In WPM mode a verified superuser may deliberately overwrite a
+                // newer revision, including when forcing a page into processing.
+                $superuserRevisionOverride = !empty($MDW_PUBLISHER_MODE) && $authIsSuperuser;
                 $metadataOnlyRevisionMismatch = false;
                 if ($postedSourceRevision !== ''
                     && in_array($publishAction, ['submit_for_processing', 'publish'], true)
@@ -927,6 +930,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         === str_replace(["\r\n", "\r"], "\n", $existingBodyForRevision);
                 }
                 if (!empty($MDW_PUBLISHER_MODE)
+                    && !$superuserRevisionOverride
                     && ($postedSourceRevision === ''
                         || (!hash_equals($existingSourceRevision, $postedSourceRevision)
                             && !$metadataOnlyRevisionMismatch))) {
