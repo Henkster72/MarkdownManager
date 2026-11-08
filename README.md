@@ -1,4 +1,4 @@
-# MarkdownManager v0.98
+# MarkdownManager v0.981
 
 ![MarkdownManager screenshot](markdownmanager.png)
 
@@ -7,6 +7,7 @@ MarkdownManager is a fast, flat-file Markdown editor you can host yourself. No d
 Use it as a simple notebook, or flip on Website Publication Mode (WPM) to run a lightweight CMS workflow with publish states, metadata, and HTML export.
 
 Recent updates:
+- v0.981: WPM save revisions now stay current after metadata updates, stale-save messages are localized, and verified superusers can deliberately override newer revisions in publisher mode.
 - v0.98: canonical WPM date storage and site-configured Jinja date formatting, localized date input masks, stale-save conflict protection, safer metadata deletion/preservation, shared-auth refreshes, and conflict-aware publisher/template reconciliation with regression coverage.
 - v0.961: visual-editor cursor/image anchoring, opt-in superuser diagnostics, Normal heading formatting, green active toolbar/save states, full-preview printing, and server-side authentication throttling.
 - v0.96: The link modal now has a PDF picker that lists PDFs from the configured instance `static_path`, displays underscore filenames with spaces, uploads PDFs into that same static folder with spaces converted to underscores, and inserts `{{document.pdf}}{:class=pdflink}` tokens for instance-specific PDF styling. Explorer focus now scrolls only inside the note pane, preventing large split-view index pages from jumping upward.

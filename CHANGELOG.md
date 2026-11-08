@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.981 — 2026-11-08
+
+- WPM stale-save protection: editor forms now carry a canonical SHA-256 revision of the loaded Markdown, and publisher-mode saves reject a genuinely newer or missing revision with HTTP 409 instead of silently overwriting another user's work. The save response returns the revision of the content that was actually written, so the next action starts from the correct server state.
+- WPM save/process workflow: server-managed metadata updates, including `changedate`, no longer leave the browser with an obsolete source revision after a successful save. Submitting or publishing content whose body is unchanged but whose hidden metadata changed is handled as the same user save rather than as a false concurrent-edit conflict.
+- WPM superuser control: authenticated superusers in publisher mode may deliberately override a newer source revision when they explicitly save, submit for processing, or publish. Regular users retain the concurrent-edit safeguard, and the override remains behind the verified WPM superuser boundary.
+- WPM conflict messaging: the stale-save message is now translated in all seven supported interface languages, including the Dutch message “Dit bestand is intussen elders gewijzigd. Herlaad het voordat je opslaat.” instead of falling back to English.
+- Regression safety: the editor keeps real concurrent body changes protected while allowing the intended save-then-process workflow to continue without a false revision error.
+
 ## 0.98 — 2026-11-06
 
 - WPM save conflicts: added a canonical SHA-256 source revision to the editor form and save response. Publisher-mode saves now reject stale or missing revisions with HTTP 409 and a clear reload message instead of silently overwriting a newer Markdown file; successful saves refresh the revision used by the next request, and concurrent browser saves are serialized client-side.
